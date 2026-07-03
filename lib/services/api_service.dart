@@ -90,4 +90,18 @@ class ApiService {
     }
     return null;
   }
+
+  /// Fetches admin-curated signal picks with live price/% change.
+  static Future<List<Map<String, dynamic>>> getSignals() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/signals'),
+      headers: _headers(),
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final list = data['signals'] as List<dynamic>? ?? [];
+      return list.cast<Map<String, dynamic>>();
+    }
+    return [];
+  }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'home_tab.dart';
+import 'signals_tab.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -13,7 +14,7 @@ class _HomeShellState extends State<HomeShell> {
 
   static const _tabs = [
     HomeTab(),
-    _ComingSoonTab(label: 'Signals'),
+    SignalsTab(),
     _ComingSoonTab(label: 'Insights'),
     _ComingSoonTab(label: 'Learn'),
   ];
