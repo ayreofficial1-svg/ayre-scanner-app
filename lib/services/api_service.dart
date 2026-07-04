@@ -6,7 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// session-cookie auth (Flask sets a cookie on login; we store it
 /// and re-attach it on every request).
 class ApiService {
-  static const String baseUrl = 'https://ayre-scanner-production.up.railway.app';
+  static const String baseUrl =
+      'https://ayre-scanner-production.up.railway.app';
 
   static String? _cookie;
 
@@ -72,10 +73,7 @@ class ApiService {
   }
 
   static Future<void> logout() async {
-    await http.post(
-      Uri.parse('$baseUrl/api/auth/logout'),
-      headers: _headers(),
-    );
+    await http.post(Uri.parse('$baseUrl/api/auth/logout'), headers: _headers());
     await _saveCookie(null);
   }
 
@@ -103,5 +101,18 @@ class ApiService {
       return list.cast<Map<String, dynamic>>();
     }
     return [];
+  }
+
+  /// Fetches the current placeholder market-sentiment value (0-100 scale)
+  /// for the Insights tab gauge.
+  static Future<Map<String, dynamic>?> getSentiment() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/sentiment'),
+      headers: _headers(),
+    );
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body) as Map<String, dynamic>;
+    }
+    return null;
   }
 }
