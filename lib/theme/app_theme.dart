@@ -161,10 +161,10 @@ abstract final class AppSpacing {
 }
 
 abstract final class AppRadius {
-  static const double sm = 14;
-  static const double md = 18;
-  static const double lg = 28;
-  static const double xl = 36;
+  static const double sm = 16;
+  static const double md = 22;
+  static const double lg = 30;
+  static const double xl = 42;
   static const double pill = 999;
 }
 
@@ -182,47 +182,48 @@ abstract final class AppMotion {
 
 abstract final class AppGradients {
   static LinearGradient primaryShifted(AppThemeTokens tokens) => LinearGradient(
-        colors: [tokens.primary, tokens.accentCool],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
+    colors: [tokens.primary, tokens.accentCool],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
-  static LinearGradient positiveShifted(AppThemeTokens tokens) => LinearGradient(
+  static LinearGradient positiveShifted(AppThemeTokens tokens) =>
+      LinearGradient(
         colors: [tokens.positive, tokens.accentMint],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       );
 
   static LinearGradient warmShifted(AppThemeTokens tokens) => LinearGradient(
-        colors: [tokens.accentWarm, tokens.accentMint],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
+    colors: [tokens.accentWarm, tokens.accentMint],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   static LinearGradient surfaceGlass(AppThemeTokens tokens) => LinearGradient(
-        colors: [tokens.surface, tokens.surfaceAlt],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
+    colors: [tokens.surface, tokens.surfaceAlt],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 }
 
 abstract final class AppTheme {
   static const Color transparent = Color(0x00000000);
 
   static const _darkTokens = AppThemeTokens(
-    background: Color(0xFF0E110F),
-    backgroundTint: Color(0xFF151A18),
-    surface: Color(0xFF1D2422),
-    surfaceAlt: Color(0xFF252C2A),
-    surfaceRaised: Color(0xFF222926),
-    primary: Color(0xFF38D686),
-    positive: Color(0xFF2AC573),
-    negative: Color(0xFFF75A55),
-    accentWarm: Color(0xFFF9B84E),
-    accentCool: Color(0xFF5AC8FA),
-    accentMint: Color(0xFF4CD9A5),
-    neutralBlock: Color(0xFF111815),
-    onPrimary: Color(0xFF02180D),
+    background: Color(0xFF101711),
+    backgroundTint: Color(0xFF19251E),
+    surface: Color(0xFF202B25),
+    surfaceAlt: Color(0xFF2A352F),
+    surfaceRaised: Color(0xFF2F3B34),
+    primary: Color(0xFF5CE59C),
+    positive: Color(0xFF51D987),
+    negative: Color(0xFFFF6B78),
+    accentWarm: Color(0xFFFFC456),
+    accentCool: Color(0xFF7CCFFF),
+    accentMint: Color(0xFF77E6C4),
+    neutralBlock: Color(0xFF151C20),
+    onPrimary: Color(0xFF052012),
     onPositive: Color(0xFFFFFFFF),
     onNegative: Color(0xFFFFFFFF),
     onAccentWarm: Color(0xFF1A1208),
@@ -238,18 +239,18 @@ abstract final class AppTheme {
   );
 
   static const _lightTokens = AppThemeTokens(
-    background: Color(0xFFFCF8F2),
-    backgroundTint: Color(0xFFF7F1E8),
+    background: Color(0xFFFFF4F8),
+    backgroundTint: Color(0xFFFFF6D8),
     surface: Color(0xFFFFFFFF),
-    surfaceAlt: Color(0xFFF2EBE2),
-    surfaceRaised: Color(0xFFFAF5EF),
-    primary: Color(0xFF2CB366),
-    positive: Color(0xFF36B366),
-    negative: Color(0xFFFF6B60),
-    accentWarm: Color(0xFFF7AD39),
-    accentCool: Color(0xFF57B5D6),
-    accentMint: Color(0xFF48D197),
-    neutralBlock: Color(0xFF232A26),
+    surfaceAlt: Color(0xFFFFF2EA),
+    surfaceRaised: Color(0xFFFFFCF3),
+    primary: Color(0xFF239D78),
+    positive: Color(0xFF23B36A),
+    negative: Color(0xFFFF5F73),
+    accentWarm: Color(0xFFFFBD45),
+    accentCool: Color(0xFF5CAFD7),
+    accentMint: Color(0xFF55DCA3),
+    neutralBlock: Color(0xFF24333B),
     onPrimary: Color(0xFFFFFFFF),
     onPositive: Color(0xFFFFFFFF),
     onNegative: Color(0xFF150A09),
@@ -260,9 +261,9 @@ abstract final class AppTheme {
     textPrimary: Color(0xFF1D1F1C),
     textSecondary: Color(0xFF6E716D),
     textDisabled: Color(0xFFA8ACA6),
-    border: Color(0xFFE2D9CB),
-    shadow: Color(0x28171716),
-    shadowLg: Color(0x44171716),
+    border: Color(0xFFEEDFCC),
+    shadow: Color(0x24171716),
+    shadowLg: Color(0x38171716),
   );
 
   static ThemeData get dark => _build(Brightness.dark, _darkTokens);
@@ -293,10 +294,35 @@ abstract final class AppTheme {
       fontFamily: 'Roboto',
     );
 
-    final textTheme = base.textTheme.apply(
-      bodyColor: tokens.textPrimary,
-      displayColor: tokens.textPrimary,
-    );
+    final textTheme = base.textTheme
+        .apply(bodyColor: tokens.textPrimary, displayColor: tokens.textPrimary)
+        .copyWith(
+          displaySmall: base.textTheme.displaySmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
+            height: 1.04,
+          ),
+          headlineMedium: base.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
+            height: 1.08,
+          ),
+          headlineSmall: base.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
+            height: 1.1,
+          ),
+          titleLarge: base.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w900,
+            letterSpacing: 0,
+            height: 1.12,
+          ),
+          titleMedium: base.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0,
+          ),
+          bodyMedium: base.textTheme.bodyMedium?.copyWith(height: 1.35),
+        );
 
     return base.copyWith(
       textTheme: textTheme,

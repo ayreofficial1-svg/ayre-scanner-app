@@ -1,6 +1,9 @@
 import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+
 import '../theme/app_theme.dart';
+import '../widgets/premium_widgets.dart';
 
 class AyreSplashScreen extends StatefulWidget {
   const AyreSplashScreen({super.key, required this.onFinished});
@@ -13,68 +16,53 @@ class AyreSplashScreen extends StatefulWidget {
 
 class _AyreSplashScreenState extends State<AyreSplashScreen>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _ctrl;
-  late final Animation<double> _logoScale;
-  late final Animation<double> _fadeIn;
-  late final Animation<double> _fadeOut;
+  late final AnimationController _controller;
+  late final Animation<double> _intro;
+  late final Animation<double> _exit;
 
   @override
   void initState() {
     super.initState();
-    _ctrl = AnimationController(
-      duration: AppMotion.splash,
-      vsync: this,
+    _controller = AnimationController(vsync: this, duration: AppMotion.splash);
+    _intro = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0, 0.66, curve: Curves.easeOutBack),
     );
-
-    _logoScale = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.3, end: 1.08), weight: 60),
-      TweenSequenceItem(tween: Tween(begin: 1.08, end: 1.0), weight: 40),
-    ]).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOutCubic),
+    _exit = Tween<double>(begin: 1, end: 0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.78, 1, curve: Curves.easeInCubic),
+      ),
     );
-
-    _fadeIn = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: const Interval(0.0, 0.4)),
-    );
-
-    _fadeOut = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: const Interval(0.6, 1.0)),
-    );
-
-    _ctrl.forward().then((_) {
+    _controller.forward().then((_) {
       if (mounted) widget.onFinished();
     });
   }
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final size = MediaQuery.sizeOf(context);
-    final shortest = math.min(size.width, size.height);
-
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [tokens.background, tokens.backgroundTint],
-          ),
-        ),
+      body: PremiumScaffold(
         child: Center(
           child: AnimatedBuilder(
-            animation: _ctrl,
-            child: _LogoContent(tokens: tokens, shortest: shortest),
-            builder: (context, child) {
+            animation: _controller,
+            builder: (context, _) {
               return Opacity(
-                opacity: _fadeIn.value * _fadeOut.value,
-                child: Transform.scale(scale: _logoScale.value, child: child),
+                opacity: _exit.value,
+                child: Transform.scale(
+                  scale: 0.72 + _intro.value * 0.28,
+                  child: _SplashMark(
+                    tokens: tokens,
+                    rotation: _controller.value * math.pi * 2,
+                  ),
+                ),
               );
             },
           ),
@@ -84,56 +72,114 @@ class _AyreSplashScreenState extends State<AyreSplashScreen>
   }
 }
 
-class _LogoContent extends StatelessWidget {
-  const _LogoContent({required this.tokens, required this.shortest});
+class _SplashMark extends StatelessWidget {
+  const _SplashMark({required this.tokens, required this.rotation});
 
   final AppThemeTokens tokens;
-  final double shortest;
+  final double rotation;
 
   @override
   Widget build(BuildContext context) {
-    final logoSize = shortest * 0.26;
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: logoSize,
-          height: logoSize,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              colors: [tokens.primary, tokens.accentCool],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: tokens.primary.withValues(alpha: 0.4),
-                blurRadius: 32,
-                spreadRadius: 6,
+        SizedBox(
+          height: 172,
+          width: 172,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Transform.rotate(
+                angle: rotation,
+                child: Container(
+                  height: 168,
+                  width: 168,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: SweepGradient(
+                      colors: [
+                        tokens.accentWarm,
+                        tokens.primary,
+                        tokens.accentCool,
+                        tokens.accentWarm,
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: tokens.primary.withValues(alpha: 0.34),
+                        blurRadius: 42,
+                        offset: const Offset(0, 18),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Container(
+                height: 126,
+                width: 126,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: tokens.surface,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    width: 2,
+                  ),
+                ),
+                child: Icon(
+                  Icons.radar_rounded,
+                  color: tokens.primary,
+                  size: 58,
+                ),
+              ),
+              Positioned(
+                right: 12,
+                top: 20,
+                child: Container(
+                  height: 34,
+                  width: 34,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: tokens.accentWarm,
+                  ),
+                ),
+              ),
+              Positioned(
+                left: 18,
+                bottom: 18,
+                child: Container(
+                  height: 24,
+                  width: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: tokens.accentCool,
+                  ),
+                ),
               ),
             ],
           ),
-          child: Icon(Icons.radar_rounded, color: tokens.onPrimary, size: logoSize * 0.55),
         ),
         const SizedBox(height: 28),
         Text(
           'Ayre Scanner',
-          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: tokens.textPrimary,
-                fontWeight: FontWeight.w900,
-                letterSpacing: -0.5,
-              ),
+          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: tokens.textPrimary,
+          ),
         ),
-        const SizedBox(height: 6),
-        Text(
-          'Market Intelligence',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: tokens.textSecondary,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 1.2,
-              ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+          decoration: BoxDecoration(
+            color: tokens.neutralBlock,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+          ),
+          child: Text(
+            'Market Intelligence',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: tokens.onNeutralBlock,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ),
       ],
     );

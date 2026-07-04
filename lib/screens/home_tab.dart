@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/premium_widgets.dart';
+import '../widgets/pressable_scale.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key, this.onProfileMenuRequested});
@@ -25,13 +27,9 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _loadData() async {
-    if (mounted && !_loading) {
-      setState(() => _refreshing = true);
-    }
-
+    if (mounted && !_loading) setState(() => _refreshing = true);
     final session = await ApiService.getSession();
     final market = await ApiService.getMarket();
-
     if (!mounted) return;
     setState(() {
       _displayName = session?['display_name'] ?? session?['username'] ?? '';
@@ -44,19 +42,10 @@ class _HomeTabState extends State<HomeTab> {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
+    if (_loading) return const PremiumLoader(label: 'Opening scanner');
 
-    if (_loading) {
-      return const _HomeLoading();
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [tokens.background, tokens.backgroundTint],
-        ),
-      ),
+    return PremiumScaffold(
+      bottomSafe: false,
       child: Stack(
         children: [
           RefreshIndicator(
@@ -64,71 +53,38 @@ class _HomeTabState extends State<HomeTab> {
             backgroundColor: tokens.surface,
             onRefresh: _loadData,
             child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.lg,
-                AppSpacing.md,
-                AppSpacing.xl + 104,
+              physics: const AlwaysScrollableScrollPhysics(
+                parent: BouncingScrollPhysics(),
               ),
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 124),
               children: [
-                _HomeHeader(
-                  displayName: _displayName,
-                  onProfileTap: () {
-                    widget.onProfileMenuRequested?.call(_displayName);
-                  },
+                AnimatedEntrance(
+                  child: _HomeHeader(
+                    displayName: _displayName,
+                    onProfileTap: () =>
+                        widget.onProfileMenuRequested?.call(_displayName),
+                  ),
                 ),
-                const SizedBox(height: AppSpacing.xl),
-                _TodayBoard(market: _market),
-                const SizedBox(height: AppSpacing.md),
-                const _ReadyThisWeekCard(),
+                const SizedBox(height: 18),
+                AnimatedEntrance(
+                  delay: const Duration(milliseconds: 80),
+                  child: _HeroBoard(market: _market),
+                ),
+                const SizedBox(height: 16),
+                const AnimatedEntrance(
+                  delay: Duration(milliseconds: 130),
+                  child: _SignalReadinessCard(),
+                ),
+                const SizedBox(height: 16),
+                AnimatedEntrance(
+                  delay: const Duration(milliseconds: 170),
+                  child: _MarketTiles(market: _market),
+                ),
               ],
             ),
           ),
           if (_refreshing) _RefreshRibbon(tokens: tokens),
         ],
-      ),
-    );
-  }
-}
-
-class _HomeLoading extends StatelessWidget {
-  const _HomeLoading();
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [tokens.background, tokens.backgroundTint],
-        ),
-      ),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          decoration: BoxDecoration(
-            color: tokens.surface,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: tokens.shadow,
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: SizedBox(
-            height: 28,
-            width: 28,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.5,
-              color: tokens.primary,
-            ),
-          ),
-        ),
       ),
     );
   }
@@ -144,200 +100,246 @@ class _HomeHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     final name = displayName.isEmpty ? 'Raghav' : displayName;
-
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _ProfileAvatar(name: name, onTap: onProfileTap),
-        const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Ayre Scanner',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: tokens.primary,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.3,
-                    ),
+                'Hi, $name',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: tokens.textSecondary,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-              const SizedBox(height: AppSpacing.xs),
+              const SizedBox(height: 4),
               Text(
-                "Hi $name, here's what we have for you today",
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      height: 1.2,
-                      letterSpacing: -0.3,
-                    ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Fresh market context and swing-trade readiness at a glance.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: tokens.textSecondary,
-                      height: 1.35,
-                      fontWeight: FontWeight.w500,
-                    ),
+                'Scanner plan',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: tokens.textPrimary,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ],
           ),
+        ),
+        GlassCircleButton(
+          icon: Icons.notifications_rounded,
+          size: 48,
+          color: tokens.surface,
+        ),
+        const SizedBox(width: 10),
+        GestureDetector(
+          onTap: onProfileTap,
+          child: _AvatarBadge(name: name),
         ),
       ],
     );
   }
 }
 
-class _ProfileAvatar extends StatefulWidget {
-  const _ProfileAvatar({required this.name, required this.onTap});
-
-  final String name;
-  final VoidCallback onTap;
-
-  @override
-  State<_ProfileAvatar> createState() => _ProfileAvatarState();
-}
-
-class _ProfileAvatarState extends State<_ProfileAvatar> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final initial =
-        widget.name.trim().isEmpty ? 'R' : widget.name.trim()[0].toUpperCase();
-
-    return Semantics(
-      button: true,
-      label: 'Open profile menu',
-      child: GestureDetector(
-        onTap: widget.onTap,
-        onTapDown: (_) => setState(() => _pressed = true),
-        onTapUp: (_) => setState(() => _pressed = false),
-        onTapCancel: () => setState(() => _pressed = false),
-        child: AnimatedScale(
-          scale: _pressed ? 0.92 : 1.0,
-          duration: AppMotion.fast,
-          curve: AppMotion.ease,
-          child: Container(
-            height: 50,
-            width: 50,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: AppGradients.primaryShifted(tokens),
-              boxShadow: [
-                BoxShadow(
-                  color: tokens.primary.withValues(alpha: 0.35),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              initial,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: tokens.onPrimary,
-                    fontWeight: FontWeight.w900,
-                  ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TodayBoard extends StatelessWidget {
-  const _TodayBoard({required this.market});
+class _HeroBoard extends StatelessWidget {
+  const _HeroBoard({required this.market});
 
   final Map<String, dynamic>? market;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-
-    return _HomePanel(
-      title: "Today's Board",
-      fillColor: tokens.neutralBlock,
-      foregroundColor: tokens.onNeutralBlock,
-      trailing: Icon(Icons.auto_graph_rounded, color: tokens.primary),
-      child: market == null
-          ? Text(
-              'Market data unavailable',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: tokens.textSecondary),
-            )
-          : Row(
-              children: [
-                Expanded(
-                  child: _TrendCard(
-                    label: 'NIFTY 50',
-                    data: _marketValue('nifty'),
+    final nifty = _marketValue('nifty');
+    final score = _scoreFrom(nifty);
+    return PremiumCard(
+      radius: 46,
+      padding: EdgeInsets.zero,
+      gradient: LinearGradient(
+        colors: [
+          tokens.accentWarm,
+          Color.lerp(tokens.accentWarm, tokens.accentMint, 0.52)!,
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      shadowColor: tokens.accentWarm.withValues(alpha: 0.34),
+      child: SizedBox(
+        height: 308,
+        child: Stack(
+          children: [
+            Positioned(
+              top: -76,
+              right: -38,
+              child: Container(
+                height: 190,
+                width: 190,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.18),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -82,
+              left: -42,
+              child: Container(
+                height: 210,
+                width: 210,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: tokens.primary.withValues(alpha: 0.58),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      _SoftPill(
+                        label: 'Live market',
+                        icon: Icons.bolt_rounded,
+                        background: tokens.neutralBlock,
+                        foreground: tokens.onNeutralBlock,
+                      ),
+                      const Spacer(),
+                      GlassCircleButton(
+                        icon: Icons.auto_graph_rounded,
+                        size: 44,
+                        color: Colors.white.withValues(alpha: 0.32),
+                        iconColor: tokens.onAccentWarm,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 26),
+                  Text(
+                    '$score%',
+                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                      color: tokens.onAccentWarm,
+                      fontSize: 62,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  Text(
+                    'Momentum quality',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: tokens.onAccentWarm.withValues(alpha: 0.76),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const Spacer(),
+                  Sparkline(
+                    color: tokens.onAccentWarm.withValues(alpha: 0.9),
+                    height: 76,
+                  ),
+                ],
+              ),
+            ),
+            Positioned(
+              right: 24,
+              bottom: 84,
+              child: FloatingOrb(
+                distance: 6,
+                child: Container(
+                  height: 74,
+                  width: 74,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: tokens.neutralBlock,
+                    boxShadow: [
+                      BoxShadow(
+                        color: tokens.shadowLg.withValues(alpha: 0.36),
+                        blurRadius: 22,
+                        offset: const Offset(0, 12),
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    _displayChange(nifty),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: tokens.onNeutralBlock,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: _TrendCard(
-                    label: 'SENSEX',
-                    data: _marketValue('sensex'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  dynamic _marketValue(String key) =>
+      market?[key] ?? market?[key.toUpperCase()];
+}
+
+class _SignalReadinessCard extends StatelessWidget {
+  const _SignalReadinessCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return PremiumCard(
+      gradient: LinearGradient(
+        colors: [
+          tokens.neutralBlock,
+          Color.lerp(tokens.neutralBlock, tokens.accentCool, 0.14)!,
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      child: Row(
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                height: 76,
+                width: 76,
+                child: CircularProgressIndicator(
+                  value: 0.78,
+                  strokeWidth: 9,
+                  color: tokens.primary,
+                  backgroundColor: tokens.onNeutralBlock.withValues(
+                    alpha: 0.12,
+                  ),
+                  strokeCap: StrokeCap.round,
+                ),
+              ),
+              Text(
+                '78%',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: tokens.onNeutralBlock,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Trade readiness',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: tokens.onNeutralBlock,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Fresh setups, breadth context, and risk checkpoints are staged for review.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: tokens.onNeutralBlock.withValues(alpha: 0.72),
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
-    );
-  }
-
-  dynamic _marketValue(String key) {
-    if (market == null) return null;
-    return market![key] ?? market![key.toUpperCase()];
-  }
-}
-
-class _ReadyThisWeekCard extends StatelessWidget {
-  const _ReadyThisWeekCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-
-    return _HomePanel(
-      title: 'Ready This Week',
-      fillColor: tokens.accentWarm,
-      foregroundColor: tokens.onAccentWarm,
-      trailing: Icon(Icons.event_available_rounded, color: tokens.onAccentWarm),
-      child: Row(
-        children: [
-          Container(
-            height: 52,
-            width: 52,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  tokens.positive,
-                  tokens.accentMint,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(Icons.trending_up_rounded,
-                color: Color(0xFFFFFFFF), size: 26),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              'Open Signals when you want the latest curated setups.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: tokens.onAccentWarm,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                  ),
-            ),
           ),
         ],
       ),
@@ -345,219 +347,168 @@ class _ReadyThisWeekCard extends StatelessWidget {
   }
 }
 
-class _HomePanel extends StatelessWidget {
-  const _HomePanel({
-    required this.title,
-    required this.fillColor,
-    required this.foregroundColor,
-    required this.trailing,
-    required this.child,
-  });
+class _MarketTiles extends StatelessWidget {
+  const _MarketTiles({required this.market});
 
-  final String title;
-  final Color fillColor;
-  final Color foregroundColor;
-  final Widget trailing;
-  final Widget child;
+  final Map<String, dynamic>? market;
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: fillColor,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        boxShadow: [
-          BoxShadow(
-            color: tokens.shadowLg.withValues(alpha: isDark ? 0.45 : 0.25),
-            blurRadius: 32,
-            offset: const Offset(0, 12),
-          ),
-          BoxShadow(
-            color: tokens.shadow.withValues(alpha: isDark ? 0.25 : 0.12),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppRadius.lg),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: foregroundColor,
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  trailing,
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md + 2),
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.zero,
-                decoration: BoxDecoration(
-                  color:
-                      foregroundColor.withValues(alpha: isDark ? 0.08 : 0.12),
-                  borderRadius: BorderRadius.circular(AppRadius.md),
-                ),
-                child: child,
-              ),
-            ],
+    return Row(
+      children: [
+        Expanded(
+          child: _MarketTile(
+            label: 'NIFTY 50',
+            data: _marketValue('nifty'),
+            tone: _TileTone.mint,
           ),
         ),
-      ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: _MarketTile(
+            label: 'SENSEX',
+            data: _marketValue('sensex'),
+            tone: _TileTone.cool,
+          ),
+        ),
+      ],
     );
   }
+
+  dynamic _marketValue(String key) =>
+      market?[key] ?? market?[key.toUpperCase()];
 }
 
-class _TrendCard extends StatelessWidget {
-  const _TrendCard({required this.label, required this.data});
+class _MarketTile extends StatelessWidget {
+  const _MarketTile({
+    required this.label,
+    required this.data,
+    required this.tone,
+  });
 
   final String label;
   final dynamic data;
+  final _TileTone tone;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final trend = _trendFromData(data);
-    final value = _displayValue(data);
-    final change = _displayChange(data);
+    final fill = tone == _TileTone.mint ? tokens.accentMint : tokens.accentCool;
+    return PressableScale(
+      child: PremiumCard(
+        radius: 34,
+        padding: const EdgeInsets.all(18),
+        color: fill,
+        shadowColor: fill.withValues(alpha: 0.3),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.show_chart_rounded,
+              color: Colors.black.withValues(alpha: 0.58),
+              size: 28,
+            ),
+            const SizedBox(height: 18),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: Colors.black.withValues(alpha: 0.62),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              _displayValue(data),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: Colors.black.withValues(alpha: 0.78),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
-    final colors = switch (trend) {
-      _Trend.up => _TrendColors(
-          bg: tokens.positive,
-          fg: tokens.onPositive,
-        ),
-      _Trend.down => _TrendColors(
-          bg: tokens.negative,
-          fg: tokens.onNegative,
-        ),
-      _Trend.flat => _TrendColors(
-          bg: tokens.accentWarm,
-          fg: tokens.onAccentWarm,
-        ),
-    };
+class _AvatarBadge extends StatelessWidget {
+  const _AvatarBadge({required this.name});
 
+  final String name;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final initial = name.trim().isEmpty ? 'R' : name.trim()[0].toUpperCase();
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      height: 52,
+      width: 52,
       decoration: BoxDecoration(
-        color: colors.bg,
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        shape: BoxShape.circle,
+        gradient: AppGradients.primaryShifted(tokens),
+        border: Border.all(color: Colors.white, width: 3),
         boxShadow: [
           BoxShadow(
-            color: colors.bg.withValues(alpha: 0.35),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+            color: tokens.primary.withValues(alpha: 0.34),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: tokens.onPrimary,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _SoftPill extends StatelessWidget {
+  const _SoftPill({
+    required this.label,
+    required this.icon,
+    required this.background,
+    required this.foreground,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 9, 16, 9),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          Icon(icon, color: foreground, size: 16),
+          const SizedBox(width: 7),
           Text(
             label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: colors.fg,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.3,
-                ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: colors.fg,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
-                ),
-          ),
-          const SizedBox(height: AppSpacing.xxs + 1),
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xs,
-              vertical: 2,
-            ),
-            decoration: BoxDecoration(
-              color: colors.fg.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: Text(
-              change,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colors.fg,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 11,
-                  ),
+              color: foreground,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],
       ),
     );
   }
-
-  String _displayValue(dynamic raw) {
-    final price = _numFrom(raw, const ['last_price', 'price', 'value', 'ltp']);
-    if (price != null) return price.toStringAsFixed(2);
-    return raw?.toString() ?? '--';
-  }
-
-  String _displayChange(dynamic raw) {
-    final change = _numFrom(raw, const [
-      'change_pct',
-      'percent_change',
-      'change',
-    ]);
-    if (change == null) return 'Awaiting move';
-    return '${change >= 0 ? '+' : ''}${change.toStringAsFixed(2)}%';
-  }
-
-  _Trend _trendFromData(dynamic raw) {
-    final change = _numFrom(raw, const [
-      'change_pct',
-      'percent_change',
-      'change',
-    ]);
-    if (change == null || change == 0) return _Trend.flat;
-    return change > 0 ? _Trend.up : _Trend.down;
-  }
-
-  num? _numFrom(dynamic raw, List<String> keys) {
-    if (raw is num) return raw;
-    if (raw is Map) {
-      for (final key in keys) {
-        final value = raw[key];
-        if (value is num) return value;
-        if (value is String) return num.tryParse(value);
-      }
-    }
-    if (raw is String) return num.tryParse(raw);
-    return null;
-  }
 }
-
-class _TrendColors {
-  const _TrendColors({required this.bg, required this.fg});
-  final Color bg;
-  final Color fg;
-}
-
-enum _Trend { up, down, flat }
 
 class _RefreshRibbon extends StatelessWidget {
   const _RefreshRibbon({required this.tokens});
@@ -567,44 +518,31 @@ class _RefreshRibbon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      top: MediaQuery.paddingOf(context).top + AppSpacing.md,
-      left: AppSpacing.md,
-      right: AppSpacing.md,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.sm,
-          vertical: AppSpacing.xs,
-        ),
-        decoration: BoxDecoration(
-          color: tokens.surface,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          border: Border.all(color: tokens.border),
-          boxShadow: [
-            BoxShadow(
-              color: tokens.shadowLg,
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
+      top: MediaQuery.paddingOf(context).top + 14,
+      left: 78,
+      right: 78,
+      child: PremiumCard(
+        radius: AppRadius.pill,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        color: tokens.surface,
         child: Row(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SizedBox(
               height: 14,
               width: 14,
               child: CircularProgressIndicator(
-                strokeWidth: 2,
+                strokeWidth: 2.2,
                 color: tokens.primary,
               ),
             ),
-            const SizedBox(width: AppSpacing.xs + 2),
+            const SizedBox(width: 8),
             Text(
               'Refreshing',
-              style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    color: tokens.textSecondary,
-                    fontWeight: FontWeight.w700,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w900),
             ),
           ],
         ),
@@ -612,3 +550,40 @@ class _RefreshRibbon extends StatelessWidget {
     );
   }
 }
+
+String _displayValue(dynamic raw) {
+  final price = _numFrom(raw, const ['last_price', 'price', 'value', 'ltp']);
+  if (price != null) return price.toStringAsFixed(2);
+  return raw?.toString() ?? '--';
+}
+
+String _displayChange(dynamic raw) {
+  final change = _numFrom(raw, const [
+    'change_pct',
+    'percent_change',
+    'change',
+  ]);
+  if (change == null) return '+0.0%';
+  return '${change >= 0 ? '+' : ''}${change.toStringAsFixed(1)}%';
+}
+
+int _scoreFrom(dynamic raw) {
+  final change =
+      _numFrom(raw, const ['change_pct', 'percent_change', 'change']) ?? 0;
+  return (72 + change.clamp(-8, 8) * 2).round().clamp(48, 94).toInt();
+}
+
+num? _numFrom(dynamic raw, List<String> keys) {
+  if (raw is num) return raw;
+  if (raw is Map) {
+    for (final key in keys) {
+      final value = raw[key];
+      if (value is num) return value;
+      if (value is String) return num.tryParse(value);
+    }
+  }
+  if (raw is String) return num.tryParse(raw);
+  return null;
+}
+
+enum _TileTone { mint, cool }

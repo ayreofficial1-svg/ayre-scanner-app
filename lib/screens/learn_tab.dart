@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/premium_widgets.dart';
 import '../widgets/pressable_scale.dart';
 
 class LearnTab extends StatelessWidget {
@@ -8,88 +9,196 @@ class LearnTab extends StatelessWidget {
 
   static const _lessons = [
     _Lesson(
-      title: 'Read the Setup',
-      eyebrow: '5 min',
-      description: 'Translate trend, level, and trigger into a clean trade idea.',
-      icon: Icons.auto_graph_rounded,
-      tone: _LessonTone.warm,
+      'Read the Setup',
+      '12 min',
+      'Trend, level, trigger, and clean invalidation.',
+      Icons.auto_graph_rounded,
+      _LessonTone.orange,
     ),
     _Lesson(
-      title: 'Risk Before Reward',
-      eyebrow: 'Core',
-      description: 'Size positions around invalidation instead of conviction.',
-      icon: Icons.shield_rounded,
-      tone: _LessonTone.dark,
+      'Risk First',
+      'Core',
+      'Position sizing that keeps decisions calm.',
+      Icons.shield_rounded,
+      _LessonTone.dark,
     ),
     _Lesson(
-      title: 'Momentum Check',
-      eyebrow: '3 min',
-      description: 'Use market breadth and price action to avoid late entries.',
-      icon: Icons.speed_rounded,
-      tone: _LessonTone.positive,
+      'Momentum Check',
+      '8 min',
+      'Confirm breadth before chasing candles.',
+      Icons.speed_rounded,
+      _LessonTone.mint,
     ),
   ];
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [tokens.background, tokens.backgroundTint],
-        ),
-      ),
+    return PremiumScaffold(
+      bottomSafe: false,
       child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.lg,
-          AppSpacing.md,
-          AppSpacing.xl + 104,
+        physics: const AlwaysScrollableScrollPhysics(
+          parent: BouncingScrollPhysics(),
         ),
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 124),
         itemCount: _lessons.length + 1,
-        separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.md),
+        separatorBuilder: (_, __) => const SizedBox(height: 14),
         itemBuilder: (context, index) {
-          if (index == 0) {
-            return const _LearnHeader();
-          }
-          return _LessonCard(lesson: _lessons[index - 1]);
+          if (index == 0)
+            return AnimatedEntrance(child: _LearnHero(tokens: tokens));
+          return AnimatedEntrance(
+            delay: Duration(milliseconds: 60 * index),
+            child: _LessonCard(lesson: _lessons[index - 1]),
+          );
         },
       ),
     );
   }
 }
 
-class _LearnHeader extends StatelessWidget {
-  const _LearnHeader();
+class _LearnHero extends StatelessWidget {
+  const _LearnHero({required this.tokens});
+
+  final AppThemeTokens tokens;
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Learn',
-          style: Theme.of(context)
-              .textTheme
-              .headlineSmall
-              ?.copyWith(fontWeight: FontWeight.w900),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          'Short lessons for reading scanner ideas with calmer execution.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: tokens.textSecondary,
-                height: 1.35,
-                fontWeight: FontWeight.w500,
+    return PremiumCard(
+      radius: 44,
+      padding: EdgeInsets.zero,
+      gradient: LinearGradient(
+        colors: [
+          tokens.accentCool,
+          Color.lerp(tokens.accentCool, tokens.negative, 0.32)!,
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      shadowColor: tokens.accentCool.withValues(alpha: 0.28),
+      child: SizedBox(
+        height: 220,
+        child: Stack(
+          children: [
+            Positioned(
+              right: -28,
+              top: -42,
+              child: Container(
+                height: 150,
+                width: 150,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.18),
+                ),
               ),
+            ),
+            Positioned(
+              right: 24,
+              top: 34,
+              child: Transform.rotate(
+                angle: -0.25,
+                child: FloatingOrb(
+                  child: Icon(
+                    Icons.school_rounded,
+                    size: 88,
+                    color: Colors.white.withValues(alpha: 0.88),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _HeroChip(tokens: tokens),
+                  const Spacer(),
+                  Text(
+                    'My courses',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      _HeroStat(label: 'Subjects', value: '12', tokens: tokens),
+                      const SizedBox(width: 10),
+                      _HeroStat(label: 'Lessons', value: '43', tokens: tokens),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _HeroChip extends StatelessWidget {
+  const _HeroChip({required this.tokens});
+
+  final AppThemeTokens tokens;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+      decoration: BoxDecoration(
+        color: tokens.neutralBlock,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Text(
+        'Trading library',
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: tokens.onNeutralBlock,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroStat extends StatelessWidget {
+  const _HeroStat({
+    required this.label,
+    required this.value,
+    required this.tokens,
+  });
+
+  final String label;
+  final String value;
+  final AppThemeTokens tokens;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.24),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        children: [
+          Text(
+            value,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Colors.white.withValues(alpha: 0.78),
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -102,185 +211,146 @@ class _LessonCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final colors = _colorsFor(tokens, lesson.tone);
-
+    final colors = _colors(tokens, lesson.tone);
     return PressableScale(
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [colors.fill, colors.fill.withValues(alpha: 0.92)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          boxShadow: [
-            BoxShadow(
-              color: colors.fill.withValues(alpha: 0.25),
-              blurRadius: 22,
-              offset: const Offset(0, 8),
+      onTap: () {},
+      child: PremiumCard(
+        radius: 36,
+        padding: EdgeInsets.zero,
+        gradient: LinearGradient(
+          colors: [colors.fill, colors.fill2],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        shadowColor: colors.fill.withValues(alpha: 0.28),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -30,
+              bottom: -40,
+              child: Container(
+                height: 132,
+                width: 132,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: colors.foreground.withValues(alpha: 0.1),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Container(
+                    height: 68,
+                    width: 68,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: colors.foreground.withValues(alpha: 0.14),
+                    ),
+                    child: Icon(
+                      lesson.icon,
+                      color: colors.foreground,
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colors.foreground.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(AppRadius.pill),
+                          ),
+                          child: Text(
+                            lesson.eyebrow,
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: colors.foreground,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          lesson.title,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                color: colors.foreground,
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          lesson.description,
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: colors.foreground.withValues(
+                                  alpha: 0.74,
+                                ),
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    height: 46,
+                    width: 46,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: colors.foreground,
+                    ),
+                    child: Icon(
+                      Icons.arrow_forward_rounded,
+                      color: colors.fill,
+                      size: 24,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _LessonBadge(label: lesson.eyebrow, fill: colors.pill),
-                    const Spacer(),
-                    Icon(lesson.icon, color: colors.foreground, size: 28),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                Text(
-                  lesson.title,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: colors.foreground,
-                        fontWeight: FontWeight.w900,
-                      ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  lesson.description,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: colors.foreground.withValues(alpha: 0.85),
-                        height: 1.35,
-                        fontWeight: FontWeight.w500,
-                      ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: _LessonButton(colors: colors),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );
   }
 
-  _LessonColors _colorsFor(AppThemeTokens tokens, _LessonTone tone) {
+  _LessonColors _colors(AppThemeTokens tokens, _LessonTone tone) {
     return switch (tone) {
-      _LessonTone.warm => _LessonColors(
-          fill: tokens.accentWarm,
-          foreground: tokens.onAccentWarm,
-          pill: tokens.neutralBlock,
-        ),
+      _LessonTone.orange => _LessonColors(
+        tokens.accentWarm,
+        Color.lerp(tokens.accentWarm, tokens.negative, 0.2)!,
+        tokens.onAccentWarm,
+      ),
       _LessonTone.dark => _LessonColors(
-          fill: tokens.neutralBlock,
-          foreground: tokens.onNeutralBlock,
-          pill: tokens.accentWarm,
-        ),
-      _LessonTone.positive => _LessonColors(
-          fill: tokens.positive,
-          foreground: tokens.onPositive,
-          pill: tokens.neutralBlock,
-        ),
+        tokens.neutralBlock,
+        Color.lerp(tokens.neutralBlock, tokens.primary, 0.12)!,
+        tokens.onNeutralBlock,
+      ),
+      _LessonTone.mint => _LessonColors(
+        tokens.accentMint,
+        Color.lerp(tokens.accentMint, tokens.accentCool, 0.26)!,
+        tokens.onAccentMint,
+      ),
     };
   }
 }
 
-class _LessonBadge extends StatelessWidget {
-  const _LessonBadge({required this.label, required this.fill});
-
-  final String label;
-  final Color fill;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final onLabel = Theme.of(context).brightness == Brightness.dark
-        ? tokens.onNeutralBlock
-        : tokens.textPrimary;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: AppSpacing.xs,
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: onLabel,
-              fontWeight: FontWeight.w800,
-            ),
-      ),
-    );
-  }
-}
-
-class _LessonButton extends StatelessWidget {
-  const _LessonButton({required this.colors});
-
-  final _LessonColors colors;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final onLabel = colors.pill == tokens.neutralBlock
-        ? tokens.onNeutralBlock
-        : tokens.textPrimary;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: colors.pill,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md + 2,
-        AppSpacing.xs,
-        AppSpacing.xs,
-        AppSpacing.xs,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Start Learning',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: onLabel,
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
-          const SizedBox(width: AppSpacing.xs),
-          Container(
-            height: 28,
-            width: 28,
-            decoration: BoxDecoration(
-              color: onLabel.withValues(alpha: 0.16),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.play_arrow_rounded,
-              color: onLabel,
-              size: 18,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _Lesson {
-  const _Lesson({
-    required this.title,
-    required this.eyebrow,
-    required this.description,
-    required this.icon,
-    required this.tone,
-  });
+  const _Lesson(
+    this.title,
+    this.eyebrow,
+    this.description,
+    this.icon,
+    this.tone,
+  );
 
   final String title;
   final String eyebrow;
@@ -290,15 +360,11 @@ class _Lesson {
 }
 
 class _LessonColors {
-  const _LessonColors({
-    required this.fill,
-    required this.foreground,
-    required this.pill,
-  });
+  const _LessonColors(this.fill, this.fill2, this.foreground);
 
   final Color fill;
+  final Color fill2;
   final Color foreground;
-  final Color pill;
 }
 
-enum _LessonTone { warm, dark, positive }
+enum _LessonTone { orange, dark, mint }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/premium_widgets.dart';
 import 'home_tab.dart';
 import 'insights_tab.dart';
 import 'learn_tab.dart';
@@ -32,7 +33,9 @@ class _HomeShellState extends State<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return Scaffold(
+      backgroundColor: tokens.background,
       extendBody: true,
       body: IndexedStack(
         index: _index,
@@ -81,35 +84,29 @@ class _FloatingPillNav extends StatelessWidget {
         AppSpacing.md,
         AppSpacing.sm + bottomPadding,
       ),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: tokens.surface,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-          boxShadow: [
-            BoxShadow(
-              color: tokens.shadowLg,
-              blurRadius: 32,
-              offset: const Offset(0, 12),
-            ),
+      child: PremiumCard(
+        radius: AppRadius.pill,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        gradient: LinearGradient(
+          colors: [
+            tokens.neutralBlock.withValues(alpha: 0.96),
+            Color.lerp(tokens.neutralBlock, tokens.primary, 0.1)!,
           ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xs,
-            vertical: AppSpacing.xs,
-          ),
-          child: Row(
-            children: [
-              for (var i = 0; i < _items.length; i++)
-                Expanded(
-                  child: _FloatingNavItem(
-                    data: _items[i],
-                    selected: selectedIndex == i,
-                    onTap: () => onSelected(i),
-                  ),
+        borderColor: Colors.white.withValues(alpha: 0.08),
+        child: Row(
+          children: [
+            for (var i = 0; i < _items.length; i++)
+              Expanded(
+                child: _FloatingNavItem(
+                  data: _items[i],
+                  selected: selectedIndex == i,
+                  onTap: () => onSelected(i),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
@@ -130,7 +127,9 @@ class _FloatingNavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final contentColor = selected ? tokens.primary : tokens.textSecondary;
+    final contentColor = selected
+        ? tokens.onPrimary
+        : tokens.onNeutralBlock.withValues(alpha: 0.68);
 
     return Semantics(
       button: true,
@@ -140,30 +139,41 @@ class _FloatingNavItem extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.pill),
         splashColor: tokens.primary.withValues(alpha: 0.12),
-        child: Container(
-          height: 42,
+        child: AnimatedContainer(
+          duration: AppMotion.medium,
+          curve: AppMotion.ease,
+          height: 48,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: selected ? tokens.primary.withValues(alpha: 0.12) : AppTheme.transparent,
+            gradient: selected ? AppGradients.primaryShifted(tokens) : null,
             borderRadius: BorderRadius.circular(AppRadius.pill),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: tokens.primary.withValues(alpha: 0.34),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
+                : null,
           ),
           child: selected
               ? Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(data.icon, color: contentColor, size: 20),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 7),
                     Text(
                       data.label,
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                            color: contentColor,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 12,
-                          ),
+                        color: contentColor,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 )
-              : Icon(data.icon, color: contentColor, size: 22),
+              : Icon(data.icon, color: contentColor, size: 23),
         ),
       ),
     );

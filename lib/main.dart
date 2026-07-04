@@ -102,7 +102,10 @@ class AppThemeController extends InheritedWidget {
 
 /// Replaces the old _StartupGate. Runs splash then checks auth session.
 class _StartupGate extends StatefulWidget {
-  const _StartupGate({required this.onSplashComplete, required this.splashComplete});
+  const _StartupGate({
+    required this.onSplashComplete,
+    required this.splashComplete,
+  });
 
   final VoidCallback onSplashComplete;
   final bool splashComplete;

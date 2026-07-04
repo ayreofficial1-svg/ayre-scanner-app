@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../main.dart';
 import '../theme/app_theme.dart';
+import '../widgets/premium_widgets.dart';
 
 class ProfileMenuSheet extends StatefulWidget {
   const ProfileMenuSheet({super.key, required this.displayName});
@@ -28,59 +29,46 @@ class _ProfileMenuSheetState extends State<ProfileMenuSheet> {
       top: false,
       child: Container(
         decoration: BoxDecoration(
-          color: tokens.background,
-          borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(AppRadius.xl + 8),
+          gradient: LinearGradient(
+            colors: [tokens.background, tokens.backgroundTint],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
           ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(46)),
         ),
         child: ListView(
           shrinkWrap: true,
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.md,
-            AppSpacing.sm,
-            AppSpacing.md,
-            AppSpacing.lg,
-          ),
+          padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
           children: [
             Center(
               child: Container(
-                width: 44,
+                width: 46,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: tokens.textSecondary.withValues(alpha: 0.3),
+                  color: tokens.textSecondary.withValues(alpha: 0.24),
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
               ),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            _ProfileHero(name: name),
-            const SizedBox(height: AppSpacing.md),
-            _MenuGroup(
-              title: 'Account',
-              children: [
-                _MenuActionRow(
-                  icon: Icons.person_rounded,
-                  title: 'Profile',
-                  subtitle: 'Trading identity and account details',
-                  onTap: () {},
-                ),
-                _MenuActionRow(
-                  icon: Icons.tune_rounded,
-                  title: 'Settings',
-                  subtitle: 'Scanner preferences and saved defaults',
-                  onTap: () {},
-                ),
+            const SizedBox(height: 18),
+            AnimatedEntrance(child: _ProfileHero(name: name)),
+            const SizedBox(height: 14),
+            _MenuGrid(
+              items: [
+                _GridItem(Icons.person_rounded, 'Profile', tokens.accentMint),
+                _GridItem(Icons.tune_rounded, 'Settings', tokens.accentWarm),
+                _GridItem(Icons.bookmark_rounded, 'Saved', tokens.accentCool),
               ],
             ),
-            const SizedBox(height: AppSpacing.md),
-            _MenuGroup(
+            const SizedBox(height: 14),
+            _MenuSection(
               title: 'Notifications',
               children: [
                 _MenuSwitchRow(
                   icon: Icons.notifications_rounded,
                   title: 'Push Notifications',
-                  subtitle: 'Setup alerts and important scanner updates',
+                  subtitle: 'Setup alerts and scanner updates',
                   value: _pushNotifications,
                   onChanged: (v) => setState(() => _pushNotifications = v),
                 ),
@@ -94,55 +82,45 @@ class _ProfileMenuSheetState extends State<ProfileMenuSheet> {
                 _MenuSwitchRow(
                   icon: Icons.calendar_month_rounded,
                   title: 'Weekly Digest',
-                  subtitle: 'A calm summary before the next trading week',
+                  subtitle: 'A calm summary before Monday',
                   value: _weeklyDigest,
                   onChanged: (v) => setState(() => _weeklyDigest = v),
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.md),
-            _MenuGroup(
+            const SizedBox(height: 14),
+            _MenuSection(
               title: 'Appearance',
               children: [
                 _MenuSwitchRow(
-                  icon: isDark ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                  icon: isDark
+                      ? Icons.dark_mode_rounded
+                      : Icons.light_mode_rounded,
                   title: 'Night Mode',
-                  subtitle: isDark ? 'Dark canvas enabled' : 'Light canvas enabled',
+                  subtitle: isDark
+                      ? 'Dark premium canvas enabled'
+                      : 'Light premium canvas enabled',
                   value: isDark,
-                  onChanged: (v) {
-                    themeController.setThemeMode(
-                      v ? ThemeMode.dark : ThemeMode.light,
-                    );
-                  },
+                  onChanged: (v) => themeController.setThemeMode(
+                    v ? ThemeMode.dark : ThemeMode.light,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.md),
-            _MenuGroup(
-              title: 'Library',
+            const SizedBox(height: 14),
+            _MenuSection(
+              title: 'Session',
               children: [
-                _MenuActionRow(
-                  icon: Icons.bookmark_rounded,
-                  title: 'Saved Screens',
-                  subtitle: 'Pinned boards and scanner views',
-                  onTap: () {},
-                ),
                 _MenuActionRow(
                   icon: Icons.help_rounded,
                   title: 'Help',
                   subtitle: 'Guides, support, and scanner basics',
                   onTap: () {},
                 ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _MenuGroup(
-              title: 'Session',
-              children: [
                 _MenuActionRow(
                   icon: Icons.logout_rounded,
                   title: 'Sign Out',
-                  subtitle: 'Keep auth disabled for now; flow can return later',
+                  subtitle: 'Keep auth disabled for now',
                   destructive: true,
                   onTap: () {},
                 ),
@@ -163,51 +141,127 @@ class _ProfileHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(
-        color: tokens.neutralBlock,
-        borderRadius: BorderRadius.circular(AppRadius.xl),
-        boxShadow: [
-          BoxShadow(
-            color: tokens.shadow,
-            blurRadius: 22,
-            offset: const Offset(0, 10),
-          ),
+    return PremiumCard(
+      radius: 42,
+      padding: EdgeInsets.zero,
+      gradient: LinearGradient(
+        colors: [
+          tokens.neutralBlock,
+          Color.lerp(tokens.neutralBlock, tokens.primary, 0.16)!,
         ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
       ),
-      child: Row(
-        children: [
-          _AvatarBadge(name: name, size: 60),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: tokens.onNeutralBlock,
-                        fontWeight: FontWeight.w900,
-                      ),
+      child: SizedBox(
+        height: 142,
+        child: Stack(
+          children: [
+            Positioned(
+              right: -32,
+              top: -48,
+              child: Container(
+                height: 154,
+                width: 154,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.08),
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Ayre Scanner',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: tokens.onNeutralBlock.withValues(alpha: 0.7),
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ],
+              ),
             ),
-          ),
-          Icon(
-            Icons.chevron_right_rounded,
-            color: tokens.onNeutralBlock.withValues(alpha: 0.6),
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  _AvatarBadge(name: name, size: 70),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(
+                                color: tokens.onNeutralBlock,
+                                fontWeight: FontWeight.w900,
+                              ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Ayre Scanner workspace',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: tokens.onNeutralBlock.withValues(
+                                  alpha: 0.68,
+                                ),
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  GlassCircleButton(
+                    icon: Icons.arrow_forward_rounded,
+                    size: 46,
+                    color: Colors.white.withValues(alpha: 0.12),
+                    iconColor: tokens.onNeutralBlock,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuGrid extends StatelessWidget {
+  const _MenuGrid({required this.items});
+
+  final List<_GridItem> items;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) const SizedBox(width: 10),
+          Expanded(child: _MenuGridTile(item: items[i])),
+        ],
+      ],
+    );
+  }
+}
+
+class _MenuGridTile extends StatelessWidget {
+  const _MenuGridTile({required this.item});
+
+  final _GridItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return PremiumCard(
+      radius: 28,
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
+      color: item.color,
+      shadowColor: item.color.withValues(alpha: 0.22),
+      child: Column(
+        children: [
+          Icon(item.icon, color: tokens.neutralBlock, size: 26),
+          const SizedBox(height: 8),
+          Text(
+            item.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: tokens.neutralBlock,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ],
       ),
@@ -215,8 +269,8 @@ class _ProfileHero extends StatelessWidget {
   }
 }
 
-class _MenuGroup extends StatelessWidget {
-  const _MenuGroup({required this.title, required this.children});
+class _MenuSection extends StatelessWidget {
+  const _MenuSection({required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
@@ -224,38 +278,23 @@ class _MenuGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.xs,
-            0,
-            AppSpacing.xs,
-            AppSpacing.xs,
-          ),
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
           child: Text(
             title,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: tokens.textSecondary,
-                  fontWeight: FontWeight.w800,
-                ),
+              color: tokens.textSecondary,
+              fontWeight: FontWeight.w900,
+            ),
           ),
         ),
-        Container(
-          decoration: BoxDecoration(
-            color: tokens.surface,
-            borderRadius: BorderRadius.circular(AppRadius.lg),
-            border: Border.all(color: tokens.border),
-            boxShadow: [
-              BoxShadow(
-                color: tokens.shadow.withValues(alpha: 0.25),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
+        PremiumCard(
+          radius: 32,
+          padding: EdgeInsets.zero,
+          gradient: AppGradients.surfaceGlass(tokens),
           child: Column(children: children),
         ),
       ],
@@ -281,15 +320,14 @@ class _MenuActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final color = destructive ? tokens.negative : tokens.primary;
-
     return _MenuRowFrame(
-      onTap: onTap,
-      leading: _IconBubble(icon: icon, color: color),
+      icon: icon,
+      iconColor: destructive ? tokens.negative : tokens.primary,
       title: title,
       subtitle: subtitle,
       titleColor: destructive ? tokens.negative : null,
       trailing: Icon(Icons.chevron_right_rounded, color: tokens.textSecondary),
+      onTap: onTap,
     );
   }
 }
@@ -312,20 +350,21 @@ class _MenuSwitchRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-
     return _MenuRowFrame(
-      onTap: () => onChanged(!value),
-      leading: _IconBubble(icon: icon, color: tokens.primary),
+      icon: icon,
+      iconColor: tokens.primary,
       title: title,
       subtitle: subtitle,
       trailing: Switch.adaptive(value: value, onChanged: onChanged),
+      onTap: () => onChanged(!value),
     );
   }
 }
 
-class _MenuRowFrame extends StatefulWidget {
+class _MenuRowFrame extends StatelessWidget {
   const _MenuRowFrame({
-    required this.leading,
+    required this.icon,
+    required this.iconColor,
     required this.title,
     required this.subtitle,
     required this.trailing,
@@ -333,7 +372,8 @@ class _MenuRowFrame extends StatefulWidget {
     this.titleColor,
   });
 
-  final Widget leading;
+  final IconData icon;
+  final Color iconColor;
   final String title;
   final String subtitle;
   final Widget trailing;
@@ -341,77 +381,51 @@ class _MenuRowFrame extends StatefulWidget {
   final Color? titleColor;
 
   @override
-  State<_MenuRowFrame> createState() => _MenuRowFrameState();
-}
-
-class _MenuRowFrameState extends State<_MenuRowFrame> {
-  bool _hovering = false;
-
-  @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovering = true),
-      onExit: (_) => setState(() => _hovering = false),
-      child: InkWell(
-        onTap: widget.onTap,
-        child: Container(
-          color: _hovering ? tokens.primary.withValues(alpha: 0.06) : AppTheme.transparent,
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
-            children: [
-              widget.leading,
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.title,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            color: widget.titleColor ?? tokens.textPrimary,
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      widget.subtitle,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: tokens.textSecondary,
-                            height: 1.25,
-                            fontWeight: FontWeight.w500,
-                          ),
-                    ),
-                  ],
-                ),
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              height: 46,
+              width: 46,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: iconColor.withValues(alpha: 0.14),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              widget.trailing,
-            ],
-          ),
+              child: Icon(icon, color: iconColor, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: titleColor ?? tokens.textPrimary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: tokens.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            trailing,
+          ],
         ),
       ),
-    );
-  }
-}
-
-class _IconBubble extends StatelessWidget {
-  const _IconBubble({required this.icon, required this.color});
-
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 40,
-      width: 40,
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(AppRadius.sm),
-      ),
-      child: Icon(icon, color: color, size: 20),
     );
   }
 }
@@ -426,18 +440,18 @@ class _AvatarBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     final initial = name.trim().isEmpty ? 'R' : name.trim()[0].toUpperCase();
-
     return Container(
       height: size,
       width: size,
       decoration: BoxDecoration(
         gradient: AppGradients.primaryShifted(tokens),
         shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 3),
         boxShadow: [
           BoxShadow(
-            color: tokens.primary.withValues(alpha: 0.4),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+            color: tokens.primary.withValues(alpha: 0.34),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -445,10 +459,18 @@ class _AvatarBadge extends StatelessWidget {
       child: Text(
         initial,
         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: tokens.onPrimary,
-              fontWeight: FontWeight.w900,
-            ),
+          color: tokens.onPrimary,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }
+}
+
+class _GridItem {
+  const _GridItem(this.icon, this.label, this.color);
+
+  final IconData icon;
+  final String label;
+  final Color color;
 }

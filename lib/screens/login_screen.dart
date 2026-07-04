@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/premium_widgets.dart';
+import '../widgets/pressable_scale.dart';
 import 'home_shell.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -14,8 +17,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _loading = false;
-  String? _error;
   bool _submitted = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -28,28 +31,39 @@ class _LoginScreenState extends State<LoginScreen> {
     FocusScope.of(context).unfocus();
     setState(() {
       _loading = true;
-      _error = null;
       _submitted = true;
+      _error = null;
     });
 
     final success = await ApiService.login(
       _usernameController.text.trim(),
       _passwordController.text,
     );
-
     if (!mounted) return;
     setState(() => _loading = false);
 
     if (success) {
       await Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (ctx, anim, secAnim) => const HomeShell(),
-          transitionsBuilder: (ctx, anim, secAnim, child) {
-            final slide = Tween<Offset>(begin: const Offset(0.04, 0), end: Offset.zero)
-                .animate(CurvedAnimation(parent: anim, curve: AppMotion.ease));
-            return SlideTransition(position: slide, child: child);
+          pageBuilder: (_, __, ___) => const HomeShell(),
+          transitionDuration: AppMotion.slow,
+          reverseTransitionDuration: AppMotion.medium,
+          transitionsBuilder: (_, animation, __, child) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: AppMotion.ease,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: SlideTransition(
+                position: Tween(
+                  begin: const Offset(0, 0.04),
+                  end: Offset.zero,
+                ).animate(curved),
+                child: child,
+              ),
+            );
           },
-          transitionDuration: AppMotion.medium,
         ),
       );
     } else {
@@ -60,70 +74,70 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [tokens.background, tokens.backgroundTint],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 400),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 80),
-                    _LoginLogo(tokens: tokens),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Welcome Back',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                            color: tokens.textPrimary,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.5,
+      body: PremiumScaffold(
+        child: Center(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(18, 24, 18, 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 430),
+              child: Column(
+                children: [
+                  AnimatedEntrance(child: _LoginHero(tokens: tokens)),
+                  const SizedBox(height: 18),
+                  AnimatedEntrance(
+                    delay: const Duration(milliseconds: 100),
+                    child: PremiumCard(
+                      radius: 44,
+                      padding: const EdgeInsets.all(22),
+                      gradient: AppGradients.surfaceGlass(tokens),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Welcome back',
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(fontWeight: FontWeight.w900),
                           ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Sign in to access market intelligence.',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: tokens.textSecondary,
-                            fontWeight: FontWeight.w500,
-                            height: 1.4,
+                          const SizedBox(height: 6),
+                          Text(
+                            'Sign in to continue your scanner workspace.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: tokens.textSecondary,
+                                  fontWeight: FontWeight.w700,
+                                ),
                           ),
+                          const SizedBox(height: 22),
+                          _LoginTextField(
+                            controller: _usernameController,
+                            label: 'Username',
+                            icon: Icons.person_rounded,
+                            submitted: _submitted,
+                          ),
+                          const SizedBox(height: 12),
+                          _LoginTextField(
+                            controller: _passwordController,
+                            label: 'Password',
+                            icon: Icons.lock_rounded,
+                            obscure: true,
+                            submitted: _submitted,
+                          ),
+                          if (_error != null) ...[
+                            const SizedBox(height: 14),
+                            _LoginError(message: _error!),
+                          ],
+                          const SizedBox(height: 20),
+                          _LoginButton(
+                            loading: _loading,
+                            onPressed: _handleLogin,
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 40),
-                    _LoginTextField(
-                      controller: _usernameController,
-                      label: 'Username',
-                      submitted: _submitted,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    _LoginTextField(
-                      controller: _passwordController,
-                      label: 'Password',
-                      obscure: true,
-                      submitted: _submitted,
-                    ),
-                    if (_error != null) ...[
-                      const SizedBox(height: AppSpacing.md),
-                      _LoginError(message: _error!),
-                    ],
-                    const SizedBox(height: AppSpacing.lg),
-                    _LoginButton(loading: _loading, onPressed: _handleLogin),
-                    const SizedBox(height: 48),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -133,28 +147,98 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class _LoginLogo extends StatelessWidget {
-  const _LoginLogo({required this.tokens});
+class _LoginHero extends StatelessWidget {
+  const _LoginHero({required this.tokens});
+
   final AppThemeTokens tokens;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 80,
-        height: 80,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: AppGradients.primaryShifted(tokens),
-          boxShadow: [
-            BoxShadow(
-              color: tokens.primary.withValues(alpha: 0.4),
-              blurRadius: 32,
-              spreadRadius: 4,
+    return PremiumCard(
+      radius: 48,
+      padding: EdgeInsets.zero,
+      gradient: LinearGradient(
+        colors: [
+          tokens.primary,
+          Color.lerp(tokens.primary, tokens.accentCool, 0.55)!,
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      shadowColor: tokens.primary.withValues(alpha: 0.28),
+      child: SizedBox(
+        height: 244,
+        child: Stack(
+          children: [
+            Positioned(
+              top: -46,
+              right: -26,
+              child: Container(
+                height: 150,
+                width: 150,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.2),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 22,
+              top: 22,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  color: tokens.neutralBlock,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Text(
+                  'Ayre Scanner',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: tokens.onNeutralBlock,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 28,
+              top: 62,
+              child: FloatingOrb(
+                child: Container(
+                  height: 106,
+                  width: 106,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.22),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.34),
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.radar_rounded,
+                    color: Colors.white,
+                    size: 52,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 24,
+              right: 142,
+              bottom: 24,
+              child: Text(
+                'Market intelligence with calm execution.',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: tokens.onPrimary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
             ),
           ],
         ),
-        child: Icon(Icons.radar_rounded, color: tokens.onPrimary, size: 42),
       ),
     );
   }
@@ -164,31 +248,31 @@ class _LoginTextField extends StatefulWidget {
   const _LoginTextField({
     required this.controller,
     required this.label,
-    this.obscure = false,
+    required this.icon,
     required this.submitted,
+    this.obscure = false,
   });
 
   final TextEditingController controller;
   final String label;
-  final bool obscure;
+  final IconData icon;
   final bool submitted;
+  final bool obscure;
 
   @override
   State<_LoginTextField> createState() => _LoginTextFieldState();
 }
 
 class _LoginTextFieldState extends State<_LoginTextField> {
-  bool _focused = false;
   final _focusNode = FocusNode();
+  bool _focused = false;
 
   @override
   void initState() {
     super.initState();
-    _focusNode.addListener(() {
-      if (mounted) {
-        setState(() => _focused = _focusNode.hasFocus);
-      }
-    });
+    _focusNode.addListener(
+      () => setState(() => _focused = _focusNode.hasFocus),
+    );
   }
 
   @override
@@ -200,70 +284,71 @@ class _LoginTextFieldState extends State<_LoginTextField> {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final hasValue = widget.controller.text.isNotEmpty;
-    final error = widget.submitted && !hasValue;
-
-    return Container(
+    final invalid = widget.submitted && widget.controller.text.isEmpty;
+    return AnimatedContainer(
+      duration: AppMotion.medium,
+      curve: AppMotion.ease,
       decoration: BoxDecoration(
-        color: tokens.surfaceAlt,
-        borderRadius: BorderRadius.circular(AppRadius.lg),
+        color: tokens.surfaceRaised,
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: error
+          color: invalid
               ? tokens.negative
               : _focused
-                  ? tokens.primary
-                  : tokens.border,
-          width: error ? 1.2 : 1.0,
+              ? tokens.primary
+              : Colors.white.withValues(alpha: 0.38),
         ),
         boxShadow: [
-          BoxShadow(
-            color: tokens.shadow.withValues(alpha: _focused ? 0.4 : 0.25),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
+          if (_focused)
+            BoxShadow(
+              color: tokens.primary.withValues(alpha: 0.18),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
         ],
       ),
       child: TextField(
         focusNode: _focusNode,
         controller: widget.controller,
         obscureText: widget.obscure,
-        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: tokens.textPrimary,
-              fontWeight: FontWeight.w600,
-            ),
+        style: Theme.of(
+          context,
+        ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w800),
         decoration: InputDecoration(
+          prefixIcon: Icon(
+            widget.icon,
+            color: invalid ? tokens.negative : tokens.primary,
+          ),
+          suffixIcon: invalid
+              ? Icon(Icons.error_rounded, color: tokens.negative)
+              : null,
           labelText: widget.label,
-          labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: tokens.textSecondary,
-                fontWeight: FontWeight.w600,
-              ),
-          floatingLabelStyle: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: tokens.primary,
-                fontWeight: FontWeight.w800,
-              ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          labelStyle: TextStyle(
+            color: tokens.textSecondary,
+            fontWeight: FontWeight.w800,
+          ),
+          floatingLabelStyle: TextStyle(
+            color: invalid ? tokens.negative : tokens.primary,
+            fontWeight: FontWeight.w900,
+          ),
           filled: true,
           fillColor: AppTheme.transparent,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 18,
+          ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
+            borderRadius: BorderRadius.circular(24),
             borderSide: BorderSide.none,
           ),
           enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
+            borderRadius: BorderRadius.circular(24),
             borderSide: BorderSide.none,
           ),
           focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppRadius.lg),
+            borderRadius: BorderRadius.circular(24),
             borderSide: BorderSide.none,
           ),
-          suffixIcon: error
-              ? Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 16),
-                  child: Icon(Icons.error_outline_rounded,
-                      color: tokens.negative, size: 20),
-                )
-              : null,
         ),
       ),
     );
@@ -279,22 +364,22 @@ class _LoginError extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: tokens.negative.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(AppRadius.md),
+        color: tokens.negative.withValues(alpha: 0.13),
+        borderRadius: BorderRadius.circular(22),
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline_rounded, color: tokens.negative, size: 18),
+          Icon(Icons.error_outline_rounded, color: tokens.negative, size: 20),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: tokens.negative,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: tokens.negative,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
         ],
@@ -304,10 +389,7 @@ class _LoginError extends StatelessWidget {
 }
 
 class _LoginButton extends StatelessWidget {
-  const _LoginButton({
-    required this.loading,
-    required this.onPressed,
-  });
+  const _LoginButton({required this.loading, required this.onPressed});
 
   final bool loading;
   final VoidCallback onPressed;
@@ -315,20 +397,20 @@ class _LoginButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-
-    return InkWell(
+    return PressableScale(
       onTap: loading ? null : onPressed,
-      borderRadius: BorderRadius.circular(AppRadius.pill),
-      child: Container(
-        height: 52,
+      borderRadius: AppRadius.pill,
+      child: AnimatedContainer(
+        duration: AppMotion.medium,
+        height: 58,
         decoration: BoxDecoration(
           gradient: AppGradients.primaryShifted(tokens),
           borderRadius: BorderRadius.circular(AppRadius.pill),
           boxShadow: [
             BoxShadow(
-              color: tokens.primary.withValues(alpha: 0.4),
-              blurRadius: 20,
-              offset: const Offset(0, 6),
+              color: tokens.primary.withValues(alpha: 0.34),
+              blurRadius: 22,
+              offset: const Offset(0, 12),
             ),
           ],
         ),
@@ -338,18 +420,16 @@ class _LoginButton extends StatelessWidget {
                   height: 22,
                   width: 22,
                   child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
+                    strokeWidth: 2.6,
                     color: Colors.white,
                   ),
                 )
               : Text(
                   'Log In',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: tokens.onPrimary,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 16,
-                        letterSpacing: 0.2,
-                      ),
+                    color: tokens.onPrimary,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
         ),
       ),

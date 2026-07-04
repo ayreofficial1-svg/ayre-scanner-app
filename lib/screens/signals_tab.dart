@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/premium_widgets.dart';
 import '../widgets/pressable_scale.dart';
 
 class SignalsTab extends StatefulWidget {
@@ -33,80 +34,123 @@ class _SignalsTabState extends State<SignalsTab> {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
+    if (_loading) return const PremiumLoader(label: 'Scanning setups');
 
-    if (_loading) {
-      return const _SignalsLoading();
-    }
-
-    if (_signals.isEmpty) {
-      return RefreshIndicator(
+    return PremiumScaffold(
+      bottomSafe: false,
+      child: RefreshIndicator(
         color: tokens.primary,
         backgroundColor: tokens.surface,
         onRefresh: _load,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          children: [_SignalsEmptyState()],
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 124),
+          itemCount: _signals.isEmpty ? 2 : _signals.length + 1,
+          separatorBuilder: (_, __) => const SizedBox(height: 14),
+          itemBuilder: (context, index) {
+            if (index == 0)
+              return const AnimatedEntrance(child: _SignalsHeader());
+            if (_signals.isEmpty)
+              return const AnimatedEntrance(
+                delay: Duration(milliseconds: 80),
+                child: _SignalsEmptyState(),
+              );
+            return AnimatedEntrance(
+              delay: Duration(milliseconds: 45 * index),
+              child: _SignalCard(signal: _signals[index - 1], index: index),
+            );
+          },
         ),
-      );
-    }
-
-    return RefreshIndicator(
-      color: tokens.primary,
-      backgroundColor: tokens.surface,
-      onRefresh: _load,
-      child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.md,
-          AppSpacing.lg,
-          AppSpacing.md,
-          AppSpacing.xl + 104,
-        ),
-        itemCount: _signals.length,
-        separatorBuilder: (context, index) => const SizedBox(height: AppSpacing.sm),
-        itemBuilder: (context, i) => _SignalCard(signal: _signals[i]),
       ),
     );
   }
 }
 
-class _SignalsLoading extends StatelessWidget {
-  const _SignalsLoading();
+class _SignalsHeader extends StatelessWidget {
+  const _SignalsHeader();
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [tokens.background, tokens.backgroundTint],
-        ),
+    return PremiumCard(
+      padding: const EdgeInsets.all(22),
+      gradient: LinearGradient(
+        colors: [
+          tokens.negative,
+          Color.lerp(tokens.negative, tokens.accentWarm, 0.34)!,
+        ],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
       ),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.lg),
-          decoration: BoxDecoration(
-            color: tokens.surface,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: tokens.shadow,
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: SizedBox(
-            height: 24,
-            width: 24,
-            child: CircularProgressIndicator(
-              strokeWidth: 2.5,
-              color: tokens.primary,
+      shadowColor: tokens.negative.withValues(alpha: 0.26),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _HeaderBadge(tokens: tokens),
+                const SizedBox(height: 24),
+                Text(
+                  'Signal board',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Curated setups with live movement and compact rationale.',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.76),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
           ),
+          FloatingOrb(
+            child: Container(
+              height: 82,
+              width: 82,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white.withValues(alpha: 0.18),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+              ),
+              child: const Icon(
+                Icons.radar_rounded,
+                color: Colors.white,
+                size: 38,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderBadge extends StatelessWidget {
+  const _HeaderBadge({required this.tokens});
+
+  final AppThemeTokens tokens;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+      decoration: BoxDecoration(
+        color: tokens.neutralBlock,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Text(
+        'Live scanner',
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: tokens.onNeutralBlock,
+          fontWeight: FontWeight.w900,
         ),
       ),
     );
@@ -119,181 +163,220 @@ class _SignalsEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const SizedBox(height: 48),
-        Container(
-          height: 90,
-          width: 90,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [tokens.accentWarm, tokens.accentMint],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    return PremiumCard(
+      padding: const EdgeInsets.all(28),
+      gradient: AppGradients.surfaceGlass(tokens),
+      child: Column(
+        children: [
+          FloatingOrb(
+            child: Container(
+              height: 104,
+              width: 104,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: AppGradients.warmShifted(tokens),
+                boxShadow: [
+                  BoxShadow(
+                    color: tokens.accentWarm.withValues(alpha: 0.32),
+                    blurRadius: 30,
+                    offset: const Offset(0, 14),
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.travel_explore_rounded,
+                color: tokens.onAccentWarm,
+                size: 46,
+              ),
             ),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: tokens.primary.withValues(alpha: 0.25),
-                blurRadius: 28,
-                spreadRadius: 4,
-              ),
-            ],
           ),
-          child: Icon(Icons.radar_rounded, color: tokens.onAccentWarm, size: 42),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        Text(
-          'No new setups yet',
-          style: Theme.of(context)
-              .textTheme
-              .titleLarge
-              ?.copyWith(fontWeight: FontWeight.w900),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          'Pull to refresh when you want to scan again.',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: tokens.textSecondary,
-                height: 1.4,
-                fontWeight: FontWeight.w500,
-              ),
-        ),
-      ],
+          const SizedBox(height: 24),
+          Text(
+            'No fresh setups',
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Pull down when you want the scanner to sweep again.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: tokens.textSecondary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 class _SignalCard extends StatelessWidget {
-  const _SignalCard({required this.signal});
+  const _SignalCard({required this.signal, required this.index});
 
   final Map<String, dynamic> signal;
+  final int index;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final symbol = signal['symbol']?.toString() ?? '';
+    final symbol = signal['symbol']?.toString() ?? 'SETUP';
     final rationale = signal['rationale']?.toString() ?? '';
     final dateAdded = signal['date_added']?.toString() ?? '';
     final lastPrice = signal['last_price'];
     final changePct = signal['change_pct'];
-
-    final isUp = (changePct is num) ? changePct >= 0 : null;
-    final cardColor =
-        isUp == null ? tokens.surface : (isUp ? tokens.positive : tokens.negative);
-    final onCardColor =
-        isUp == null ? tokens.textPrimary : (isUp ? tokens.onPositive : tokens.onNegative);
-    final secondaryColor = isUp == null ? tokens.textSecondary : onCardColor;
+    final isUp = changePct is num ? changePct >= 0 : true;
+    final fill = isUp ? tokens.accentMint : tokens.negative;
+    final foreground = isUp ? tokens.onAccentMint : tokens.onNegative;
 
     return PressableScale(
-      child: Container(
-        decoration: BoxDecoration(
-          color: cardColor,
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          boxShadow: [
-            BoxShadow(
-              color: (isUp == null ? tokens.shadow : cardColor)
-                  .withValues(alpha: isUp == null ? 0.4 : 0.35),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
+      onTap: () {},
+      child: PremiumCard(
+        radius: 36,
+        padding: EdgeInsets.zero,
+        color: fill,
+        shadowColor: fill.withValues(alpha: 0.3),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -36,
+              top: -40,
+              child: Container(
+                height: 142,
+                width: 142,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.18),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(22),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        height: 48,
+                        width: 48,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: tokens.neutralBlock,
+                        ),
+                        child: Icon(
+                          isUp
+                              ? Icons.trending_up_rounded
+                              : Icons.trending_down_rounded,
+                          color: tokens.onNeutralBlock,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              symbol,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleLarge
+                                  ?.copyWith(
+                                    color: foreground,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                            ),
+                            Text(
+                              dateAdded.isEmpty
+                                  ? 'Scanner pick #$index'
+                                  : 'Added $dateAdded',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.labelMedium
+                                  ?.copyWith(
+                                    color: foreground.withValues(alpha: 0.68),
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      _PricePill(
+                        price: lastPrice,
+                        changePct: changePct,
+                        foreground: foreground,
+                      ),
+                    ],
+                  ),
+                  if (rationale.isNotEmpty) ...[
+                    const SizedBox(height: 18),
+                    Text(
+                      rationale,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: foreground.withValues(alpha: 0.78),
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  Sparkline(
+                    color: foreground.withValues(alpha: 0.8),
+                    height: 54,
+                    points: isUp
+                        ? const [0.72, 0.64, 0.7, 0.5, 0.58, 0.38, 0.42, 0.24]
+                        : const [0.24, 0.38, 0.32, 0.5, 0.48, 0.62, 0.58, 0.72],
+                  ),
+                ],
+              ),
             ),
           ],
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        symbol,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: onCardColor,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.2,
-                            ),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.sm),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          lastPrice is num ? lastPrice.toStringAsFixed(2) : '--',
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                color: onCardColor,
-                                fontWeight: FontWeight.w900,
-                              ),
-                        ),
-                        const SizedBox(height: AppSpacing.xxs),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.xs,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: onCardColor.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(AppRadius.sm),
-                          ),
-                          child: Text(
-                            changePct is num
-                                ? '${isUp! ? '+' : ''}${changePct.toStringAsFixed(2)}%'
-                                : '--',
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: onCardColor,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 11,
-                                    ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                if (rationale.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    rationale,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: secondaryColor,
-                          height: 1.4,
-                          fontWeight: FontWeight.w500,
-                        ),
-                  ),
-                ],
-                if (dateAdded.isNotEmpty) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm,
-                      vertical: AppSpacing.xxs,
-                    ),
-                    decoration: BoxDecoration(
-                      color: secondaryColor.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
-                    ),
-                    child: Text(
-                      'Added $dateAdded',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: secondaryColor,
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                  ),
-                ],
-              ],
+      ),
+    );
+  }
+}
+
+class _PricePill extends StatelessWidget {
+  const _PricePill({
+    required this.price,
+    required this.changePct,
+    required this.foreground,
+  });
+
+  final dynamic price;
+  final dynamic changePct;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    final isUp = changePct is num ? changePct >= 0 : true;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: foreground.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            price is num ? price.toStringAsFixed(2) : '--',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: foreground,
+              fontWeight: FontWeight.w900,
             ),
           ),
-        ),
+          Text(
+            changePct is num
+                ? '${isUp ? '+' : ''}${changePct.toStringAsFixed(2)}%'
+                : '--',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: foreground.withValues(alpha: 0.78),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
       ),
     );
   }
