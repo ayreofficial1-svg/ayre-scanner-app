@@ -17,6 +17,7 @@ class _InsightsTabState extends State<InsightsTab> {
   int? _sentiment;
   String? _note;
   String? _updatedAt;
+  List<Map<String, dynamic>> _insights = [];
   bool _loading = true;
   bool _error = false;
 
@@ -28,9 +29,11 @@ class _InsightsTabState extends State<InsightsTab> {
 
   Future<void> _load() async {
     final data = await ApiService.getSentiment();
+    final insights = await ApiService.getInsights();
     if (!mounted) return;
     setState(() {
       _loading = false;
+      _insights = insights;
       if (data != null && data['sentiment'] is num) {
         _error = false;
         _sentiment = (data['sentiment'] as num).round().clamp(0, 100);
@@ -82,6 +85,15 @@ class _InsightsTabState extends State<InsightsTab> {
                   updatedAt: _updatedAt,
                 ),
               ),
+              ..._insights.asMap().entries.map(
+                (entry) => Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: AnimatedEntrance(
+                    delay: Duration(milliseconds: 180 + entry.key * 50),
+                    child: _InsightContentCard(insight: entry.value),
+                  ),
+                ),
+              ),
             ],
           ],
         ),
@@ -93,6 +105,84 @@ class _InsightsTabState extends State<InsightsTab> {
     if (value < 35) return tokens.negative;
     if (value < 65) return tokens.accentWarm;
     return tokens.positive;
+  }
+}
+
+class _InsightContentCard extends StatelessWidget {
+  const _InsightContentCard({required this.insight});
+
+  final Map<String, dynamic> insight;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final title = insight['title']?.toString() ?? '';
+    final body = insight['body']?.toString() ?? '';
+    final category = insight['category']?.toString();
+    final featured = insight['featured'] == true || insight['pinned'] == true;
+    final color = featured ? tokens.accentWarm : tokens.accentCool;
+    final foreground = featured ? tokens.onAccentWarm : tokens.onAccentCool;
+
+    return PremiumCard(
+      gradient: LinearGradient(
+        colors: [color, Color.lerp(color, tokens.accentMint, 0.28)!],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      shadowColor: color.withValues(alpha: 0.24),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 56,
+            width: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: tokens.neutralBlock,
+            ),
+            child: Icon(
+              featured ? Icons.push_pin_rounded : Icons.insights_rounded,
+              color: tokens.onNeutralBlock,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (category?.isNotEmpty == true) ...[
+                  Text(
+                    category!,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: foreground.withValues(alpha: 0.7),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                ],
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: foreground,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                if (body.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    body,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: foreground.withValues(alpha: 0.76),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

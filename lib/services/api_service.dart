@@ -10,6 +10,7 @@ class ApiService {
       'https://ayre-scanner-production.up.railway.app';
 
   static String? _cookie;
+  static const Duration _contentCacheTtl = Duration(minutes: 10);
 
   /// Load any saved cookie from disk (call this once at app startup).
   static Future<void> loadSavedCookie() async {
@@ -114,5 +115,60 @@ class ApiService {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
     return null;
+  }
+
+  static Future<List<Map<String, dynamic>>> getLearnArticles() async {
+    return _getCachedList(
+      endpoint: '/api/learn',
+      rootKey: 'articles',
+      cacheKey: 'content_learn_articles',
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> getInsights() async {
+    return _getCachedList(
+      endpoint: '/api/insights',
+      rootKey: 'insights',
+      cacheKey: 'content_insights',
+    );
+  }
+
+  static Future<List<Map<String, dynamic>>> _getCachedList({
+    required String endpoint,
+    required String rootKey,
+    required String cacheKey,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final cacheBody = prefs.getString(cacheKey);
+    final cacheTime = prefs.getInt('${cacheKey}_saved_at') ?? 0;
+    final isFresh =
+        DateTime.now().millisecondsSinceEpoch - cacheTime <
+        _contentCacheTtl.inMilliseconds;
+
+    if (isFresh && cacheBody != null) {
+      final cached = jsonDecode(cacheBody) as List<dynamic>;
+      return cached.cast<Map<String, dynamic>>();
+    }
+
+    final response = await http.get(
+      Uri.parse('$baseUrl$endpoint'),
+      headers: _headers(),
+    );
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final list = data[rootKey] as List<dynamic>? ?? [];
+      await prefs.setString(cacheKey, jsonEncode(list));
+      await prefs.setInt(
+        '${cacheKey}_saved_at',
+        DateTime.now().millisecondsSinceEpoch,
+      );
+      return list.cast<Map<String, dynamic>>();
+    }
+
+    if (cacheBody != null) {
+      final cached = jsonDecode(cacheBody) as List<dynamic>;
+      return cached.cast<Map<String, dynamic>>();
+    }
+    return [];
   }
 }

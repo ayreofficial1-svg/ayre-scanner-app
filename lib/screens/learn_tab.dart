@@ -1,65 +1,83 @@
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/premium_widgets.dart';
 import '../widgets/pressable_scale.dart';
 
-class LearnTab extends StatelessWidget {
+class LearnTab extends StatefulWidget {
   const LearnTab({super.key});
 
-  static const _lessons = [
-    _Lesson(
-      'Read the Setup',
-      '12 min',
-      'Trend, level, trigger, and clean invalidation.',
-      Icons.auto_graph_rounded,
-      _LessonTone.orange,
-    ),
-    _Lesson(
-      'Risk First',
-      'Core',
-      'Position sizing that keeps decisions calm.',
-      Icons.shield_rounded,
-      _LessonTone.dark,
-    ),
-    _Lesson(
-      'Momentum Check',
-      '8 min',
-      'Confirm breadth before chasing candles.',
-      Icons.speed_rounded,
-      _LessonTone.mint,
-    ),
-  ];
+  @override
+  State<LearnTab> createState() => _LearnTabState();
+}
+
+class _LearnTabState extends State<LearnTab> {
+  List<Map<String, dynamic>> _lessons = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final lessons = await ApiService.getLearnArticles();
+    if (!mounted) return;
+    setState(() {
+      _lessons = lessons;
+      _loading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
+    if (_loading) return const PremiumLoader(label: 'Loading library');
     return PremiumScaffold(
       bottomSafe: false,
-      child: ListView.separated(
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
+      child: RefreshIndicator(
+        color: tokens.primary,
+        backgroundColor: tokens.surface,
+        onRefresh: _load,
+        child: ListView.separated(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 124),
+          itemCount: _lessons.isEmpty ? 2 : _lessons.length + 1,
+          separatorBuilder: (_, __) => const SizedBox(height: 14),
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return AnimatedEntrance(
+                child: _LearnHero(tokens: tokens, lessons: _lessons),
+              );
+            }
+            if (_lessons.isEmpty) {
+              return const AnimatedEntrance(
+                delay: Duration(milliseconds: 80),
+                child: _LearnEmptyState(),
+              );
+            }
+            return AnimatedEntrance(
+              delay: Duration(milliseconds: 60 * index),
+              child: _LessonCard(
+                lesson: _Lesson.fromJson(_lessons[index - 1]),
+              ),
+            );
+          },
         ),
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 124),
-        itemCount: _lessons.length + 1,
-        separatorBuilder: (_, __) => const SizedBox(height: 14),
-        itemBuilder: (context, index) {
-          if (index == 0)
-            return AnimatedEntrance(child: _LearnHero(tokens: tokens));
-          return AnimatedEntrance(
-            delay: Duration(milliseconds: 60 * index),
-            child: _LessonCard(lesson: _lessons[index - 1]),
-          );
-        },
       ),
     );
   }
 }
 
 class _LearnHero extends StatelessWidget {
-  const _LearnHero({required this.tokens});
+  const _LearnHero({required this.tokens, required this.lessons});
 
   final AppThemeTokens tokens;
+  final List<Map<String, dynamic>> lessons;
 
   @override
   Widget build(BuildContext context) {
@@ -122,15 +140,49 @@ class _LearnHero extends StatelessWidget {
                   const SizedBox(height: 14),
                   Row(
                     children: [
-                      _HeroStat(label: 'Subjects', value: '12', tokens: tokens),
+                      _HeroStat(
+                        label: 'Subjects',
+                        value: lessons
+                            .map((lesson) => lesson['category']?.toString())
+                            .where((category) => category?.isNotEmpty == true)
+                            .toSet()
+                            .length
+                            .toString(),
+                        tokens: tokens,
+                      ),
                       const SizedBox(width: 10),
-                      _HeroStat(label: 'Lessons', value: '43', tokens: tokens),
+                      _HeroStat(
+                        label: 'Lessons',
+                        value: lessons.length.toString(),
+                        tokens: tokens,
+                      ),
                     ],
                   ),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LearnEmptyState extends StatelessWidget {
+  const _LearnEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return PremiumCard(
+      padding: const EdgeInsets.all(28),
+      gradient: AppGradients.surfaceGlass(tokens),
+      child: Text(
+        'No lessons available.',
+        textAlign: TextAlign.center,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          color: tokens.textSecondary,
+          fontWeight: FontWeight.w900,
         ),
       ),
     );
@@ -357,6 +409,38 @@ class _Lesson {
   final String description;
   final IconData icon;
   final _LessonTone tone;
+
+  factory _Lesson.fromJson(Map<String, dynamic> json) {
+    return _Lesson(
+      json['title']?.toString() ?? '',
+      json['category']?.toString() ??
+          json['eyebrow']?.toString() ??
+          'Lesson',
+      json['body']?.toString() ??
+          json['description']?.toString() ??
+          '',
+      _iconFrom(json['icon']?.toString()),
+      _toneFrom(json['tone']?.toString()),
+    );
+  }
+
+  static IconData _iconFrom(String? value) {
+    return switch (value) {
+      'shield' => Icons.shield_rounded,
+      'speed' => Icons.speed_rounded,
+      'school' => Icons.school_rounded,
+      'psychology' => Icons.psychology_alt_rounded,
+      _ => Icons.auto_graph_rounded,
+    };
+  }
+
+  static _LessonTone _toneFrom(String? value) {
+    return switch (value) {
+      'dark' => _LessonTone.dark,
+      'mint' => _LessonTone.mint,
+      _ => _LessonTone.orange,
+    };
+  }
 }
 
 class _LessonColors {
