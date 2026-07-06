@@ -26,7 +26,8 @@ class _HomeShellState extends State<HomeShell> {
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: AppTheme.transparent,
-      barrierColor: const Color(0xB3000000),
+      barrierColor: Colors.black.withValues(alpha: 0.6), // Darker backdrop
+      elevation: 0,
       builder: (_) => ProfileMenuSheet(displayName: _displayName),
     );
   }
@@ -79,23 +80,17 @@ class _FloatingPillNav extends StatelessWidget {
 
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        AppSpacing.md,
+        AppSpacing.lg,
         0,
-        AppSpacing.md,
-        AppSpacing.sm + bottomPadding,
+        AppSpacing.lg,
+        AppSpacing.lg + (bottomPadding > 0 ? bottomPadding - 10 : 0),
       ),
       child: PremiumCard(
-        radius: AppRadius.pill,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-        gradient: LinearGradient(
-          colors: [
-            tokens.neutralBlock.withValues(alpha: 0.96),
-            Color.lerp(tokens.neutralBlock, tokens.primary, 0.1)!,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderColor: Colors.white.withValues(alpha: 0.08),
+        radius: AppRadius.navBar,
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.xs),
+        color: tokens.surface.withValues(alpha: 0.9), // Glassy Apple effect
+        borderColor: tokens.borderSubtle,
+        shadowColor: tokens.shadowLg,
         child: Row(
           children: [
             for (var i = 0; i < _items.length; i++)
@@ -127,53 +122,61 @@ class _FloatingNavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final contentColor = selected
-        ? tokens.onPrimary
-        : tokens.onNeutralBlock.withValues(alpha: 0.68);
 
     return Semantics(
       button: true,
       selected: selected,
       label: data.label,
-      child: InkWell(
+      child: GestureDetector(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-        splashColor: tokens.primary.withValues(alpha: 0.12),
+        behavior: HitTestBehavior.opaque,
         child: AnimatedContainer(
-          duration: AppMotion.medium,
+          duration: AppMotion.fast,
           curve: AppMotion.ease,
-          height: 48,
+          height: 52,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            gradient: selected ? AppGradients.primaryShifted(tokens) : null,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      color: tokens.primary.withValues(alpha: 0.34),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
-                    ),
-                  ]
-                : null,
+            color: selected ? tokens.primary.withValues(alpha: 0.12) : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadius.navBar),
           ),
-          child: selected
-              ? Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(data.icon, color: contentColor, size: 20),
-                    const SizedBox(width: 7),
-                    Text(
-                      data.label,
-                      style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: contentColor,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 12,
+          child: AnimatedSwitcher(
+            duration: AppMotion.fast,
+            switchInCurve: AppMotion.ease,
+            switchOutCurve: AppMotion.ease,
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.1),
+                    end: Offset.zero,
+                  ).animate(animation),
+                  child: child,
+                ),
+              );
+            },
+            child: selected
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    key: const ValueKey('selected'),
+                    children: [
+                      Icon(data.icon, color: tokens.primary, size: 20),
+                      const SizedBox(width: AppSpacing.xs),
+                      Text(
+                        data.label,
+                        style: AppTypo.eyebrow(tokens, color: tokens.primary).copyWith(
+                          fontSize: 12, // Slightly larger for readability
+                        ),
                       ),
-                    ),
-                  ],
-                )
-              : Icon(data.icon, color: contentColor, size: 23),
+                    ],
+                  )
+                : Icon(
+                    data.icon,
+                    key: const ValueKey('unselected'),
+                    color: tokens.textTertiary,
+                    size: 24,
+                  ),
+          ),
         ),
       ),
     );

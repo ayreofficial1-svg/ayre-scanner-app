@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
@@ -28,6 +29,7 @@ class _HomeTabState extends State<HomeTab> {
 
   Future<void> _loadData() async {
     if (mounted && !_loading) setState(() => _refreshing = true);
+    HapticFeedback.mediumImpact();
     final session = await ApiService.getSession();
     final market = await ApiService.getMarket();
     if (!mounted) return;
@@ -42,9 +44,10 @@ class _HomeTabState extends State<HomeTab> {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    if (_loading) return const PremiumLoader(label: 'Opening scanner');
+    if (_loading) return const PremiumLoader(label: 'Opening scanner', section: AyreSection.home);
 
     return PremiumScaffold(
+      section: AyreSection.home,
       bottomSafe: false,
       child: Stack(
         children: [
@@ -52,11 +55,12 @@ class _HomeTabState extends State<HomeTab> {
             color: tokens.primary,
             backgroundColor: tokens.surface,
             onRefresh: _loadData,
+            edgeOffset: 120, // push down below header
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(
                 parent: BouncingScrollPhysics(),
               ),
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 124),
+              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, 140),
               children: [
                 AnimatedEntrance(
                   child: _HomeHeader(
@@ -65,19 +69,19 @@ class _HomeTabState extends State<HomeTab> {
                         widget.onProfileMenuRequested?.call(_displayName),
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: AppSpacing.xxl),
                 AnimatedEntrance(
-                  delay: const Duration(milliseconds: 80),
+                  delay: const Duration(milliseconds: 100),
                   child: _HeroBoard(market: _market),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 const AnimatedEntrance(
-                  delay: Duration(milliseconds: 130),
+                  delay: Duration(milliseconds: 150),
                   child: _SignalReadinessCard(),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSpacing.lg),
                 AnimatedEntrance(
-                  delay: const Duration(milliseconds: 170),
+                  delay: const Duration(milliseconds: 200),
                   child: _MarketTiles(market: _market),
                 ),
               ],
@@ -108,30 +112,28 @@ class _HomeHeader extends StatelessWidget {
             children: [
               Text(
                 'Hi, $name',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: tokens.textSecondary,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: AppTypo.bodyMedium(tokens, color: tokens.textSecondary),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 'Scanner plan',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: tokens.textPrimary,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: AppTypo.pageTitle(tokens),
               ),
             ],
           ),
         ),
         GlassCircleButton(
           icon: Icons.notifications_rounded,
-          size: 48,
-          color: tokens.surface,
+          size: 46,
+          color: tokens.surfaceAlt,
+          iconColor: tokens.textPrimary,
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: AppSpacing.md),
         GestureDetector(
-          onTap: onProfileTap,
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onProfileTap();
+          },
           child: _AvatarBadge(name: name),
         ),
       ],
@@ -150,54 +152,43 @@ class _HeroBoard extends StatelessWidget {
     final nifty = _marketValue('nifty');
     final score = _scoreFrom(nifty);
     return PremiumCard(
-      radius: 46,
+      radius: AppRadius.heroCard,
       padding: EdgeInsets.zero,
-      gradient: LinearGradient(
-        colors: [
-          tokens.accentWarm,
-          Color.lerp(tokens.accentWarm, tokens.accentMint, 0.52)!,
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      shadowColor: tokens.accentWarm.withValues(alpha: 0.34),
+      gradient: AppGradients.heroCard(AyreSection.home, tokens),
+      shadowColor: tokens.primary.withValues(alpha: 0.3),
       child: SizedBox(
-        height: 308,
+        height: 320,
         child: Stack(
           children: [
             Positioned(
-              top: -76,
-              right: -38,
+              top: -80,
+              right: -40,
               child: Container(
-                height: 190,
-                width: 190,
+                height: 200,
+                width: 200,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.18),
+                  color: Colors.white.withValues(alpha: 0.08),
                 ),
               ),
             ),
             Positioned(
-              bottom: -82,
-              left: -42,
-              child: Container(
-                height: 210,
-                width: 210,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: tokens.primary.withValues(alpha: 0.58),
-                ),
+              bottom: -60,
+              left: -50,
+              child: AuraHalo(
+                color: tokens.teal2,
+                size: 240,
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(AppSpacing.xxl),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
                       _SoftPill(
-                        label: 'Live market',
+                        label: 'LIVE MARKET',
                         icon: Icons.bolt_rounded,
                         background: tokens.neutralBlock,
                         foreground: tokens.onNeutralBlock,
@@ -206,61 +197,55 @@ class _HeroBoard extends StatelessWidget {
                       GlassCircleButton(
                         icon: Icons.auto_graph_rounded,
                         size: 44,
-                        color: Colors.white.withValues(alpha: 0.32),
-                        iconColor: tokens.onAccentWarm,
+                        color: Colors.white.withValues(alpha: 0.2),
+                        iconColor: tokens.onPrimary,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 26),
+                  const SizedBox(height: AppSpacing.xxl),
                   Text(
                     '$score%',
-                    style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      color: tokens.onAccentWarm,
-                      fontSize: 62,
-                      fontWeight: FontWeight.w900,
+                    style: AppTypo.heroValue(tokens, color: tokens.onPrimary).copyWith(
+                      fontSize: 64,
                     ),
                   ),
                   Text(
                     'Momentum quality',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: tokens.onAccentWarm.withValues(alpha: 0.76),
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: AppTypo.bodyMedium(tokens, color: tokens.onPrimary.withValues(alpha: 0.8)),
                   ),
                   const Spacer(),
                   Sparkline(
-                    color: tokens.onAccentWarm.withValues(alpha: 0.9),
-                    height: 76,
+                    color: tokens.onPrimary.withValues(alpha: 0.95),
+                    height: 80,
                   ),
                 ],
               ),
             ),
             Positioned(
-              right: 24,
-              bottom: 84,
+              right: AppSpacing.xxl,
+              bottom: 90,
               child: FloatingOrb(
-                distance: 6,
+                distance: 8,
                 child: Container(
-                  height: 74,
-                  width: 74,
+                  height: 76,
+                  width: 76,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: tokens.neutralBlock,
                     boxShadow: [
                       BoxShadow(
-                        color: tokens.shadowLg.withValues(alpha: 0.36),
-                        blurRadius: 22,
-                        offset: const Offset(0, 12),
+                        color: tokens.shadowLg.withValues(alpha: 0.3),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
                       ),
                     ],
                   ),
                   child: Text(
                     _displayChange(nifty),
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: tokens.onNeutralBlock,
-                      fontWeight: FontWeight.w900,
+                    style: AppTypo.dataNum(tokens, color: tokens.onNeutralBlock).copyWith(
+                      fontSize: 16,
                     ),
                   ),
                 ),
@@ -283,10 +268,11 @@ class _SignalReadinessCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     return PremiumCard(
+      padding: const EdgeInsets.all(AppSpacing.xl),
       gradient: LinearGradient(
         colors: [
-          tokens.neutralBlock,
-          Color.lerp(tokens.neutralBlock, tokens.accentCool, 0.14)!,
+          tokens.surfaceRaised,
+          Color.lerp(tokens.surfaceRaised, tokens.primary, 0.05)!,
         ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
@@ -297,46 +283,37 @@ class _SignalReadinessCard extends StatelessWidget {
             alignment: Alignment.center,
             children: [
               SizedBox(
-                height: 76,
-                width: 76,
+                height: 72,
+                width: 72,
                 child: CircularProgressIndicator(
                   value: 0.78,
-                  strokeWidth: 9,
+                  strokeWidth: 8,
                   color: tokens.primary,
-                  backgroundColor: tokens.onNeutralBlock.withValues(
-                    alpha: 0.12,
-                  ),
+                  backgroundColor: tokens.border,
                   strokeCap: StrokeCap.round,
                 ),
               ),
               Text(
                 '78%',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: tokens.onNeutralBlock,
-                  fontWeight: FontWeight.w900,
+                style: AppTypo.dataNum(tokens, color: tokens.textPrimary).copyWith(
+                  fontSize: 16,
                 ),
               ),
             ],
           ),
-          const SizedBox(width: 18),
+          const SizedBox(width: AppSpacing.lg),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   'Trade readiness',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: tokens.onNeutralBlock,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: AppTypo.cardTitle(tokens),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   'Fresh setups, breadth context, and risk checkpoints are staged for review.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: tokens.onNeutralBlock.withValues(alpha: 0.72),
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: AppTypo.body(tokens),
                 ),
               ],
             ),
@@ -363,7 +340,7 @@ class _MarketTiles extends StatelessWidget {
             tone: _TileTone.mint,
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: AppSpacing.md),
         Expanded(
           child: _MarketTile(
             label: 'SENSEX',
@@ -393,39 +370,48 @@ class _MarketTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final fill = tone == _TileTone.mint ? tokens.accentMint : tokens.accentCool;
+    final fill = tone == _TileTone.mint ? tokens.accentMint : tokens.lavender;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final contentColor = isDark ? tokens.surface : tokens.onAccentMint;
+    
     return PressableScale(
       child: PremiumCard(
-        radius: 34,
-        padding: const EdgeInsets.all(18),
-        color: fill,
-        shadowColor: fill.withValues(alpha: 0.3),
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        gradient: LinearGradient(
+          colors: [fill, Color.lerp(fill, Colors.white, 0.1)!],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        shadowColor: fill.withValues(alpha: 0.25),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(
-              Icons.show_chart_rounded,
-              color: Colors.black.withValues(alpha: 0.58),
-              size: 28,
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: contentColor.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.show_chart_rounded,
+                color: contentColor,
+                size: 24,
+              ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: AppSpacing.lg),
             Text(
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: Colors.black.withValues(alpha: 0.62),
-                fontWeight: FontWeight.w900,
-              ),
+              style: AppTypo.eyebrow(tokens, color: contentColor.withValues(alpha: 0.8)),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: AppSpacing.xs),
             Text(
               _displayValue(data),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: Colors.black.withValues(alpha: 0.78),
-                fontWeight: FontWeight.w900,
+              style: AppTypo.dataNum(tokens, color: contentColor).copyWith(
+                fontSize: 18,
               ),
             ),
           ],
@@ -445,27 +431,24 @@ class _AvatarBadge extends StatelessWidget {
     final tokens = context.tokens;
     final initial = name.trim().isEmpty ? 'R' : name.trim()[0].toUpperCase();
     return Container(
-      height: 52,
-      width: 52,
+      height: 48,
+      width: 48,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: AppGradients.primaryShifted(tokens),
-        border: Border.all(color: Colors.white, width: 3),
+        border: Border.all(color: tokens.surface, width: 3),
         boxShadow: [
           BoxShadow(
-            color: tokens.primary.withValues(alpha: 0.34),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: tokens.primary.withValues(alpha: 0.2),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       alignment: Alignment.center,
       child: Text(
         initial,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: tokens.onPrimary,
-          fontWeight: FontWeight.w900,
-        ),
+        style: AppTypo.cardTitle(tokens, color: tokens.onPrimary),
       ),
     );
   }
@@ -486,23 +469,28 @@ class _SoftPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tokens = context.tokens;
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 9, 16, 9),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(AppRadius.pill),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: foreground, size: 16),
-          const SizedBox(width: 7),
+          Icon(icon, color: foreground, size: 14),
+          const SizedBox(width: AppSpacing.xs),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: foreground,
-              fontWeight: FontWeight.w900,
-            ),
+            style: AppTypo.eyebrow(tokens, color: foreground),
           ),
         ],
       ),
@@ -518,33 +506,33 @@ class _RefreshRibbon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Positioned(
-      top: MediaQuery.paddingOf(context).top + 14,
-      left: 78,
-      right: 78,
-      child: PremiumCard(
-        radius: AppRadius.pill,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        color: tokens.surface,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              height: 14,
-              width: 14,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.2,
-                color: tokens.primary,
+      top: MediaQuery.paddingOf(context).top + 16,
+      left: 0,
+      right: 0,
+      child: Center(
+        child: PremiumCard(
+          radius: AppRadius.pill,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
+          color: tokens.surfaceAlt,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                height: 14,
+                width: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: tokens.primary,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Refreshing',
-              style: Theme.of(
-                context,
-              ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w900),
-            ),
-          ],
+              const SizedBox(width: AppSpacing.sm),
+              Text(
+                'Refreshing',
+                style: AppTypo.eyebrow(tokens),
+              ),
+            ],
+          ),
         ),
       ),
     );

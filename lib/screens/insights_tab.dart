@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
@@ -28,6 +29,7 @@ class _InsightsTabState extends State<InsightsTab> {
   }
 
   Future<void> _load() async {
+    HapticFeedback.lightImpact();
     final data = await ApiService.getSentiment();
     final insights = await ApiService.getInsights();
     if (!mounted) return;
@@ -48,11 +50,12 @@ class _InsightsTabState extends State<InsightsTab> {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    if (_loading) return const PremiumLoader(label: 'Reading climate');
+    if (_loading) return const PremiumLoader(label: 'Reading climate', section: AyreSection.insights);
 
     final value = _sentiment ?? 0;
     final color = _color(value, tokens);
     return PremiumScaffold(
+      section: AyreSection.insights,
       bottomSafe: false,
       child: RefreshIndicator(
         color: tokens.primary,
@@ -62,23 +65,23 @@ class _InsightsTabState extends State<InsightsTab> {
           physics: const AlwaysScrollableScrollPhysics(
             parent: BouncingScrollPhysics(),
           ),
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 124),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, 140),
           children: [
             const AnimatedEntrance(child: _InsightsHeader()),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.xxl),
             if (_error)
               const AnimatedEntrance(
-                delay: Duration(milliseconds: 80),
+                delay: Duration(milliseconds: 100),
                 child: _InsightsErrorState(),
               )
             else ...[
               AnimatedEntrance(
-                delay: const Duration(milliseconds: 80),
+                delay: const Duration(milliseconds: 100),
                 child: _SentimentCard(value: value, color: color),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
               AnimatedEntrance(
-                delay: const Duration(milliseconds: 140),
+                delay: const Duration(milliseconds: 150),
                 child: _InsightNotes(
                   value: value,
                   note: _note,
@@ -87,9 +90,9 @@ class _InsightsTabState extends State<InsightsTab> {
               ),
               ..._insights.asMap().entries.map(
                 (entry) => Padding(
-                  padding: const EdgeInsets.only(top: 16),
+                  padding: const EdgeInsets.only(top: AppSpacing.lg),
                   child: AnimatedEntrance(
-                    delay: Duration(milliseconds: 180 + entry.key * 50),
+                    delay: Duration(milliseconds: 200 + entry.key * 50),
                     child: _InsightContentCard(insight: entry.value),
                   ),
                 ),
@@ -120,16 +123,20 @@ class _InsightContentCard extends StatelessWidget {
     final body = insight['body']?.toString() ?? '';
     final category = insight['category']?.toString();
     final featured = insight['featured'] == true || insight['pinned'] == true;
+    
+    // Softer backgrounds
     final color = featured ? tokens.accentWarm : tokens.accentCool;
-    final foreground = featured ? tokens.onAccentWarm : tokens.onAccentCool;
+    final bgColor = featured 
+        ? tokens.accentWarm.withValues(alpha: 0.1) 
+        : tokens.accentCool.withValues(alpha: 0.1);
+    
+    final foreground = featured ? tokens.accentWarm : tokens.accentCool;
 
     return PremiumCard(
-      gradient: LinearGradient(
-        colors: [color, Color.lerp(color, tokens.accentMint, 0.28)!],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      shadowColor: color.withValues(alpha: 0.24),
+      radius: AppRadius.card,
+      color: bgColor,
+      borderColor: color.withValues(alpha: 0.2),
+      shadowColor: color.withValues(alpha: 0.05),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -138,43 +145,34 @@ class _InsightContentCard extends StatelessWidget {
             width: 56,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: tokens.neutralBlock,
+              color: color.withValues(alpha: 0.2),
             ),
             child: Icon(
               featured ? Icons.push_pin_rounded : Icons.insights_rounded,
-              color: tokens.onNeutralBlock,
+              color: foreground,
             ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: AppSpacing.lg),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (category?.isNotEmpty == true) ...[
                   Text(
-                    category!,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: foreground.withValues(alpha: 0.7),
-                      fontWeight: FontWeight.w900,
-                    ),
+                    category!.toUpperCase(),
+                    style: AppTypo.eyebrow(tokens, color: foreground),
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: AppSpacing.xs),
                 ],
                 Text(
                   title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: foreground,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: AppTypo.cardTitle(tokens),
                 ),
                 if (body.isNotEmpty) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.sm),
                   Text(
                     body,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: foreground.withValues(alpha: 0.76),
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: AppTypo.body(tokens),
                   ),
                 ],
               ],
@@ -200,25 +198,21 @@ class _InsightsHeader extends StatelessWidget {
             children: [
               Text(
                 'Progress',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
+                style: AppTypo.pageTitle(tokens),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xs),
               Text(
                 'Market breadth and sentiment pulse.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: tokens.textSecondary,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: AppTypo.bodyMedium(tokens, color: tokens.textSecondary),
               ),
             ],
           ),
         ),
         GlassCircleButton(
           icon: Icons.tune_rounded,
-          size: 48,
-          color: tokens.surface,
+          size: 46,
+          color: tokens.surfaceAlt,
+          iconColor: tokens.textPrimary,
         ),
       ],
     );
@@ -235,43 +229,37 @@ class _SentimentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     return PremiumCard(
-      radius: 44,
-      padding: const EdgeInsets.all(22),
-      gradient: LinearGradient(
-        colors: [tokens.surface, tokens.surfaceRaised],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
+      radius: AppRadius.heroCard,
+      padding: const EdgeInsets.all(AppSpacing.xxl),
+      gradient: AppGradients.heroCard(AyreSection.insights, tokens),
+      shadowColor: tokens.primary.withValues(alpha: 0.2),
       child: Column(
         children: [
           Row(
             children: [
               _BlackBadge(label: 'Weekly', selected: true),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.sm),
               _BlackBadge(label: 'Month', selected: false),
               const Spacer(),
               Text(
                 _label(value),
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: color,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: AppTypo.eyebrow(tokens, color: color),
               ),
             ],
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: AppSpacing.xxl),
           TweenAnimationBuilder<double>(
             tween: Tween(begin: 0, end: value / 100),
             duration: AppMotion.slow,
             curve: AppMotion.ease,
             builder: (context, progress, _) {
               return SizedBox(
-                height: 210,
+                height: 220,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
                     CustomPaint(
-                      size: const Size(double.infinity, 210),
+                      size: const Size(double.infinity, 220),
                       painter: _GaugePainter(
                         progress: progress,
                         color: color,
@@ -279,24 +267,16 @@ class _SentimentCard extends StatelessWidget {
                       ),
                     ),
                     Positioned(
-                      bottom: 18,
+                      bottom: 24,
                       child: Column(
                         children: [
                           Text(
                             '${(progress * 100).round()}',
-                            style: Theme.of(context).textTheme.displaySmall
-                                ?.copyWith(
-                                  fontSize: 58,
-                                  fontWeight: FontWeight.w900,
-                                ),
+                            style: AppTypo.heroValue(tokens, color: tokens.onPrimary).copyWith(fontSize: 56),
                           ),
                           Text(
-                            'sentiment score',
-                            style: Theme.of(context).textTheme.labelLarge
-                                ?.copyWith(
-                                  color: tokens.textSecondary,
-                                  fontWeight: FontWeight.w900,
-                                ),
+                            'SENTIMENT SCORE',
+                            style: AppTypo.caption(tokens, color: tokens.onPrimary.withValues(alpha: 0.8)),
                           ),
                         ],
                       ),
@@ -311,24 +291,27 @@ class _SentimentCard extends StatelessWidget {
               Expanded(
                 child: _MetricBubble(
                   value: '48',
-                  label: 'lessons',
+                  label: 'LESSONS',
                   color: tokens.accentWarm,
+                  tokens: tokens,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: _MetricBubble(
                   value: '12',
-                  label: 'hours',
-                  color: tokens.accentCool,
+                  label: 'HOURS',
+                  color: tokens.accentMint,
+                  tokens: tokens,
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: _MetricBubble(
                   value: '$value%',
-                  label: 'pulse',
+                  label: 'PULSE',
                   color: color,
+                  tokens: tokens,
                 ),
               ),
             ],
@@ -339,9 +322,9 @@ class _SentimentCard extends StatelessWidget {
   }
 
   String _label(int value) {
-    if (value < 35) return 'Caution';
-    if (value < 65) return 'Neutral';
-    return 'Strong';
+    if (value < 35) return 'CAUTION';
+    if (value < 65) return 'NEUTRAL';
+    return 'STRONG';
   }
 }
 
@@ -360,15 +343,15 @@ class _InsightNotes extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     return PremiumCard(
+      radius: AppRadius.card,
       gradient: LinearGradient(
         colors: [
-          tokens.accentMint,
-          Color.lerp(tokens.accentMint, tokens.accentCool, 0.36)!,
+          tokens.surfaceRaised,
+          Color.lerp(tokens.surfaceRaised, tokens.accentMint, 0.05)!,
         ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
-      shadowColor: tokens.accentMint.withValues(alpha: 0.28),
       child: Row(
         children: [
           Container(
@@ -376,15 +359,15 @@ class _InsightNotes extends StatelessWidget {
             width: 64,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: tokens.neutralBlock,
+              color: tokens.accentMint.withValues(alpha: 0.2),
             ),
             child: Icon(
               Icons.psychology_alt_rounded,
-              color: tokens.onNeutralBlock,
-              size: 30,
+              color: tokens.accentMint,
+              size: 32,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: AppSpacing.lg),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -397,19 +380,15 @@ class _InsightNotes extends StatelessWidget {
                             : value < 35
                             ? 'defensive'
                             : 'balanced'} today.',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: tokens.onAccentMint,
-                    fontWeight: FontWeight.w800,
+                  style: AppTypo.body(tokens).copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 if (updatedAt?.isNotEmpty == true) ...[
-                  const SizedBox(height: 8),
+                  const SizedBox(height: AppSpacing.xs),
                   Text(
                     'Updated $updatedAt',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: tokens.onAccentMint.withValues(alpha: 0.68),
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: AppTypo.caption(tokens),
                   ),
                 ],
               ],
@@ -431,18 +410,16 @@ class _BlackBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     return AnimatedContainer(
-      duration: AppMotion.medium,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+      duration: AppMotion.fast,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
-        color: selected ? tokens.neutralBlock : tokens.surfaceAlt,
+        color: selected ? tokens.neutralBlock : Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: selected ? null : Border.all(color: Colors.white.withValues(alpha: 0.2)),
       ),
       child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: selected ? tokens.onNeutralBlock : tokens.textSecondary,
-          fontWeight: FontWeight.w900,
-        ),
+        label.toUpperCase(),
+        style: AppTypo.eyebrow(tokens, color: selected ? tokens.onNeutralBlock : tokens.onPrimary),
       ),
     );
   }
@@ -453,35 +430,32 @@ class _MetricBubble extends StatelessWidget {
     required this.value,
     required this.label,
     required this.color,
+    required this.tokens,
   });
 
   final String value;
   final String label;
   final Color color;
+  final AppThemeTokens tokens;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: AppSpacing.lg),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.18),
-        borderRadius: BorderRadius.circular(24),
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
       child: Column(
         children: [
           Text(
             value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w900,
-            ),
+            style: AppTypo.dataNum(tokens, color: color).copyWith(fontSize: 18),
           ),
+          const SizedBox(height: AppSpacing.xs),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color.withValues(alpha: 0.78),
-              fontWeight: FontWeight.w900,
-            ),
+            style: AppTypo.caption(tokens, color: color),
           ),
         ],
       ),
@@ -502,13 +476,13 @@ class _GaugePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height - 22);
-    final radius = math.min(size.width / 2, size.height) - 28;
+    final center = Offset(size.width / 2, size.height - 24);
+    final radius = math.min(size.width / 2, size.height) - 32;
     final rect = Rect.fromCircle(center: center, radius: radius);
-    const stroke = 20.0;
+    const stroke = 24.0;
 
     final trackPaint = Paint()
-      ..color = tokens.surfaceAlt
+      ..color = Colors.white.withValues(alpha: 0.15)
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
       ..strokeCap = StrokeCap.round;
@@ -530,8 +504,8 @@ class _GaugePainter extends CustomPainter {
       center.dx + radius * math.cos(angle),
       center.dy + radius * math.sin(angle),
     );
-    canvas.drawCircle(knob, 17, Paint()..color = Colors.white);
-    canvas.drawCircle(knob, 12, Paint()..color = color);
+    canvas.drawCircle(knob, 20, Paint()..color = Colors.white);
+    canvas.drawCircle(knob, 14, Paint()..color = color);
   }
 
   @override
@@ -547,20 +521,21 @@ class _InsightsErrorState extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     return PremiumCard(
-      padding: const EdgeInsets.all(26),
+      radius: AppRadius.card,
+      padding: const EdgeInsets.all(AppSpacing.xxl),
       gradient: LinearGradient(
         colors: [
           tokens.negative,
           Color.lerp(tokens.negative, tokens.accentWarm, 0.22)!,
         ],
       ),
-      shadowColor: tokens.negative.withValues(alpha: 0.28),
+      shadowColor: tokens.negative.withValues(alpha: 0.3),
       child: Column(
         children: [
           FloatingOrb(
             child: Container(
-              height: 92,
-              width: 92,
+              height: 96,
+              width: 96,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.white.withValues(alpha: 0.2),
@@ -568,27 +543,21 @@ class _InsightsErrorState extends StatelessWidget {
               child: const Icon(
                 Icons.wifi_off_rounded,
                 color: Colors.white,
-                size: 42,
+                size: 44,
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSpacing.xxl),
           Text(
             'Could not load sentiment',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-            ),
+            style: AppTypo.sectionTitle(tokens, color: Colors.white),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             'Pull down to retry fetching data.',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.white.withValues(alpha: 0.76),
-              fontWeight: FontWeight.w700,
-            ),
+            style: AppTypo.body(tokens, color: Colors.white.withValues(alpha: 0.8)),
           ),
         ],
       ),

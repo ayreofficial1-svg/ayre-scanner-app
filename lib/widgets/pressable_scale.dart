@@ -7,8 +7,8 @@ class PressableScale extends StatefulWidget {
     super.key,
     required this.child,
     this.onTap,
-    this.borderRadius = AppRadius.lg,
-    this.scale = 0.96,
+    this.borderRadius = AppRadius.md,
+    this.scale = 0.97, // Subtle scale (Apple standard is around 0.97-0.98)
   });
 
   final Widget child;
@@ -30,7 +30,7 @@ class _PressableScaleState extends State<PressableScale> {
     return AnimatedScale(
       scale: _pressed ? widget.scale : 1,
       duration: AppMotion.fast,
-      curve: AppMotion.ease,
+      curve: AppMotion.ease, // Snappy ease out
       child: Material(
         color: AppTheme.transparent,
         borderRadius: radius,
@@ -49,8 +49,10 @@ class _PressableScaleState extends State<PressableScale> {
           borderRadius: radius,
           splashColor: Theme.of(
             context,
-          ).colorScheme.primary.withValues(alpha: 0.08),
-          highlightColor: AppTheme.transparent,
+          ).colorScheme.primary.withValues(alpha: 0.05),
+          highlightColor: Theme.of(
+            context,
+          ).colorScheme.primary.withValues(alpha: 0.02),
           child: widget.child,
         ),
       ),

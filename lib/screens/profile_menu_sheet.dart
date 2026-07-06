@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../main.dart';
 import '../theme/app_theme.dart';
@@ -29,31 +30,34 @@ class _ProfileMenuSheetState extends State<ProfileMenuSheet> {
       top: false,
       child: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [tokens.background, tokens.backgroundTint],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(46)),
+          color: tokens.surfaceAlt, // Use a solid elevated color for the sheet
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 24,
+              offset: const Offset(0, -8),
+            ),
+          ],
         ),
         child: ListView(
           shrinkWrap: true,
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 24),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xxxl),
           children: [
             Center(
               child: Container(
-                width: 46,
+                width: 40,
                 height: 5,
                 decoration: BoxDecoration(
-                  color: tokens.textSecondary.withValues(alpha: 0.24),
+                  color: tokens.textTertiary.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: AppSpacing.lg),
             AnimatedEntrance(child: _ProfileHero(name: name)),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.lg),
             _MenuGrid(
               items: [
                 _GridItem(Icons.person_rounded, 'Profile', tokens.accentMint),
@@ -61,7 +65,7 @@ class _ProfileMenuSheetState extends State<ProfileMenuSheet> {
                 _GridItem(Icons.bookmark_rounded, 'Saved', tokens.accentCool),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.lg),
             _MenuSection(
               title: 'Notifications',
               children: [
@@ -70,25 +74,36 @@ class _ProfileMenuSheetState extends State<ProfileMenuSheet> {
                   title: 'Push Notifications',
                   subtitle: 'Setup alerts and scanner updates',
                   value: _pushNotifications,
-                  onChanged: (v) => setState(() => _pushNotifications = v),
+                  onChanged: (v) {
+                    HapticFeedback.lightImpact();
+                    setState(() => _pushNotifications = v);
+                  },
                 ),
+                const _MenuDivider(),
                 _MenuSwitchRow(
                   icon: Icons.add_alert_rounded,
                   title: 'Price Alerts',
                   subtitle: 'Watchlist moves and trigger levels',
                   value: _priceAlerts,
-                  onChanged: (v) => setState(() => _priceAlerts = v),
+                  onChanged: (v) {
+                    HapticFeedback.lightImpact();
+                    setState(() => _priceAlerts = v);
+                  },
                 ),
+                const _MenuDivider(),
                 _MenuSwitchRow(
                   icon: Icons.calendar_month_rounded,
                   title: 'Weekly Digest',
                   subtitle: 'A calm summary before Monday',
                   value: _weeklyDigest,
-                  onChanged: (v) => setState(() => _weeklyDigest = v),
+                  onChanged: (v) {
+                    HapticFeedback.lightImpact();
+                    setState(() => _weeklyDigest = v);
+                  },
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.lg),
             _MenuSection(
               title: 'Appearance',
               children: [
@@ -101,13 +116,16 @@ class _ProfileMenuSheetState extends State<ProfileMenuSheet> {
                       ? 'Dark premium canvas enabled'
                       : 'Light premium canvas enabled',
                   value: isDark,
-                  onChanged: (v) => themeController.setThemeMode(
-                    v ? ThemeMode.dark : ThemeMode.light,
-                  ),
+                  onChanged: (v) {
+                    HapticFeedback.lightImpact();
+                    themeController.setThemeMode(
+                      v ? ThemeMode.dark : ThemeMode.light,
+                    );
+                  },
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: AppSpacing.lg),
             _MenuSection(
               title: 'Session',
               children: [
@@ -115,14 +133,19 @@ class _ProfileMenuSheetState extends State<ProfileMenuSheet> {
                   icon: Icons.help_rounded,
                   title: 'Help',
                   subtitle: 'Guides, support, and scanner basics',
-                  onTap: () {},
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                  },
                 ),
+                const _MenuDivider(),
                 _MenuActionRow(
                   icon: Icons.logout_rounded,
                   title: 'Sign Out',
                   subtitle: 'Keep auth disabled for now',
                   destructive: true,
-                  onTap: () {},
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                  },
                 ),
               ],
             ),
@@ -142,38 +165,38 @@ class _ProfileHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     return PremiumCard(
-      radius: 42,
+      radius: AppRadius.xl,
       padding: EdgeInsets.zero,
       gradient: LinearGradient(
         colors: [
           tokens.neutralBlock,
-          Color.lerp(tokens.neutralBlock, tokens.primary, 0.16)!,
+          Color.lerp(tokens.neutralBlock, tokens.primary, 0.2)!
         ],
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
       ),
       child: SizedBox(
-        height: 142,
+        height: 150,
         child: Stack(
           children: [
             Positioned(
-              right: -32,
-              top: -48,
+              right: -40,
+              top: -60,
               child: Container(
-                height: 154,
-                width: 154,
+                height: 180,
+                width: 180,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.08),
+                  color: Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(AppSpacing.xl),
               child: Row(
                 children: [
-                  _AvatarBadge(name: name, size: 70),
-                  const SizedBox(width: 16),
+                  _AvatarBadge(name: name, size: 76),
+                  const SizedBox(width: AppSpacing.lg),
                   Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -183,30 +206,20 @@ class _ProfileHero extends StatelessWidget {
                           name,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                color: tokens.onNeutralBlock,
-                                fontWeight: FontWeight.w900,
-                              ),
+                          style: AppTypo.sectionTitle(tokens, color: tokens.onNeutralBlock),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           'Ayre Scanner workspace',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: tokens.onNeutralBlock.withValues(
-                                  alpha: 0.68,
-                                ),
-                                fontWeight: FontWeight.w800,
-                              ),
+                          style: AppTypo.body(tokens, color: tokens.onNeutralBlock.withValues(alpha: 0.8)),
                         ),
                       ],
                     ),
                   ),
                   GlassCircleButton(
                     icon: Icons.arrow_forward_rounded,
-                    size: 46,
-                    color: Colors.white.withValues(alpha: 0.12),
+                    size: 48,
+                    color: Colors.white.withValues(alpha: 0.15),
                     iconColor: tokens.onNeutralBlock,
                   ),
                 ],
@@ -229,7 +242,7 @@ class _MenuGrid extends StatelessWidget {
     return Row(
       children: [
         for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) const SizedBox(width: 10),
+          if (i > 0) const SizedBox(width: AppSpacing.md),
           Expanded(child: _MenuGridTile(item: items[i])),
         ],
       ],
@@ -245,25 +258,34 @@ class _MenuGridTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    return PremiumCard(
-      radius: 28,
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
-      color: item.color,
-      shadowColor: item.color.withValues(alpha: 0.22),
-      child: Column(
-        children: [
-          Icon(item.icon, color: tokens.neutralBlock, size: 26),
-          const SizedBox(height: 8),
-          Text(
-            item.label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: tokens.neutralBlock,
-              fontWeight: FontWeight.w900,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // Softer backgrounds
+    final bg = isDark ? item.color.withValues(alpha: 0.15) : item.color.withValues(alpha: 0.1);
+
+    return InkWell(
+      onTap: () {
+        HapticFeedback.selectionClick();
+      },
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      child: PremiumCard(
+        radius: AppRadius.card,
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.lg, horizontal: AppSpacing.sm),
+        color: bg,
+        borderColor: item.color.withValues(alpha: 0.2),
+        shadowColor: item.color.withValues(alpha: 0.1),
+        child: Column(
+          children: [
+            Icon(item.icon, color: item.color, size: 28),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              item.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypo.eyebrow(tokens, color: item.color),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -282,19 +304,16 @@ class _MenuSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.sm),
           child: Text(
-            title,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: tokens.textSecondary,
-              fontWeight: FontWeight.w900,
-            ),
+            title.toUpperCase(),
+            style: AppTypo.eyebrow(tokens),
           ),
         ),
         PremiumCard(
-          radius: 32,
+          radius: AppRadius.card,
           padding: EdgeInsets.zero,
-          gradient: AppGradients.surfaceGlass(tokens),
+          color: tokens.surface,
           child: Column(children: children),
         ),
       ],
@@ -326,7 +345,7 @@ class _MenuActionRow extends StatelessWidget {
       title: title,
       subtitle: subtitle,
       titleColor: destructive ? tokens.negative : null,
-      trailing: Icon(Icons.chevron_right_rounded, color: tokens.textSecondary),
+      trailing: Icon(Icons.chevron_right_rounded, color: tokens.textTertiary),
       onTap: onTap,
     );
   }
@@ -386,42 +405,36 @@ class _MenuRowFrame extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.lg),
         child: Row(
           children: [
             Container(
-              height: 46,
-              width: 46,
+              height: 48,
+              width: 48,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: iconColor.withValues(alpha: 0.14),
+                color: iconColor.withValues(alpha: 0.15),
               ),
-              child: Icon(icon, color: iconColor, size: 22),
+              child: Icon(icon, color: iconColor, size: 24),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: AppSpacing.lg),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: titleColor ?? tokens.textPrimary,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: AppTypo.cardTitle(tokens, color: titleColor),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: tokens.textSecondary,
-                      fontWeight: FontWeight.w700,
-                    ),
+                    style: AppTypo.body(tokens),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: AppSpacing.md),
             trailing,
           ],
         ),
@@ -429,6 +442,21 @@ class _MenuRowFrame extends StatelessWidget {
     );
   }
 }
+
+class _MenuDivider extends StatelessWidget {
+  const _MenuDivider();
+  
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      indent: 80, // Align with text
+      color: context.tokens.borderSubtle,
+    );
+  }
+}
+
 
 class _AvatarBadge extends StatelessWidget {
   const _AvatarBadge({required this.name, required this.size});
@@ -449,19 +477,16 @@ class _AvatarBadge extends StatelessWidget {
         border: Border.all(color: Colors.white, width: 3),
         boxShadow: [
           BoxShadow(
-            color: tokens.primary.withValues(alpha: 0.34),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: tokens.shadowLg,
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       alignment: Alignment.center,
       child: Text(
         initial,
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-          color: tokens.onPrimary,
-          fontWeight: FontWeight.w900,
-        ),
+        style: AppTypo.sectionTitle(tokens, color: tokens.onPrimary).copyWith(fontSize: size * 0.4),
       ),
     );
   }

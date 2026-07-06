@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
@@ -23,6 +24,7 @@ class _SignalsTabState extends State<SignalsTab> {
   }
 
   Future<void> _load() async {
+    HapticFeedback.lightImpact();
     final signals = await ApiService.getSignals();
     if (!mounted) return;
     setState(() {
@@ -34,9 +36,10 @@ class _SignalsTabState extends State<SignalsTab> {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    if (_loading) return const PremiumLoader(label: 'Scanning setups');
+    if (_loading) return const PremiumLoader(label: 'Scanning setups', section: AyreSection.signals);
 
     return PremiumScaffold(
+      section: AyreSection.signals,
       bottomSafe: false,
       child: RefreshIndicator(
         color: tokens.primary,
@@ -46,19 +49,21 @@ class _SignalsTabState extends State<SignalsTab> {
           physics: const AlwaysScrollableScrollPhysics(
             parent: BouncingScrollPhysics(),
           ),
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 124),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, 140),
           itemCount: _signals.isEmpty ? 2 : _signals.length + 1,
-          separatorBuilder: (_, __) => const SizedBox(height: 14),
+          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
           itemBuilder: (context, index) {
-            if (index == 0)
+            if (index == 0) {
               return const AnimatedEntrance(child: _SignalsHeader());
-            if (_signals.isEmpty)
+            }
+            if (_signals.isEmpty) {
               return const AnimatedEntrance(
-                delay: Duration(milliseconds: 80),
+                delay: Duration(milliseconds: 100),
                 child: _SignalsEmptyState(),
               );
+            }
             return AnimatedEntrance(
-              delay: Duration(milliseconds: 45 * index),
+              delay: Duration(milliseconds: 50 * index),
               child: _SignalCard(signal: _signals[index - 1], index: index),
             );
           },
@@ -75,16 +80,10 @@ class _SignalsHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     return PremiumCard(
-      padding: const EdgeInsets.all(22),
-      gradient: LinearGradient(
-        colors: [
-          tokens.negative,
-          Color.lerp(tokens.negative, tokens.accentWarm, 0.34)!,
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      shadowColor: tokens.negative.withValues(alpha: 0.26),
+      radius: AppRadius.heroCard,
+      padding: const EdgeInsets.all(AppSpacing.xxl),
+      gradient: AppGradients.heroCard(AyreSection.signals, tokens),
+      shadowColor: tokens.primary.withValues(alpha: 0.3),
       child: Row(
         children: [
           Expanded(
@@ -92,38 +91,32 @@ class _SignalsHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _HeaderBadge(tokens: tokens),
-                const SizedBox(height: 24),
+                const SizedBox(height: AppSpacing.xxl),
                 Text(
                   'Signal board',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: AppTypo.pageTitle(tokens, color: tokens.onPrimary),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
                   'Curated setups with live movement and compact rationale.',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.76),
-                    fontWeight: FontWeight.w700,
-                  ),
+                  style: AppTypo.bodyMedium(tokens, color: tokens.onPrimary.withValues(alpha: 0.8)),
                 ),
               ],
             ),
           ),
           FloatingOrb(
             child: Container(
-              height: 82,
-              width: 82,
+              height: 86,
+              width: 86,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.18),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+                color: Colors.white.withValues(alpha: 0.15),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
               ),
               child: const Icon(
                 Icons.radar_rounded,
                 color: Colors.white,
-                size: 38,
+                size: 40,
               ),
             ),
           ),
@@ -141,17 +134,21 @@ class _HeaderBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
         color: tokens.neutralBlock,
         borderRadius: BorderRadius.circular(AppRadius.pill),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Text(
-        'Live scanner',
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: tokens.onNeutralBlock,
-          fontWeight: FontWeight.w900,
-        ),
+        'LIVE SCANNER',
+        style: AppTypo.eyebrow(tokens, color: tokens.onNeutralBlock),
       ),
     );
   }
@@ -164,47 +161,42 @@ class _SignalsEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     return PremiumCard(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(AppSpacing.xxxl),
       gradient: AppGradients.surfaceGlass(tokens),
       child: Column(
         children: [
           FloatingOrb(
             child: Container(
-              height: 104,
-              width: 104,
+              height: 110,
+              width: 110,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: AppGradients.warmShifted(tokens),
+                gradient: AppGradients.primaryShifted(tokens),
                 boxShadow: [
                   BoxShadow(
-                    color: tokens.accentWarm.withValues(alpha: 0.32),
-                    blurRadius: 30,
-                    offset: const Offset(0, 14),
+                    color: tokens.primary.withValues(alpha: 0.3),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
                   ),
                 ],
               ),
               child: Icon(
                 Icons.travel_explore_rounded,
-                color: tokens.onAccentWarm,
-                size: 46,
+                color: tokens.onPrimary,
+                size: 48,
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.xxl),
           Text(
             'No fresh setups',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+            style: AppTypo.sectionTitle(tokens),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             'Pull down when you want the scanner to sweep again.',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: tokens.textSecondary,
-              fontWeight: FontWeight.w700,
-            ),
+            style: AppTypo.body(tokens),
           ),
         ],
       ),
@@ -227,52 +219,66 @@ class _SignalCard extends StatelessWidget {
     final lastPrice = signal['last_price'];
     final changePct = signal['change_pct'];
     final isUp = changePct is num ? changePct >= 0 : true;
-    final fill = isUp ? tokens.accentMint : tokens.negative;
-    final foreground = isUp ? tokens.onAccentMint : tokens.onNegative;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // Softer background colors for signal cards
+    final fill = isUp 
+        ? (isDark ? tokens.positive.withValues(alpha: 0.15) : tokens.mint) 
+        : (isDark ? tokens.negative.withValues(alpha: 0.15) : tokens.peach);
+    
+    final foreground = isUp 
+        ? (isDark ? tokens.positive : tokens.primary)
+        : (isDark ? tokens.negative : tokens.negative);
+        
+    final textColor = isDark ? tokens.textPrimary : tokens.neutralBlock;
 
     return PressableScale(
-      onTap: () {},
+      onTap: () {
+        HapticFeedback.selectionClick();
+      },
       child: PremiumCard(
-        radius: 36,
+        radius: AppRadius.card,
         padding: EdgeInsets.zero,
         color: fill,
-        shadowColor: fill.withValues(alpha: 0.3),
+        borderColor: isUp ? tokens.positive.withValues(alpha: 0.3) : tokens.negative.withValues(alpha: 0.3),
+        shadowColor: fill.withValues(alpha: 0.5),
         child: Stack(
           children: [
             Positioned(
-              right: -36,
+              right: -40,
               top: -40,
               child: Container(
-                height: 142,
-                width: 142,
+                height: 150,
+                width: 150,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.18),
+                  color: foreground.withValues(alpha: 0.05),
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(22),
+              padding: const EdgeInsets.all(AppSpacing.xl),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
                       Container(
-                        height: 48,
-                        width: 48,
+                        height: 52,
+                        width: 52,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: tokens.neutralBlock,
+                          color: foreground.withValues(alpha: 0.15),
                         ),
                         child: Icon(
                           isUp
                               ? Icons.trending_up_rounded
                               : Icons.trending_down_rounded,
-                          color: tokens.onNeutralBlock,
+                          color: foreground,
+                          size: 26,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: AppSpacing.md),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -281,11 +287,9 @@ class _SignalCard extends StatelessWidget {
                               symbol,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleLarge
-                                  ?.copyWith(
-                                    color: foreground,
-                                    fontWeight: FontWeight.w900,
-                                  ),
+                              style: AppTypo.cardTitle(tokens, color: textColor).copyWith(
+                                fontSize: 18,
+                              ),
                             ),
                             Text(
                               dateAdded.isEmpty
@@ -293,11 +297,7 @@ class _SignalCard extends StatelessWidget {
                                   : 'Added $dateAdded',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.labelMedium
-                                  ?.copyWith(
-                                    color: foreground.withValues(alpha: 0.68),
-                                    fontWeight: FontWeight.w800,
-                                  ),
+                              style: AppTypo.caption(tokens, color: textColor.withValues(alpha: 0.7)),
                             ),
                           ],
                         ),
@@ -306,23 +306,22 @@ class _SignalCard extends StatelessWidget {
                         price: lastPrice,
                         changePct: changePct,
                         foreground: foreground,
+                        backgroundColor: foreground.withValues(alpha: 0.15),
+                        tokens: tokens,
                       ),
                     ],
                   ),
                   if (rationale.isNotEmpty) ...[
-                    const SizedBox(height: 18),
+                    const SizedBox(height: AppSpacing.lg),
                     Text(
                       rationale,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: foreground.withValues(alpha: 0.78),
-                        fontWeight: FontWeight.w700,
-                      ),
+                      style: AppTypo.body(tokens, color: textColor.withValues(alpha: 0.85)),
                     ),
                   ],
-                  const SizedBox(height: 18),
+                  const SizedBox(height: AppSpacing.xl),
                   Sparkline(
-                    color: foreground.withValues(alpha: 0.8),
-                    height: 54,
+                    color: foreground.withValues(alpha: 0.9),
+                    height: 60,
                     points: isUp
                         ? const [0.72, 0.64, 0.7, 0.5, 0.58, 0.38, 0.42, 0.24]
                         : const [0.24, 0.38, 0.32, 0.5, 0.48, 0.62, 0.58, 0.72],
@@ -342,19 +341,23 @@ class _PricePill extends StatelessWidget {
     required this.price,
     required this.changePct,
     required this.foreground,
+    required this.backgroundColor,
+    required this.tokens,
   });
 
   final dynamic price;
   final dynamic changePct;
   final Color foreground;
+  final Color backgroundColor;
+  final AppThemeTokens tokens;
 
   @override
   Widget build(BuildContext context) {
     final isUp = changePct is num ? changePct >= 0 : true;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
-        color: foreground.withValues(alpha: 0.16),
+        color: backgroundColor,
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Column(
@@ -362,19 +365,13 @@ class _PricePill extends StatelessWidget {
         children: [
           Text(
             price is num ? price.toStringAsFixed(2) : '--',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: foreground,
-              fontWeight: FontWeight.w900,
-            ),
+            style: AppTypo.dataNum(tokens, color: foreground),
           ),
           Text(
             changePct is num
                 ? '${isUp ? '+' : ''}${changePct.toStringAsFixed(2)}%'
                 : '--',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: foreground.withValues(alpha: 0.78),
-              fontWeight: FontWeight.w900,
-            ),
+            style: AppTypo.caption(tokens, color: foreground),
           ),
         ],
       ),

@@ -76,47 +76,43 @@ class _LoginScreenState extends State<LoginScreen> {
     final tokens = context.tokens;
     return Scaffold(
       body: PremiumScaffold(
+        section: AyreSection.home,
         child: Center(
           child: SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(18, 24, 18, 24),
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.xxl),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 430),
+              constraints: const BoxConstraints(maxWidth: 400),
               child: Column(
                 children: [
                   AnimatedEntrance(child: _LoginHero(tokens: tokens)),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: AppSpacing.xl),
                   AnimatedEntrance(
                     delay: const Duration(milliseconds: 100),
                     child: PremiumCard(
-                      radius: 44,
-                      padding: const EdgeInsets.all(22),
+                      radius: AppRadius.xl,
+                      padding: const EdgeInsets.all(AppSpacing.xxl),
                       gradient: AppGradients.surfaceGlass(tokens),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Text(
                             'Welcome back',
-                            style: Theme.of(context).textTheme.headlineSmall
-                                ?.copyWith(fontWeight: FontWeight.w900),
+                            style: AppTypo.pageTitle(tokens),
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: AppSpacing.xs),
                           Text(
-                            'Sign in to continue your scanner workspace.',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: tokens.textSecondary,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                            'Sign in to continue to your workspace.',
+                            style: AppTypo.body(tokens),
                           ),
-                          const SizedBox(height: 22),
+                          const SizedBox(height: AppSpacing.xxxl),
                           _LoginTextField(
                             controller: _usernameController,
                             label: 'Username',
                             icon: Icons.person_rounded,
                             submitted: _submitted,
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: AppSpacing.lg),
                           _LoginTextField(
                             controller: _passwordController,
                             label: 'Password',
@@ -125,10 +121,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             submitted: _submitted,
                           ),
                           if (_error != null) ...[
-                            const SizedBox(height: 14),
+                            const SizedBox(height: AppSpacing.lg),
                             _LoginError(message: _error!),
                           ],
-                          const SizedBox(height: 20),
+                          const SizedBox(height: AppSpacing.xxl),
                           _LoginButton(
                             loading: _loading,
                             onPressed: _handleLogin,
@@ -155,86 +151,88 @@ class _LoginHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PremiumCard(
-      radius: 48,
+      radius: AppRadius.xl,
       padding: EdgeInsets.zero,
-      gradient: LinearGradient(
-        colors: [
-          tokens.primary,
-          Color.lerp(tokens.primary, tokens.accentCool, 0.55)!,
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      shadowColor: tokens.primary.withValues(alpha: 0.28),
+      gradient: AppGradients.heroCard(AyreSection.home, tokens),
+      shadowColor: tokens.primary.withValues(alpha: 0.3),
       child: SizedBox(
-        height: 244,
+        height: 260,
         child: Stack(
           children: [
             Positioned(
-              top: -46,
-              right: -26,
+              top: -60,
+              right: -40,
               child: Container(
-                height: 150,
-                width: 150,
+                height: 180,
+                width: 180,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.2),
+                  color: Colors.white.withValues(alpha: 0.1),
                 ),
               ),
             ),
             Positioned(
-              left: 22,
-              top: 22,
+              left: 24,
+              top: 24,
               child: Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 9,
+                  horizontal: AppSpacing.lg,
+                  vertical: AppSpacing.sm,
                 ),
                 decoration: BoxDecoration(
                   color: tokens.neutralBlock,
                   borderRadius: BorderRadius.circular(AppRadius.pill),
+                  boxShadow: [
+                    BoxShadow(
+                      color: tokens.shadow.withValues(alpha: 0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Text(
-                  'Ayre Scanner',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: tokens.onNeutralBlock,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  'AYRE SCANNER',
+                  style: AppTypo.eyebrow(tokens, color: tokens.onNeutralBlock),
                 ),
               ),
             ),
             Positioned(
               right: 28,
-              top: 62,
+              top: 72,
               child: FloatingOrb(
                 child: Container(
-                  height: 106,
-                  width: 106,
+                  height: 110,
+                  width: 110,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withValues(alpha: 0.22),
+                    color: Colors.white.withValues(alpha: 0.15),
                     border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.34),
+                      color: Colors.white.withValues(alpha: 0.3),
+                      width: 1.5,
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
                   child: const Icon(
                     Icons.radar_rounded,
                     color: Colors.white,
-                    size: 52,
+                    size: 56,
                   ),
                 ),
               ),
             ),
             Positioned(
               left: 24,
-              right: 142,
+              right: 140,
               bottom: 24,
               child: Text(
                 'Market intelligence with calm execution.',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  color: tokens.onPrimary,
-                  fontWeight: FontWeight.w900,
-                ),
+                style: AppTypo.pageTitle(tokens, color: tokens.onPrimary),
               ),
             ),
           ],
@@ -286,24 +284,25 @@ class _LoginTextFieldState extends State<_LoginTextField> {
     final tokens = context.tokens;
     final invalid = widget.submitted && widget.controller.text.isEmpty;
     return AnimatedContainer(
-      duration: AppMotion.medium,
+      duration: AppMotion.fast,
       curve: AppMotion.ease,
       decoration: BoxDecoration(
-        color: tokens.surfaceRaised,
-        borderRadius: BorderRadius.circular(24),
+        color: tokens.surfaceAlt, // Solid subtle background instead of transparent
+        borderRadius: BorderRadius.circular(AppRadius.md),
         border: Border.all(
           color: invalid
               ? tokens.negative
               : _focused
               ? tokens.primary
-              : Colors.white.withValues(alpha: 0.38),
+              : tokens.borderSubtle,
+          width: _focused || invalid ? 1.5 : 1.0,
         ),
         boxShadow: [
           if (_focused)
             BoxShadow(
-              color: tokens.primary.withValues(alpha: 0.18),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
+              color: tokens.primary.withValues(alpha: 0.1),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
         ],
       ),
@@ -311,44 +310,27 @@ class _LoginTextFieldState extends State<_LoginTextField> {
         focusNode: _focusNode,
         controller: widget.controller,
         obscureText: widget.obscure,
-        style: Theme.of(
-          context,
-        ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w800),
+        style: AppTypo.bodyMedium(tokens, color: tokens.textPrimary),
         decoration: InputDecoration(
           prefixIcon: Icon(
             widget.icon,
-            color: invalid ? tokens.negative : tokens.primary,
+            color: invalid ? tokens.negative : (_focused ? tokens.primary : tokens.textSecondary),
           ),
           suffixIcon: invalid
               ? Icon(Icons.error_rounded, color: tokens.negative)
               : null,
           labelText: widget.label,
-          labelStyle: TextStyle(
-            color: tokens.textSecondary,
-            fontWeight: FontWeight.w800,
-          ),
-          floatingLabelStyle: TextStyle(
-            color: invalid ? tokens.negative : tokens.primary,
-            fontWeight: FontWeight.w900,
-          ),
+          labelStyle: AppTypo.body(tokens, color: tokens.textSecondary),
+          floatingLabelStyle: AppTypo.bodyMedium(tokens, color: invalid ? tokens.negative : tokens.primary),
           filled: true,
           fillColor: AppTheme.transparent,
           contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 18,
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.lg,
           ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(24),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(24),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(24),
-            borderSide: BorderSide.none,
-          ),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
         ),
       ),
     );
@@ -364,22 +346,20 @@ class _LoginError extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       decoration: BoxDecoration(
-        color: tokens.negative.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(22),
+        color: tokens.negative.withValues(alpha: 0.1),
+        border: Border.all(color: tokens.negative.withValues(alpha: 0.2)),
+        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Row(
         children: [
           Icon(Icons.error_outline_rounded, color: tokens.negative, size: 20),
-          const SizedBox(width: 10),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               message,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: tokens.negative,
-                fontWeight: FontWeight.w900,
-              ),
+              style: AppTypo.caption(tokens, color: tokens.negative),
             ),
           ),
         ],
@@ -399,37 +379,34 @@ class _LoginButton extends StatelessWidget {
     final tokens = context.tokens;
     return PressableScale(
       onTap: loading ? null : onPressed,
-      borderRadius: AppRadius.pill,
+      borderRadius: AppRadius.md,
       child: AnimatedContainer(
         duration: AppMotion.medium,
-        height: 58,
+        height: 56,
         decoration: BoxDecoration(
           gradient: AppGradients.primaryShifted(tokens),
-          borderRadius: BorderRadius.circular(AppRadius.pill),
+          borderRadius: BorderRadius.circular(AppRadius.md),
           boxShadow: [
             BoxShadow(
-              color: tokens.primary.withValues(alpha: 0.34),
-              blurRadius: 22,
-              offset: const Offset(0, 12),
+              color: tokens.primary.withValues(alpha: 0.3),
+              blurRadius: 16,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
         child: Center(
           child: loading
               ? const SizedBox(
-                  height: 22,
-                  width: 22,
+                  height: 24,
+                  width: 24,
                   child: CircularProgressIndicator(
-                    strokeWidth: 2.6,
+                    strokeWidth: 2.5,
                     color: Colors.white,
                   ),
                 )
               : Text(
-                  'Log In',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: tokens.onPrimary,
-                    fontWeight: FontWeight.w900,
-                  ),
+                  'Sign In',
+                  style: AppTypo.cardTitle(tokens, color: tokens.onPrimary),
                 ),
         ),
       ),

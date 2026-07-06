@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
@@ -23,6 +24,7 @@ class _LearnTabState extends State<LearnTab> {
   }
 
   Future<void> _load() async {
+    HapticFeedback.lightImpact();
     final lessons = await ApiService.getLearnArticles();
     if (!mounted) return;
     setState(() {
@@ -34,8 +36,10 @@ class _LearnTabState extends State<LearnTab> {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    if (_loading) return const PremiumLoader(label: 'Loading library');
+    if (_loading) return const PremiumLoader(label: 'Loading library', section: AyreSection.learn);
+    
     return PremiumScaffold(
+      section: AyreSection.learn,
       bottomSafe: false,
       child: RefreshIndicator(
         color: tokens.primary,
@@ -45,9 +49,9 @@ class _LearnTabState extends State<LearnTab> {
           physics: const AlwaysScrollableScrollPhysics(
             parent: BouncingScrollPhysics(),
           ),
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 124),
+          padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, 140),
           itemCount: _lessons.isEmpty ? 2 : _lessons.length + 1,
-          separatorBuilder: (_, __) => const SizedBox(height: 14),
+          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
           itemBuilder: (context, index) {
             if (index == 0) {
               return AnimatedEntrance(
@@ -56,14 +60,15 @@ class _LearnTabState extends State<LearnTab> {
             }
             if (_lessons.isEmpty) {
               return const AnimatedEntrance(
-                delay: Duration(milliseconds: 80),
+                delay: Duration(milliseconds: 100),
                 child: _LearnEmptyState(),
               );
             }
             return AnimatedEntrance(
-              delay: Duration(milliseconds: 60 * index),
+              delay: Duration(milliseconds: 50 * index),
               child: _LessonCard(
                 lesson: _Lesson.fromJson(_lessons[index - 1]),
+                tokens: tokens,
               ),
             );
           },
@@ -82,49 +87,42 @@ class _LearnHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PremiumCard(
-      radius: 44,
+      radius: AppRadius.heroCard,
       padding: EdgeInsets.zero,
-      gradient: LinearGradient(
-        colors: [
-          tokens.accentCool,
-          Color.lerp(tokens.accentCool, tokens.negative, 0.32)!,
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-      shadowColor: tokens.accentCool.withValues(alpha: 0.28),
+      gradient: AppGradients.heroCard(AyreSection.learn, tokens),
+      shadowColor: tokens.accentWarm.withValues(alpha: 0.25),
       child: SizedBox(
-        height: 220,
+        height: 240,
         child: Stack(
           children: [
             Positioned(
-              right: -28,
-              top: -42,
+              right: -30,
+              top: -50,
               child: Container(
-                height: 150,
-                width: 150,
+                height: 180,
+                width: 180,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.18),
+                  color: Colors.white.withValues(alpha: 0.15),
                 ),
               ),
             ),
             Positioned(
-              right: 24,
-              top: 34,
+              right: 20,
+              top: 30,
               child: Transform.rotate(
-                angle: -0.25,
+                angle: -0.2,
                 child: FloatingOrb(
                   child: Icon(
                     Icons.school_rounded,
-                    size: 88,
-                    color: Colors.white.withValues(alpha: 0.88),
+                    size: 96,
+                    color: Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(AppSpacing.xxl),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -132,16 +130,13 @@ class _LearnHero extends StatelessWidget {
                   const Spacer(),
                   Text(
                     'My courses',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                    ),
+                    style: AppTypo.pageTitle(tokens, color: tokens.onPrimary),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: AppSpacing.md),
                   Row(
                     children: [
                       _HeroStat(
-                        label: 'Subjects',
+                        label: 'SUBJECTS',
                         value: lessons
                             .map((lesson) => lesson['category']?.toString())
                             .where((category) => category?.isNotEmpty == true)
@@ -150,9 +145,9 @@ class _LearnHero extends StatelessWidget {
                             .toString(),
                         tokens: tokens,
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: AppSpacing.md),
                       _HeroStat(
-                        label: 'Lessons',
+                        label: 'LESSONS',
                         value: lessons.length.toString(),
                         tokens: tokens,
                       ),
@@ -175,15 +170,12 @@ class _LearnEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     return PremiumCard(
-      padding: const EdgeInsets.all(28),
+      padding: const EdgeInsets.all(AppSpacing.xxxl),
       gradient: AppGradients.surfaceGlass(tokens),
       child: Text(
         'No lessons available.',
         textAlign: TextAlign.center,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: tokens.textSecondary,
-          fontWeight: FontWeight.w900,
-        ),
+        style: AppTypo.sectionTitle(tokens),
       ),
     );
   }
@@ -197,17 +189,21 @@ class _HeroChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
       decoration: BoxDecoration(
         color: tokens.neutralBlock,
         borderRadius: BorderRadius.circular(AppRadius.pill),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Text(
-        'Trading library',
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-          color: tokens.onNeutralBlock,
-          fontWeight: FontWeight.w900,
-        ),
+        'TRADING LIBRARY',
+        style: AppTypo.eyebrow(tokens, color: tokens.onNeutralBlock),
       ),
     );
   }
@@ -227,27 +223,21 @@ class _HeroStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.24),
+        color: Colors.white.withValues(alpha: 0.25),
         borderRadius: BorderRadius.circular(AppRadius.pill),
       ),
       child: Row(
         children: [
           Text(
             value,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
-            ),
+            style: AppTypo.dataNum(tokens, color: Colors.white).copyWith(fontSize: 16),
           ),
-          const SizedBox(width: 6),
+          const SizedBox(width: AppSpacing.sm),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Colors.white.withValues(alpha: 0.78),
-              fontWeight: FontWeight.w800,
-            ),
+            style: AppTypo.eyebrow(tokens, color: Colors.white.withValues(alpha: 0.9)),
           ),
         ],
       ),
@@ -256,112 +246,113 @@ class _HeroStat extends StatelessWidget {
 }
 
 class _LessonCard extends StatelessWidget {
-  const _LessonCard({required this.lesson});
+  const _LessonCard({required this.lesson, required this.tokens});
 
   final _Lesson lesson;
+  final AppThemeTokens tokens;
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
     final colors = _colors(tokens, lesson.tone);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    
+    // Create a softer card background instead of solid color
+    final cardBg = isDark 
+        ? colors.fill.withValues(alpha: 0.15) 
+        : colors.fill.withValues(alpha: 0.1);
+        
+    final iconBg = colors.foreground.withValues(alpha: 0.15);
+
     return PressableScale(
-      onTap: () {},
+      onTap: () {
+        HapticFeedback.selectionClick();
+      },
       child: PremiumCard(
-        radius: 36,
+        radius: AppRadius.card,
         padding: EdgeInsets.zero,
-        gradient: LinearGradient(
-          colors: [colors.fill, colors.fill2],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        shadowColor: colors.fill.withValues(alpha: 0.28),
+        color: cardBg,
+        borderColor: colors.fill.withValues(alpha: 0.3),
+        shadowColor: colors.fill.withValues(alpha: 0.1),
         child: Stack(
           children: [
             Positioned(
-              right: -30,
-              bottom: -40,
+              right: -40,
+              bottom: -50,
               child: Container(
-                height: 132,
-                width: 132,
+                height: 160,
+                width: 160,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: colors.foreground.withValues(alpha: 0.1),
+                  color: colors.foreground.withValues(alpha: 0.05),
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(AppSpacing.xl),
               child: Row(
                 children: [
                   Container(
-                    height: 68,
-                    width: 68,
+                    height: 72,
+                    width: 72,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: colors.foreground.withValues(alpha: 0.14),
+                      color: iconBg,
                     ),
                     child: Icon(
                       lesson.icon,
                       color: colors.foreground,
-                      size: 32,
+                      size: 36,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: AppSpacing.lg),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
+                            horizontal: AppSpacing.md,
+                            vertical: AppSpacing.xs,
                           ),
                           decoration: BoxDecoration(
-                            color: colors.foreground.withValues(alpha: 0.14),
+                            color: iconBg,
                             borderRadius: BorderRadius.circular(AppRadius.pill),
                           ),
                           child: Text(
-                            lesson.eyebrow,
-                            style: Theme.of(context).textTheme.labelSmall
-                                ?.copyWith(
-                                  color: colors.foreground,
-                                  fontWeight: FontWeight.w900,
-                                ),
+                            lesson.eyebrow.toUpperCase(),
+                            style: AppTypo.eyebrow(tokens, color: colors.foreground),
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: AppSpacing.md),
                         Text(
                           lesson.title,
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(
-                                color: colors.foreground,
-                                fontWeight: FontWeight.w900,
-                              ),
+                          style: AppTypo.cardTitle(tokens).copyWith(fontSize: 18),
                         ),
-                        const SizedBox(height: 5),
+                        const SizedBox(height: AppSpacing.xs),
                         Text(
                           lesson.description,
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: colors.foreground.withValues(
-                                  alpha: 0.74,
-                                ),
-                                fontWeight: FontWeight.w700,
-                              ),
+                          style: AppTypo.body(tokens),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    height: 46,
-                    width: 46,
+                    height: 48,
+                    width: 48,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: colors.foreground,
+                      boxShadow: [
+                        BoxShadow(
+                          color: colors.foreground.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
                     child: Icon(
                       Icons.arrow_forward_rounded,
-                      color: colors.fill,
+                      color: isDark ? tokens.background : Colors.white,
                       size: 24,
                     ),
                   ),
@@ -379,17 +370,17 @@ class _LessonCard extends StatelessWidget {
       _LessonTone.orange => _LessonColors(
         tokens.accentWarm,
         Color.lerp(tokens.accentWarm, tokens.negative, 0.2)!,
-        tokens.onAccentWarm,
+        tokens.accentWarm,
       ),
       _LessonTone.dark => _LessonColors(
-        tokens.neutralBlock,
-        Color.lerp(tokens.neutralBlock, tokens.primary, 0.12)!,
-        tokens.onNeutralBlock,
+        tokens.primary,
+        Color.lerp(tokens.primary, tokens.teal2, 0.12)!,
+        tokens.primary,
       ),
       _LessonTone.mint => _LessonColors(
         tokens.accentMint,
         Color.lerp(tokens.accentMint, tokens.accentCool, 0.26)!,
-        tokens.onAccentMint,
+        tokens.accentMint,
       ),
     };
   }

@@ -5,36 +5,31 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
+/// Scaffold with per-section gradient background + decorative blobs.
 class PremiumScaffold extends StatelessWidget {
   const PremiumScaffold({
     super.key,
     required this.child,
+    this.section = AyreSection.home,
     this.padding = EdgeInsets.zero,
     this.bottomSafe = true,
   });
 
   final Widget child;
+  final AyreSection section;
   final EdgeInsetsGeometry padding;
   final bool bottomSafe;
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
+    final brightness = Theme.of(context).brightness;
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            tokens.background,
-            Color.lerp(tokens.backgroundTint, tokens.accentWarm, 0.1)!,
-            Color.lerp(tokens.backgroundTint, tokens.accentCool, 0.14)!,
-          ],
-        ),
+        gradient: AppGradients.screenBg(section, brightness),
       ),
       child: Stack(
         children: [
-          const Positioned.fill(child: _AmbientShapes()),
+          Positioned.fill(child: _AmbientShapes(section: section)),
           SafeArea(
             bottom: bottomSafe,
             child: Padding(padding: padding, child: child),
@@ -45,12 +40,13 @@ class PremiumScaffold extends StatelessWidget {
   }
 }
 
+/// Frosted card with design-system-compliant borders, shadows, rounded corners.
 class PremiumCard extends StatelessWidget {
   const PremiumCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(AppSpacing.lg),
-    this.radius = AppRadius.xl,
+    this.padding = const EdgeInsets.all(AppSpacing.xl),
+    this.radius = AppRadius.card,
     this.gradient,
     this.color,
     this.borderColor,
@@ -75,26 +71,15 @@ class PremiumCard extends StatelessWidget {
       gradient: gradient,
       borderRadius: BorderRadius.circular(radius),
       border: Border.all(
-        color:
-            borderColor ??
-            Colors.white.withValues(
-              alpha: Theme.of(context).brightness == Brightness.dark
-                  ? 0.06
-                  : 0.58,
-            ),
+        color: borderColor ?? tokens.borderSubtle,
+        width: 1.0, // Thicker, subtle border for premium feel
       ),
       boxShadow: [
         BoxShadow(
-          color: shadowColor ?? tokens.shadowLg.withValues(alpha: 0.28),
-          blurRadius: 34,
-          offset: const Offset(0, 18),
-        ),
-        BoxShadow(
-          color: Colors.white.withValues(
-            alpha: Theme.of(context).brightness == Brightness.dark ? 0.02 : 0.4,
-          ),
-          blurRadius: 1,
-          offset: const Offset(0, 1),
+          color: shadowColor ?? tokens.shadow,
+          blurRadius: 32, // Softer, larger shadow
+          spreadRadius: 0,
+          offset: const Offset(0, 12),
         ),
       ],
     );
@@ -102,18 +87,92 @@ class PremiumCard extends StatelessWidget {
     return DecoratedBox(
       decoration: decoration,
       child: clip
-          ? ClipRRect(borderRadius: BorderRadius.circular(radius), child: body)
+          ? ClipRRect(borderRadius: BorderRadius.circular(radius - 1), child: body)
           : body,
     );
   }
 }
 
+/// The signature Aura Halo glow behind hero metrics.
+class AuraHalo extends StatefulWidget {
+  const AuraHalo({
+    super.key,
+    required this.color,
+    this.size = 200,
+    this.child,
+  });
+
+  final Color color;
+  final double size;
+  final Widget? child;
+
+  @override
+  State<AuraHalo> createState() => _AuraHaloState();
+}
+
+class _AuraHaloState extends State<AuraHalo>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: AppMotion.auraPulse,
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return AnimatedBuilder(
+      animation: _controller,
+      child: widget.child,
+      builder: (context, child) {
+        final t = reduceMotion ? 0.5 : _controller.value;
+        final scale = 1.0 + 0.08 * math.sin(t * math.pi); // Smoother pulsing
+        final opacity = 0.5 + 0.2 * math.cos(t * math.pi);
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            Transform.scale(
+              scale: scale,
+              child: Container(
+                width: widget.size,
+                height: widget.size,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      widget.color.withValues(alpha: opacity),
+                      widget.color.withValues(alpha: 0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            if (child != null) child,
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Glass circle button for icon actions.
 class GlassCircleButton extends StatelessWidget {
   const GlassCircleButton({
     super.key,
     required this.icon,
     this.onTap,
-    this.size = 48,
+    this.size = 44,
     this.color,
     this.iconColor,
   });
@@ -133,17 +192,20 @@ class GlassCircleButton extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
+        splashColor: tokens.primary.withValues(alpha: 0.1),
+        highlightColor: tokens.primary.withValues(alpha: 0.05),
         child: Ink(
           height: size,
           width: size,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: color ?? tokens.surface.withValues(alpha: 0.76),
+            color: color ?? tokens.paper,
+            border: Border.all(color: tokens.borderSubtle, width: 1.0),
             boxShadow: [
               BoxShadow(
-                color: tokens.shadow.withValues(alpha: 0.2),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
+                color: tokens.shadow.withValues(alpha: 0.05),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -158,12 +220,13 @@ class GlassCircleButton extends StatelessWidget {
   }
 }
 
+/// Staggered fade + upward slide entrance animation.
 class AnimatedEntrance extends StatelessWidget {
   const AnimatedEntrance({
     super.key,
     required this.child,
     this.delay = Duration.zero,
-    this.offset = const Offset(0, 24),
+    this.offset = const Offset(0, 16),
   });
 
   final Widget child;
@@ -174,20 +237,16 @@ class AnimatedEntrance extends StatelessWidget {
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: AppMotion.slow + delay,
+      duration: AppMotion.cardEntrance + delay,
       curve: AppMotion.ease,
       builder: (context, value, child) {
-        final delayed =
-            (delay == Duration.zero
-                    ? value
-                    : ((value -
-                                  delay.inMilliseconds /
-                                      (AppMotion.slow + delay).inMilliseconds) /
-                              (1 -
-                                  delay.inMilliseconds /
-                                      (AppMotion.slow + delay).inMilliseconds))
-                          .clamp(0.0, 1.0))
-                .toDouble();
+        final totalMs = (AppMotion.cardEntrance + delay).inMilliseconds;
+        final delayMs = delay.inMilliseconds;
+        final delayed = (delay == Duration.zero
+                ? value
+                : ((value - delayMs / totalMs) / (1 - delayMs / totalMs))
+                    .clamp(0.0, 1.0))
+            .toDouble();
         return Opacity(
           opacity: delayed,
           child: Transform.translate(
@@ -204,12 +263,13 @@ class AnimatedEntrance extends StatelessWidget {
   }
 }
 
+/// Floating bob animation for decorative elements.
 class FloatingOrb extends StatefulWidget {
   const FloatingOrb({
     super.key,
     required this.child,
-    this.distance = 8,
-    this.duration = const Duration(milliseconds: 2200),
+    this.distance = 8, // slightly more float
+    this.duration = const Duration(milliseconds: 3000), // smoother float
   });
 
   final Widget child;
@@ -246,7 +306,8 @@ class _FloatingOrbState extends State<FloatingOrb>
         return Transform.translate(
           offset: Offset(
             0,
-            math.sin(_controller.value * math.pi) * -widget.distance,
+            // Use sin with easeInOut logic
+            Curves.easeInOutSine.transform(_controller.value) * -widget.distance,
           ),
           child: child,
         );
@@ -255,40 +316,44 @@ class _FloatingOrbState extends State<FloatingOrb>
   }
 }
 
+/// Loading state with floating card.
 class PremiumLoader extends StatelessWidget {
-  const PremiumLoader({super.key, this.label});
+  const PremiumLoader({super.key, this.label, this.section = AyreSection.home});
 
   final String? label;
+  final AyreSection section;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     return PremiumScaffold(
+      section: section,
       child: Center(
         child: FloatingOrb(
           child: PremiumCard(
-            radius: AppRadius.xl,
-            padding: const EdgeInsets.all(22),
+            radius: AppRadius.heroCard,
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
             gradient: AppGradients.surfaceGlass(tokens),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 SizedBox(
-                  height: 42,
-                  width: 42,
+                  height: 36,
+                  width: 36,
                   child: CircularProgressIndicator(
-                    strokeWidth: 4,
+                    strokeWidth: 3,
                     color: tokens.primary,
                     strokeCap: StrokeCap.round,
                   ),
                 ),
                 if (label != null) ...[
-                  const SizedBox(height: AppSpacing.sm),
+                  const SizedBox(height: AppSpacing.lg),
                   Text(
                     label!,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    style: AppTypo.caption(tokens).copyWith(
                       color: tokens.textSecondary,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.5,
                     ),
                   ),
                 ],
@@ -301,22 +366,14 @@ class PremiumLoader extends StatelessWidget {
   }
 }
 
+/// Mini sparkline chart.
 class Sparkline extends StatelessWidget {
   const Sparkline({
     super.key,
     required this.color,
-    this.height = 72,
+    this.height = 64,
     this.points = const [
-      0.62,
-      0.42,
-      0.48,
-      0.34,
-      0.52,
-      0.46,
-      0.22,
-      0.28,
-      0.18,
-      0.52,
+      0.62, 0.42, 0.48, 0.34, 0.52, 0.46, 0.22, 0.28, 0.18, 0.52,
     ],
   });
 
@@ -336,38 +393,44 @@ class Sparkline extends StatelessWidget {
   }
 }
 
+/// Decorative blurred blobs per section.
 class _AmbientShapes extends StatelessWidget {
-  const _AmbientShapes();
+  const _AmbientShapes({required this.section});
+
+  final AyreSection section;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final blobOpacity = isDark ? 0.08 : 0.12; // More subtle blobs for a premium look
+
+    final (Color c1, Color c2) = switch (section) {
+      AyreSection.home => (tokens.primary, tokens.accentMint),
+      AyreSection.signals => (tokens.accentMint, tokens.teal),
+      AyreSection.insights => (tokens.accentCool, tokens.primary),
+      AyreSection.learn => (tokens.gold, tokens.accentWarm),
+      AyreSection.profile => (tokens.primary, tokens.accentCool),
+    };
+
     return IgnorePointer(
       child: ClipRect(
         child: Stack(
           children: [
             Positioned(
-              top: -96,
+              top: -100,
               right: -80,
               child: _BlurCircle(
-                size: 260,
-                color: tokens.accentWarm.withValues(alpha: 0.18),
+                size: 320,
+                color: c1.withValues(alpha: blobOpacity),
               ),
             ),
             Positioned(
-              top: 170,
-              left: -110,
+              bottom: -40,
+              left: -120,
               child: _BlurCircle(
-                size: 260,
-                color: tokens.accentCool.withValues(alpha: 0.18),
-              ),
-            ),
-            Positioned(
-              bottom: 90,
-              right: -120,
-              child: _BlurCircle(
-                size: 300,
-                color: tokens.primary.withValues(alpha: 0.14),
+                size: 380,
+                color: c2.withValues(alpha: blobOpacity * 0.8),
               ),
             ),
           ],
@@ -386,7 +449,7 @@ class _BlurCircle extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ImageFiltered(
-      imageFilter: ImageFilter.blur(sigmaX: 34, sigmaY: 34),
+      imageFilter: ImageFilter.blur(sigmaX: 72, sigmaY: 72), // Softer blur
       child: Container(
         width: size,
         height: size,
@@ -408,12 +471,12 @@ class _SparklinePainter extends CustomPainter {
     final path = Path();
     for (var i = 0; i < points.length; i++) {
       final x = i / (points.length - 1) * size.width;
-      final y = points[i].clamp(0.0, 1.0) * size.height;
+      final y = (1.0 - points[i].clamp(0.0, 1.0)) * size.height; // Invert Y axis
       if (i == 0) {
         path.moveTo(x, y);
       } else {
         final px = (i - 1) / (points.length - 1) * size.width;
-        final py = points[i - 1].clamp(0.0, 1.0) * size.height;
+        final py = (1.0 - points[i - 1].clamp(0.0, 1.0)) * size.height;
         path.cubicTo(px + size.width / 18, py, x - size.width / 18, y, x, y);
       }
     }
@@ -428,7 +491,7 @@ class _SparklinePainter extends CustomPainter {
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [color.withValues(alpha: 0.25), color.withValues(alpha: 0)],
+          colors: [color.withValues(alpha: 0.2), color.withValues(alpha: 0)],
         ).createShader(Offset.zero & size),
     );
     canvas.drawPath(
@@ -436,7 +499,7 @@ class _SparklinePainter extends CustomPainter {
       Paint()
         ..color = color
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 4
+        ..strokeWidth = 2.5 // Slightly thinner sparkline
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round,
     );

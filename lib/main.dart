@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'services/api_service.dart';
@@ -10,6 +11,8 @@ import 'theme/app_theme.dart';
 const bool kEnableAuthStartupGate = false;
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const AyreScannerApp());
 }
 
@@ -61,6 +64,7 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
       setThemeMode: setThemeMode,
       child: MaterialApp(
         title: 'Ayre Scanner',
+        debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: _themeMode,
