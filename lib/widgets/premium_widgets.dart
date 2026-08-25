@@ -77,9 +77,9 @@ class PremiumCard extends StatelessWidget {
       boxShadow: [
         BoxShadow(
           color: shadowColor ?? tokens.shadow,
-          blurRadius: 32, // Softer, larger shadow
+          blurRadius: 18, // Restrained, close elevation — not a glow
           spreadRadius: 0,
-          offset: const Offset(0, 12),
+          offset: const Offset(0, 6),
         ),
       ],
     );
@@ -137,8 +137,8 @@ class _AuraHaloState extends State<AuraHalo>
       child: widget.child,
       builder: (context, child) {
         final t = reduceMotion ? 0.5 : _controller.value;
-        final scale = 1.0 + 0.08 * math.sin(t * math.pi); // Smoother pulsing
-        final opacity = 0.5 + 0.2 * math.cos(t * math.pi);
+        final scale = 1.0 + 0.04 * math.sin(t * math.pi); // Restrained pulse
+        final opacity = 0.32 + 0.12 * math.cos(t * math.pi);
         return Stack(
           alignment: Alignment.center,
           children: [
@@ -403,14 +403,16 @@ class _AmbientShapes extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.tokens;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final blobOpacity = isDark ? 0.08 : 0.12; // More subtle blobs for a premium look
+    final blobOpacity = isDark ? 0.05 : 0.07; // Barely a texture, not a decoration
 
-    final (Color c1, Color c2) = switch (section) {
-      AyreSection.home => (tokens.primary, tokens.accentMint),
-      AyreSection.signals => (tokens.accentMint, tokens.teal),
-      AyreSection.insights => (tokens.accentCool, tokens.primary),
-      AyreSection.learn => (tokens.gold, tokens.accentWarm),
-      AyreSection.profile => (tokens.primary, tokens.accentCool),
+    // One brand-led tint per section, not a second competing hue — the
+    // ambient shape should read as atmosphere, not as a second identity.
+    final Color c1 = switch (section) {
+      AyreSection.home => tokens.primary,
+      AyreSection.signals => tokens.primary,
+      AyreSection.insights => tokens.accentCool,
+      AyreSection.learn => tokens.accentWarm,
+      AyreSection.profile => tokens.primary,
     };
 
     return IgnorePointer(
@@ -418,19 +420,19 @@ class _AmbientShapes extends StatelessWidget {
         child: Stack(
           children: [
             Positioned(
-              top: -100,
-              right: -80,
+              top: -120,
+              right: -100,
               child: _BlurCircle(
-                size: 320,
+                size: 280,
                 color: c1.withValues(alpha: blobOpacity),
               ),
             ),
             Positioned(
-              bottom: -40,
-              left: -120,
+              bottom: -60,
+              left: -140,
               child: _BlurCircle(
-                size: 380,
-                color: c2.withValues(alpha: blobOpacity * 0.8),
+                size: 320,
+                color: c1.withValues(alpha: blobOpacity * 0.7),
               ),
             ),
           ],

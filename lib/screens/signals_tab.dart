@@ -51,7 +51,7 @@ class _SignalsTabState extends State<SignalsTab> {
           ),
           padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, 140),
           itemCount: _signals.isEmpty ? 2 : _signals.length + 1,
-          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
+          separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
           itemBuilder: (context, index) {
             if (index == 0) {
               return const AnimatedEntrance(child: _SignalsHeader());

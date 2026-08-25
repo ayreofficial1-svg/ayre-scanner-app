@@ -45,10 +45,10 @@ class _LoginScreenState extends State<LoginScreen> {
     if (success) {
       await Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (_, __, ___) => const HomeShell(),
+          pageBuilder: (_, _, _) => const HomeShell(),
           transitionDuration: AppMotion.slow,
           reverseTransitionDuration: AppMotion.medium,
-          transitionsBuilder: (_, animation, __, child) {
+          transitionsBuilder: (_, animation, _, child) {
             final curved = CurvedAnimation(
               parent: animation,
               curve: AppMotion.ease,

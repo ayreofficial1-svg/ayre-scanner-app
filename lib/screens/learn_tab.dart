@@ -51,7 +51,7 @@ class _LearnTabState extends State<LearnTab> {
           ),
           padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, 140),
           itemCount: _lessons.isEmpty ? 2 : _lessons.length + 1,
-          separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),
+          separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.md),
           itemBuilder: (context, index) {
             if (index == 0) {
               return AnimatedEntrance(

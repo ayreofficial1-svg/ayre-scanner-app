@@ -133,6 +133,16 @@ class _StartupGateState extends State<_StartupGate> {
       await Future.delayed(const Duration(milliseconds: 200));
       if (!mounted) return;
     }
+
+    if (!kEnableAuthStartupGate) {
+      if (!mounted) return;
+      setState(() {
+        _loggedIn = true;
+        _checking = false;
+      });
+      return;
+    }
+
     await ApiService.loadSavedCookie();
     final session = await ApiService.getSession();
     if (!mounted) return;
