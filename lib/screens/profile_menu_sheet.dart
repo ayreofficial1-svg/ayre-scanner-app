@@ -45,17 +45,13 @@ class _ProfileMenuSheetState extends State<ProfileMenuSheet> {
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.sm, AppSpacing.lg, AppSpacing.xxxl),
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: tokens.textTertiary.withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-              ),
+            _SheetDismissHeader(
+              onClose: () {
+                HapticFeedback.lightImpact();
+                Navigator.of(context).pop();
+              },
             ),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.md),
             AnimatedEntrance(child: _ProfileHero(name: name)),
             const SizedBox(height: AppSpacing.lg),
             _MenuGrid(
@@ -151,6 +147,49 @@ class _ProfileMenuSheetState extends State<ProfileMenuSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Sheet header: explicit, always-visible close control (leading, Apple
+/// modal-sheet "X" semantics) plus the standard drag affordance. Drag-to-
+/// dismiss still works underneath — this adds a discoverable tap target
+/// instead of replacing the gesture.
+class _SheetDismissHeader extends StatelessWidget {
+  const _SheetDismissHeader({required this.onClose});
+
+  final VoidCallback onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    return SizedBox(
+      height: 44,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Container(
+            width: 40,
+            height: 5,
+            decoration: BoxDecoration(
+              color: tokens.textTertiary.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            child: Semantics(
+              button: true,
+              label: 'Close profile menu',
+              child: GlassCircleButton(
+                icon: Icons.close_rounded,
+                size: 36,
+                onTap: onClose,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
