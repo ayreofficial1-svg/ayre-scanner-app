@@ -104,20 +104,18 @@ class _SignalsHeader extends StatelessWidget {
               ],
             ),
           ),
-          FloatingOrb(
-            child: Container(
-              height: 86,
-              width: 86,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.15),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-              ),
-              child: const Icon(
-                Icons.radar_rounded,
-                color: Colors.white,
-                size: 40,
-              ),
+          Container(
+            height: 86,
+            width: 86,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withValues(alpha: 0.15),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+            ),
+            child: const Icon(
+              Icons.radar_rounded,
+              color: Colors.white,
+              size: 40,
             ),
           ),
         ],
@@ -165,26 +163,24 @@ class _SignalsEmptyState extends StatelessWidget {
       gradient: AppGradients.surfaceGlass(tokens),
       child: Column(
         children: [
-          FloatingOrb(
-            child: Container(
-              height: 110,
-              width: 110,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: AppGradients.primaryShifted(tokens),
-                boxShadow: [
-                  BoxShadow(
-                    color: tokens.primary.withValues(alpha: 0.3),
-                    blurRadius: 24,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.travel_explore_rounded,
-                color: tokens.onPrimary,
-                size: 48,
-              ),
+          Container(
+            height: 110,
+            width: 110,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: AppGradients.primaryShifted(tokens),
+              boxShadow: [
+                BoxShadow(
+                  color: tokens.primary.withValues(alpha: 0.3),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.travel_explore_rounded,
+              color: tokens.onPrimary,
+              size: 48,
             ),
           ),
           const SizedBox(height: AppSpacing.xxl),
@@ -219,18 +215,13 @@ class _SignalCard extends StatelessWidget {
     final lastPrice = signal['last_price'];
     final changePct = signal['change_pct'];
     final isUp = changePct is num ? changePct >= 0 : true;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    
-    // Softer background colors for signal cards
-    final fill = isUp 
-        ? (isDark ? tokens.positive.withValues(alpha: 0.15) : tokens.mint) 
-        : (isDark ? tokens.negative.withValues(alpha: 0.15) : tokens.peach);
-    
-    final foreground = isUp 
-        ? (isDark ? tokens.positive : tokens.primary)
-        : (isDark ? tokens.negative : tokens.negative);
-        
-    final textColor = isDark ? tokens.textPrimary : tokens.neutralBlock;
+
+    // Redesign (Phase 3): the semantic positiveBg/negativeBg tokens already
+    // carry the right tint + alpha per theme, so this no longer needs a
+    // light/dark branch or the legacy mint/peach tokens.
+    final fill = isUp ? tokens.positiveBg : tokens.negativeBg;
+    final foreground = isUp ? tokens.positive : tokens.negative;
+    final textColor = tokens.textPrimary;
 
     return PressableScale(
       onTap: () {

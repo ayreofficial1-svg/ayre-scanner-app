@@ -520,44 +520,40 @@ class _InsightsErrorState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
+    // Redesign (Phase 3): a failed fetch is a normal, low-stakes state, not
+    // an alarm — calm neutral surface, a small icon badge for hierarchy,
+    // and whitespace instead of a full red gradient banner. No animation:
+    // stillness reads as composed here, not as data.
     return PremiumCard(
       radius: AppRadius.card,
       padding: const EdgeInsets.all(AppSpacing.xxl),
-      gradient: LinearGradient(
-        colors: [
-          tokens.negative,
-          Color.lerp(tokens.negative, tokens.accentWarm, 0.22)!,
-        ],
-      ),
-      shadowColor: tokens.negative.withValues(alpha: 0.3),
+      color: tokens.surfaceRaised,
       child: Column(
         children: [
-          FloatingOrb(
-            child: Container(
-              height: 96,
-              width: 96,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.2),
-              ),
-              child: const Icon(
-                Icons.wifi_off_rounded,
-                color: Colors.white,
-                size: 44,
-              ),
+          Container(
+            height: 72,
+            width: 72,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: tokens.negative.withValues(alpha: 0.12),
+            ),
+            child: Icon(
+              Icons.wifi_off_rounded,
+              color: tokens.negative,
+              size: 32,
             ),
           ),
           const SizedBox(height: AppSpacing.xxl),
           Text(
             'Could not load sentiment',
             textAlign: TextAlign.center,
-            style: AppTypo.sectionTitle(tokens, color: Colors.white),
+            style: AppTypo.sectionTitle(tokens),
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
             'Pull down to retry fetching data.',
             textAlign: TextAlign.center,
-            style: AppTypo.body(tokens, color: Colors.white.withValues(alpha: 0.8)),
+            style: AppTypo.body(tokens),
           ),
         ],
       ),

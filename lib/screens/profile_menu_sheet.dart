@@ -206,14 +206,9 @@ class _ProfileHero extends StatelessWidget {
     return PremiumCard(
       radius: AppRadius.xl,
       padding: EdgeInsets.zero,
-      gradient: LinearGradient(
-        colors: [
-          tokens.neutralBlock,
-          Color.lerp(tokens.neutralBlock, tokens.primary, 0.2)!
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
+      // Redesign (Phase 3): reuse the shared hero gradient instead of
+      // duplicating the same neutral+primary blend inline.
+      gradient: AppGradients.heroCard(AyreSection.profile, tokens),
       child: SizedBox(
         height: 150,
         child: Stack(

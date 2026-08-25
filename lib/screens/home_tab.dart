@@ -176,7 +176,7 @@ class _HeroBoard extends StatelessWidget {
               bottom: -60,
               left: -50,
               child: AuraHalo(
-                color: tokens.teal2,
+                color: tokens.primary,
                 size: 240,
               ),
             ),
@@ -370,31 +370,27 @@ class _MarketTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final fill = tone == _TileTone.mint ? tokens.accentMint : tokens.lavender;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final contentColor = isDark ? tokens.surface : tokens.onAccentMint;
-    
+    // Redesign (Phase 3): market tiles are a neutral information surface —
+    // the tone only selects a small icon accent now, not a full decorative
+    // fill (was tokens.accentMint / tokens.lavender as a solid gradient).
+    final accent = tone == _TileTone.mint ? tokens.accentMint : tokens.accentCool;
+
     return PressableScale(
       child: PremiumCard(
         padding: const EdgeInsets.all(AppSpacing.lg),
-        gradient: LinearGradient(
-          colors: [fill, Color.lerp(fill, Colors.white, 0.1)!],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        shadowColor: fill.withValues(alpha: 0.25),
+        color: tokens.surfaceRaised,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: contentColor.withValues(alpha: 0.2),
+                color: accent.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.show_chart_rounded,
-                color: contentColor,
+                color: accent,
                 size: 24,
               ),
             ),
@@ -403,14 +399,14 @@ class _MarketTile extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: AppTypo.eyebrow(tokens, color: contentColor.withValues(alpha: 0.8)),
+              style: AppTypo.eyebrow(tokens),
             ),
             const SizedBox(height: AppSpacing.xs),
             Text(
               _displayValue(data),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: AppTypo.dataNum(tokens, color: contentColor).copyWith(
+              style: AppTypo.dataNum(tokens).copyWith(
                 fontSize: 18,
               ),
             ),

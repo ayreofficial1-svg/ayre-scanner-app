@@ -112,12 +112,10 @@ class _LearnHero extends StatelessWidget {
               top: 30,
               child: Transform.rotate(
                 angle: -0.2,
-                child: FloatingOrb(
-                  child: Icon(
-                    Icons.school_rounded,
-                    size: 96,
-                    color: Colors.white.withValues(alpha: 0.9),
-                  ),
+                child: Icon(
+                  Icons.school_rounded,
+                  size: 96,
+                  color: Colors.white.withValues(alpha: 0.9),
                 ),
               ),
             ),
@@ -374,7 +372,7 @@ class _LessonCard extends StatelessWidget {
       ),
       _LessonTone.dark => _LessonColors(
         tokens.primary,
-        Color.lerp(tokens.primary, tokens.teal2, 0.12)!,
+        Color.lerp(tokens.primary, tokens.accentMint, 0.12)!,
         tokens.primary,
       ),
       _LessonTone.mint => _LessonColors(

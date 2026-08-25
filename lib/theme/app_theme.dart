@@ -216,31 +216,26 @@ abstract final class AppGradients {
   }
 
   static LinearGradient heroCard(AyreSection section, AppThemeTokens tokens) {
-    // One restrained brand language across sections: primary-teal is the
-    // default identity surface; only Learn and Insights carry their
-    // semantic tint, and even then as a subtle blend, not a hue swap.
-    return switch (section) {
-      AyreSection.home => LinearGradient(
-        colors: [tokens.primary, Color.lerp(tokens.primary, tokens.teal2, 0.35)!],
-        begin: Alignment.topLeft, end: Alignment.bottomRight,
-      ),
-      AyreSection.signals => LinearGradient(
-        colors: [tokens.teal, Color.lerp(tokens.teal, tokens.accentMint, 0.3)!],
-        begin: Alignment.topLeft, end: Alignment.bottomRight,
-      ),
-      AyreSection.insights => LinearGradient(
-        colors: [tokens.accentCool, Color.lerp(tokens.accentCool, tokens.neutralBlock, 0.25)!],
-        begin: Alignment.topLeft, end: Alignment.bottomRight,
-      ),
-      AyreSection.learn => LinearGradient(
-        colors: [tokens.accentWarm, Color.lerp(tokens.accentWarm, tokens.gold, 0.35)!],
-        begin: Alignment.topLeft, end: Alignment.bottomRight,
-      ),
-      AyreSection.profile => LinearGradient(
-        colors: [tokens.neutralBlock, Color.lerp(tokens.neutralBlock, tokens.primary, 0.18)!],
-        begin: Alignment.topLeft, end: Alignment.bottomRight,
-      ),
+    // Redesign (Phase 3): one brand identity across every hero surface.
+    // Primary-teal is the base for every section — Insights and Learn take
+    // a light semantic tint (cool / warm) so a sentiment gauge doesn't read
+    // identically to a lesson library, but it's a supporting shift baked
+    // into the *same* base color, not a competing hue. Profile keeps its
+    // neutral-block identity (it's a settings surface, not a data surface).
+    final Color base = switch (section) {
+      AyreSection.insights => Color.lerp(tokens.primary, tokens.accentCool, 0.24)!,
+      AyreSection.learn => Color.lerp(tokens.primary, tokens.accentWarm, 0.24)!,
+      AyreSection.profile => tokens.neutralBlock,
+      AyreSection.home || AyreSection.signals => tokens.primary,
     };
+    final Color end = section == AyreSection.profile
+        ? Color.lerp(tokens.neutralBlock, tokens.primary, 0.2)!
+        : Color.lerp(base, tokens.neutralBlock, 0.26)!;
+    return LinearGradient(
+      colors: [base, end],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
   }
 
   static LinearGradient primaryShifted(AppThemeTokens tokens) => LinearGradient(
