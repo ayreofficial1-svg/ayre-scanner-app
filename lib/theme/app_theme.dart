@@ -6,6 +6,15 @@ import 'package:google_fonts/google_fonts.dart';
 enum AyreSection { home, signals, insights, learn, profile }
 
 // ─── Token extension ────────────────────────────────────────────────────────
+// NOTE (redesign, Phase 1): background/backgroundTint/surface*/primary/
+// positive/negative/accentWarm/accentCool/accentMint/neutralBlock/text*/
+// border*/shadow* are the live semantic system — use these for all new work.
+//
+// cream, ivory, peach, coral, mint, mintDeep, teal2, lavender, violet, sage,
+// gold are LEGACY decorative tokens from the pre-redesign palette. They are
+// still wired (a handful of call sites remain, see
+// DESIGN_REDESIGN_PROGRESS.md Phase 3) but carry no semantic meaning and are
+// being phased out. Do not introduce new usages of them.
 @immutable
 class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   const AppThemeTokens({
@@ -180,9 +189,14 @@ abstract final class AppMotion {
   static const Duration cardStagger = Duration(milliseconds: 50);
   static const Curve ease = Curves.easeOutCubic;
   static const Curve easeIn = Curves.easeInCubic;
-  static const Curve elastic = Curves.elasticOut;
-  static const Curve bounce = Curves.easeOutBack;
-  static const Curve spring = Curves.easeOutBack;
+  // No overshoot/bounce curves in this system — a financial product should
+  // feel precise, not springy. elastic/bounce/spring all resolve to the same
+  // controlled deceleration as `ease`; kept as named aliases so call sites
+  // can express *intent* (e.g. "this settles into place") without importing
+  // exaggerated motion.
+  static const Curve elastic = Curves.easeOutCubic;
+  static const Curve bounce = Curves.easeOutCubic;
+  static const Curve spring = Curves.easeOutCubic;
   static const Curve decel = Curves.decelerate;
 }
 
