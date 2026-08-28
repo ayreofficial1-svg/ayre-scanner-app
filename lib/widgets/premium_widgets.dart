@@ -158,7 +158,7 @@ class _AuraHaloState extends State<AuraHalo>
                 ),
               ),
             ),
-            if (child != null) child,
+            ?child,
           ],
         );
       },
