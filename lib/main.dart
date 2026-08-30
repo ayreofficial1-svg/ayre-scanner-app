@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'services/api_service.dart';
-import 'screens/splash_screen.dart';
 import 'screens/home_shell.dart';
 import 'screens/login_screen.dart';
+import 'screens/splash_screen.dart';
+import 'services/api_service.dart';
+import 'services/settings_store.dart';
 import 'theme/app_theme.dart';
 
 const bool kEnableAuthStartupGate = false;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  // Portrait-only remains right for a mobile-first product; revisit if tablet
+  // becomes a real target.
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const AyreScannerApp());
 }
@@ -32,7 +35,15 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
   @override
   void initState() {
     super.initState();
-    _loadThemeMode();
+    _bootstrap();
+  }
+
+  Future<void> _bootstrap() async {
+    await Future.wait([
+      _loadThemeMode(),
+      SettingsStore.instance.load(),
+      NotificationLog.instance.load(),
+    ]);
   }
 
   Future<void> _loadThemeMode() async {
@@ -40,9 +51,10 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
     final value = prefs.getString(_themeModeKey);
     if (!mounted || value == null) return;
     setState(() {
-      _themeMode = value == ThemeMode.light.name
-          ? ThemeMode.light
-          : ThemeMode.dark;
+      _themeMode = ThemeMode.values.firstWhere(
+        (mode) => mode.name == value,
+        orElse: () => ThemeMode.dark,
+      );
     });
   }
 
@@ -87,6 +99,7 @@ class AppThemeController extends InheritedWidget {
     required super.child,
   });
 
+  /// System / Light / Dark — the three-way selector in Settings writes here.
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> setThemeMode;
 
@@ -104,7 +117,7 @@ class AppThemeController extends InheritedWidget {
   }
 }
 
-/// Replaces the old _StartupGate. Runs splash then checks auth session.
+/// Runs the splash, then checks for a session.
 class _StartupGate extends StatefulWidget {
   const _StartupGate({
     required this.onSplashComplete,

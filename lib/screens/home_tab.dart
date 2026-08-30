@@ -2,14 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/api_service.dart';
+import '../services/market_movers_service.dart';
+import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
+import '../widgets/instrument_marks.dart';
+import '../widgets/market_movers_section.dart';
+import '../widgets/numeral.dart';
 import '../widgets/premium_widgets.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/spring.dart';
+import 'home_shell.dart' show NavAvatar;
+import 'notifications_screen.dart';
 
 class HomeTab extends StatefulWidget {
-  const HomeTab({super.key, this.onProfileMenuRequested});
+  const HomeTab({
+    super.key,
+    this.onIdentityResolved,
+    this.onOpenProfile,
+    this.marketMovers = const AyreBackendMarketMoversService(),
+  });
 
-  final ValueChanged<String>? onProfileMenuRequested;
+  final ValueChanged<String>? onIdentityResolved;
+  final VoidCallback? onOpenProfile;
+
+  /// Injected so nothing on this screen knows which provider is behind the
+  /// three market-mover sections.
+  final MarketMoversService marketMovers;
 
   @override
   State<HomeTab> createState() => _HomeTabState();
@@ -19,7 +37,11 @@ class _HomeTabState extends State<HomeTab> {
   String _displayName = '';
   Map<String, dynamic>? _market;
   bool _loading = true;
-  bool _refreshing = false;
+
+  MarketMoversResult? _gainers;
+  MarketMoversResult? _losers;
+  MarketMoversResult? _mostActive;
+  bool _moversLoading = true;
 
   @override
   void initState() {
@@ -28,82 +50,169 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _loadData() async {
-    if (mounted && !_loading) setState(() => _refreshing = true);
-    HapticFeedback.mediumImpact();
     final session = await ApiService.getSession();
     final market = await ApiService.getMarket();
     if (!mounted) return;
+    final firstLoad = _loading;
     setState(() {
       _displayName = session?['display_name'] ?? session?['username'] ?? '';
       _market = market;
       _loading = false;
-      _refreshing = false;
     });
+    widget.onIdentityResolved?.call(_displayName);
+
+    await _loadMovers();
+
+    if (!mounted) return;
+    // A pull-to-refresh that successfully lands new data earns a confirmation
+    // weight haptic; opening the app is not an action to confirm.
+    if (!firstLoad) HapticFeedback.mediumImpact();
+  }
+
+  Future<void> _loadMovers() async {
+    final results = await Future.wait([
+      widget.marketMovers.getTopGainers(),
+      widget.marketMovers.getTopLosers(),
+      widget.marketMovers.getMostActiveEquities(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _gainers = results[0];
+      _losers = results[1];
+      _mostActive = results[2];
+      _moversLoading = false;
+    });
+
+    if (results.any((r) => r.stale)) {
+      NotificationLog.instance.add(
+        Notice(
+          kind: NoticeKind.staleData,
+          title: 'Market data is behind',
+          body:
+              'The mover lists are older than their normal update interval. '
+              'Last known values are still shown.',
+          at: DateTime.now(),
+        ),
+      );
+    }
+  }
+
+  Future<void> _refresh() async {
+    await _loadData();
   }
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    if (_loading) return const PremiumLoader(label: 'Opening scanner', section: AyreSection.home);
+    if (_loading) {
+      return const PremiumLoader(
+        label: 'Opening scanner',
+        section: AyreSection.home,
+      );
+    }
+
+    final nifty = _marketValue('nifty');
+    final score = _scoreFrom(nifty);
 
     return PremiumScaffold(
       section: AyreSection.home,
       bottomSafe: false,
-      child: Stack(
-        children: [
-          RefreshIndicator(
-            color: tokens.primary,
-            backgroundColor: tokens.surface,
-            onRefresh: _loadData,
-            edgeOffset: 120, // push down below header
-            child: ListView(
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: BouncingScrollPhysics(),
-              ),
-              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.xl, AppSpacing.lg, 140),
-              children: [
-                AnimatedEntrance(
-                  child: _HomeHeader(
-                    displayName: _displayName,
-                    onProfileTap: () =>
-                        widget.onProfileMenuRequested?.call(_displayName),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xxl),
-                AnimatedEntrance(
-                  delay: const Duration(milliseconds: 100),
-                  child: _HeroBoard(market: _market),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                const AnimatedEntrance(
-                  delay: Duration(milliseconds: 150),
-                  child: _SignalReadinessCard(),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                AnimatedEntrance(
-                  delay: const Duration(milliseconds: 200),
-                  child: _MarketTiles(market: _market),
-                ),
-              ],
+      // One refresh indicator, app-wide. The bespoke ribbon that used to run
+      // alongside it is gone.
+      child: RefreshIndicator(
+        color: tokens.primary,
+        backgroundColor: tokens.surface,
+        onRefresh: _refresh,
+        edgeOffset: 96,
+        child: ContentWidth(
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.xl,
+              AppSpacing.lg,
+              140,
             ),
+            children: [
+              AnimatedEntrance(
+                child: _HomeHeader(
+                  displayName: _displayName,
+                  onOpenProfile: widget.onOpenProfile,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xxl),
+              AnimatedEntrance(
+                delay: const Duration(milliseconds: 100),
+                child: _HeroBoard(market: _market, score: score),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              const AnimatedEntrance(
+                delay: Duration(milliseconds: 150),
+                child: _SignalReadinessCard(),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              AnimatedEntrance(
+                delay: const Duration(milliseconds: 200),
+                child: _MarketTiles(market: _market),
+              ),
+              const SizedBox(height: AppSpacing.xxl),
+              AnimatedEntrance(
+                delay: const Duration(milliseconds: 250),
+                child: MarketMoversSection(
+                  title: 'Top gainers',
+                  result: _gainers,
+                  loading: _moversLoading,
+                  emptyMessage:
+                      'No advancing equities in this session yet. This list '
+                      'fills once the market is open.',
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              AnimatedEntrance(
+                delay: const Duration(milliseconds: 280),
+                child: MarketMoversSection(
+                  title: 'Top losers',
+                  result: _losers,
+                  loading: _moversLoading,
+                  emptyMessage:
+                      'No declining equities in this session yet. This list '
+                      'fills once the market is open.',
+                ),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              AnimatedEntrance(
+                delay: const Duration(milliseconds: 310),
+                child: MarketMoversSection(
+                  title: 'Most active equities',
+                  result: _mostActive,
+                  loading: _moversLoading,
+                  showVolume: true,
+                  emptyMessage:
+                      'No traded volume reported yet for this session.',
+                ),
+              ),
+            ],
           ),
-          if (_refreshing) _RefreshRibbon(tokens: tokens),
-        ],
+        ),
       ),
     );
   }
+
+  dynamic _marketValue(String key) =>
+      _market?[key] ?? _market?[key.toUpperCase()];
 }
 
 class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({required this.displayName, required this.onProfileTap});
+  const _HomeHeader({required this.displayName, required this.onOpenProfile});
 
   final String displayName;
-  final VoidCallback onProfileTap;
+  final VoidCallback? onOpenProfile;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final name = displayName.isEmpty ? 'Raghav' : displayName;
+    final name = displayName.trim().isEmpty ? 'there' : displayName.trim();
+
     return Row(
       children: [
         Expanded(
@@ -114,151 +223,236 @@ class _HomeHeader extends StatelessWidget {
                 'Hi, $name',
                 style: AppTypo.bodyMedium(tokens, color: tokens.textSecondary),
               ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(
-                'Scanner plan',
-                style: AppTypo.pageTitle(tokens),
-              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text('Scanner plan', style: AppTypo.pageTitle(tokens)),
             ],
           ),
         ),
-        GlassCircleButton(
-          icon: Icons.notifications_rounded,
-          size: 46,
-          color: tokens.surfaceAlt,
-          iconColor: tokens.textPrimary,
+        // The bell now goes somewhere: a reverse-chronological list of the
+        // alerts the app has actually recorded.
+        ListenableBuilder(
+          listenable: NotificationLog.instance,
+          builder: (context, _) => InstrumentIconButton(
+            icon: Icons.notifications_none_rounded,
+            semanticLabel: 'Alerts',
+            size: 44,
+            badge: NotificationLog.instance.hasUnread,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+              );
+            },
+          ),
         ),
         const SizedBox(width: AppSpacing.md),
-        GestureDetector(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            onProfileTap();
-          },
-          child: _AvatarBadge(name: name),
+        Semantics(
+          button: true,
+          label: 'Profile',
+          child: PressableScale(
+            borderRadius: 24,
+            onTap: onOpenProfile == null
+                ? null
+                : () {
+                    HapticFeedback.selectionClick();
+                    onOpenProfile!();
+                  },
+            child: Padding(
+              padding: const EdgeInsets.all(2),
+              child: NavAvatar(name: displayName, size: 40),
+            ),
+          ),
         ),
       ],
     );
   }
 }
 
+/// Home's hero — the one surface on this screen permitted an ornament, and the
+/// one place besides the splash wordmark where a numeral renders in the display
+/// serif.
 class _HeroBoard extends StatelessWidget {
-  const _HeroBoard({required this.market});
+  const _HeroBoard({required this.market, required this.score});
 
   final Map<String, dynamic>? market;
+  final int score;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    final nifty = _marketValue('nifty');
-    final score = _scoreFrom(nifty);
+    final nifty = market?['nifty'] ?? market?['NIFTY'];
+    final changePct = _numFrom(nifty, const [
+      'change_pct',
+      'percent_change',
+      'change',
+    ]);
+
+    // Ember appears here only when the reading is genuinely notable — a strong
+    // or a poor score. A middling reading gets brass like everything else.
+    final notable = score >= 82 || score <= 55;
+    final ringTone = notable ? tokens.accentWarm : tokens.onPrimary;
+    final onHero = AppSurfaces.onHero(AyreSection.home, tokens);
+
     return PremiumCard(
       radius: AppRadius.heroCard,
-      padding: EdgeInsets.zero,
-      gradient: AppGradients.heroCard(AyreSection.home, tokens),
-      shadowColor: tokens.primary.withValues(alpha: 0.3),
-      child: SizedBox(
-        height: 320,
-        child: Stack(
-          children: [
-            Positioned(
-              top: -80,
-              right: -40,
-              child: Container(
-                height: 200,
-                width: 200,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.08),
-                ),
+      padding: const EdgeInsets.all(AppSpacing.xxl),
+      color: AppSurfaces.heroFill(AyreSection.home, tokens),
+      borderColor: tokens.primary.withValues(alpha: 0.35),
+      ornament: HeroOrnament.contour,
+      ornamentColor: onHero.withValues(alpha: 0.16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              StatusChip(
+                label: 'Live market',
+                icon: Icons.circle,
+                outlined: true,
+                foreground: onHero,
               ),
-            ),
-            Positioned(
-              bottom: -60,
-              left: -50,
-              child: AuraHalo(
-                color: tokens.primary,
-                size: 240,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(AppSpacing.xxl),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      _SoftPill(
-                        label: 'LIVE MARKET',
-                        icon: Icons.bolt_rounded,
-                        background: tokens.neutralBlock,
-                        foreground: tokens.onNeutralBlock,
-                      ),
-                      const Spacer(),
-                      GlassCircleButton(
-                        icon: Icons.auto_graph_rounded,
-                        size: 44,
-                        color: Colors.white.withValues(alpha: 0.2),
-                        iconColor: tokens.onPrimary,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.xxl),
-                  Text(
-                    '$score%',
-                    style: AppTypo.heroValue(tokens, color: tokens.onPrimary).copyWith(
-                      fontSize: 64,
-                    ),
-                  ),
-                  Text(
-                    'Momentum quality',
-                    style: AppTypo.bodyMedium(tokens, color: tokens.onPrimary.withValues(alpha: 0.8)),
-                  ),
-                  const Spacer(),
-                  Sparkline(
-                    color: tokens.onPrimary.withValues(alpha: 0.95),
-                    height: 80,
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              right: AppSpacing.xxl,
-              bottom: 90,
-              child: FloatingOrb(
-                distance: 8,
-                child: Container(
-                  height: 76,
-                  width: 76,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: tokens.neutralBlock,
-                    boxShadow: [
-                      BoxShadow(
-                        color: tokens.shadowLg.withValues(alpha: 0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    _displayChange(nifty),
-                    textAlign: TextAlign.center,
-                    style: AppTypo.dataNum(tokens, color: tokens.onNeutralBlock).copyWith(
-                      fontSize: 16,
-                    ),
+              const Spacer(),
+              _MomentumRing(score: score, tone: ringTone, track: onHero),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              // The display-serif numeral exception, moment one of two.
+              Text('$score', style: AppTypo.heroSerif(tokens, color: onHero)),
+              const SizedBox(width: AppSpacing.xs),
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: Text(
+                  '/100',
+                  style: AppTypo.bodyMedium(
+                    tokens,
+                    color: onHero.withValues(alpha: 0.7),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          Row(
+            children: [
+              Text(
+                'Momentum quality',
+                style: AppTypo.bodyMedium(
+                  tokens,
+                  color: onHero.withValues(alpha: 0.85),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              DeltaFigure(
+                change: changePct,
+                fontSize: 13,
+                color: onHero.withValues(alpha: 0.92),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          // Brass-family trace, not a gain/loss color: the sparkline is the
+          // instrument's record first and a direction second.
+          Sparkline(
+            color: onHero.withValues(alpha: 0.9),
+            height: 64,
+            points: _traceFor(changePct),
+          ),
+        ],
       ),
     );
   }
 
-  dynamic _marketValue(String key) =>
-      market?[key] ?? market?[key.toUpperCase()];
+  /// A deterministic trace shape from the day's move, so the hero doesn't
+  /// pretend to intraday history the backend doesn't return.
+  List<double> _traceFor(num? changePct) {
+    final lift = ((changePct ?? 0) / 4).clamp(-0.4, 0.4).toDouble();
+    const base = [0.42, 0.46, 0.40, 0.52, 0.48, 0.58, 0.54, 0.62];
+    return [
+      for (var i = 0; i < base.length; i++)
+        (base[i] + lift * (i / (base.length - 1))).clamp(0.05, 0.95).toDouble(),
+    ];
+  }
+}
+
+/// The momentum-score ring. Ember-toned only when the reading is notable — the
+/// first of the four sanctioned ember uses.
+class _MomentumRing extends StatelessWidget {
+  const _MomentumRing({
+    required this.score,
+    required this.tone,
+    required this.track,
+  });
+
+  final int score;
+  final Color tone;
+  final Color track;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 44,
+      width: 44,
+      child: SpringValue(
+        value: score / 100,
+        animateOnMount: true,
+        builder: (context, progress, _) => CustomPaint(
+          painter: _RingPainter(
+            progress: progress.clamp(0.0, 1.0),
+            tone: tone,
+            track: track.withValues(alpha: 0.25),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  const _RingPainter({
+    required this.progress,
+    required this.tone,
+    required this.track,
+  });
+
+  final double progress;
+  final Color tone;
+  final Color track;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Rect.fromCircle(
+      center: size.center(Offset.zero),
+      radius: size.width / 2 - 2,
+    );
+    canvas.drawArc(
+      rect,
+      0,
+      6.28318,
+      false,
+      Paint()
+        ..color = track
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+    canvas.drawArc(
+      rect,
+      -1.5708,
+      6.28318 * progress,
+      false,
+      Paint()
+        ..color = tone
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.butt,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter old) =>
+      old.progress != progress || old.tone != tone || old.track != track;
 }
 
 class _SignalReadinessCard extends StatelessWidget {
@@ -269,50 +463,38 @@ class _SignalReadinessCard extends StatelessWidget {
     final tokens = context.tokens;
     return PremiumCard(
       padding: const EdgeInsets.all(AppSpacing.xl),
-      gradient: LinearGradient(
-        colors: [
-          tokens.surfaceRaised,
-          Color.lerp(tokens.surfaceRaised, tokens.primary, 0.05)!,
-        ],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
+      color: tokens.surface,
       child: Row(
         children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              SizedBox(
-                height: 72,
-                width: 72,
-                child: CircularProgressIndicator(
-                  value: 0.78,
-                  strokeWidth: 8,
-                  color: tokens.primary,
-                  backgroundColor: tokens.border,
-                  strokeCap: StrokeCap.round,
+          SizedBox(
+            height: 52,
+            width: 52,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox.expand(
+                  child: CustomPaint(
+                    painter: _RingPainter(
+                      progress: 0.78,
+                      tone: tokens.primary,
+                      track: tokens.border,
+                    ),
+                  ),
                 ),
-              ),
-              Text(
-                '78%',
-                style: AppTypo.dataNum(tokens, color: tokens.textPrimary).copyWith(
-                  fontSize: 16,
-                ),
-              ),
-            ],
+                const Numeral.static('78', fontSize: 14),
+              ],
+            ),
           ),
           const SizedBox(width: AppSpacing.lg),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text('Trade readiness', style: AppTypo.cardTitle(tokens)),
+                const SizedBox(height: AppSpacing.xxs),
                 Text(
-                  'Trade readiness',
-                  style: AppTypo.cardTitle(tokens),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Fresh setups, breadth context, and risk checkpoints are staged for review.',
+                  'Fresh setups, breadth context and risk checkpoints are '
+                  'staged for review.',
                   style: AppTypo.body(tokens),
                 ),
               ],
@@ -334,19 +516,11 @@ class _MarketTiles extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: _MarketTile(
-            label: 'NIFTY 50',
-            data: _marketValue('nifty'),
-            tone: _TileTone.mint,
-          ),
+          child: _MarketTile(label: 'NIFTY 50', data: _marketValue('nifty')),
         ),
         const SizedBox(width: AppSpacing.md),
         Expanded(
-          child: _MarketTile(
-            label: 'SENSEX',
-            data: _marketValue('sensex'),
-            tone: _TileTone.cool,
-          ),
+          child: _MarketTile(label: 'SENSEX', data: _marketValue('sensex')),
         ),
       ],
     );
@@ -357,198 +531,64 @@ class _MarketTiles extends StatelessWidget {
 }
 
 class _MarketTile extends StatelessWidget {
-  const _MarketTile({
-    required this.label,
-    required this.data,
-    required this.tone,
-  });
+  const _MarketTile({required this.label, required this.data});
 
   final String label;
   final dynamic data;
-  final _TileTone tone;
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
-    // Redesign (Phase 3): market tiles are a neutral information surface —
-    // the tone only selects a small icon accent now, not a full decorative
-    // fill (was tokens.accentMint / tokens.lavender as a solid gradient).
-    final accent = tone == _TileTone.mint ? tokens.accentMint : tokens.accentCool;
+    final price = _numFrom(data, const ['last_price', 'price', 'value', 'ltp']);
+    final changePct = _numFrom(data, const [
+      'change_pct',
+      'percent_change',
+      'change',
+    ]);
 
-    return PressableScale(
-      child: PremiumCard(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        color: tokens.surfaceRaised,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.15),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.show_chart_rounded,
-                color: accent,
-                size: 24,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTypo.eyebrow(tokens),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              _displayValue(data),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: AppTypo.dataNum(tokens).copyWith(
-                fontSize: 18,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AvatarBadge extends StatelessWidget {
-  const _AvatarBadge({required this.name});
-
-  final String name;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final initial = name.trim().isEmpty ? 'R' : name.trim()[0].toUpperCase();
-    return Container(
-      height: 48,
-      width: 48,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: AppGradients.primaryShifted(tokens),
-        border: Border.all(color: tokens.surface, width: 3),
-        boxShadow: [
-          BoxShadow(
-            color: tokens.primary.withValues(alpha: 0.2),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        initial,
-        style: AppTypo.cardTitle(tokens, color: tokens.onPrimary),
-      ),
-    );
-  }
-}
-
-class _SoftPill extends StatelessWidget {
-  const _SoftPill({
-    required this.label,
-    required this.icon,
-    required this.background,
-    required this.foreground,
-  });
-
-  final String label;
-  final IconData icon;
-  final Color background;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+    return PremiumCard(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      color: tokens.surface,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: foreground, size: 14),
-          const SizedBox(width: AppSpacing.xs),
-          Text(
-            label,
-            style: AppTypo.eyebrow(tokens, color: foreground),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RefreshRibbon extends StatelessWidget {
-  const _RefreshRibbon({required this.tokens});
-
-  final AppThemeTokens tokens;
-
-  @override
-  Widget build(BuildContext context) {
-    return Positioned(
-      top: MediaQuery.paddingOf(context).top + 16,
-      left: 0,
-      right: 0,
-      child: Center(
-        child: PremiumCard(
-          radius: AppRadius.pill,
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
-          color: tokens.surfaceAlt,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
+          Row(
             children: [
-              SizedBox(
-                height: 14,
-                width: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: tokens.primary,
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypo.microLabel(tokens),
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Text(
-                'Refreshing',
-                style: AppTypo.eyebrow(tokens),
+              SizedBox(
+                height: 8,
+                width: 24,
+                child: TickMarks(
+                  color: tokens.engraved,
+                  count: 5,
+                  length: 3,
+                  majorEvery: 4,
+                  majorLength: 7,
+                ),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: AppSpacing.md),
+          Numeral(
+            formatPrice(price),
+            value: price?.toDouble(),
+            format: formatPrice,
+            fontSize: 19,
+            fontWeight: FontWeight.w500,
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          DeltaFigure(change: changePct, fontSize: 12),
+        ],
       ),
     );
   }
-}
-
-String _displayValue(dynamic raw) {
-  final price = _numFrom(raw, const ['last_price', 'price', 'value', 'ltp']);
-  if (price != null) return price.toStringAsFixed(2);
-  return raw?.toString() ?? '--';
-}
-
-String _displayChange(dynamic raw) {
-  final change = _numFrom(raw, const [
-    'change_pct',
-    'percent_change',
-    'change',
-  ]);
-  if (change == null) return '+0.0%';
-  return '${change >= 0 ? '+' : ''}${change.toStringAsFixed(1)}%';
 }
 
 int _scoreFrom(dynamic raw) {
@@ -569,5 +609,3 @@ num? _numFrom(dynamic raw, List<String> keys) {
   if (raw is String) return num.tryParse(raw);
   return null;
 }
-
-enum _TileTone { mint, cool }

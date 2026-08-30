@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/instrument_marks.dart';
 import '../widgets/premium_widgets.dart';
 
 class AyreSplashScreen extends StatefulWidget {
@@ -25,9 +26,11 @@ class _AyreSplashScreenState extends State<AyreSplashScreen>
   void initState() {
     super.initState();
     _controller = AnimationController(vsync: this, duration: AppMotion.splash);
+    // Was easeOutBack, which overshot and contradicted the app-wide no-bounce
+    // rule. Same duration, standard deceleration.
     _introScale = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0, 0.60, curve: Curves.easeOutBack),
+      curve: const Interval(0, 0.60, curve: Curves.easeOutCubic),
     );
     _introOpacity = CurvedAnimation(
       parent: _controller,
@@ -53,6 +56,8 @@ class _AyreSplashScreenState extends State<AyreSplashScreen>
   @override
   Widget build(BuildContext context) {
     final tokens = context.tokens;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+
     return Scaffold(
       body: PremiumScaffold(
         section: AyreSection.home,
@@ -61,12 +66,21 @@ class _AyreSplashScreenState extends State<AyreSplashScreen>
             animation: _controller,
             builder: (context, _) {
               return Opacity(
-                opacity: _introOpacity.value * _exit.value,
+                opacity: reduceMotion ? 1 : _introOpacity.value * _exit.value,
                 child: Transform.scale(
-                  scale: 0.85 + _introScale.value * 0.15, // Softer zoom
+                  scale: reduceMotion ? 1 : 0.90 + _introScale.value * 0.10,
                   child: _SplashMark(
                     tokens: tokens,
-                    rotation: _controller.value * math.pi * 2,
+                    // One slow-rotating needle, critically damped and never
+                    // overshooting, in place of the retired rotating gradient
+                    // ring. The needle is the same motif as the nav's
+                    // needle-mark and the gauge's needle.
+                    needleAngle: reduceMotion
+                        ? -math.pi / 4
+                        : (Curves.easeOutCubic.transform(_controller.value) *
+                                  math.pi *
+                                  1.4) -
+                              (math.pi / 2),
                   ),
                 ),
               );
@@ -79,117 +93,48 @@ class _AyreSplashScreenState extends State<AyreSplashScreen>
 }
 
 class _SplashMark extends StatelessWidget {
-  const _SplashMark({required this.tokens, required this.rotation});
+  const _SplashMark({required this.tokens, required this.needleAngle});
 
   final AppThemeTokens tokens;
-  final double rotation;
+  final double needleAngle;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        SizedBox(
-          height: 180,
-          width: 180,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Transform.rotate(
-                angle: rotation,
-                child: Container(
-                  height: 172,
-                  width: 172,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: SweepGradient(
-                      colors: [
-                        tokens.primary,
-                        tokens.teal,
-                        tokens.accentMint,
-                        tokens.primary,
-                      ],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: tokens.primary.withValues(alpha: 0.3),
-                        blurRadius: 40,
-                        offset: const Offset(0, 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              Container(
-                height: 132,
-                width: 132,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: tokens.surface,
-                  border: Border.all(
-                    color: tokens.borderSubtle,
-                    width: 4,
-                  ),
-                ),
-                child: Icon(
-                  Icons.radar_rounded,
-                  color: tokens.primary,
-                  size: 64,
-                ),
-              ),
-              Positioned(
-                right: 14,
-                top: 24,
-                child: Container(
-                  height: 36,
-                  width: 36,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: tokens.teal,
-                    border: Border.all(color: tokens.surface, width: 3),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 18,
-                bottom: 22,
-                child: Container(
-                  height: 26,
-                  width: 26,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: tokens.accentMint,
-                    border: Border.all(color: tokens.surface, width: 2),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        BearingMark(
+          color: tokens.engraved,
+          size: 168,
+          needleColor: tokens.primary,
+          needleAngle: needleAngle,
         ),
         const SizedBox(height: AppSpacing.xxxl),
+        // The wordmark: the second and last place the display serif carries a
+        // brand moment on its own.
         Text(
           'Ayre Scanner',
-          style: AppTypo.pageTitle(tokens),
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
-          decoration: BoxDecoration(
-            color: tokens.neutralBlock,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            boxShadow: [
-              BoxShadow(
-                color: tokens.shadow,
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Text(
-            'Market Intelligence',
-            style: AppTypo.eyebrow(tokens, color: tokens.onNeutralBlock),
+          style: AppTypo.serif(
+            fontSize: 30,
+            fontWeight: FontWeight.w600,
+            color: tokens.textPrimary,
+            letterSpacing: -0.4,
           ),
         ),
+        const SizedBox(height: AppSpacing.md),
+        SizedBox(
+          height: 8,
+          width: 96,
+          child: TickMarks(
+            color: tokens.engraved,
+            count: 17,
+            length: 3,
+            majorEvery: 8,
+            majorLength: 8,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Text('MARKET INTELLIGENCE', style: AppTypo.microLabel(tokens)),
       ],
     );
   }
