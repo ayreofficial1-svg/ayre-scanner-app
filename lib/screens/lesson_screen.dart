@@ -1,31 +1,33 @@
 import 'package:flutter/material.dart';
 
+import '../services/market_models.dart';
 import '../theme/app_theme.dart';
-import '../widgets/premium_widgets.dart';
+import '../widgets/ayre_components.dart';
+import '../widgets/ayre_icons.dart';
+import '../widgets/figure.dart';
 
-/// The destination behind a lesson card's arrow. The list truncates a lesson's
-/// body to keep cards scannable; this shows it in full, which is what the arrow
-/// has always implied.
+/// The destination behind a course row. The list truncates the body to stay
+/// scannable; this shows it in full, which is what the chevron has always implied.
 class LessonScreen extends StatelessWidget {
-  const LessonScreen({
-    super.key,
-    required this.title,
-    required this.eyebrow,
-    required this.body,
-    required this.icon,
-  });
+  const LessonScreen({super.key, required this.course});
 
-  final String title;
-  final String eyebrow;
-  final String body;
-  final IconData icon;
+  final Course course;
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
+    final t = context.tokens;
+    final progress = course.progress;
+
     return Scaffold(
-      backgroundColor: tokens.background,
-      appBar: AppBar(title: Text(eyebrow)),
+      backgroundColor: t.background,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: AyreIcon(AyreGlyph.back, size: 20, color: t.textPrimary),
+          onPressed: () => Navigator.of(context).maybePop(),
+          tooltip: 'Back',
+        ),
+        title: Text(course.category),
+      ),
       body: ContentWidth(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
@@ -35,26 +37,37 @@ class LessonScreen extends StatelessWidget {
             AppSpacing.huge,
           ),
           children: [
-            Row(
+            // Wraps rather than overflowing at large text scales — the header
+            // row that broke in the previous build.
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.xs,
               children: [
-                Icon(icon, size: 20, color: tokens.accentCool),
-                const SizedBox(width: AppSpacing.sm),
-                Text(
-                  eyebrow.toUpperCase(),
-                  style: AppTypo.microLabel(tokens),
-                ),
+                AyreIcon(AyreGlyph.course, size: 16, color: t.textTertiary),
+                Text(course.category.toUpperCase(), style: AppTypo.label(t)),
               ],
             ),
             const SizedBox(height: AppSpacing.md),
-            Text(title, style: AppTypo.pageTitle(tokens)),
+            Text(course.title, style: AppTypo.pageTitle(t)),
+            if (progress != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              ProgressRule(value: progress),
+              const SizedBox(height: AppSpacing.xs),
+              Figure.static(
+                '${course.lessonsDone}/${course.lessonsTotal} lessons complete',
+                fontSize: 11,
+                color: t.textTertiary,
+              ),
+            ],
             const SizedBox(height: AppSpacing.lg),
             const HairlineDivider(),
             const SizedBox(height: AppSpacing.lg),
             Text(
-              body.isEmpty
-                  ? 'This lesson has no written body yet.'
-                  : body,
-              style: AppTypo.body(tokens).copyWith(fontSize: 15, height: 1.6),
+              course.body.isEmpty
+                  ? 'This course has no written body yet.'
+                  : course.body,
+              style: AppTypo.body(t).copyWith(fontSize: 14, height: 1.6),
             ),
           ],
         ),

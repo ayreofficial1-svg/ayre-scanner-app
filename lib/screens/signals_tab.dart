@@ -1,47 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../services/api_service.dart';
+import '../services/market_data_service.dart';
+import '../services/market_models.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
-import '../widgets/app_states.dart';
-import '../widgets/numeral.dart';
-import '../widgets/premium_widgets.dart';
-import '../widgets/responsive.dart';
+import '../widgets/ayre_components.dart';
+import '../widgets/ayre_icons.dart';
+import '../widgets/figure.dart';
+import '../widgets/state_views.dart';
+import 'equity_detail_screen.dart';
 
+/// Signals — the signal board.
+///
+/// Dense terminal rows rather than generously-spaced editorial cards: this is a
+/// data-desk screen. Conviction reads as filled/unfilled signal ticks, never a
+/// dial.
 class SignalsTab extends StatefulWidget {
-  const SignalsTab({super.key});
+  const SignalsTab({super.key, required this.marketData});
+
+  final MarketDataService marketData;
 
   @override
   State<SignalsTab> createState() => _SignalsTabState();
 }
 
 class _SignalsTabState extends State<SignalsTab> {
-  List<Map<String, dynamic>> _signals = [];
+  DataResult<List<Signal>>? _result;
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _load(initial: true);
   }
 
-  Future<void> _load() async {
-    final signals = await ApiService.getSignals();
+  Future<void> _load({bool initial = false}) async {
+    final result = await widget.marketData.getSignals();
     if (!mounted) return;
-    final firstLoad = _loading;
     setState(() {
-      _signals = signals;
+      _result = result;
       _loading = false;
     });
-    // A refresh that lands new data confirms itself; the first load doesn't.
-    if (!firstLoad) HapticFeedback.mediumImpact();
+    if (!initial) HapticFeedback.mediumImpact();
 
-    final symbols = signals
-        .map((s) => s['symbol']?.toString())
-        .whereType<String>()
-        .where((s) => s.isNotEmpty);
-    final fresh = await SeenSignalsStore.diffAndRecord(symbols);
+    if (!result.isReady) return;
+    final fresh = await SeenSignalsStore.diffAndRecord(
+      result.value!.map((s) => s.symbol),
+    );
     if (fresh.isEmpty) return;
     await NotificationLog.instance.add(
       Notice(
@@ -49,88 +55,95 @@ class _SignalsTabState extends State<SignalsTab> {
         title: fresh.length == 1
             ? 'New scanner pick: ${fresh.first}'
             : '${fresh.length} new scanner picks',
-        body:
-            '${fresh.take(4).join(', ')}'
+        body: '${fresh.take(4).join(', ')}'
             '${fresh.length > 4 ? ', and more' : ''}',
         at: DateTime.now(),
       ),
     );
   }
 
+  void _openEquity(Signal signal) {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EquityDetailScreen(
+          symbol: signal.symbol,
+          marketData: widget.marketData,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    if (_loading) {
-      return const PremiumLoader(
-        label: 'Scanning setups',
-        section: AyreSection.signals,
-      );
-    }
+    final t = context.tokens;
 
-    // Signals is a list of self-contained, independently-scannable items, so it
-    // goes two-column once the viewport comfortably fits two readable cards.
-    final twoColumn = AppBreakpoints.usesTwoColumn(context);
-
-    return PremiumScaffold(
-      section: AyreSection.signals,
-      bottomSafe: false,
-      child: RefreshIndicator(
-        color: tokens.primary,
-        backgroundColor: tokens.surface,
-        onRefresh: _load,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.xl,
-                AppSpacing.lg,
-                AppSpacing.lg,
-              ),
-              sliver: const SliverToBoxAdapter(
-                child: AnimatedEntrance(child: _SignalsHeader()),
+    return RefreshIndicator(
+      color: t.citrineInk,
+      backgroundColor: t.surface,
+      onRefresh: _load,
+      edgeOffset: 72,
+      child: ContentWidth(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.lg,
+            120,
+          ),
+          children: [
+            SafeArea(
+              bottom: false,
+              child: Entrance(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('LIVE SCANNER', style: AppTypo.label(t)),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text('Signal board', style: AppTypo.pageTitle(t)),
+                    const SizedBox(height: AppSpacing.xxs),
+                    Text(
+                      'Curated setups with live movement and compact rationale.',
+                      style: AppTypo.body(t),
+                    ),
+                  ],
+                ),
               ),
             ),
-            if (_signals.isEmpty)
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                sliver: const SliverToBoxAdapter(
-                  child: AppStateMessage(
-                    icon: Icons.radar_rounded,
-                    heading: 'No fresh setups',
-                    message:
-                        'Pull down when you want the scanner to sweep again.',
-                  ),
+            const SizedBox(height: AppSpacing.xl),
+            if (_loading)
+              const AyreCard(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                child: Column(
+                  children: [
+                    SkeletonTickerRow(),
+                    SkeletonTickerRow(),
+                    SkeletonTickerRow(),
+                    SkeletonTickerRow(),
+                  ],
                 ),
               )
+            else if (_result!.isFailed)
+              StatePanel.failed(
+                headline: "The scanner couldn't refresh",
+                message: 'Pull down to sweep again.',
+              )
+            else if (_result!.isEmpty)
+              const StatePanel.empty(
+                headline: 'No fresh setups right now',
+                message: 'Pull down when you want the scanner to sweep again.',
+              )
             else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
-                  0,
-                  AppSpacing.lg,
-                  140,
-                ),
-                sliver: SliverGrid(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: twoColumn ? 2 : 1,
-                    mainAxisSpacing: AppSpacing.md,
-                    crossAxisSpacing: AppSpacing.md,
-                    mainAxisExtent: 168,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    childCount: _signals.length,
-                    (context, index) => AnimatedEntrance(
-                      delay: Duration(milliseconds: 40 * (index + 1)),
-                      child: _SignalCard(
-                        signal: _signals[index],
-                        index: index + 1,
-                      ),
-                    ),
+              for (final (i, signal) in _result!.value!.indexed) ...[
+                if (i > 0) const SizedBox(height: AppSpacing.sm),
+                Entrance(
+                  index: i + 1,
+                  child: _SignalRowCard(
+                    signal: signal,
+                    onTap: () => _openEquity(signal),
                   ),
                 ),
-              ),
+              ],
           ],
         ),
       ),
@@ -138,40 +151,116 @@ class _SignalsTabState extends State<SignalsTab> {
   }
 }
 
-/// Signals' hero carries no ornament — Home's hero is the one ornamented
-/// surface in the app, and this screen relies on the flat, bordered surface
-/// treatment instead.
-class _SignalsHeader extends StatelessWidget {
-  const _SignalsHeader();
+class _SignalRowCard extends StatelessWidget {
+  const _SignalRowCard({required this.signal, required this.onTap});
+
+  final Signal signal;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    return PremiumCard(
-      radius: AppRadius.heroCard,
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      color: AppSurfaces.heroFill(AyreSection.signals, tokens),
-      borderColor: tokens.primary.withValues(alpha: 0.35),
+    final t = context.tokens;
+    final tone = signal.bullish ? t.jade : t.garnet;
+
+    return AyreCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          StatusChip(
-            label: 'Live scanner',
-            outlined: true,
-            foreground: tokens.onPrimary,
+          Row(
+            children: [
+              // The bias glyph carries direction alongside the colour.
+              AyreIcon(
+                signal.bullish ? AyreGlyph.trendUp : AyreGlyph.trendDown,
+                size: 17,
+                color: tone,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      signal.symbol,
+                      style: AppTypo.rowLabel(t),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (signal.name != null && signal.name!.isNotEmpty)
+                      Text(
+                        signal.name!,
+                        style: AppTypo.caption(t),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      if (signal.lastPrice != null)
+                        Figure(formatPrice(signal.lastPrice), fontSize: 14),
+                      const SizedBox(height: AppSpacing.xxs),
+                      DeltaFigure(change: signal.percentChange, fontSize: 12),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            'Signal board',
-            style: AppTypo.pageTitle(tokens, color: tokens.onPrimary),
-          ),
-          const SizedBox(height: AppSpacing.xxs),
-          Text(
-            'Curated setups with live movement and compact rationale.',
-            style: AppTypo.bodyMedium(
-              tokens,
-              color: tokens.onPrimary.withValues(alpha: 0.85),
+          if (signal.rationale.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              signal.rationale,
+              style: AppTypo.body(t),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
+          ],
+          const SizedBox(height: AppSpacing.sm),
+          const HairlineDivider(),
+          const SizedBox(height: AppSpacing.sm),
+          // The levels row only renders the figures the feed actually provided.
+          Row(
+            children: [
+              if (signal.strength != null) ...[
+                Text('CONVICTION', style: AppTypo.label(t)),
+                const SizedBox(width: AppSpacing.xs),
+                SignalStrength(level: signal.strength!, color: tone),
+                const SizedBox(width: AppSpacing.md),
+              ],
+              Expanded(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerRight,
+                  child: Row(
+                    children: [
+                      if (signal.entry != null)
+                        _Level(label: 'Entry', value: signal.entry),
+                      if (signal.target != null)
+                        _Level(label: 'Target', value: signal.target, tone: t.jade),
+                      if (signal.stop != null)
+                        _Level(label: 'Stop', value: signal.stop, tone: t.garnet),
+                      if (signal.entry == null &&
+                          signal.target == null &&
+                          signal.stop == null &&
+                          signal.addedOn != null)
+                        Text(
+                          'ADDED ${signal.addedOn!.toUpperCase()}',
+                          style: AppTypo.label(t),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -179,88 +268,23 @@ class _SignalsHeader extends StatelessWidget {
   }
 }
 
-class _SignalCard extends StatelessWidget {
-  const _SignalCard({required this.signal, required this.index});
+class _Level extends StatelessWidget {
+  const _Level({required this.label, required this.value, this.tone});
 
-  final Map<String, dynamic> signal;
-  final int index;
+  final String label;
+  final num? value;
+  final Color? tone;
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final symbol = signal['symbol']?.toString() ?? 'SETUP';
-    final rationale = signal['rationale']?.toString() ?? '';
-    final dateAdded = signal['date_added']?.toString() ?? '';
-    final lastPrice = signal['last_price'];
-    final changePct = signal['change_pct'];
-    final price = lastPrice is num ? lastPrice : null;
-    final change = changePct is num ? changePct : null;
-    final up = (change ?? 0) >= 0;
-
-    return PremiumCard(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final t = context.tokens;
+    return Padding(
+      padding: const EdgeInsets.only(left: AppSpacing.md),
+      child: Row(
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      symbol,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypo.cardTitle(tokens).copyWith(fontSize: 17),
-                    ),
-                    const SizedBox(height: 1),
-                    Text(
-                      dateAdded.isEmpty
-                          ? 'Scanner pick #$index'
-                          : 'Added $dateAdded',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypo.caption(tokens),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Numeral(
-                    formatPrice(price),
-                    value: price?.toDouble(),
-                    format: formatPrice,
-                    fontSize: 16,
-                  ),
-                  const SizedBox(height: 1),
-                  DeltaFigure(change: change, fontSize: 12),
-                ],
-              ),
-            ],
-          ),
-          if (rationale.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              rationale,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: AppTypo.body(tokens),
-            ),
-          ],
-          const Spacer(),
-          // Per-signal traces stay in brass: the trace records the shape of the
-          // move, and the sign and glyph above already carry the direction.
-          Sparkline(
-            height: 44,
-            points: up
-                ? const [0.24, 0.30, 0.28, 0.44, 0.40, 0.58, 0.62, 0.74]
-                : const [0.76, 0.68, 0.70, 0.52, 0.56, 0.38, 0.34, 0.22],
-          ),
+          Text(label.toUpperCase(), style: AppTypo.label(t)),
+          const SizedBox(width: AppSpacing.xs),
+          Figure(formatPrice(value), fontSize: 12, color: tone),
         ],
       ),
     );

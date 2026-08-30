@@ -3,17 +3,15 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
 /// Press feedback for every tappable surface: a 0.97 scale with no overshoot.
-/// The interaction weight was already right — this only extends it to the
-/// surfaces that lacked it, and adds a hover tint where a cursor exists.
 ///
-/// Hover shifts the background tint only; it never scales, because a cursor
-/// passing over a card isn't a press.
+/// Hover shifts the background tint only and never scales, because a cursor
+/// passing over a card is not a press.
 class PressableScale extends StatefulWidget {
   const PressableScale({
     super.key,
     required this.child,
     this.onTap,
-    this.borderRadius = AppRadius.md,
+    this.borderRadius = AppRadius.card,
     this.scale = 0.97,
     this.hoverTint = true,
   });
@@ -31,10 +29,16 @@ class PressableScale extends StatefulWidget {
 class _PressableScaleState extends State<PressableScale> {
   bool _pressed = false;
 
+  void _setPressed(bool value) {
+    if (_pressed == value) return;
+    setState(() => _pressed = value);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
+    final t = context.tokens;
     final radius = BorderRadius.circular(widget.borderRadius);
+    final enabled = widget.onTap != null;
 
     return AnimatedScale(
       scale: _pressed ? widget.scale : 1,
@@ -46,21 +50,15 @@ class _PressableScaleState extends State<PressableScale> {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: widget.onTap,
-          onTapDown: widget.onTap == null
-              ? null
-              : (_) => setState(() => _pressed = true),
-          onTapUp: widget.onTap == null
-              ? null
-              : (_) => setState(() => _pressed = false),
-          onTapCancel: widget.onTap == null
-              ? null
-              : () => setState(() => _pressed = false),
+          onTapDown: enabled ? (_) => _setPressed(true) : null,
+          onTapUp: enabled ? (_) => _setPressed(false) : null,
+          onTapCancel: enabled ? () => _setPressed(false) : null,
           borderRadius: radius,
           hoverColor: widget.hoverTint
-              ? tokens.primary.withValues(alpha: 0.05)
+              ? t.citrine.withValues(alpha: 0.06)
               : AppTheme.transparent,
-          splashColor: tokens.primary.withValues(alpha: 0.06),
-          highlightColor: tokens.primary.withValues(alpha: 0.03),
+          splashColor: t.citrine.withValues(alpha: 0.07),
+          highlightColor: t.citrine.withValues(alpha: 0.04),
           child: widget.child,
         ),
       ),

@@ -3,16 +3,15 @@ import 'package:flutter/services.dart';
 
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
-import '../widgets/premium_widgets.dart';
+import '../widgets/ayre_components.dart';
+import '../widgets/ayre_icons.dart';
 
-/// A pushed route, not a tab. The bottom nav is hidden for its duration: a
-/// plain top app bar with Cancel on the left and Save on the right, disabled
+/// A pushed route, not a tab. Cancel on the left, Save on the right, disabled
 /// until a field actually changes.
 ///
-/// Only the display name is editable, because that is all the backend supports
-/// — it exposes session identity but no profile-update endpoint, so the name is
-/// stored on the device and the username is shown read-only rather than as a
-/// field that would silently fail to save.
+/// Only the display name is editable: the backend exposes session identity but no
+/// profile-update endpoint, so the name is stored on the device and the username
+/// is read-only rather than a field that would silently fail to save.
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({
     super.key,
@@ -58,24 +57,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
+    final t = context.tokens;
     final canSave = _dirty && _valid && !_saving;
 
     return Scaffold(
-      backgroundColor: tokens.background,
+      backgroundColor: t.background,
       appBar: AppBar(
-        leading: TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: Text(
-            'Cancel',
-            style: AppTypo.bodyMedium(tokens, color: tokens.textSecondary),
-          ),
+        leading: IconButton(
+          icon: AyreIcon(AyreGlyph.close, size: 19, color: t.textPrimary),
+          onPressed: () => Navigator.of(context).maybePop(),
+          tooltip: 'Cancel',
         ),
-        leadingWidth: 84,
         title: const Text('Edit profile'),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.sm),
+            padding: const EdgeInsets.only(right: AppSpacing.md),
             child: TextButton(
               onPressed: canSave
                   ? () {
@@ -85,10 +81,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   : null,
               child: Text(
                 'Save',
-                style: AppTypo.bodyMedium(
-                  tokens,
-                  color: canSave ? tokens.primary : tokens.textDisabled,
-                ).copyWith(fontWeight: FontWeight.w600),
+                style: AppTypo.button(
+                  t,
+                  color: canSave ? t.citrineInk : t.textDisabled,
+                ),
               ),
             ),
           ),
@@ -98,47 +94,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
+            AppSpacing.md,
             AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.xxxl,
+            AppSpacing.huge,
           ),
           children: [
-            Text('DISPLAY NAME', style: AppTypo.microLabel(tokens)),
-            const SizedBox(height: AppSpacing.sm),
+            const SectionLabel(label: 'Display name'),
             TextField(
               controller: _name,
               textCapitalization: TextCapitalization.words,
               textInputAction: TextInputAction.done,
-              style: AppTypo.bodyMedium(tokens, color: tokens.textPrimary),
+              style: AppTypo.bodyStrong(t),
               decoration: InputDecoration(
                 hintText: 'How the app should address you',
-                hintStyle: AppTypo.body(tokens, color: tokens.textTertiary),
                 errorText: _dirty && !_valid ? 'Enter a name' : null,
               ),
               onSubmitted: canSave ? (_) => _save() : null,
             ),
-            const SizedBox(height: AppSpacing.xl),
             if (widget.handle != null && widget.handle!.isNotEmpty) ...[
-              Text('SIGN-IN USERNAME', style: AppTypo.microLabel(tokens)),
-              const SizedBox(height: AppSpacing.sm),
-              PremiumCard(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                color: tokens.surfaceAlt,
+              const SizedBox(height: AppSpacing.xl),
+              const SectionLabel(label: 'Sign-in username'),
+              AyreCard(
+                color: t.surfaceAlt,
+                padding: const EdgeInsets.all(AppSpacing.md),
                 child: Row(
                   children: [
-                    Icon(
-                      Icons.lock_outline_rounded,
-                      size: 16,
-                      color: tokens.textTertiary,
-                    ),
+                    AyreIcon(AyreGlyph.lock, size: 16, color: t.textTertiary),
                     const SizedBox(width: AppSpacing.md),
                     Expanded(
                       child: Text(
                         widget.handle!,
-                        style: AppTypo.bodyMedium(
-                          tokens,
-                          color: tokens.textSecondary,
-                        ),
+                        style: AppTypo.bodyStrong(t, color: t.textSecondary),
                       ),
                     ),
                   ],
@@ -146,9 +132,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Your username identifies the account and cannot be changed '
-                'here.',
-                style: AppTypo.caption(tokens),
+                'Your username identifies the account and cannot be changed here.',
+                style: AppTypo.caption(t),
               ),
             ],
           ],

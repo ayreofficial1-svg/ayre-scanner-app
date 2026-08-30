@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
-import '../widgets/app_states.dart';
-import '../widgets/numeral.dart';
-import '../widgets/premium_widgets.dart';
+import '../widgets/ayre_components.dart';
+import '../widgets/ayre_icons.dart';
+import '../widgets/figure.dart';
+import '../widgets/state_views.dart';
 
-/// The destination behind Home's notification bell: a reverse-chronological
-/// list of what the app has actually recorded, gated by the switches in
-/// Settings. Nothing here is sample data — an untouched install shows the empty
-/// state, which is the honest reading.
+/// The destination behind Home's bell: a reverse-chronological list of what the
+/// app has actually recorded, gated by the switches in Settings. An untouched
+/// install shows the empty state, which is the honest reading.
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -27,10 +27,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
+    final t = context.tokens;
     return Scaffold(
-      backgroundColor: tokens.background,
-      appBar: AppBar(title: const Text('Alerts')),
+      backgroundColor: t.background,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: AyreIcon(AyreGlyph.back, size: 20, color: t.textPrimary),
+          onPressed: () => Navigator.of(context).maybePop(),
+          tooltip: 'Back',
+        ),
+        title: const Text('Alerts'),
+      ),
       body: ContentWidth(
         child: ListenableBuilder(
           listenable: NotificationLog.instance,
@@ -38,21 +45,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             final entries = NotificationLog.instance.entries;
             if (entries.isEmpty) {
               return ListView(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
-                  AppSpacing.xxl,
-                  AppSpacing.lg,
-                  AppSpacing.xxl,
-                ),
+                padding: const EdgeInsets.all(AppSpacing.lg),
                 children: [
-                  AppStateMessage(
-                    icon: Icons.notifications_none_rounded,
-                    heading: 'Nothing recorded yet',
+                  StatePanel.empty(
+                    headline: 'Nothing recorded yet',
                     message: SettingsStore.instance.inAppAlerts
-                        ? 'New scanner picks and delayed-data warnings will '
-                              'appear here as they happen.'
+                        ? 'New scanner picks and delayed-data warnings appear '
+                              'here as they happen.'
                         : 'In-app alerts are switched off in Settings, so '
                               'nothing is being recorded.',
+                    pullToRefreshHint: false,
                   ),
                 ],
               );
@@ -61,9 +63,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             return ListView.separated(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.lg,
+                AppSpacing.sm,
                 AppSpacing.lg,
-                AppSpacing.lg,
-                AppSpacing.xxxl,
+                AppSpacing.huge,
               ),
               itemCount: entries.length,
               separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
@@ -83,20 +85,19 @@ class _NoticeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final (icon, tone) = switch (notice.kind) {
-      // Delayed data is a time-sensitive, attention-needed state: one of the
-      // sanctioned ember uses.
-      NoticeKind.staleData => (Icons.schedule_rounded, tokens.accentWarm),
-      NoticeKind.signal => (Icons.add_chart_rounded, tokens.primary),
+    final t = context.tokens;
+    // Delayed data is time-sensitive attention, which is Ember's job.
+    final (glyph, tone) = switch (notice.kind) {
+      NoticeKind.staleData => (AyreGlyph.delayed, t.ember),
+      NoticeKind.signal => (AyreGlyph.alerts, t.citrineInk),
     };
 
-    return PremiumCard(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+    return AyreCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: tone),
+          AyreIcon(glyph, size: 17, color: tone),
           const SizedBox(width: AppSpacing.md),
           Expanded(
             child: Column(
@@ -106,22 +107,18 @@ class _NoticeCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
-                      child: Text(
-                        notice.title,
-                        style: AppTypo.cardTitle(tokens).copyWith(fontSize: 15),
-                      ),
+                      child: Text(notice.title, style: AppTypo.rowLabel(t)),
                     ),
                     const SizedBox(width: AppSpacing.sm),
-                    Numeral.static(
-                      formatClock(notice.at),
+                    Figure.static(
+                      formatClockShort(notice.at),
                       fontSize: 11,
-                      fontWeight: FontWeight.w400,
-                      color: tokens.textTertiary,
+                      color: t.textTertiary,
                     ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.xxs),
-                Text(notice.body, style: AppTypo.body(tokens)),
+                Text(notice.body, style: AppTypo.body(t)),
               ],
             ),
           ),

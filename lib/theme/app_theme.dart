@@ -2,18 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// ─── Section identifiers ────────────────────────────────────────────────────
-enum AyreSection { home, signals, insights, learn, profile }
-
-// ─── Token extension ────────────────────────────────────────────────────────
-// The palette is warm brass + warm ink. Brass (`primary`) is the sole always-on
-// brand hue and doubles as "the instrument's mechanism" (gauge needle, nav
-// needle-mark, sparkline trace). The base is warm at every step in both
-// themes: parchment in light, warm ink/graphite — never blue-black — in dark.
+// ─── "Cinder & Citrine" ─────────────────────────────────────────────────────
 //
-// The legacy decorative tokens (cream/ivory/peach/coral/mint/mintDeep/teal/
-// teal2/lavender/violet/sage/gold) are gone. There is no decorative palette
-// any more: every color here has one semantic job, described below.
+// A market-terminal identity: cool ink/graphite/paper surfaces, one ownable
+// brand hue (Citrine), and market data rendered as terminal readouts.
+//
+// The base hue family is deliberately COOL. Nothing warm-neutral, cream, brown,
+// brass or bronze appears anywhere. There are no gradients, no glows, no
+// translucency and no drop shadows — elevation reads through a tight lightness
+// scale plus 1px hairlines.
+//
+// Three greens exist and they never trade jobs:
+//   • Citrine — brand only. Warm, mineral, yellow-leaning. Never attached to a
+//     numeric market value, never carries a +/− sign.
+//   • Jade    — gain only. Cool, blue-leaning, saturated. Always with + and an
+//     up-glyph on a numeric value.
+//   • Garnet  — loss only. Deep and wine-toned. Always with − and a down-glyph.
 @immutable
 class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   const AppThemeTokens({
@@ -22,21 +26,16 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     required this.surface,
     required this.surfaceAlt,
     required this.surfaceRaised,
-    required this.primary,
-    required this.primaryMuted,
-    required this.positive,
-    required this.negative,
-    required this.accentWarm,
-    required this.accentCool,
-    required this.accentMint,
-    required this.neutralBlock,
-    required this.onPrimary,
-    required this.onPositive,
-    required this.onNegative,
-    required this.onAccentWarm,
-    required this.onAccentCool,
-    required this.onAccentMint,
-    required this.onNeutralBlock,
+    required this.inkPanel,
+    required this.onInkPanel,
+    required this.citrine,
+    required this.citrineInk,
+    required this.citrineMuted,
+    required this.onCitrine,
+    required this.jade,
+    required this.garnet,
+    required this.ember,
+    required this.slateViolet,
     required this.textPrimary,
     required this.textSecondary,
     required this.textTertiary,
@@ -44,85 +43,83 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     required this.border,
     required this.borderSubtle,
     required this.hairline,
-    required this.engraved,
     required this.positiveBg,
     required this.negativeBg,
-    required this.shimmer,
+    required this.emberBg,
+    required this.chartGrid,
+    required this.chartLine,
+    required this.skeleton,
   });
 
-  /// App canvas. Warm parchment (light) / warm ink-graphite (dark).
+  /// App canvas. Fogpaper (cool off-white, graphite undertone) in light;
+  /// Cinder (true near-black graphite) in dark.
   final Color background;
 
-  /// A half-step off `background`, for banded/grouped regions on the canvas.
+  /// A half-step off [background] for banded or grouped regions.
   final Color backgroundTint;
 
-  /// Elevation scale. Elevation reads through lightness and warmth, never
-  /// through shadow — there are no drop shadows in this system.
+  /// Elevation scale — a tight ascending series kept close together for calm,
+  /// low-glare reading. Never paired with a shadow.
   final Color surface;
   final Color surfaceAlt;
   final Color surfaceRaised;
 
-  /// Warm brass. The one always-on brand hue: nav needle-mark, primary
-  /// buttons, section accents, hero surfaces, the gauge needle, the sparkline
-  /// stroke, wayfinding marks.
-  final Color primary;
+  /// The "terminal readout" panel embedded in a card: the one deliberately
+  /// near-black surface in light mode, and a cooler inset panel in dark.
+  final Color inkPanel;
+  final Color onInkPanel;
 
-  /// Brass held back for large fills and hero surfaces where the full-strength
-  /// hue would shout. Never used for text or thin lines.
-  final Color primaryMuted;
+  /// The brand hue as a solid fill. Identity only: the Fold's focal control,
+  /// primary buttons, selected states, the hero card's accent edge.
+  final Color citrine;
 
-  /// Gain / loss. Ink-toned verdigris and vermillion-rust; always paired with
-  /// a sign in the number and a directional glyph, never color alone.
-  final Color positive;
-  final Color negative;
+  /// Citrine dark enough to be text or a thin line. The light-mode fill tone is
+  /// too light to clear 4.5:1 as small text, so anything type-weight — links,
+  /// selected labels, small icons — uses this instead.
+  final Color citrineInk;
 
-  /// "Ember" — the one deliberately vivid, narrowly-used hue. Doubles as the
-  /// warning / stale-data / attention semantic. See the ember usage rule:
-  /// notable momentum readings, at most one or two "featured" badges, and
-  /// time-sensitive states. Never a decorative fill or a rotated card color.
-  final Color accentWarm;
+  /// Citrine held back for large, low-emphasis fills.
+  final Color citrineMuted;
 
-  /// Deep cartographic slate — reads as "ink", not as a second brand color.
-  /// Informational badges, secondary/outline buttons, neutral trend lines.
-  final Color accentCool;
+  /// Ink text on a Citrine fill. Citrine is light, so inverted white text would
+  /// under-perform; this is deliberately dark.
+  final Color onCitrine;
 
-  /// Small-area "new"/fresh marker only (dots, tiny badges). Deliberately
-  /// outside the teal/green family so it can never drift back toward reading
-  /// as a paler brand color.
-  final Color accentMint;
+  /// Gain. Cool and blue-leaning so it never reads as Citrine.
+  final Color jade;
 
-  /// A full-strength ink block, used where a surface needs to invert.
-  final Color neutralBlock;
+  /// Loss. Deep and wine-toned rather than a flat alert red.
+  final Color garnet;
 
-  final Color onPrimary;
-  final Color onPositive;
-  final Color onNegative;
-  final Color onAccentWarm;
-  final Color onAccentCool;
-  final Color onAccentMint;
-  final Color onNeutralBlock;
+  /// Attention: the LIVE dot, delayed/stale chips, offline notices. Never a
+  /// button fill, never navigation, never the brand.
+  final Color ember;
 
-  /// Text hierarchy. Warm ink / warm off-white — never pure black or white.
-  /// All three clear 4.5:1 against their typical surface in both themes.
+  /// Informational secondary. Small-area only — a "NEW" tag, a category label.
+  /// Never a large fill, never navigation, never a button.
+  final Color slateViolet;
+
+  /// Cool graphite through muted grey. All clear 4.5:1 on their surfaces.
   final Color textPrimary;
   final Color textSecondary;
   final Color textTertiary;
   final Color textDisabled;
 
-  /// Separation. `hairline` is the visible 1px edge on cards and dividers;
-  /// `border` / `borderSubtle` are the softer container edges.
+  /// 1px structure. [hairline] is the visible card and divider edge.
   final Color border;
   final Color borderSubtle;
   final Color hairline;
 
-  /// The engraved line-work tone: tick marks, contour lines, dial calibration.
-  final Color engraved;
-
+  /// Faint tint fields behind movers rows and semantic badges.
   final Color positiveBg;
   final Color negativeBg;
+  final Color emberBg;
 
-  /// Skeleton/placeholder fill.
-  final Color shimmer;
+  /// Near-invisible chart grid; neutral trace for non-featured charts.
+  final Color chartGrid;
+  final Color chartLine;
+
+  final Color skeleton;
 
   @override
   AppThemeTokens copyWith({
@@ -131,21 +128,16 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     Color? surface,
     Color? surfaceAlt,
     Color? surfaceRaised,
-    Color? primary,
-    Color? primaryMuted,
-    Color? positive,
-    Color? negative,
-    Color? accentWarm,
-    Color? accentCool,
-    Color? accentMint,
-    Color? neutralBlock,
-    Color? onPrimary,
-    Color? onPositive,
-    Color? onNegative,
-    Color? onAccentWarm,
-    Color? onAccentCool,
-    Color? onAccentMint,
-    Color? onNeutralBlock,
+    Color? inkPanel,
+    Color? onInkPanel,
+    Color? citrine,
+    Color? citrineInk,
+    Color? citrineMuted,
+    Color? onCitrine,
+    Color? jade,
+    Color? garnet,
+    Color? ember,
+    Color? slateViolet,
     Color? textPrimary,
     Color? textSecondary,
     Color? textTertiary,
@@ -153,10 +145,12 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     Color? border,
     Color? borderSubtle,
     Color? hairline,
-    Color? engraved,
     Color? positiveBg,
     Color? negativeBg,
-    Color? shimmer,
+    Color? emberBg,
+    Color? chartGrid,
+    Color? chartLine,
+    Color? skeleton,
   }) {
     return AppThemeTokens(
       background: background ?? this.background,
@@ -164,21 +158,16 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       surface: surface ?? this.surface,
       surfaceAlt: surfaceAlt ?? this.surfaceAlt,
       surfaceRaised: surfaceRaised ?? this.surfaceRaised,
-      primary: primary ?? this.primary,
-      primaryMuted: primaryMuted ?? this.primaryMuted,
-      positive: positive ?? this.positive,
-      negative: negative ?? this.negative,
-      accentWarm: accentWarm ?? this.accentWarm,
-      accentCool: accentCool ?? this.accentCool,
-      accentMint: accentMint ?? this.accentMint,
-      neutralBlock: neutralBlock ?? this.neutralBlock,
-      onPrimary: onPrimary ?? this.onPrimary,
-      onPositive: onPositive ?? this.onPositive,
-      onNegative: onNegative ?? this.onNegative,
-      onAccentWarm: onAccentWarm ?? this.onAccentWarm,
-      onAccentCool: onAccentCool ?? this.onAccentCool,
-      onAccentMint: onAccentMint ?? this.onAccentMint,
-      onNeutralBlock: onNeutralBlock ?? this.onNeutralBlock,
+      inkPanel: inkPanel ?? this.inkPanel,
+      onInkPanel: onInkPanel ?? this.onInkPanel,
+      citrine: citrine ?? this.citrine,
+      citrineInk: citrineInk ?? this.citrineInk,
+      citrineMuted: citrineMuted ?? this.citrineMuted,
+      onCitrine: onCitrine ?? this.onCitrine,
+      jade: jade ?? this.jade,
+      garnet: garnet ?? this.garnet,
+      ember: ember ?? this.ember,
+      slateViolet: slateViolet ?? this.slateViolet,
       textPrimary: textPrimary ?? this.textPrimary,
       textSecondary: textSecondary ?? this.textSecondary,
       textTertiary: textTertiary ?? this.textTertiary,
@@ -186,48 +175,48 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       border: border ?? this.border,
       borderSubtle: borderSubtle ?? this.borderSubtle,
       hairline: hairline ?? this.hairline,
-      engraved: engraved ?? this.engraved,
       positiveBg: positiveBg ?? this.positiveBg,
       negativeBg: negativeBg ?? this.negativeBg,
-      shimmer: shimmer ?? this.shimmer,
+      emberBg: emberBg ?? this.emberBg,
+      chartGrid: chartGrid ?? this.chartGrid,
+      chartLine: chartLine ?? this.chartLine,
+      skeleton: skeleton ?? this.skeleton,
     );
   }
 
   @override
   AppThemeTokens lerp(ThemeExtension<AppThemeTokens>? other, double t) {
     if (other is! AppThemeTokens) return this;
+    Color c(Color a, Color b) => Color.lerp(a, b, t)!;
     return AppThemeTokens(
-      background: Color.lerp(background, other.background, t)!,
-      backgroundTint: Color.lerp(backgroundTint, other.backgroundTint, t)!,
-      surface: Color.lerp(surface, other.surface, t)!,
-      surfaceAlt: Color.lerp(surfaceAlt, other.surfaceAlt, t)!,
-      surfaceRaised: Color.lerp(surfaceRaised, other.surfaceRaised, t)!,
-      primary: Color.lerp(primary, other.primary, t)!,
-      primaryMuted: Color.lerp(primaryMuted, other.primaryMuted, t)!,
-      positive: Color.lerp(positive, other.positive, t)!,
-      negative: Color.lerp(negative, other.negative, t)!,
-      accentWarm: Color.lerp(accentWarm, other.accentWarm, t)!,
-      accentCool: Color.lerp(accentCool, other.accentCool, t)!,
-      accentMint: Color.lerp(accentMint, other.accentMint, t)!,
-      neutralBlock: Color.lerp(neutralBlock, other.neutralBlock, t)!,
-      onPrimary: Color.lerp(onPrimary, other.onPrimary, t)!,
-      onPositive: Color.lerp(onPositive, other.onPositive, t)!,
-      onNegative: Color.lerp(onNegative, other.onNegative, t)!,
-      onAccentWarm: Color.lerp(onAccentWarm, other.onAccentWarm, t)!,
-      onAccentCool: Color.lerp(onAccentCool, other.onAccentCool, t)!,
-      onAccentMint: Color.lerp(onAccentMint, other.onAccentMint, t)!,
-      onNeutralBlock: Color.lerp(onNeutralBlock, other.onNeutralBlock, t)!,
-      textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
-      textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
-      textTertiary: Color.lerp(textTertiary, other.textTertiary, t)!,
-      textDisabled: Color.lerp(textDisabled, other.textDisabled, t)!,
-      border: Color.lerp(border, other.border, t)!,
-      borderSubtle: Color.lerp(borderSubtle, other.borderSubtle, t)!,
-      hairline: Color.lerp(hairline, other.hairline, t)!,
-      engraved: Color.lerp(engraved, other.engraved, t)!,
-      positiveBg: Color.lerp(positiveBg, other.positiveBg, t)!,
-      negativeBg: Color.lerp(negativeBg, other.negativeBg, t)!,
-      shimmer: Color.lerp(shimmer, other.shimmer, t)!,
+      background: c(background, other.background),
+      backgroundTint: c(backgroundTint, other.backgroundTint),
+      surface: c(surface, other.surface),
+      surfaceAlt: c(surfaceAlt, other.surfaceAlt),
+      surfaceRaised: c(surfaceRaised, other.surfaceRaised),
+      inkPanel: c(inkPanel, other.inkPanel),
+      onInkPanel: c(onInkPanel, other.onInkPanel),
+      citrine: c(citrine, other.citrine),
+      citrineInk: c(citrineInk, other.citrineInk),
+      citrineMuted: c(citrineMuted, other.citrineMuted),
+      onCitrine: c(onCitrine, other.onCitrine),
+      jade: c(jade, other.jade),
+      garnet: c(garnet, other.garnet),
+      ember: c(ember, other.ember),
+      slateViolet: c(slateViolet, other.slateViolet),
+      textPrimary: c(textPrimary, other.textPrimary),
+      textSecondary: c(textSecondary, other.textSecondary),
+      textTertiary: c(textTertiary, other.textTertiary),
+      textDisabled: c(textDisabled, other.textDisabled),
+      border: c(border, other.border),
+      borderSubtle: c(borderSubtle, other.borderSubtle),
+      hairline: c(hairline, other.hairline),
+      positiveBg: c(positiveBg, other.positiveBg),
+      negativeBg: c(negativeBg, other.negativeBg),
+      emberBg: c(emberBg, other.emberBg),
+      chartGrid: c(chartGrid, other.chartGrid),
+      chartLine: c(chartLine, other.chartLine),
+      skeleton: c(skeleton, other.skeleton),
     );
   }
 }
@@ -236,7 +225,7 @@ extension AppThemeContext on BuildContext {
   AppThemeTokens get tokens => Theme.of(this).extension<AppThemeTokens>()!;
 }
 
-// ─── Spacing (8-pt grid — unchanged) ───────────────────────────────────────
+// ─── Spacing (8pt grid, retained as a system) ───────────────────────────────
 abstract final class AppSpacing {
   static const double xxs = 2;
   static const double xs = 4;
@@ -247,516 +236,446 @@ abstract final class AppSpacing {
   static const double xxl = 24;
   static const double xxxl = 32;
   static const double huge = 40;
-  static const double screenH = 20;
+
+  /// Terminal-row vertical padding — dense and scannable by design.
+  static const double row = 10;
 }
 
-// ─── Radii ──────────────────────────────────────────────────────────────────
-// Machined, not bubbly: roughly half the pre-redesign radii. The full
-// pill/stadium shape is retired as a default for cards, sheets, and larger
-// badges — it survives for genuinely small discrete chips, and as the single
-// sanctioned exception for the bottom navigation bar.
+// ─── Radii ─────────────────────────────────────────────────────────────────
+// Crisper than the previous identity: a terminal card, not a soft app card.
+// The full capsule is not a default anywhere — it survives only for genuinely
+// circular controls and small status chips.
 abstract final class AppRadius {
-  static const double xs = 4;
-  static const double sm = 6;
-  static const double md = 8;
-  static const double card = 10;
-  static const double heroCard = 12;
-  static const double lg = 10;
-  static const double xl = 14;
+  static const double chip = 3;
+  static const double panel = 4;
+  static const double card = 6;
+  static const double button = 6;
+  static const double control = 8;
+  static const double sheet = 12;
 
-  /// Small discrete chips and status badges only.
-  static const double pill = 999;
+  /// The Fold's expanded tray.
+  static const double dock = 20;
 
-  /// The one sanctioned capsule: the floating navigation bar (§5).
-  static const double navBar = 30;
-
-  /// Chamfer depth — the flat corner cut used by instrument-coded elements.
-  static const double chamfer = 12;
+  static const double circle = 999;
 }
 
-// ─── Motion ─────────────────────────────────────────────────────────────────
-// No bounce, no overshoot, no elastic curves — anywhere, ever. Springs in this
-// system are critically damped (ratio 1.0): they resolve directly to target
-// with zero overshoot, and re-target smoothly when interrupted mid-flight.
+// ─── Motion ────────────────────────────────────────────────────────────────
+// No bounce, no overshoot, ever. Springs are critically damped (ratio 1.0):
+// they resolve straight to target and re-target smoothly when interrupted.
 abstract final class AppMotion {
   static const Duration instant = Duration(milliseconds: 80);
-  static const Duration fast = Duration(milliseconds: 180);
-  static const Duration medium = Duration(milliseconds: 280);
-  static const Duration slow = Duration(milliseconds: 420);
+  static const Duration fast = Duration(milliseconds: 170);
+  static const Duration medium = Duration(milliseconds: 260);
+  static const Duration slow = Duration(milliseconds: 400);
 
-  /// Large multi-element sequenced transitions. Sized so a 3–5 element
-  /// staggered sequence completes inside ~500–650ms in total.
-  static const Duration choreographed = Duration(milliseconds: 600);
+  /// The Fold's unfold/fold shape transition.
+  static const Duration fold = Duration(milliseconds: 320);
 
-  static const Duration splash = Duration(milliseconds: 1200);
-  static const Duration navExpand = Duration(milliseconds: 280);
-  static const Duration cardEntrance = Duration(milliseconds: 450);
-  static const Duration cardStagger = Duration(milliseconds: 50);
+  /// How long the expanded dock waits before folding itself away again.
+  static const Duration foldIdle = Duration(seconds: 4);
 
-  /// One slow single sweep marking freshly-landed live data. Plays once per
-  /// update — never loops.
-  static const Duration livePulse = Duration(milliseconds: 900);
+  /// A changed figure settling to its new value.
+  static const Duration digitRoll = Duration(milliseconds: 420);
 
-  /// The needle-sweep and digit-roll settle window.
-  static const Duration settle = Duration(milliseconds: 520);
+  /// A ticker trace drawing itself on.
+  static const Duration traceDraw = Duration(milliseconds: 620);
+
+  /// One cycle of the LIVE dot's pulse.
+  static const Duration livePulse = Duration(milliseconds: 1600);
+
+  static const Duration entrance = Duration(milliseconds: 380);
+  static const Duration stagger = Duration(milliseconds: 40);
 
   static const Curve ease = Curves.easeOutCubic;
   static const Curve easeIn = Curves.easeInCubic;
-  static const Curve decel = Curves.decelerate;
-
-  /// Stagger step between elements that change at the same moment (§11).
-  static const Duration stagger = Duration(milliseconds: 20);
-
-  /// The needle-mark trails the label reveal rather than firing with it.
-  static const Duration needleLag = Duration(milliseconds: 18);
+  static const Curve easeInOut = Curves.easeInOutCubic;
 }
 
-// ─── Instrument surfaces ────────────────────────────────────────────────────
-// Replaces the old AppGradients. Surfaces are flat, matte and opaque; the only
-// gradients left in the system either represent data or shade a dial face for
-// depth, which is the one sanctioned "physical" reading (§4.5 #4).
-abstract final class AppSurfaces {
-  /// A hero surface's flat fill. Brass-led everywhere; Insights and Learn take
-  /// a small semantic shift baked into the same base so a sentiment gauge
-  /// doesn't read identically to a lesson library.
-  static Color heroFill(AyreSection section, AppThemeTokens tokens) {
-    return switch (section) {
-      AyreSection.home || AyreSection.signals => tokens.primaryMuted,
-      AyreSection.insights =>
-        Color.lerp(tokens.primaryMuted, tokens.accentCool, 0.22)!,
-      AyreSection.learn =>
-        Color.lerp(tokens.primaryMuted, tokens.accentWarm, 0.18)!,
-      AyreSection.profile => tokens.surfaceRaised,
-    };
-  }
-
-  /// Foreground for content sitting on [heroFill].
-  static Color onHero(AyreSection section, AppThemeTokens tokens) {
-    return section == AyreSection.profile ? tokens.textPrimary : tokens.onPrimary;
-  }
-
-  /// Shading a dial face for depth — a data surface, not atmosphere.
-  static LinearGradient dialFace(AppThemeTokens tokens) => LinearGradient(
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-    colors: [
-      Color.lerp(tokens.surfaceAlt, tokens.background, 0.35)!,
-      tokens.surfaceAlt,
-    ],
-  );
-}
-
-// ─── Typography — three roles, applied without exception ────────────────────
-// 1. Instrument-readout monospace: every live market figure, without exception.
-// 2. Display serif: screen titles, section eyebrows and headings as a voice —
-//    and a numeral in exactly two places (Home's momentum score, the splash
-//    wordmark), nowhere else.
-// 3. Inter: body copy, list-row labels, buttons, categorical micro-labels.
+// ─── Typography ────────────────────────────────────────────────────────────
+// Three faces, three jobs, no overlap:
+//   • Space Grotesk — display. Screen titles, index names, course titles.
+//   • JetBrains Mono — ticker. EVERY numeric market value, without exception.
+//   • Manrope — UI. Body copy, labels, buttons, settings rows.
 abstract final class AppTypo {
-  static TextStyle inter({
-    double fontSize = 15,
-    FontWeight fontWeight = FontWeight.w400,
+  static TextStyle display({
+    double fontSize = 24,
+    FontWeight fontWeight = FontWeight.w700,
     Color? color,
     double? height,
     double? letterSpacing,
-  }) => GoogleFonts.inter(
+  }) => GoogleFonts.spaceGrotesk(
     fontSize: fontSize,
     fontWeight: fontWeight,
     color: color,
     height: height,
-    letterSpacing: letterSpacing,
+    letterSpacing: letterSpacing ?? -0.4,
   );
 
-  /// The engraved display serif. Reserved per the role rules above.
-  static TextStyle serif({
-    double fontSize = 20,
-    FontWeight fontWeight = FontWeight.w600,
-    Color? color,
-    double? height,
-    double? letterSpacing,
-  }) => GoogleFonts.fraunces(
-    fontSize: fontSize,
-    fontWeight: fontWeight,
-    color: color,
-    height: height,
-    letterSpacing: letterSpacing,
-  );
-
-  /// The instrument readout. Tabular figures mean a live-updating number never
-  /// reflows its neighbours on refresh.
-  static TextStyle mono({
-    double fontSize = 15,
+  /// Tabular figures mean columns of numbers align and a live value never
+  /// reflows its neighbours when it updates.
+  static TextStyle ticker({
+    double fontSize = 14,
     FontWeight fontWeight = FontWeight.w500,
     Color? color,
     double? height,
     double? letterSpacing,
-  }) => GoogleFonts.ibmPlexMono(
+  }) => GoogleFonts.jetBrainsMono(
     fontSize: fontSize,
     fontWeight: fontWeight,
     color: color,
     height: height,
-    letterSpacing: letterSpacing,
+    letterSpacing: letterSpacing ?? -0.3,
     fontFeatures: const [FontFeature.tabularFigures()],
   );
 
-  // ── Serif roles ──────────────────────────────────────────────────────────
-
-  /// Home's momentum score and the splash wordmark. The only two places a
-  /// numeral may render in the serif.
-  static TextStyle heroSerif(AppThemeTokens tokens, {Color? color}) => serif(
-    fontSize: 60,
-    fontWeight: FontWeight.w600,
-    color: color ?? tokens.textPrimary,
-    height: 1.0,
-    letterSpacing: -1.6,
+  static TextStyle ui({
+    double fontSize = 14,
+    FontWeight fontWeight = FontWeight.w500,
+    Color? color,
+    double? height,
+    double? letterSpacing,
+  }) => GoogleFonts.manrope(
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+    color: color,
+    height: height,
+    letterSpacing: letterSpacing,
   );
 
-  static TextStyle pageTitle(AppThemeTokens tokens, {Color? color}) => serif(
-    fontSize: 27,
-    fontWeight: FontWeight.w600,
-    color: color ?? tokens.textPrimary,
-    height: 1.18,
+  // ── Display roles ────────────────────────────────────────────────────────
+
+  static TextStyle pageTitle(AppThemeTokens t, {Color? color}) => display(
+    fontSize: 26,
+    fontWeight: FontWeight.w700,
+    color: color ?? t.textPrimary,
+    height: 1.14,
+    letterSpacing: -0.7,
+  );
+
+  static TextStyle sectionTitle(AppThemeTokens t, {Color? color}) => display(
+    fontSize: 18,
+    fontWeight: FontWeight.w700,
+    color: color ?? t.textPrimary,
+    height: 1.22,
     letterSpacing: -0.4,
   );
 
-  static TextStyle sectionTitle(AppThemeTokens tokens, {Color? color}) => serif(
-    fontSize: 19,
+  static TextStyle cardTitle(AppThemeTokens t, {Color? color}) => display(
+    fontSize: 15,
     fontWeight: FontWeight.w600,
-    color: color ?? tokens.textPrimary,
+    color: color ?? t.textPrimary,
     height: 1.25,
     letterSpacing: -0.2,
   );
 
-  /// Section headers ("TOP GAINERS"). The serif as a structural voice.
-  static TextStyle sectionEyebrow(AppThemeTokens tokens, {Color? color}) =>
-      serif(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: color ?? tokens.textSecondary,
-        letterSpacing: 0.7,
-      );
+  // ── Ticker roles ─────────────────────────────────────────────────────────
 
-  // ── Monospace roles ──────────────────────────────────────────────────────
+  /// The largest data text in the app — index and equity levels. Deliberately
+  /// larger than any heading.
+  static TextStyle heroValue(AppThemeTokens t, {Color? color}) => ticker(
+    fontSize: 32,
+    fontWeight: FontWeight.w600,
+    color: color ?? t.textPrimary,
+    height: 1.0,
+    letterSpacing: -1.2,
+  );
 
-  /// Every live market figure. Prefer the shared `Numeral` widget over calling
-  /// this directly, so no screen can accidentally fall back to Inter.
-  static TextStyle dataNum(
-    AppThemeTokens tokens, {
+  static TextStyle value(
+    AppThemeTokens t, {
     Color? color,
-    double fontSize = 15,
-    FontWeight fontWeight = FontWeight.w500,
-  }) => mono(
+    double fontSize = 14,
+  }) => ticker(
     fontSize: fontSize,
-    fontWeight: fontWeight,
-    color: color ?? tokens.textPrimary,
-    letterSpacing: -0.2,
-  );
-
-  /// "as of 15:31" freshness markers and chart axis labels.
-  static TextStyle dataMeta(AppThemeTokens tokens, {Color? color}) => mono(
-    fontSize: 11,
-    fontWeight: FontWeight.w400,
-    color: color ?? tokens.textTertiary,
-    letterSpacing: 0.1,
-  );
-
-  // ── Inter roles ──────────────────────────────────────────────────────────
-
-  static TextStyle cardTitle(AppThemeTokens tokens, {Color? color}) => inter(
-    fontSize: 16,
-    fontWeight: FontWeight.w600,
-    color: color ?? tokens.textPrimary,
-    letterSpacing: -0.3,
-    height: 1.25,
-  );
-
-  static TextStyle body(AppThemeTokens tokens, {Color? color}) => inter(
-    fontSize: 14,
-    fontWeight: FontWeight.w400,
-    color: color ?? tokens.textSecondary,
-    height: 1.45,
-    letterSpacing: -0.1,
-  );
-
-  static TextStyle bodyMedium(AppThemeTokens tokens, {Color? color}) => inter(
-    fontSize: 14,
     fontWeight: FontWeight.w500,
-    color: color ?? tokens.textSecondary,
+    color: color ?? t.textPrimary,
+  );
+
+  static TextStyle valueSmall(AppThemeTokens t, {Color? color}) => ticker(
+    fontSize: 11,
+    fontWeight: FontWeight.w400,
+    color: color ?? t.textTertiary,
+    letterSpacing: 0,
+  );
+
+  // ── UI roles ─────────────────────────────────────────────────────────────
+
+  static TextStyle body(AppThemeTokens t, {Color? color}) => ui(
+    fontSize: 13,
+    fontWeight: FontWeight.w400,
+    color: color ?? t.textSecondary,
     height: 1.45,
+  );
+
+  static TextStyle bodyStrong(AppThemeTokens t, {Color? color}) => ui(
+    fontSize: 13,
+    fontWeight: FontWeight.w600,
+    color: color ?? t.textPrimary,
+    height: 1.4,
+  );
+
+  static TextStyle rowLabel(AppThemeTokens t, {Color? color}) => ui(
+    fontSize: 14,
+    fontWeight: FontWeight.w600,
+    color: color ?? t.textPrimary,
     letterSpacing: -0.1,
   );
 
-  /// All-caps categorical micro-labels ("NIFTY 50", "SUBJECTS"). Never a live
-  /// figure — those go to [dataNum].
-  static TextStyle microLabel(AppThemeTokens tokens, {Color? color}) => inter(
-    fontSize: 11,
-    fontWeight: FontWeight.w600,
-    color: color ?? tokens.textTertiary,
-    letterSpacing: 0.7,
-  );
-
-  static TextStyle caption(AppThemeTokens tokens, {Color? color}) => inter(
+  static TextStyle caption(AppThemeTokens t, {Color? color}) => ui(
     fontSize: 12,
     fontWeight: FontWeight.w400,
-    color: color ?? tokens.textTertiary,
+    color: color ?? t.textTertiary,
     height: 1.35,
+  );
+
+  /// The terminal-label convention: small, uppercase, wide-tracked, tertiary.
+  /// Sits above every data value and heads every section.
+  static TextStyle label(
+    AppThemeTokens t, {
+    Color? color,
+    double fontSize = 10,
+  }) => ui(
+    fontSize: fontSize,
+    fontWeight: FontWeight.w700,
+    color: color ?? t.textTertiary,
+    letterSpacing: 1.1,
+  );
+
+  static TextStyle button(AppThemeTokens t, {Color? color}) => ui(
+    fontSize: 14,
+    fontWeight: FontWeight.w700,
+    color: color,
+    letterSpacing: 0.1,
   );
 }
 
-// ─── Theme builder ──────────────────────────────────────────────────────────
+// ─── Theme builder ─────────────────────────────────────────────────────────
 abstract final class AppTheme {
   static const Color transparent = Color(0x00000000);
 
-  // Light — warm parchment. Tuned against its own background, not as an
-  // inversion of dark: same semantic roles, same hue identity, different
-  // numbers.
-  static const _lightTokens = AppThemeTokens(
-    background: Color(0xFFF7F3EA),
-    backgroundTint: Color(0xFFF1EBDE),
-    surface: Color(0xFFFDFAF3),
-    surfaceAlt: Color(0xFFF2ECDF),
-    surfaceRaised: Color(0xFFFFFDF7),
-    primary: Color(0xFF8C6414),
-    primaryMuted: Color(0xFF6E4E10),
-    positive: Color(0xFF2F6B4F),
-    negative: Color(0xFFA32C22),
-    accentWarm: Color(0xFFB3441A),
-    accentCool: Color(0xFF3F5568),
-    accentMint: Color(0xFF6B4A7A),
-    neutralBlock: Color(0xFF241F17),
-    onPrimary: Color(0xFFFDFAF3),
-    onPositive: Color(0xFFFDFAF3),
-    onNegative: Color(0xFFFDFAF3),
-    onAccentWarm: Color(0xFFFDFAF3),
-    onAccentCool: Color(0xFFFDFAF3),
-    onAccentMint: Color(0xFFFDFAF3),
-    onNeutralBlock: Color(0xFFF7F3EA),
-    textPrimary: Color(0xFF241F17),
-    textSecondary: Color(0xFF5C5346),
-    textTertiary: Color(0xFF6E6455),
-    textDisabled: Color(0xFFA79C89),
-    border: Color(0x24241F17),
-    borderSubtle: Color(0x12241F17),
-    hairline: Color(0x33241F17),
-    engraved: Color(0x59241F17),
-    positiveBg: Color(0x162F6B4F),
-    negativeBg: Color(0x16A32C22),
-    shimmer: Color(0xFFEDE6D7),
+  // Fogpaper — cool off-white with a graphite undertone. Not cream, not stark.
+  static const _light = AppThemeTokens(
+    background: Color(0xFFF4F5F7),
+    backgroundTint: Color(0xFFEBEDF1),
+    surface: Color(0xFFFBFBFD),
+    surfaceAlt: Color(0xFFEFF1F4),
+    surfaceRaised: Color(0xFFFFFFFF),
+    inkPanel: Color(0xFF12151A),
+    onInkPanel: Color(0xFFEDEFF2),
+    citrine: Color(0xFFBFCB2E),
+    citrineInk: Color(0xFF65700C),
+    citrineMuted: Color(0xFFE4E9A8),
+    onCitrine: Color(0xFF141712),
+    jade: Color(0xFF0F7F5B),
+    garnet: Color(0xFFA32036),
+    ember: Color(0xFFA85B12),
+    slateViolet: Color(0xFF5B5488),
+    textPrimary: Color(0xFF14171C),
+    textSecondary: Color(0xFF565E6B),
+    textTertiary: Color(0xFF666E7A),
+    textDisabled: Color(0xFFA0A7B1),
+    border: Color(0x1F14171C),
+    borderSubtle: Color(0x1214171C),
+    hairline: Color(0x2E14171C),
+    positiveBg: Color(0x140F7F5B),
+    negativeBg: Color(0x14A32036),
+    emberBg: Color(0x16A85B12),
+    chartGrid: Color(0x1214171C),
+    chartLine: Color(0xFF565E6B),
+    skeleton: Color(0xFFE4E7EC),
   );
 
-  // Dark — warm ink / graphite. Never blue-tinted black.
-  static const _darkTokens = AppThemeTokens(
-    background: Color(0xFF100D0A),
-    backgroundTint: Color(0xFF15110D),
-    surface: Color(0xFF1B1710),
-    surfaceAlt: Color(0xFF231E16),
-    surfaceRaised: Color(0xFF2B251B),
-    primary: Color(0xFFD8A73E),
-    primaryMuted: Color(0xFF6B5220),
-    positive: Color(0xFF5FB58C),
-    negative: Color(0xFFE8705F),
-    accentWarm: Color(0xFFE2703C),
-    accentCool: Color(0xFF8FA6BC),
-    accentMint: Color(0xFFB08AC4),
-    neutralBlock: Color(0xFFF4EEE1),
-    onPrimary: Color(0xFF100D0A),
-    onPositive: Color(0xFF100D0A),
-    onNegative: Color(0xFF100D0A),
-    onAccentWarm: Color(0xFF100D0A),
-    onAccentCool: Color(0xFF100D0A),
-    onAccentMint: Color(0xFF100D0A),
-    onNeutralBlock: Color(0xFF100D0A),
-    textPrimary: Color(0xFFF4EEE1),
-    textSecondary: Color(0xFFB5AB99),
-    textTertiary: Color(0xFF8B8172),
-    textDisabled: Color(0xFF5A5346),
-    border: Color(0x24F4EEE1),
-    borderSubtle: Color(0x12F4EEE1),
-    hairline: Color(0x33F4EEE1),
-    engraved: Color(0x66F4EEE1),
-    positiveBg: Color(0x1F5FB58C),
-    negativeBg: Color(0x1FE8705F),
-    shimmer: Color(0xFF231E16),
+  // Cinder — a trading desk at night. True near-black, no warm undertone.
+  static const _dark = AppThemeTokens(
+    background: Color(0xFF0B0C0E),
+    backgroundTint: Color(0xFF101216),
+    surface: Color(0xFF14171B),
+    surfaceAlt: Color(0xFF1A1E23),
+    surfaceRaised: Color(0xFF22262C),
+    inkPanel: Color(0xFF0A0D11),
+    onInkPanel: Color(0xFFEDEFF2),
+    citrine: Color(0xFFC9D137),
+    citrineInk: Color(0xFFC9D137),
+    citrineMuted: Color(0xFF5C6220),
+    onCitrine: Color(0xFF0B0C0E),
+    jade: Color(0xFF22C58A),
+    garnet: Color(0xFFDE5B6A),
+    ember: Color(0xFFE08A3C),
+    slateViolet: Color(0xFF9A93C4),
+    textPrimary: Color(0xFFEDEFF2),
+    textSecondary: Color(0xFFA2A9B4),
+    textTertiary: Color(0xFF868E9A),
+    textDisabled: Color(0xFF4E545E),
+    border: Color(0x1FFFFFFF),
+    borderSubtle: Color(0x12FFFFFF),
+    hairline: Color(0x2EFFFFFF),
+    positiveBg: Color(0x1F22C58A),
+    negativeBg: Color(0x1FDE5B6A),
+    emberBg: Color(0x1FE08A3C),
+    chartGrid: Color(0x12FFFFFF),
+    chartLine: Color(0xFFA2A9B4),
+    skeleton: Color(0xFF1E2228),
   );
 
-  static AppThemeTokens get lightTokens => _lightTokens;
-  static AppThemeTokens get darkTokens => _darkTokens;
+  static AppThemeTokens get lightTokens => _light;
+  static AppThemeTokens get darkTokens => _dark;
 
-  static ThemeData get dark => _build(Brightness.dark, _darkTokens);
-  static ThemeData get light => _build(Brightness.light, _lightTokens);
+  static ThemeData get light => _build(Brightness.light, _light);
+  static ThemeData get dark => _build(Brightness.dark, _dark);
 
-  static ThemeData _build(Brightness brightness, AppThemeTokens tokens) {
+  static ThemeData _build(Brightness brightness, AppThemeTokens t) {
     final isDark = brightness == Brightness.dark;
-    final colorScheme = ColorScheme(
+
+    final scheme = ColorScheme(
       brightness: brightness,
-      primary: tokens.primary,
-      onPrimary: tokens.onPrimary,
-      secondary: tokens.accentCool,
-      onSecondary: tokens.onAccentCool,
-      tertiary: tokens.accentWarm,
-      onTertiary: tokens.onAccentWarm,
-      error: tokens.negative,
-      onError: tokens.onNegative,
-      surface: tokens.surface,
-      onSurface: tokens.textPrimary,
+      primary: t.citrine,
+      onPrimary: t.onCitrine,
+      secondary: t.slateViolet,
+      onSecondary: isDark ? t.background : const Color(0xFFFFFFFF),
+      tertiary: t.ember,
+      onTertiary: isDark ? t.background : const Color(0xFFFFFFFF),
+      error: t.garnet,
+      onError: isDark ? t.background : const Color(0xFFFFFFFF),
+      surface: t.surface,
+      onSurface: t.textPrimary,
     );
 
-    // Titles and headings take the serif voice; body, labels and chrome stay
-    // on Inter. Numerals never come from the TextTheme — they go through the
-    // `Numeral` widget so the monospace rule can't be bypassed.
-    final textTheme = TextTheme(
-      displayLarge: AppTypo.serif(fontSize: 38, color: tokens.textPrimary, letterSpacing: -0.9),
-      displayMedium: AppTypo.serif(fontSize: 32, color: tokens.textPrimary, letterSpacing: -0.7),
-      displaySmall: AppTypo.serif(fontSize: 27, color: tokens.textPrimary, letterSpacing: -0.5),
-      headlineLarge: AppTypo.serif(fontSize: 23, color: tokens.textPrimary, letterSpacing: -0.4),
-      headlineMedium: AppTypo.serif(fontSize: 20, color: tokens.textPrimary, letterSpacing: -0.3),
-      headlineSmall: AppTypo.serif(fontSize: 18, color: tokens.textPrimary, letterSpacing: -0.2),
-      titleLarge: AppTypo.serif(fontSize: 17, color: tokens.textPrimary),
-      titleMedium: AppTypo.inter(fontSize: 15, fontWeight: FontWeight.w600, color: tokens.textPrimary, letterSpacing: -0.1),
-      titleSmall: AppTypo.inter(fontSize: 13, fontWeight: FontWeight.w600, color: tokens.textPrimary),
-      bodyLarge: AppTypo.inter(fontSize: 16, color: tokens.textPrimary, height: 1.5),
-      bodyMedium: AppTypo.inter(fontSize: 14, color: tokens.textSecondary, height: 1.45),
-      bodySmall: AppTypo.inter(fontSize: 12, color: tokens.textTertiary, height: 1.4),
-      labelLarge: AppTypo.inter(fontSize: 14, fontWeight: FontWeight.w600, color: tokens.textPrimary),
-      labelMedium: AppTypo.inter(fontSize: 12, fontWeight: FontWeight.w500, color: tokens.textSecondary, letterSpacing: 0.2),
-      labelSmall: AppTypo.microLabel(tokens),
+    // Headings take the display face; body and chrome take the UI face.
+    // Numerals never come from the TextTheme — they route through `Figure`
+    // so the monospace rule cannot be bypassed.
+    final text = TextTheme(
+      displayLarge: AppTypo.display(fontSize: 34, color: t.textPrimary, letterSpacing: -1.0),
+      displayMedium: AppTypo.display(fontSize: 29, color: t.textPrimary, letterSpacing: -0.8),
+      displaySmall: AppTypo.display(fontSize: 26, color: t.textPrimary, letterSpacing: -0.7),
+      headlineLarge: AppTypo.display(fontSize: 22, color: t.textPrimary, letterSpacing: -0.5),
+      headlineMedium: AppTypo.display(fontSize: 19, color: t.textPrimary, letterSpacing: -0.4),
+      headlineSmall: AppTypo.display(fontSize: 17, color: t.textPrimary, letterSpacing: -0.3),
+      titleLarge: AppTypo.display(fontSize: 16, color: t.textPrimary, letterSpacing: -0.2),
+      titleMedium: AppTypo.ui(fontSize: 14, fontWeight: FontWeight.w600, color: t.textPrimary),
+      titleSmall: AppTypo.ui(fontSize: 13, fontWeight: FontWeight.w600, color: t.textPrimary),
+      bodyLarge: AppTypo.ui(fontSize: 15, color: t.textPrimary, height: 1.5),
+      bodyMedium: AppTypo.body(t),
+      bodySmall: AppTypo.caption(t),
+      labelLarge: AppTypo.button(t, color: t.textPrimary),
+      labelMedium: AppTypo.ui(fontSize: 12, fontWeight: FontWeight.w600, color: t.textSecondary),
+      labelSmall: AppTypo.label(t),
     );
 
     final base = ThemeData(
       brightness: brightness,
-      colorScheme: colorScheme,
+      colorScheme: scheme,
       useMaterial3: true,
-      extensions: [tokens],
-      scaffoldBackgroundColor: tokens.background,
+      extensions: [t],
+      scaffoldBackgroundColor: t.background,
     );
 
     return base.copyWith(
-      textTheme: textTheme,
-      primaryTextTheme: textTheme,
-      dividerColor: tokens.hairline,
-      cardColor: tokens.surface,
-      dividerTheme: DividerThemeData(
-        color: tokens.hairline,
-        thickness: 1,
-        space: 1,
-      ),
+      textTheme: text,
+      primaryTextTheme: text,
+      dividerColor: t.hairline,
+      dividerTheme: DividerThemeData(color: t.hairline, thickness: 1, space: 1),
+      cardColor: t.surface,
       cardTheme: CardThemeData(
-        color: tokens.surface,
+        color: t.surface,
         elevation: 0,
         shadowColor: transparent,
         surfaceTintColor: transparent,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.card),
-          side: BorderSide(color: tokens.borderSubtle),
+          side: BorderSide(color: t.borderSubtle),
         ),
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: tokens.background,
-        foregroundColor: tokens.textPrimary,
+        backgroundColor: t.background,
+        foregroundColor: t.textPrimary,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        titleTextStyle: AppTypo.sectionTitle(tokens),
+        titleSpacing: AppSpacing.sm,
+        titleTextStyle: AppTypo.sectionTitle(t),
         surfaceTintColor: transparent,
         systemOverlayStyle:
             isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
       ),
       bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: tokens.surface,
+        backgroundColor: t.surface,
         surfaceTintColor: transparent,
         elevation: 0,
         modalElevation: 0,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppRadius.xl),
+            top: Radius.circular(AppRadius.sheet),
           ),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: tokens.surfaceAlt,
-        labelStyle: AppTypo.body(tokens),
-        floatingLabelStyle: AppTypo.bodyMedium(tokens, color: tokens.primary),
+        fillColor: t.surfaceAlt,
+        hintStyle: AppTypo.body(t, color: t.textTertiary),
+        labelStyle: AppTypo.body(t),
+        floatingLabelStyle: AppTypo.body(t, color: t.citrineInk),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.lg,
+        ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide(color: tokens.border, width: 1),
+          borderRadius: BorderRadius.circular(AppRadius.control),
+          borderSide: BorderSide(color: t.border),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          borderSide: BorderSide(color: tokens.primary, width: 1.5),
+          borderRadius: BorderRadius.circular(AppRadius.control),
+          borderSide: BorderSide(color: t.citrineInk, width: 1.5),
         ),
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: tokens.primary,
-          foregroundColor: tokens.onPrimary,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xxl,
-            vertical: 16,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          textStyle: AppTypo.inter(fontWeight: FontWeight.w600, fontSize: 16),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.control),
+          borderSide: BorderSide(color: t.garnet),
         ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: tokens.accentCool,
-          side: BorderSide(color: tokens.border),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.xl,
-            vertical: 14,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
-          textStyle: AppTypo.inter(fontWeight: FontWeight.w600, fontSize: 15),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadius.control),
+          borderSide: BorderSide(color: t.garnet, width: 1.5),
         ),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
-        color: tokens.primary,
-        circularTrackColor: tokens.surfaceAlt,
-        linearTrackColor: tokens.surfaceAlt,
+        color: t.citrineInk,
+        circularTrackColor: t.surfaceAlt,
+        linearTrackColor: t.surfaceAlt,
+        linearMinHeight: 3,
       ),
-      switchTheme: SwitchThemeData(
-        thumbColor: WidgetStateProperty.resolveWith((states) {
-          return states.contains(WidgetState.selected)
-              ? tokens.onPositive
-              : tokens.textSecondary;
-        }),
-        trackColor: WidgetStateProperty.resolveWith((states) {
-          return states.contains(WidgetState.selected)
-              ? tokens.positive
-              : tokens.surfaceAlt;
-        }),
-        trackOutlineColor: WidgetStateProperty.resolveWith((states) {
-          return states.contains(WidgetState.selected)
-              ? AppTheme.transparent
-              : tokens.border;
-        }),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: t.surfaceRaised,
+        contentTextStyle: AppTypo.bodyStrong(t),
+        elevation: 0,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          side: BorderSide(color: t.border),
+        ),
+      ),
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: t.citrineInk,
+        selectionColor: t.citrine.withValues(alpha: 0.3),
+        selectionHandleColor: t.citrineInk,
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
-          TargetPlatform.android: _SlideFadePageTransitionsBuilder(),
-          TargetPlatform.iOS: _SlideFadePageTransitionsBuilder(),
-          TargetPlatform.macOS: _SlideFadePageTransitionsBuilder(),
-          TargetPlatform.windows: _SlideFadePageTransitionsBuilder(),
-          TargetPlatform.linux: _SlideFadePageTransitionsBuilder(),
-          TargetPlatform.fuchsia: _SlideFadePageTransitionsBuilder(),
+          TargetPlatform.android: TerminalPageTransitions(),
+          TargetPlatform.iOS: TerminalPageTransitions(),
+          TargetPlatform.macOS: TerminalPageTransitions(),
+          TargetPlatform.windows: TerminalPageTransitions(),
+          TargetPlatform.linux: TerminalPageTransitions(),
+          TargetPlatform.fuchsia: TerminalPageTransitions(),
         },
       ),
     );
   }
 }
 
-/// Horizontal slide-in plus a subtle fade — the standing convention for every
-/// pushed screen (Profile → Settings, → Edit Profile, and anything added
-/// later). No overshoot.
-class _SlideFadePageTransitionsBuilder extends PageTransitionsBuilder {
-  const _SlideFadePageTransitionsBuilder();
+/// Direction-aware push/pop with no overshoot. The detail screen slides in over
+/// the list it came from and the list drifts back slightly, so
+/// Home → Index Detail → Equity Detail reads as one continuous drill-down
+/// rather than three unrelated screens appearing.
+class TerminalPageTransitions extends PageTransitionsBuilder {
+  const TerminalPageTransitions();
 
   @override
   Widget buildTransitions<T>(
@@ -766,19 +685,31 @@ class _SlideFadePageTransitionsBuilder extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    final curved = CurvedAnimation(
+    final incoming = CurvedAnimation(
       parent: animation,
       curve: AppMotion.ease,
       reverseCurve: AppMotion.easeIn,
     );
-    return FadeTransition(
-      opacity: curved,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(0.12, 0),
-          end: Offset.zero,
-        ).animate(curved),
-        child: child,
+    final outgoing = CurvedAnimation(
+      parent: secondaryAnimation,
+      curve: AppMotion.ease,
+      reverseCurve: AppMotion.easeIn,
+    );
+
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: Offset.zero,
+        end: const Offset(-0.16, 0),
+      ).animate(outgoing),
+      child: FadeTransition(
+        opacity: incoming,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(1, 0),
+            end: Offset.zero,
+          ).animate(incoming),
+          child: child,
+        ),
       ),
     );
   }

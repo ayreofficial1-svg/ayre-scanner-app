@@ -1,11 +1,13 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
-import '../widgets/instrument_marks.dart';
-import '../widgets/premium_widgets.dart';
 
+/// The brand mark: three ascending bars on a baseline rule, drawn in Citrine —
+/// the same shape family as the Signals glyph, so the wordmark and the app's
+/// iconography read as one identity.
+///
+/// The bars rise on load, once, with no overshoot. No rotating ring, no gradient
+/// sweep, no gauge — none of that survives from the previous identity.
 class AyreSplashScreen extends StatefulWidget {
   const AyreSplashScreen({super.key, required this.onFinished});
 
@@ -18,29 +20,13 @@ class AyreSplashScreen extends StatefulWidget {
 class _AyreSplashScreenState extends State<AyreSplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _introScale;
-  late final Animation<double> _introOpacity;
-  late final Animation<double> _exit;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: AppMotion.splash);
-    // Was easeOutBack, which overshot and contradicted the app-wide no-bounce
-    // rule. Same duration, standard deceleration.
-    _introScale = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0, 0.60, curve: Curves.easeOutCubic),
-    );
-    _introOpacity = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0, 0.40, curve: Curves.easeOutCubic),
-    );
-    _exit = Tween<double>(begin: 1, end: 0).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Interval(0.80, 1, curve: Curves.easeInCubic),
-      ),
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1050),
     );
     _controller.forward().then((_) {
       if (mounted) widget.onFinished();
@@ -55,87 +41,119 @@ class _AyreSplashScreenState extends State<AyreSplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
+    final t = context.tokens;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     return Scaffold(
-      body: PremiumScaffold(
-        section: AyreSection.home,
-        child: Center(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, _) {
-              return Opacity(
-                opacity: reduceMotion ? 1 : _introOpacity.value * _exit.value,
-                child: Transform.scale(
-                  scale: reduceMotion ? 1 : 0.90 + _introScale.value * 0.10,
-                  child: _SplashMark(
-                    tokens: tokens,
-                    // One slow-rotating needle, critically damped and never
-                    // overshooting, in place of the retired rotating gradient
-                    // ring. The needle is the same motif as the nav's
-                    // needle-mark and the gauge's needle.
-                    needleAngle: reduceMotion
-                        ? -math.pi / 4
-                        : (Curves.easeOutCubic.transform(_controller.value) *
-                                  math.pi *
-                                  1.4) -
-                              (math.pi / 2),
+      backgroundColor: t.background,
+      body: Center(
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final rise = reduceMotion
+                ? 1.0
+                : AppMotion.ease.transform(
+                    (_controller.value / 0.7).clamp(0.0, 1.0),
+                  );
+            final fade = reduceMotion
+                ? 1.0
+                : ((_controller.value - 0.2) / 0.4).clamp(0.0, 1.0);
+            final exit = reduceMotion
+                ? 1.0
+                : 1 - ((_controller.value - 0.86) / 0.14).clamp(0.0, 1.0);
+
+            return Opacity(
+              opacity: exit,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 68,
+                    width: 84,
+                    child: CustomPaint(
+                      painter: _MarkPainter(
+                        rise: rise,
+                        color: t.citrine,
+                        rule: t.hairline,
+                      ),
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
+                  const SizedBox(height: AppSpacing.xl),
+                  Opacity(
+                    opacity: fade,
+                    child: Column(
+                      children: [
+                        Text(
+                          'AYRE SCANNER',
+                          style: AppTypo.display(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: t.textPrimary,
+                            letterSpacing: 3.2,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          'MARKET TERMINAL',
+                          style: AppTypo.label(t, fontSize: 10),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );
   }
 }
 
-class _SplashMark extends StatelessWidget {
-  const _SplashMark({required this.tokens, required this.needleAngle});
+class _MarkPainter extends CustomPainter {
+  const _MarkPainter({
+    required this.rise,
+    required this.color,
+    required this.rule,
+  });
 
-  final AppThemeTokens tokens;
-  final double needleAngle;
+  /// 0..1 — how far the bars have risen.
+  final double rise;
+  final Color color;
+  final Color rule;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        BearingMark(
-          color: tokens.engraved,
-          size: 168,
-          needleColor: tokens.primary,
-          needleAngle: needleAngle,
-        ),
-        const SizedBox(height: AppSpacing.xxxl),
-        // The wordmark: the second and last place the display serif carries a
-        // brand moment on its own.
-        Text(
-          'Ayre Scanner',
-          style: AppTypo.serif(
-            fontSize: 30,
-            fontWeight: FontWeight.w600,
-            color: tokens.textPrimary,
-            letterSpacing: -0.4,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        SizedBox(
-          height: 8,
-          width: 96,
-          child: TickMarks(
-            color: tokens.engraved,
-            count: 17,
-            length: 3,
-            majorEvery: 8,
-            majorLength: 8,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Text('MARKET INTELLIGENCE', style: AppTypo.microLabel(tokens)),
-      ],
+  void paint(Canvas canvas, Size size) {
+    final baseline = size.height - 1;
+    canvas.drawLine(
+      Offset(0, baseline),
+      Offset(size.width, baseline),
+      Paint()
+        ..color = rule
+        ..strokeWidth = 1,
     );
+
+    const heights = [0.46, 0.78, 1.0];
+    final barWidth = size.width / 7;
+    final paint = Paint()..color = color;
+
+    for (var i = 0; i < heights.length; i++) {
+      // Later bars start a beat after the earlier ones.
+      final staged = ((rise - i * 0.12) / (1 - 0.24)).clamp(0.0, 1.0);
+      final height = size.height * heights[i] * staged;
+      if (height <= 0) continue;
+      final left = barWidth * (1 + i * 2);
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTRB(left, baseline - height, left + barWidth, baseline),
+          const Radius.circular(1.5),
+        ),
+        paint,
+      );
+    }
   }
+
+  @override
+  bool shouldRepaint(covariant _MarkPainter old) =>
+      old.rise != rise || old.color != color || old.rule != rule;
 }

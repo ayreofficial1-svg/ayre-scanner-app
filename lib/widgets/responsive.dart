@@ -1,35 +1,38 @@
 import 'package:flutter/material.dart';
 
-/// The repository ships macOS, Windows, Linux and Web targets alongside mobile.
-/// These are the only breakpoints in the system — everything adaptive keys off
-/// them so behaviour stays predictable across screens.
+/// The only breakpoints in the system — everything adaptive keys off these so
+/// behaviour stays predictable across screens.
 abstract final class AppBreakpoints {
-  /// Above this, the bottom nav becomes a left-side vertical rail (§5.4).
-  static const double rail = 900;
+  /// At and above this, list-shaped screens go two-column.
+  static const double twoColumn = 720;
 
-  /// Above this, list-shaped tabs (Signals, Learn) may go two-column.
-  /// Insights and Home stay single-column at every width — both read as a
-  /// linear narrative a grid would break apart.
-  static const double twoColumn = 760;
+  /// At and above this, three-column is worth it for card grids.
+  static const double threeColumn = 1120;
 
-  /// Above this the nav bar stops stretching and centres at a capped width.
-  static const double navCap = 620;
+  /// A comfortable reading measure for single-column content.
+  static const double contentMaxWidth = 620;
 
-  /// A comfortable reading measure for scrollable content.
-  static const double contentMaxWidth = 560;
-
-  /// Widest the floating nav bar is allowed to get before it centres.
-  static const double navMaxWidth = 560;
+  /// Widest the Fold's expanded dock is allowed to get before it centres.
+  static const double dockMaxWidth = 480;
 
   static double _width(BuildContext context) => MediaQuery.sizeOf(context).width;
 
-  static bool usesRail(BuildContext context) => _width(context) >= rail;
+  /// Column count for list/card grids.
+  ///
+  /// Previously this excluded the widest tier, which meant desktop windows fell
+  /// back to a single column — the opposite of the intent. Wider always means
+  /// the same or more columns, never fewer.
+  static int columns(BuildContext context) {
+    final w = _width(context);
+    if (w >= threeColumn) return 3;
+    if (w >= twoColumn) return 2;
+    return 1;
+  }
 
-  static bool usesTwoColumn(BuildContext context) =>
-      _width(context) >= twoColumn && !usesRail(context);
+  static bool isCompact(BuildContext context) => _width(context) < 380;
 
-  /// True where a pointer is actually present, so hover affordances only
-  /// appear when they can be used.
+  /// True only where a pointer is actually present, so hover affordances appear
+  /// only when they can be used.
   static bool hasPointer(BuildContext context) {
     return switch (Theme.of(context).platform) {
       TargetPlatform.macOS ||

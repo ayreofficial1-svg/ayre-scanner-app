@@ -1,4 +1,6 @@
 import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -27,6 +29,25 @@ class ApiService {
       await prefs.setString('session_cookie', cookie);
     }
   }
+
+  /// Headers other services need in order to reuse this session. Exposed so the
+  /// market data layer can attach the cookie without owning auth itself.
+  static Map<String, String> authHeaders({bool json = false}) =>
+      _headers(json: json);
+
+  /// Fires when an authenticated call comes back 401/403, so the app can route to
+  /// re-authentication instead of leaving the user on a screen that will never
+  /// load. Set by the app shell.
+  static VoidCallback? onSessionExpired;
+
+  static void notifySessionExpired() => onSessionExpired?.call();
+
+  /// Fires when a request succeeds or fails to reach the host at all, so the app
+  /// can show or clear its offline banner without polling.
+  static ValueChanged<bool>? onReachabilityChanged;
+
+  static void notifyReachable(bool reachable) =>
+      onReachabilityChanged?.call(reachable);
 
   static Map<String, String> _headers({bool json = true}) {
     final headers = <String, String>{};

@@ -2,240 +2,201 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/api_service.dart';
-import '../services/market_movers_service.dart';
+import '../services/market_data_service.dart';
+import '../services/market_models.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
-import '../widgets/instrument_marks.dart';
-import '../widgets/market_movers_section.dart';
-import '../widgets/numeral.dart';
-import '../widgets/premium_widgets.dart';
+import '../widgets/ayre_components.dart';
+import '../widgets/ayre_icons.dart';
+import '../widgets/figure.dart';
 import '../widgets/pressable_scale.dart';
-import '../widgets/spring.dart';
-import 'home_shell.dart' show NavAvatar;
+import '../widgets/responsive.dart';
+import '../widgets/state_views.dart';
+import '../widgets/ticker_trace.dart';
+import 'home_shell.dart' show initialsFor;
+import 'index_detail_screen.dart';
 import 'notifications_screen.dart';
 
+/// Home — the market gateway.
+///
+/// Greets, shows the three primary instruments as tappable cards, gives one
+/// high-level scanner summary, and routes onward. The movers lists used to live
+/// here and now belong to the Insights desk.
 class HomeTab extends StatefulWidget {
   const HomeTab({
     super.key,
-    this.onIdentityResolved,
+    required this.marketData,
+    this.onAccountResolved,
     this.onOpenProfile,
-    this.marketMovers = const AyreBackendMarketMoversService(),
   });
 
-  final ValueChanged<String>? onIdentityResolved;
+  final MarketDataService marketData;
+  final ValueChanged<String>? onAccountResolved;
   final VoidCallback? onOpenProfile;
-
-  /// Injected so nothing on this screen knows which provider is behind the
-  /// three market-mover sections.
-  final MarketMoversService marketMovers;
 
   @override
   State<HomeTab> createState() => _HomeTabState();
 }
 
 class _HomeTabState extends State<HomeTab> {
-  String _displayName = '';
-  Map<String, dynamic>? _market;
+  DataResult<List<Quote>>? _board;
+  DataResult<Sentiment>? _breadth;
+  String _accountName = '';
   bool _loading = true;
-
-  MarketMoversResult? _gainers;
-  MarketMoversResult? _losers;
-  MarketMoversResult? _mostActive;
-  bool _moversLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _load(initial: true);
   }
 
-  Future<void> _loadData() async {
+  Future<void> _load({bool initial = false}) async {
     final session = await ApiService.getSession();
-    final market = await ApiService.getMarket();
+    final board = await widget.marketData.getIndexBoard();
+    final breadth = await widget.marketData.getSentiment(monthly: false);
     if (!mounted) return;
-    final firstLoad = _loading;
+
+    final name =
+        session?['display_name']?.toString() ??
+        session?['username']?.toString() ??
+        '';
+
     setState(() {
-      _displayName = session?['display_name'] ?? session?['username'] ?? '';
-      _market = market;
+      _accountName = name;
+      _board = board;
+      _breadth = breadth;
       _loading = false;
     });
-    widget.onIdentityResolved?.call(_displayName);
+    widget.onAccountResolved?.call(name);
 
-    await _loadMovers();
-
-    if (!mounted) return;
-    // A pull-to-refresh that successfully lands new data earns a confirmation
-    // weight haptic; opening the app is not an action to confirm.
-    if (!firstLoad) HapticFeedback.mediumImpact();
-  }
-
-  Future<void> _loadMovers() async {
-    final results = await Future.wait([
-      widget.marketMovers.getTopGainers(),
-      widget.marketMovers.getTopLosers(),
-      widget.marketMovers.getMostActiveEquities(),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _gainers = results[0];
-      _losers = results[1];
-      _mostActive = results[2];
-      _moversLoading = false;
-    });
-
-    if (results.any((r) => r.stale)) {
+    if (board.stale) {
       NotificationLog.instance.add(
         Notice(
           kind: NoticeKind.staleData,
-          title: 'Market data is behind',
-          body:
-              'The mover lists are older than their normal update interval. '
+          title: 'Index feed is behind',
+          body: 'Levels are older than their usual update interval. '
               'Last known values are still shown.',
           at: DateTime.now(),
         ),
       );
     }
-  }
 
-  Future<void> _refresh() async {
-    await _loadData();
+    // A refresh that lands new data confirms itself; opening the app doesn't.
+    if (!initial) HapticFeedback.mediumImpact();
   }
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    if (_loading) {
-      return const PremiumLoader(
-        label: 'Opening scanner',
-        section: AyreSection.home,
-      );
-    }
+    final t = context.tokens;
+    final displayName =
+        SettingsStore.instance.displayNameOverride ?? _accountName;
 
-    final nifty = _marketValue('nifty');
-    final score = _scoreFrom(nifty);
-
-    return PremiumScaffold(
-      section: AyreSection.home,
-      bottomSafe: false,
-      // One refresh indicator, app-wide. The bespoke ribbon that used to run
-      // alongside it is gone.
-      child: RefreshIndicator(
-        color: tokens.primary,
-        backgroundColor: tokens.surface,
-        onRefresh: _refresh,
-        edgeOffset: 96,
-        child: ContentWidth(
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.xl,
-              AppSpacing.lg,
-              140,
-            ),
-            children: [
-              AnimatedEntrance(
-                child: _HomeHeader(
-                  displayName: _displayName,
+    return RefreshIndicator(
+      color: t.citrineInk,
+      backgroundColor: t.surface,
+      onRefresh: _load,
+      edgeOffset: 72,
+      child: ContentWidth(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.lg,
+            120,
+          ),
+          children: [
+            SafeArea(
+              bottom: false,
+              child: Entrance(
+                child: _Header(
+                  name: displayName,
                   onOpenProfile: widget.onOpenProfile,
                 ),
               ),
-              const SizedBox(height: AppSpacing.xxl),
-              AnimatedEntrance(
-                delay: const Duration(milliseconds: 100),
-                child: _HeroBoard(market: _market, score: score),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            Entrance(
+              index: 1,
+              child: SectionLabel(
+                label: 'Index board',
+                trailing: _board?.isReady == true
+                    ? FreshnessStamp(
+                        asOf: _board!.value!
+                            .map((q) => q.asOf)
+                            .reduce((a, b) => a.isAfter(b) ? a : b),
+                        stale: _board!.stale,
+                      )
+                    : null,
               ),
-              const SizedBox(height: AppSpacing.md),
-              const AnimatedEntrance(
-                delay: Duration(milliseconds: 150),
-                child: _SignalReadinessCard(),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              AnimatedEntrance(
-                delay: const Duration(milliseconds: 200),
-                child: _MarketTiles(market: _market),
-              ),
-              const SizedBox(height: AppSpacing.xxl),
-              AnimatedEntrance(
-                delay: const Duration(milliseconds: 250),
-                child: MarketMoversSection(
-                  title: 'Top gainers',
-                  result: _gainers,
-                  loading: _moversLoading,
-                  emptyMessage:
-                      'No advancing equities in this session yet. This list '
-                      'fills once the market is open.',
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              AnimatedEntrance(
-                delay: const Duration(milliseconds: 280),
-                child: MarketMoversSection(
-                  title: 'Top losers',
-                  result: _losers,
-                  loading: _moversLoading,
-                  emptyMessage:
-                      'No declining equities in this session yet. This list '
-                      'fills once the market is open.',
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              AnimatedEntrance(
-                delay: const Duration(milliseconds: 310),
-                child: MarketMoversSection(
-                  title: 'Most active equities',
-                  result: _mostActive,
-                  loading: _moversLoading,
-                  showVolume: true,
-                  emptyMessage:
-                      'No traded volume reported yet for this session.',
-                ),
-              ),
-            ],
-          ),
+            ),
+            _IndexBoard(
+              result: _loading ? null : _board,
+              onOpen: _openIndex,
+              onRetry: _load,
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            Entrance(index: 2, child: const SectionLabel(label: 'Scanner')),
+            _ScannerSummary(result: _loading ? null : _breadth),
+          ],
         ),
       ),
     );
   }
 
-  dynamic _marketValue(String key) =>
-      _market?[key] ?? _market?[key.toUpperCase()];
+  void _openIndex(Quote quote) {
+    final index = IndexId.fromId(quote.symbol) ??
+        IndexId.values.firstWhere(
+          (i) => i.label == quote.name,
+          orElse: () => IndexId.nifty50,
+        );
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => IndexDetailScreen(
+          index: index,
+          marketData: widget.marketData,
+          seed: quote,
+        ),
+      ),
+    );
+  }
 }
 
-class _HomeHeader extends StatelessWidget {
-  const _HomeHeader({required this.displayName, required this.onOpenProfile});
+class _Header extends StatelessWidget {
+  const _Header({required this.name, required this.onOpenProfile});
 
-  final String displayName;
+  final String name;
   final VoidCallback? onOpenProfile;
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final name = displayName.trim().isEmpty ? 'there' : displayName.trim();
+    final t = context.tokens;
+    final resolved = name.trim();
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text('WELCOME BACK', style: AppTypo.label(t)),
+              const SizedBox(height: AppSpacing.xs),
               Text(
-                'Hi, $name',
-                style: AppTypo.bodyMedium(tokens, color: tokens.textSecondary),
+                resolved.isEmpty ? 'Hi there' : 'Hi, $resolved',
+                style: AppTypo.pageTitle(t),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: AppSpacing.xxs),
-              Text('Scanner plan', style: AppTypo.pageTitle(tokens)),
             ],
           ),
         ),
-        // The bell now goes somewhere: a reverse-chronological list of the
-        // alerts the app has actually recorded.
+        const SizedBox(width: AppSpacing.sm),
         ListenableBuilder(
           listenable: NotificationLog.instance,
-          builder: (context, _) => InstrumentIconButton(
-            icon: Icons.notifications_none_rounded,
-            semanticLabel: 'Alerts',
-            size: 44,
+          builder: (context, _) => _HeaderControl(
+            glyph: AyreGlyph.bell,
+            label: 'Alerts',
             badge: NotificationLog.instance.hasUnread,
             onTap: () {
               HapticFeedback.selectionClick();
@@ -245,367 +206,443 @@ class _HomeHeader extends StatelessWidget {
             },
           ),
         ),
-        const SizedBox(width: AppSpacing.md),
-        Semantics(
-          button: true,
-          label: 'Profile',
-          child: PressableScale(
-            borderRadius: 24,
-            onTap: onOpenProfile == null
-                ? null
-                : () {
-                    HapticFeedback.selectionClick();
-                    onOpenProfile!();
-                  },
-            child: Padding(
-              padding: const EdgeInsets.all(2),
-              child: NavAvatar(name: displayName, size: 40),
-            ),
-          ),
-        ),
+        const SizedBox(width: AppSpacing.sm),
+        _AccountControl(name: resolved, onTap: onOpenProfile),
       ],
     );
   }
 }
 
-/// Home's hero — the one surface on this screen permitted an ornament, and the
-/// one place besides the splash wordmark where a numeral renders in the display
-/// serif.
-class _HeroBoard extends StatelessWidget {
-  const _HeroBoard({required this.market, required this.score});
-
-  final Map<String, dynamic>? market;
-  final int score;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final nifty = market?['nifty'] ?? market?['NIFTY'];
-    final changePct = _numFrom(nifty, const [
-      'change_pct',
-      'percent_change',
-      'change',
-    ]);
-
-    // Ember appears here only when the reading is genuinely notable — a strong
-    // or a poor score. A middling reading gets brass like everything else.
-    final notable = score >= 82 || score <= 55;
-    final ringTone = notable ? tokens.accentWarm : tokens.onPrimary;
-    final onHero = AppSurfaces.onHero(AyreSection.home, tokens);
-
-    return PremiumCard(
-      radius: AppRadius.heroCard,
-      padding: const EdgeInsets.all(AppSpacing.xxl),
-      color: AppSurfaces.heroFill(AyreSection.home, tokens),
-      borderColor: tokens.primary.withValues(alpha: 0.35),
-      ornament: HeroOrnament.contour,
-      ornamentColor: onHero.withValues(alpha: 0.16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              StatusChip(
-                label: 'Live market',
-                icon: Icons.circle,
-                outlined: true,
-                foreground: onHero,
-              ),
-              const Spacer(),
-              _MomentumRing(score: score, tone: ringTone, track: onHero),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              // The display-serif numeral exception, moment one of two.
-              Text('$score', style: AppTypo.heroSerif(tokens, color: onHero)),
-              const SizedBox(width: AppSpacing.xs),
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: Text(
-                  '/100',
-                  style: AppTypo.bodyMedium(
-                    tokens,
-                    color: onHero.withValues(alpha: 0.7),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xxs),
-          Row(
-            children: [
-              Text(
-                'Momentum quality',
-                style: AppTypo.bodyMedium(
-                  tokens,
-                  color: onHero.withValues(alpha: 0.85),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              DeltaFigure(
-                change: changePct,
-                fontSize: 13,
-                color: onHero.withValues(alpha: 0.92),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          // Brass-family trace, not a gain/loss color: the sparkline is the
-          // instrument's record first and a direction second.
-          Sparkline(
-            color: onHero.withValues(alpha: 0.9),
-            height: 64,
-            points: _traceFor(changePct),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// A deterministic trace shape from the day's move, so the hero doesn't
-  /// pretend to intraday history the backend doesn't return.
-  List<double> _traceFor(num? changePct) {
-    final lift = ((changePct ?? 0) / 4).clamp(-0.4, 0.4).toDouble();
-    const base = [0.42, 0.46, 0.40, 0.52, 0.48, 0.58, 0.54, 0.62];
-    return [
-      for (var i = 0; i < base.length; i++)
-        (base[i] + lift * (i / (base.length - 1))).clamp(0.05, 0.95).toDouble(),
-    ];
-  }
-}
-
-/// The momentum-score ring. Ember-toned only when the reading is notable — the
-/// first of the four sanctioned ember uses.
-class _MomentumRing extends StatelessWidget {
-  const _MomentumRing({
-    required this.score,
-    required this.tone,
-    required this.track,
+/// Header controls are flat and hairline-bordered — no circular soft fills.
+class _HeaderControl extends StatelessWidget {
+  const _HeaderControl({
+    required this.glyph,
+    required this.label,
+    required this.onTap,
+    this.badge = false,
   });
 
-  final int score;
-  final Color tone;
-  final Color track;
+  final AyreGlyph glyph;
+  final String label;
+  final VoidCallback onTap;
+  final bool badge;
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 44,
-      width: 44,
-      child: SpringValue(
-        value: score / 100,
-        animateOnMount: true,
-        builder: (context, progress, _) => CustomPaint(
-          painter: _RingPainter(
-            progress: progress.clamp(0.0, 1.0),
-            tone: tone,
-            track: track.withValues(alpha: 0.25),
+    final t = context.tokens;
+    return Semantics(
+      button: true,
+      label: label,
+      child: PressableScale(
+        onTap: onTap,
+        borderRadius: AppRadius.control,
+        child: Container(
+          height: 40,
+          width: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: t.surface,
+            borderRadius: BorderRadius.circular(AppRadius.control),
+            border: Border.all(color: t.border),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RingPainter extends CustomPainter {
-  const _RingPainter({
-    required this.progress,
-    required this.tone,
-    required this.track,
-  });
-
-  final double progress;
-  final Color tone;
-  final Color track;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Rect.fromCircle(
-      center: size.center(Offset.zero),
-      radius: size.width / 2 - 2,
-    );
-    canvas.drawArc(
-      rect,
-      0,
-      6.28318,
-      false,
-      Paint()
-        ..color = track
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
-    canvas.drawArc(
-      rect,
-      -1.5708,
-      6.28318 * progress,
-      false,
-      Paint()
-        ..color = tone
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..strokeCap = StrokeCap.butt,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _RingPainter old) =>
-      old.progress != progress || old.tone != tone || old.track != track;
-}
-
-class _SignalReadinessCard extends StatelessWidget {
-  const _SignalReadinessCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    return PremiumCard(
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      color: tokens.surface,
-      child: Row(
-        children: [
-          SizedBox(
-            height: 52,
-            width: 52,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                SizedBox.expand(
-                  child: CustomPaint(
-                    painter: _RingPainter(
-                      progress: 0.78,
-                      tone: tokens.primary,
-                      track: tokens.border,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              AyreIcon(glyph, size: 18, color: t.textSecondary),
+              if (badge)
+                Positioned(
+                  top: 1,
+                  right: 1,
+                  child: Container(
+                    height: 6,
+                    width: 6,
+                    decoration: BoxDecoration(
+                      color: t.slateViolet,
+                      shape: BoxShape.circle,
                     ),
                   ),
                 ),
-                const Numeral.static('78', fontSize: 14),
-              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccountControl extends StatelessWidget {
+  const _AccountControl({required this.name, required this.onTap});
+
+  final String name;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Semantics(
+      button: true,
+      label: 'Profile',
+      child: PressableScale(
+        onTap: onTap,
+        borderRadius: AppRadius.control,
+        child: Container(
+          height: 40,
+          width: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: t.surface,
+            borderRadius: BorderRadius.circular(AppRadius.control),
+            border: Border.all(color: t.border),
+          ),
+          child: Text(
+            initialsFor(name),
+            style: AppTypo.ui(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: t.textPrimary,
             ),
           ),
-          const SizedBox(width: AppSpacing.lg),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Trade readiness', style: AppTypo.cardTitle(tokens)),
-                const SizedBox(height: AppSpacing.xxs),
-                Text(
-                  'Fresh setups, breadth context and risk checkpoints are '
-                  'staged for review.',
-                  style: AppTypo.body(tokens),
+        ),
+      ),
+    );
+  }
+}
+
+/// The three instruments, each a physical-card-like block with an embedded ink
+/// readout. The whole card is the tap target into Index Detail.
+class _IndexBoard extends StatelessWidget {
+  const _IndexBoard({
+    required this.result,
+    required this.onOpen,
+    required this.onRetry,
+  });
+
+  final DataResult<List<Quote>>? result;
+  final ValueChanged<Quote> onOpen;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    if (result == null) {
+      return Column(
+        children: [
+          for (var i = 0; i < 3; i++) ...[
+            if (i > 0) const SizedBox(height: AppSpacing.md),
+            const _IndexCardSkeleton(),
+          ],
+        ],
+      );
+    }
+
+    if (result!.isFailed) {
+      return StatePanel.failed(
+        headline: 'Index feed unavailable',
+        message: 'Pull down to try again.',
+        onRetry: onRetry,
+      );
+    }
+
+    if (result!.isEmpty) {
+      return const StatePanel.empty(
+        headline: 'No index data',
+        message: 'The feed returned no instruments for this session.',
+      );
+    }
+
+    final quotes = result!.value!;
+    final columns = AppBreakpoints.columns(context);
+
+    // Home stays a linear narrative on phones; wider viewports lay the three
+    // instruments side by side rather than stretching one card across a desk.
+    if (columns == 1) {
+      return Column(
+        children: [
+          for (var i = 0; i < quotes.length; i++) ...[
+            if (i > 0) const SizedBox(height: AppSpacing.md),
+            Entrance(
+              index: i + 1,
+              child: _IndexCard(
+                quote: quotes[i],
+                stale: result!.stale,
+                onTap: () => onOpen(quotes[i]),
+              ),
+            ),
+          ],
+        ],
+      );
+    }
+
+    // IntrinsicHeight so the three cards share a height. A bare stretch would
+    // ask this Row's unbounded parent for an infinite height.
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < quotes.length; i++) ...[
+            if (i > 0) const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: Entrance(
+                index: i + 1,
+                child: _IndexCard(
+                  quote: quotes[i],
+                  stale: result!.stale,
+                  onTap: () => onOpen(quotes[i]),
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 }
 
-class _MarketTiles extends StatelessWidget {
-  const _MarketTiles({required this.market});
+class _IndexCard extends StatelessWidget {
+  const _IndexCard({
+    required this.quote,
+    required this.stale,
+    required this.onTap,
+  });
 
-  final Map<String, dynamic>? market;
+  final Quote quote;
+  final bool stale;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _MarketTile(label: 'NIFTY 50', data: _marketValue('nifty')),
+    final t = context.tokens;
+
+    return AyreCard(
+      onTap: onTap,
+      padding: EdgeInsets.zero,
+      accentEdge: true,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: Text(
+                    quote.name,
+                    style: AppTypo.cardTitle(t),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                ShrinkTrailing(
+                  child: stale
+                      ? const AyreChip(label: 'Delayed', tone: ChipTone.attention)
+                      : const AyreChip(
+                          label: 'Live',
+                          tone: ChipTone.live,
+                          pulse: true,
+                        ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            // The readout panel: the live figures sit on ink, so they read as
+            // coming off a feed rather than being page content.
+            InkPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Figure(
+                      formatPrice(quote.lastPrice),
+                      fontSize: 30,
+                      fontWeight: FontWeight.w600,
+                      color: t.onInkPanel,
+                      semanticsLabel:
+                          '${quote.name} at ${formatPrice(quote.lastPrice)}',
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Row(
+                            children: [
+                              Figure(
+                                formatDelta(quote.change, percent: false),
+                                fontSize: 12,
+                                color: t.onInkPanel.withValues(alpha: 0.75),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              DeltaFigure(change: quote.percentChange, fontSize: 13),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      // The clock is a non-flex child, so it would otherwise be
+                      // measured against unbounded width and push the row over
+                      // in a narrow multi-column card at a large text scale.
+                      ShrinkTrailing(
+                        child: Text(
+                          _clock(quote.asOf),
+                          style: AppTypo.valueSmall(
+                            t,
+                            color: t.onInkPanel.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (quote.trace.length >= 2) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    TickerTrace(
+                      points: normaliseTrace(quote.trace),
+                      height: 34,
+                      color: t.onInkPanel.withValues(alpha: 0.7),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'VIEW CONSTITUENTS',
+                    style: AppTypo.label(t),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                AyreIcon(AyreGlyph.forward, size: 12, color: t.textTertiary),
+              ],
+            ),
+          ],
         ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _MarketTile(label: 'SENSEX', data: _marketValue('sensex')),
-        ),
-      ],
+      ),
     );
   }
 
-  dynamic _marketValue(String key) =>
-      market?[key] ?? market?[key.toUpperCase()];
+  static String _clock(DateTime at) {
+    final local = at.toLocal();
+    return '${local.hour.toString().padLeft(2, '0')}:'
+        '${local.minute.toString().padLeft(2, '0')}:'
+        '${local.second.toString().padLeft(2, '0')}';
+  }
 }
 
-class _MarketTile extends StatelessWidget {
-  const _MarketTile({required this.label, required this.data});
-
-  final String label;
-  final dynamic data;
+class _IndexCardSkeleton extends StatelessWidget {
+  const _IndexCardSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final price = _numFrom(data, const ['last_price', 'price', 'value', 'ltp']);
-    final changePct = _numFrom(data, const [
-      'change_pct',
-      'percent_change',
-      'change',
-    ]);
+    return const AyreCard(
+      padding: EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkeletonBlock(width: 96, height: 13),
+          SizedBox(height: AppSpacing.md),
+          SkeletonBlock(height: 30, radius: AppRadius.panel),
+          SizedBox(height: AppSpacing.sm),
+          SkeletonBlock(width: 140, height: 11),
+        ],
+      ),
+    );
+  }
+}
 
-    return PremiumCard(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      color: tokens.surface,
+/// The scanner summary, restyled as a readout row. The circular momentum ring
+/// belonged to the previous identity and is retired.
+class _ScannerSummary extends StatelessWidget {
+  const _ScannerSummary({required this.result});
+
+  final DataResult<Sentiment>? result;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+
+    if (result == null) {
+      return const AyreCard(
+        child: Row(
+          children: [
+            Expanded(child: SkeletonBlock(width: 70, height: 26)),
+            Expanded(child: SkeletonBlock(width: 70, height: 26)),
+            Expanded(child: SkeletonBlock(width: 70, height: 26)),
+          ],
+        ),
+      );
+    }
+
+    if (!result!.isReady) {
+      return StatePanel.failed(
+        headline: 'Scanner summary unavailable',
+        message: 'Pull down to try again.',
+        compact: true,
+      );
+    }
+
+    final sentiment = result!.value!;
+    final advances = sentiment.advances;
+    final declines = sentiment.declines;
+
+    return AyreCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTypo.microLabel(tokens),
+                child: LabelledFigure(
+                  label: 'Sentiment',
+                  value: '${sentiment.score}',
                 ),
               ),
-              SizedBox(
-                height: 8,
-                width: 24,
-                child: TickMarks(
-                  color: tokens.engraved,
-                  count: 5,
-                  length: 3,
-                  majorEvery: 4,
-                  majorLength: 7,
+              Container(width: 1, height: 30, color: t.hairline),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: AppSpacing.md),
+                  child: LabelledFigure(
+                    label: 'Advances',
+                    value: advances == null ? '—' : '$advances',
+                    color: advances == null ? null : t.jade,
+                  ),
+                ),
+              ),
+              Container(width: 1, height: 30, color: t.hairline),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: AppSpacing.md),
+                  child: LabelledFigure(
+                    label: 'Declines',
+                    value: declines == null ? '—' : '$declines',
+                    color: declines == null ? null : t.garnet,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          Numeral(
-            formatPrice(price),
-            value: price?.toDouble(),
-            format: formatPrice,
-            fontSize: 19,
-            fontWeight: FontWeight.w500,
-          ),
-          const SizedBox(height: AppSpacing.xxs),
-          DeltaFigure(change: changePct, fontSize: 12),
+          if (sentiment.note != null && sentiment.note!.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            const HairlineDivider(),
+            const SizedBox(height: AppSpacing.md),
+            Text(sentiment.note!, style: AppTypo.body(t)),
+          ],
+          if (result!.stale) ...[
+            const SizedBox(height: AppSpacing.sm),
+            const StaleNotice(),
+          ],
         ],
       ),
     );
   }
-}
-
-int _scoreFrom(dynamic raw) {
-  final change =
-      _numFrom(raw, const ['change_pct', 'percent_change', 'change']) ?? 0;
-  return (72 + change.clamp(-8, 8) * 2).round().clamp(48, 94).toInt();
-}
-
-num? _numFrom(dynamic raw, List<String> keys) {
-  if (raw is num) return raw;
-  if (raw is Map) {
-    for (final key in keys) {
-      final value = raw[key];
-      if (value is num) return value;
-      if (value is String) return num.tryParse(value);
-    }
-  }
-  if (raw is String) return num.tryParse(raw);
-  return null;
 }

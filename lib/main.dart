@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/home_shell.dart';
@@ -8,14 +7,13 @@ import 'screens/splash_screen.dart';
 import 'services/api_service.dart';
 import 'services/settings_store.dart';
 import 'theme/app_theme.dart';
+import 'widgets/ayre_components.dart';
+import 'widgets/state_views.dart';
 
 const bool kEnableAuthStartupGate = false;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // Portrait-only remains right for a mobile-first product; revisit if tablet
-  // becomes a real target.
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   runApp(const AyreScannerApp());
 }
 
@@ -29,13 +27,39 @@ class AyreScannerApp extends StatefulWidget {
 class _AyreScannerAppState extends State<AyreScannerApp> {
   static const _themeModeKey = 'theme_mode';
 
-  ThemeMode _themeMode = ThemeMode.dark;
+  final _navigatorKey = GlobalKey<NavigatorState>();
+
+  ThemeMode _themeMode = ThemeMode.system;
   bool _splashComplete = false;
+  bool _offline = false;
+  bool _offlineDismissed = false;
+  bool _sessionExpired = false;
 
   @override
   void initState() {
     super.initState();
     _bootstrap();
+    // A session dying mid-use routes to a calm re-auth prompt rather than
+    // leaving the user on a screen that will never load.
+    ApiService.onSessionExpired = () {
+      if (!mounted || _sessionExpired) return;
+      setState(() => _sessionExpired = true);
+    };
+    ApiService.onReachabilityChanged = (reachable) {
+      if (!mounted) return;
+      setState(() {
+        _offline = !reachable;
+        // A fresh disconnection earns a fresh banner.
+        if (!reachable) _offlineDismissed = false;
+      });
+    };
+  }
+
+  @override
+  void dispose() {
+    ApiService.onSessionExpired = null;
+    ApiService.onReachabilityChanged = null;
+    super.dispose();
   }
 
   Future<void> _bootstrap() async {
@@ -53,7 +77,7 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
     setState(() {
       _themeMode = ThemeMode.values.firstWhere(
         (mode) => mode.name == value,
-        orElse: () => ThemeMode.dark,
+        orElse: () => ThemeMode.system,
       );
     });
   }
@@ -77,15 +101,33 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
       child: MaterialApp(
         title: 'Ayre Scanner',
         debugShowCheckedModeBanner: false,
+        navigatorKey: _navigatorKey,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: _themeMode,
         themeAnimationDuration: AppMotion.medium,
         themeAnimationCurve: AppMotion.ease,
-        home: _StartupGate(
-          onSplashComplete: _onSplashComplete,
-          splashComplete: _splashComplete,
-        ),
+        builder: (context, child) {
+          // The offline notice is app-wide chrome, above every route, so it never
+          // has to be re-implemented per screen.
+          return Column(
+            children: [
+              if (_offline && !_offlineDismissed)
+                OfflineBanner(
+                  onDismiss: () => setState(() => _offlineDismissed = true),
+                ),
+              Expanded(child: child ?? const SizedBox.shrink()),
+            ],
+          );
+        },
+        home: _sessionExpired
+            ? SessionExpiredScreen(
+                onSignIn: () => setState(() => _sessionExpired = false),
+              )
+            : _StartupGate(
+                onSplashComplete: _onSplashComplete,
+                splashComplete: _splashComplete,
+              ),
       ),
     );
   }
@@ -99,7 +141,7 @@ class AppThemeController extends InheritedWidget {
     required super.child,
   });
 
-  /// System / Light / Dark — the three-way selector in Settings writes here.
+  /// System / Light / Dark — the segmented selector in Settings writes here.
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> setThemeMode;
 
@@ -114,6 +156,49 @@ class AppThemeController extends InheritedWidget {
   bool updateShouldNotify(AppThemeController oldWidget) {
     return oldWidget.themeMode != themeMode ||
         oldWidget.setThemeMode != setThemeMode;
+  }
+}
+
+/// Shown when an authenticated call is rejected. Deliberately calm and plain: no
+/// status code, no crash, one clear action.
+class SessionExpiredScreen extends StatelessWidget {
+  const SessionExpiredScreen({super.key, required this.onSignIn});
+
+  final VoidCallback onSignIn;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Scaffold(
+      backgroundColor: t.background,
+      body: SafeArea(
+        child: ContentWidth(
+          maxWidth: 360,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                StatePanel(
+                  headline: 'Session expired',
+                  message:
+                      "Your session's expired — sign in again to continue.",
+                  onRetry: () {
+                    onSignIn();
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (route) => false,
+                    );
+                  },
+                  retryLabel: 'Sign in',
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -143,7 +228,7 @@ class _StartupGateState extends State<_StartupGate> {
 
   Future<void> _check() async {
     if (!widget.splashComplete) {
-      await Future.delayed(const Duration(milliseconds: 200));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
       if (!mounted) return;
     }
 

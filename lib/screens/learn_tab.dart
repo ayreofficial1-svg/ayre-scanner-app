@@ -1,115 +1,156 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../services/api_service.dart';
+import '../services/market_data_service.dart';
+import '../services/market_models.dart';
 import '../theme/app_theme.dart';
-import '../widgets/app_states.dart';
-import '../widgets/numeral.dart';
-import '../widgets/premium_widgets.dart';
-import '../widgets/pressable_scale.dart';
+import '../widgets/ayre_components.dart';
+import '../widgets/ayre_icons.dart';
+import '../widgets/figure.dart';
 import '../widgets/responsive.dart';
+import '../widgets/state_views.dart';
 import 'lesson_screen.dart';
 
+/// Learn — the trading library.
+///
+/// Flat list rows with a progress readout. The open-book motif is gone; counters
+/// are figures, so they take the ticker face.
 class LearnTab extends StatefulWidget {
-  const LearnTab({super.key});
+  const LearnTab({super.key, required this.marketData});
+
+  final MarketDataService marketData;
 
   @override
   State<LearnTab> createState() => _LearnTabState();
 }
 
 class _LearnTabState extends State<LearnTab> {
-  List<Map<String, dynamic>> _lessons = [];
+  DataResult<List<Course>>? _result;
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _load(initial: true);
   }
 
-  Future<void> _load() async {
-    final lessons = await ApiService.getLearnArticles();
+  Future<void> _load({bool initial = false}) async {
+    final result = await widget.marketData.getCourses();
     if (!mounted) return;
-    final firstLoad = _loading;
     setState(() {
-      _lessons = lessons;
+      _result = result;
       _loading = false;
     });
-    if (!firstLoad) HapticFeedback.mediumImpact();
+    if (!initial) HapticFeedback.mediumImpact();
   }
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    if (_loading) {
-      return const PremiumLoader(
-        label: 'Loading library',
-        section: AyreSection.learn,
-      );
-    }
+    final t = context.tokens;
+    final courses = _result?.value ?? const <Course>[];
+    final subjects = courses.map((c) => c.category).toSet().length;
+    final columns = AppBreakpoints.columns(context);
 
-    final twoColumn = AppBreakpoints.usesTwoColumn(context);
-
-    return PremiumScaffold(
-      section: AyreSection.learn,
-      bottomSafe: false,
-      child: RefreshIndicator(
-        color: tokens.primary,
-        backgroundColor: tokens.surface,
-        onRefresh: _load,
-        child: CustomScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.xl,
-                AppSpacing.lg,
-                AppSpacing.lg,
-              ),
-              sliver: SliverToBoxAdapter(
-                child: AnimatedEntrance(child: _LearnHero(lessons: _lessons)),
+    return RefreshIndicator(
+      color: t.citrineInk,
+      backgroundColor: t.surface,
+      onRefresh: _load,
+      edgeOffset: 72,
+      child: ContentWidth(
+        maxWidth: columns > 1 ? 960 : null,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.lg,
+            AppSpacing.lg,
+            120,
+          ),
+          children: [
+            SafeArea(
+              bottom: false,
+              child: Entrance(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('TRADING LIBRARY', style: AppTypo.label(t)),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text('My courses', style: AppTypo.pageTitle(t)),
+                    const SizedBox(height: AppSpacing.md),
+                    Row(
+                      children: [
+                        LabelledFigure(
+                          label: 'Subjects',
+                          value: '$subjects',
+                          fontSize: 16,
+                        ),
+                        const SizedBox(width: AppSpacing.xxl),
+                        LabelledFigure(
+                          label: 'Courses',
+                          value: '${courses.length}',
+                          fontSize: 16,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-            if (_lessons.isEmpty)
-              const SliverPadding(
-                padding: EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-                sliver: SliverToBoxAdapter(
-                  // Brought up to the shared template — it used to be a bare
-                  // line of unstyled text while the other tabs had designed
-                  // states.
-                  child: AppStateMessage(
-                    icon: Icons.menu_book_outlined,
-                    heading: 'No lessons yet',
-                    message:
-                        'New material appears here as the library grows. Pull '
-                        'down to check again.',
-                  ),
+            const SizedBox(height: AppSpacing.xl),
+            if (_loading)
+              const AyreCard(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                child: Column(
+                  children: [
+                    SkeletonTickerRow(),
+                    SkeletonTickerRow(),
+                    SkeletonTickerRow(),
+                  ],
+                ),
+              )
+            else if (_result!.isFailed)
+              StatePanel.failed(
+                headline: "Your library didn't load",
+                message: 'Pull down to check again.',
+              )
+            else if (_result!.isEmpty)
+              const StatePanel.empty(
+                headline: 'No lessons yet',
+                message: 'New material appears here as the library grows.',
+              )
+            else if (columns == 1)
+              AyreCard(
+                padding: EdgeInsets.zero,
+                child: Column(
+                  children: [
+                    for (final (i, course) in courses.indexed) ...[
+                      if (i > 0) const HairlineDivider(indent: AppSpacing.md),
+                      _CourseRow(course: course, onTap: () => _open(course)),
+                    ],
+                  ],
                 ),
               )
             else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
-                  0,
-                  AppSpacing.lg,
-                  140,
+              // Learn is a list of self-contained, independently-scannable items,
+              // so it goes multi-column once the viewport genuinely fits it.
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+                itemCount: courses.length,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  mainAxisSpacing: AppSpacing.md,
+                  crossAxisSpacing: AppSpacing.md,
+                  // Height driven by content rather than a fixed extent, so a
+                  // large accessibility text scale grows the tile instead of
+                  // overflowing it.
+                  childAspectRatio: 2.4,
                 ),
-                sliver: SliverGrid(
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: twoColumn ? 2 : 1,
-                    mainAxisSpacing: AppSpacing.md,
-                    crossAxisSpacing: AppSpacing.md,
-                    mainAxisExtent: 152,
-                  ),
-                  delegate: SliverChildBuilderDelegate(
-                    childCount: _lessons.length,
-                    (context, index) => AnimatedEntrance(
-                      delay: Duration(milliseconds: 40 * (index + 1)),
-                      child: _LessonCard(
-                        lesson: _Lesson.fromJson(_lessons[index]),
-                      ),
-                    ),
+                itemBuilder: (context, index) => AyreCard(
+                  padding: EdgeInsets.zero,
+                  child: _CourseRow(
+                    course: courses[index],
+                    onTap: () => _open(courses[index]),
                   ),
                 ),
               ),
@@ -118,155 +159,74 @@ class _LearnTabState extends State<LearnTab> {
       ),
     );
   }
-}
 
-/// Learn's hero carries no ornament, same reasoning as Signals.
-class _LearnHero extends StatelessWidget {
-  const _LearnHero({required this.lessons});
-
-  final List<Map<String, dynamic>> lessons;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final onHero = tokens.onPrimary;
-    final subjects = lessons
-        .map((lesson) => lesson['category']?.toString())
-        .where((category) => category != null && category.isNotEmpty)
-        .toSet()
-        .length;
-
-    return PremiumCard(
-      radius: AppRadius.heroCard,
-      padding: const EdgeInsets.all(AppSpacing.xl),
-      color: AppSurfaces.heroFill(AyreSection.learn, tokens),
-      borderColor: tokens.primary.withValues(alpha: 0.3),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          StatusChip(
-            label: 'Trading library',
-            outlined: true,
-            foreground: onHero,
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Text(
-            'My courses',
-            style: AppTypo.pageTitle(tokens, color: onHero),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              _HeroStat(label: 'SUBJECTS', value: subjects, tone: onHero),
-              const SizedBox(width: AppSpacing.xl),
-              _HeroStat(label: 'LESSONS', value: lessons.length, tone: onHero),
-            ],
-          ),
-        ],
-      ),
+  void _open(Course course) {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => LessonScreen(course: course)),
     );
   }
 }
 
-/// Counts are figures, so they take the readout face — the all-caps label
-/// beside them is a categorical micro-label in Inter.
-class _HeroStat extends StatelessWidget {
-  const _HeroStat({
-    required this.label,
-    required this.value,
-    required this.tone,
-  });
+class _CourseRow extends StatelessWidget {
+  const _CourseRow({required this.course, required this.onTap});
 
-  final String label;
-  final int value;
-  final Color tone;
+  final Course course;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    return Row(
-      children: [
-        Numeral(
-          '$value',
-          value: value.toDouble(),
-          format: (v) => v.round().toString(),
-          fontSize: 17,
-          color: tone,
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Text(
-          label,
-          style: AppTypo.microLabel(tokens, color: tone.withValues(alpha: 0.8)),
-        ),
-      ],
-    );
-  }
-}
+    final t = context.tokens;
+    final progress = course.progress;
 
-class _LessonCard extends StatelessWidget {
-  const _LessonCard({required this.lesson});
-
-  final _Lesson lesson;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-
-    return PressableScale(
-      borderRadius: AppRadius.card,
-      onTap: () {
-        HapticFeedback.selectionClick();
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => LessonScreen(
-              title: lesson.title,
-              eyebrow: lesson.eyebrow,
-              body: lesson.description,
-              icon: lesson.icon,
-            ),
-          ),
-        );
-      },
-      child: PremiumCard(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+    return PressableScaleRow(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
-                Icon(lesson.icon, size: 20, color: tokens.accentCool),
+                AyreIcon(AyreGlyph.course, size: 17, color: t.textTertiary),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
-                    lesson.eyebrow.toUpperCase(),
+                    course.category.toUpperCase(),
+                    style: AppTypo.label(t),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: AppTypo.microLabel(tokens),
                   ),
                 ),
-                Icon(
-                  Icons.arrow_forward_rounded,
-                  size: 16,
-                  color: tokens.textTertiary,
-                ),
+                AyreIcon(AyreGlyph.forward, size: 14, color: t.textTertiary),
               ],
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.sm),
             Text(
-              lesson.title,
+              course.title,
+              style: AppTypo.cardTitle(t),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: AppTypo.sectionTitle(tokens).copyWith(fontSize: 17),
             ),
-            const SizedBox(height: AppSpacing.xs),
-            Expanded(
-              child: Text(
-                lesson.description,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypo.body(tokens),
+            if (progress != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              ProgressRule(value: progress),
+              const SizedBox(height: AppSpacing.xs),
+              Figure.static(
+                '${course.lessonsDone}/${course.lessonsTotal} lessons',
+                fontSize: 11,
+                color: t.textTertiary,
               ),
-            ),
+            ] else if (course.body.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                course.body,
+                style: AppTypo.body(t),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
           ],
         ),
       ),
@@ -274,30 +234,29 @@ class _LessonCard extends StatelessWidget {
   }
 }
 
-class _Lesson {
-  const _Lesson(this.title, this.eyebrow, this.description, this.icon);
+/// A row-shaped tap target with press feedback and no rounded clip of its own,
+/// so it sits flush inside a [RowGroup] or a card.
+class PressableScaleRow extends StatelessWidget {
+  const PressableScaleRow({
+    super.key,
+    required this.child,
+    required this.onTap,
+  });
 
-  final String title;
-  final String eyebrow;
-  final String description;
-  final IconData icon;
+  final Widget child;
+  final VoidCallback onTap;
 
-  factory _Lesson.fromJson(Map<String, dynamic> json) {
-    return _Lesson(
-      json['title']?.toString() ?? '',
-      json['category']?.toString() ?? json['eyebrow']?.toString() ?? 'Lesson',
-      json['body']?.toString() ?? json['description']?.toString() ?? '',
-      _iconFrom(json['icon']?.toString()),
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppTheme.transparent,
+      child: InkWell(
+        onTap: onTap,
+        hoverColor: context.tokens.citrine.withValues(alpha: 0.05),
+        splashColor: context.tokens.citrine.withValues(alpha: 0.06),
+        highlightColor: context.tokens.citrine.withValues(alpha: 0.03),
+        child: child,
+      ),
     );
-  }
-
-  static IconData _iconFrom(String? value) {
-    return switch (value) {
-      'shield' => Icons.shield_outlined,
-      'speed' => Icons.speed_outlined,
-      'school' => Icons.school_outlined,
-      'psychology' => Icons.psychology_alt_outlined,
-      _ => Icons.insights_outlined,
-    };
   }
 }

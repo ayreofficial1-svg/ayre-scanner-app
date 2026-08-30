@@ -5,19 +5,16 @@ import '../main.dart';
 import '../services/api_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
-import '../widgets/premium_widgets.dart';
-import '../widgets/pressable_scale.dart';
-import 'profile_tab.dart' show ProfileRow;
+import '../widgets/ayre_components.dart';
+import '../widgets/ayre_icons.dart';
+import '../widgets/figure.dart';
 import 'support_screen.dart';
 
-/// A pushed route reached from Profile's menu. The bottom nav is hidden for its
-/// duration and returns on the way back.
+/// Settings — same information architecture (Alerts / Appearance / Account /
+/// About), fully restyled.
 ///
-/// Every row here maps to behaviour that works today. Sections that would only
-/// contain placeholders — push delivery, watchlist price alerts, a weekly
-/// digest, data-export or privacy controls the backend doesn't offer — are left
-/// out entirely rather than shipped as controls that don't do anything.
-/// Sign Out stays on Profile: it's a session action, not a preference.
+/// Every row maps to behaviour that works today. A control with nothing behind
+/// it is left out rather than shipped inert.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -42,13 +39,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
+    final t = context.tokens;
     final settings = SettingsStore.instance;
     final themeController = AppThemeController.of(context);
 
     return Scaffold(
-      backgroundColor: tokens.background,
-      appBar: AppBar(title: const Text('Settings')),
+      backgroundColor: t.background,
+      appBar: AppBar(
+        leading: IconButton(
+          icon: AyreIcon(AyreGlyph.back, size: 20, color: t.textPrimary),
+          onPressed: () => Navigator.of(context).maybePop(),
+          tooltip: 'Back',
+        ),
+        title: const Text('Settings'),
+      ),
       body: ContentWidth(
         child: ListenableBuilder(
           listenable: settings,
@@ -60,35 +64,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
               AppSpacing.huge,
             ),
             children: [
-              _Section(
-                title: 'Alerts',
+              const SectionLabel(label: 'Alerts'),
+              RowGroup(
                 children: [
                   _SwitchRow(
-                    icon: Icons.notifications_none_rounded,
+                    glyph: AyreGlyph.bell,
                     title: 'In-app alerts',
-                    subtitle:
-                        'Keep a list of what changed while you were away, '
+                    subtitle: 'Keep a list of what changed while you were away, '
                         'reachable from the bell on Home.',
                     value: settings.inAppAlerts,
                     onChanged: settings.setInAppAlerts,
                   ),
-                  const HairlineDivider(indent: 60),
                   _SwitchRow(
-                    icon: Icons.add_chart_rounded,
+                    glyph: AyreGlyph.alerts,
                     title: 'New signal alerts',
-                    subtitle:
-                        'Record an entry when the scanner returns a pick you '
-                        'have not seen before.',
+                    subtitle: 'Record an entry when the scanner returns a pick '
+                        'you have not seen before.',
                     value: settings.newSignalAlerts,
                     enabled: settings.inAppAlerts,
                     onChanged: settings.setNewSignalAlerts,
                   ),
-                  const HairlineDivider(indent: 60),
                   _SwitchRow(
-                    icon: Icons.schedule_rounded,
+                    glyph: AyreGlyph.delayed,
                     title: 'Delayed-data warnings',
-                    subtitle:
-                        'Record an entry when market data falls behind its '
+                    subtitle: 'Record an entry when market data falls behind its '
                         'normal update interval.',
                     value: settings.staleDataWarnings,
                     enabled: settings.inAppAlerts,
@@ -97,65 +96,85 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
               const SizedBox(height: AppSpacing.xl),
-              _Section(
-                title: 'Appearance',
-                children: [
-                  _ThemeSelector(
-                    mode: themeController.themeMode,
-                    onChanged: (mode) {
-                      HapticFeedback.selectionClick();
-                      themeController.setThemeMode(mode);
-                    },
-                  ),
-                ],
+              const SectionLabel(label: 'Appearance'),
+              AyreCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AyreSegmented<ThemeMode>(
+                      value: themeController.themeMode,
+                      onChanged: (mode) {
+                        HapticFeedback.selectionClick();
+                        themeController.setThemeMode(mode);
+                      },
+                      segments: const [
+                        AyreSegment(
+                          value: ThemeMode.system,
+                          label: 'System',
+                          glyph: AyreGlyph.appearance,
+                        ),
+                        AyreSegment(
+                          value: ThemeMode.light,
+                          label: 'Light',
+                          glyph: AyreGlyph.empty,
+                        ),
+                        AyreSegment(
+                          value: ThemeMode.dark,
+                          label: 'Dark',
+                          glyph: AyreGlyph.live,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Text(
+                      'Light and dark are tuned separately — each is designed '
+                      'against its own background rather than inverted from the '
+                      'other.',
+                      style: AppTypo.caption(t),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: AppSpacing.xl),
-              _Section(
-                title: 'Account',
+              const SectionLabel(label: 'Account'),
+              RowGroup(
                 children: [
-                  ProfileRow(
-                    icon: Icons.person_outline_rounded,
+                  SettingRow(
+                    glyph: AyreGlyph.account,
                     title: 'Signed in as',
                     subtitle: _handle == null
-                        ? 'Checking this device’s session'
-                        : 'This is the identity the scanner uses',
+                        ? "Checking this device's session"
+                        : 'The identity the scanner uses',
                     trailing: Text(
                       _handle ?? '—',
-                      style: AppTypo.bodyMedium(
-                        tokens,
-                        color: tokens.textSecondary,
-                      ),
+                      style: AppTypo.bodyStrong(t, color: t.textSecondary),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: AppSpacing.xl),
-              _Section(
-                title: 'About',
+              const SectionLabel(label: 'About'),
+              RowGroup(
                 children: [
-                  ProfileRow(
-                    icon: Icons.help_outline_rounded,
+                  SettingRow(
+                    glyph: AyreGlyph.support,
                     title: 'Help and support',
                     subtitle: 'How to reach the team',
                     onTap: () {
                       HapticFeedback.selectionClick();
                       Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const SupportScreen(),
-                        ),
+                        MaterialPageRoute(builder: (_) => const SupportScreen()),
                       );
                     },
                   ),
-                  const HairlineDivider(indent: 60),
-                  ProfileRow(
-                    icon: Icons.tag_rounded,
+                  SettingRow(
+                    glyph: AyreGlyph.about,
                     title: 'Version',
-                    trailing: Text(
+                    // Numbers stay tabular even here, for system consistency.
+                    trailing: Figure.static(
                       '$kAppVersion ($kAppBuild)',
-                      style: AppTypo.bodyMedium(
-                        tokens,
-                        color: tokens.textSecondary,
-                      ),
+                      fontSize: 13,
+                      color: t.textSecondary,
                     ),
                   ),
                 ],
@@ -168,37 +187,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.children});
-
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(
-            left: AppSpacing.xs,
-            bottom: AppSpacing.sm,
-          ),
-          child: Text(title.toUpperCase(), style: AppTypo.sectionEyebrow(tokens)),
-        ),
-        PremiumCard(padding: EdgeInsets.zero, child: Column(children: children)),
-      ],
-    );
-  }
-}
-
-/// Every toggle carries a one-line description of what it actually changes, and
-/// a switch as its disclosure affordance. A confirmation-weight haptic fires on
-/// completing the change, not on the press.
+/// Every toggle carries a one-line description of what it changes, and a switch
+/// as its disclosure affordance. Confirmation-weight haptic fires on the
+/// completed change, not the press.
 class _SwitchRow extends StatelessWidget {
   const _SwitchRow({
-    required this.icon,
+    required this.glyph,
     required this.title,
     required this.subtitle,
     required this.value,
@@ -206,155 +200,34 @@ class _SwitchRow extends StatelessWidget {
     this.enabled = true,
   });
 
-  final IconData icon;
+  final AyreGlyph glyph;
   final String title;
   final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
 
   /// A dependent switch reads as inactive when its master is off, rather than
-  /// disappearing.
+  /// vanishing.
   final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    final tokens = context.tokens;
     void toggle(bool next) {
       if (!enabled) return;
       HapticFeedback.mediumImpact();
       onChanged(next);
     }
 
-    return Opacity(
-      opacity: enabled ? 1 : 0.5,
-      child: PressableScale(
-        onTap: enabled ? () => toggle(!value) : null,
-        borderRadius: 0,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.lg,
-          ),
-          child: Row(
-            children: [
-              Icon(icon, color: tokens.textSecondary, size: 20),
-              const SizedBox(width: AppSpacing.lg),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title, style: AppTypo.cardTitle(tokens)),
-                    const SizedBox(height: 2),
-                    Text(subtitle, style: AppTypo.caption(tokens)),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.md),
-              Switch.adaptive(
-                value: value && enabled,
-                onChanged: enabled ? toggle : null,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Three-way appearance selector: System follows the OS, Light and Dark pin it.
-class _ThemeSelector extends StatelessWidget {
-  const _ThemeSelector({required this.mode, required this.onChanged});
-
-  final ThemeMode mode;
-  final ValueChanged<ThemeMode> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    const options = [
-      (ThemeMode.system, 'System', Icons.brightness_auto_outlined),
-      (ThemeMode.light, 'Light', Icons.light_mode_outlined),
-      (ThemeMode.dark, 'Dark', Icons.dark_mode_outlined),
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Light and dark are tuned separately — each is designed against its '
-            'own background rather than inverted from the other.',
-            style: AppTypo.caption(tokens),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              for (final (value, label, icon) in options) ...[
-                if (value != options.first.$1)
-                  const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: _ThemeOption(
-                    label: label,
-                    icon: icon,
-                    selected: mode == value,
-                    onTap: () => onChanged(value),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ThemeOption extends StatelessWidget {
-  const _ThemeOption({
-    required this.label,
-    required this.icon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final IconData icon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final tokens = context.tokens;
-    final tone = selected ? tokens.primary : tokens.textSecondary;
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: label,
-      child: PressableScale(
-        onTap: onTap,
-        borderRadius: AppRadius.md,
-        child: AnimatedContainer(
-          duration: AppMotion.fast,
-          curve: AppMotion.ease,
-          padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-          decoration: BoxDecoration(
-            color: selected ? tokens.primary.withValues(alpha: 0.10) : null,
-            borderRadius: BorderRadius.circular(AppRadius.md),
-            border: Border.all(
-              color: selected ? tokens.primary : tokens.border,
-              width: selected ? 1.4 : 1,
-            ),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, size: 18, color: tone),
-              const SizedBox(height: AppSpacing.xs),
-              Text(label, style: AppTypo.microLabel(tokens, color: tone)),
-            ],
-          ),
-        ),
+    return SettingRow(
+      glyph: glyph,
+      title: title,
+      subtitle: subtitle,
+      enabled: enabled,
+      onTap: enabled ? () => toggle(!value) : null,
+      trailing: AyreSwitch(
+        value: value && enabled,
+        onChanged: enabled ? toggle : null,
+        semanticLabel: title,
       ),
     );
   }
