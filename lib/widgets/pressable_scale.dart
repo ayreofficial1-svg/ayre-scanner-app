@@ -55,10 +55,10 @@ class _PressableScaleState extends State<PressableScale> {
           onTapCancel: enabled ? () => _setPressed(false) : null,
           borderRadius: radius,
           hoverColor: widget.hoverTint
-              ? t.citrine.withValues(alpha: 0.06)
+              ? t.accent.withValues(alpha: 0.06)
               : AppTheme.transparent,
-          splashColor: t.citrine.withValues(alpha: 0.07),
-          highlightColor: t.citrine.withValues(alpha: 0.04),
+          splashColor: t.accent.withValues(alpha: 0.07),
+          highlightColor: t.accent.withValues(alpha: 0.04),
           child: widget.child,
         ),
       ),

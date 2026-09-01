@@ -56,8 +56,10 @@ class _FigureState extends State<Figure> with SingleTickerProviderStateMixin {
     super.initState();
     _from = widget.text;
     _to = widget.text;
-    _controller = AnimationController(vsync: this, duration: AppMotion.digitRoll)
-      ..value = 1.0;
+    _controller = AnimationController(
+      vsync: this,
+      duration: AppMotion.digitRoll,
+    )..value = 1.0;
   }
 
   @override
@@ -215,14 +217,14 @@ class DeltaFigure extends StatelessWidget {
     }
 
     final up = change! >= 0;
-    final tone = color ?? (up ? t.jade : t.garnet);
+    final tone = color ?? (up ? t.gain : t.loss);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (showGlyph) ...[
           DirectionGlyph(up: up, color: tone, size: fontSize * 0.78),
-          const SizedBox(width: AppSpacing.xs),
+          const SizedBox(width: AppSpace.xs),
         ],
         Figure(
           formatDelta(change!, percent: percent, decimals: decimals),
@@ -270,7 +272,7 @@ class LabelledFigure extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(height: AppSpacing.xxs),
+        const SizedBox(height: AppSpace.xxs),
         Figure(value, fontSize: fontSize, color: color),
       ],
     );

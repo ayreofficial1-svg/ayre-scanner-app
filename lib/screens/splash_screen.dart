@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../widgets/ayre_logo.dart';
 
-/// The brand mark: three ascending bars on a baseline rule, drawn in Citrine —
-/// the same shape family as the Signals glyph, so the wordmark and the app's
-/// iconography read as one identity.
+/// The splash screen: the logo's primary and most prominent placement.
 ///
-/// The bars rise on load, once, with no overshoot. No rotating ring, no gradient
-/// sweep, no gauge — none of that survives from the previous identity.
+/// The mark is the supplied brand asset, centred and generously sized with clear
+/// space around it — not a recreation, and not scaled to fill the screen. The
+/// previous identity's hand-drawn bar mark is gone: there is a real logo now.
+///
+/// Motion is a single quiet settle. Nothing rotates, sweeps or bounces.
 class AyreSplashScreen extends StatefulWidget {
   const AyreSplashScreen({super.key, required this.onFinished});
 
@@ -26,7 +28,7 @@ class _AyreSplashScreenState extends State<AyreSplashScreen>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1050),
+      duration: const Duration(milliseconds: 1000),
     );
     _controller.forward().then((_) {
       if (mounted) widget.onFinished();
@@ -49,111 +51,42 @@ class _AyreSplashScreenState extends State<AyreSplashScreen>
       body: Center(
         child: AnimatedBuilder(
           animation: _controller,
-          builder: (context, _) {
-            final rise = reduceMotion
-                ? 1.0
-                : AppMotion.ease.transform(
-                    (_controller.value / 0.7).clamp(0.0, 1.0),
-                  );
-            final fade = reduceMotion
-                ? 1.0
-                : ((_controller.value - 0.2) / 0.4).clamp(0.0, 1.0);
-            final exit = reduceMotion
-                ? 1.0
-                : 1 - ((_controller.value - 0.86) / 0.14).clamp(0.0, 1.0);
-
+          builder: (context, child) {
+            if (reduceMotion) return child!;
+            // A short rise and fade in, then a fade out as the app takes over.
+            final enter = AppMotion.ease.transform(
+              (_controller.value / 0.45).clamp(0.0, 1.0),
+            );
+            final exit =
+                1 - ((_controller.value - 0.88) / 0.12).clamp(0.0, 1.0);
             return Opacity(
-              opacity: exit,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(
-                    height: 68,
-                    width: 84,
-                    child: CustomPaint(
-                      painter: _MarkPainter(
-                        rise: rise,
-                        color: t.citrine,
-                        rule: t.hairline,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  Opacity(
-                    opacity: fade,
-                    child: Column(
-                      children: [
-                        Text(
-                          'AYRE SCANNER',
-                          style: AppTypo.display(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: t.textPrimary,
-                            letterSpacing: 3.2,
-                          ),
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          'MARKET TERMINAL',
-                          style: AppTypo.label(t, fontSize: 10),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+              opacity: enter * exit,
+              child: Transform.translate(
+                offset: Offset(0, 10 * (1 - enter)),
+                child: child,
               ),
             );
           },
+          child: const _SplashMark(),
         ),
       ),
     );
   }
 }
 
-class _MarkPainter extends CustomPainter {
-  const _MarkPainter({
-    required this.rise,
-    required this.color,
-    required this.rule,
-  });
-
-  /// 0..1 — how far the bars have risen.
-  final double rise;
-  final Color color;
-  final Color rule;
+class _SplashMark extends StatelessWidget {
+  const _SplashMark();
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final baseline = size.height - 1;
-    canvas.drawLine(
-      Offset(0, baseline),
-      Offset(size.width, baseline),
-      Paint()
-        ..color = rule
-        ..strokeWidth = 1,
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const LogoMark(placement: LogoPlacement.splash),
+        const SizedBox(height: AppSpace.md),
+        Text('MARKET TERMINAL', style: AppTypo.label(t)),
+      ],
     );
-
-    const heights = [0.46, 0.78, 1.0];
-    final barWidth = size.width / 7;
-    final paint = Paint()..color = color;
-
-    for (var i = 0; i < heights.length; i++) {
-      // Later bars start a beat after the earlier ones.
-      final staged = ((rise - i * 0.12) / (1 - 0.24)).clamp(0.0, 1.0);
-      final height = size.height * heights[i] * staged;
-      if (height <= 0) continue;
-      final left = barWidth * (1 + i * 2);
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTRB(left, baseline - height, left + barWidth, baseline),
-          const Radius.circular(1.5),
-        ),
-        paint,
-      );
-    }
   }
-
-  @override
-  bool shouldRepaint(covariant _MarkPainter old) =>
-      old.rise != rise || old.color != color || old.rule != rule;
 }

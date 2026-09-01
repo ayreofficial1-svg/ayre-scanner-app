@@ -45,7 +45,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             final entries = NotificationLog.instance.entries;
             if (entries.isEmpty) {
               return ListView(
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding: const EdgeInsets.all(AppSpace.lg),
                 children: [
                   StatePanel.empty(
                     headline: 'Nothing recorded yet',
@@ -62,14 +62,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
             return ListView.separated(
               padding: const EdgeInsets.fromLTRB(
-                AppSpacing.lg,
-                AppSpacing.sm,
-                AppSpacing.lg,
-                AppSpacing.huge,
+                AppSpace.lg,
+                AppSpace.sm,
+                AppSpace.lg,
+                AppSpace.xxl,
               ),
               itemCount: entries.length,
-              separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-              itemBuilder: (context, index) => _NoticeCard(notice: entries[index]),
+              separatorBuilder: (_, _) => const SizedBox(height: AppSpace.sm),
+              itemBuilder: (context, index) =>
+                  _NoticeCard(notice: entries[index]),
             );
           },
         ),
@@ -88,17 +89,17 @@ class _NoticeCard extends StatelessWidget {
     final t = context.tokens;
     // Delayed data is time-sensitive attention, which is Ember's job.
     final (glyph, tone) = switch (notice.kind) {
-      NoticeKind.staleData => (AyreGlyph.delayed, t.ember),
-      NoticeKind.signal => (AyreGlyph.alerts, t.citrineInk),
+      NoticeKind.staleData => (AyreGlyph.delayed, t.caution),
+      NoticeKind.signal => (AyreGlyph.alerts, t.accentInk),
     };
 
     return AyreCard(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpace.md),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AyreIcon(glyph, size: 17, color: tone),
-          const SizedBox(width: AppSpacing.md),
+          const SizedBox(width: AppSpace.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,7 +110,7 @@ class _NoticeCard extends StatelessWidget {
                     Expanded(
                       child: Text(notice.title, style: AppTypo.rowLabel(t)),
                     ),
-                    const SizedBox(width: AppSpacing.sm),
+                    const SizedBox(width: AppSpace.sm),
                     Figure.static(
                       formatClockShort(notice.at),
                       fontSize: 11,
@@ -117,7 +118,7 @@ class _NoticeCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.xxs),
+                const SizedBox(height: AppSpace.xxs),
                 Text(notice.body, style: AppTypo.body(t)),
               ],
             ),

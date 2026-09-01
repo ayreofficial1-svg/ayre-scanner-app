@@ -31,38 +31,38 @@ class LessonScreen extends StatelessWidget {
       body: ContentWidth(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.sm,
-            AppSpacing.lg,
-            AppSpacing.huge,
+            AppSpace.lg,
+            AppSpace.sm,
+            AppSpace.lg,
+            AppSpace.xxl,
           ),
           children: [
             // Wraps rather than overflowing at large text scales — the header
             // row that broke in the previous build.
             Wrap(
               crossAxisAlignment: WrapCrossAlignment.center,
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.xs,
+              spacing: AppSpace.sm,
+              runSpacing: AppSpace.xs,
               children: [
                 AyreIcon(AyreGlyph.course, size: 16, color: t.textTertiary),
                 Text(course.category.toUpperCase(), style: AppTypo.label(t)),
               ],
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpace.md),
             Text(course.title, style: AppTypo.pageTitle(t)),
             if (progress != null) ...[
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpace.md),
               ProgressRule(value: progress),
-              const SizedBox(height: AppSpacing.xs),
+              const SizedBox(height: AppSpace.xs),
               Figure.static(
                 '${course.lessonsDone}/${course.lessonsTotal} lessons complete',
                 fontSize: 11,
                 color: t.textTertiary,
               ),
             ],
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpace.lg),
             const HairlineDivider(),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpace.lg),
             Text(
               course.body.isEmpty
                   ? 'This course has no written body yet.'

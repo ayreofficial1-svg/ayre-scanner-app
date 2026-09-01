@@ -74,8 +74,7 @@ class FaultInjector extends ChangeNotifier {
   Map<DataSurface, FaultKind> get active =>
       enabled ? Map.unmodifiable(_faults) : const {};
 
-  FaultKind? faultFor(DataSurface surface) =>
-      enabled ? _faults[surface] : null;
+  FaultKind? faultFor(DataSurface surface) => enabled ? _faults[surface] : null;
 
   void set(DataSurface surface, FaultKind? kind) {
     if (kind == null) {

@@ -29,7 +29,8 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
 
   final _navigatorKey = GlobalKey<NavigatorState>();
 
-  ThemeMode _themeMode = ThemeMode.system;
+  // Light or dark only — never system. `system` is migrated away on first load.
+  ThemeMode _themeMode = ThemeMode.dark;
   bool _splashComplete = false;
   bool _offline = false;
   bool _offlineDismissed = false;
@@ -73,13 +74,34 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
   Future<void> _loadThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
     final value = prefs.getString(_themeModeKey);
-    if (!mounted || value == null) return;
+    if (!mounted) return;
+
+    // Existing users stored on "system" are migrated to whichever explicit mode
+    // the device is currently showing, so the app looks the same to them on the
+    // upgrade — rather than silently flipping or resolving to a mode that no
+    // longer exists in the picker.
+    if (value == null || value == ThemeMode.system.name) {
+      final brightness = View.of(context).platformDispatcher.platformBrightness;
+      final resolved = brightness == Brightness.light
+          ? ThemeMode.light
+          : ThemeMode.dark;
+      setState(() => _themeMode = resolved);
+      await prefs.setString(_themeModeKey, resolved.name);
+      return;
+    }
+
     setState(() {
-      _themeMode = ThemeMode.values.firstWhere(
-        (mode) => mode.name == value,
-        orElse: () => ThemeMode.system,
-      );
+      _themeMode = value == ThemeMode.light.name
+          ? ThemeMode.light
+          : ThemeMode.dark;
     });
+  }
+
+  Future<void> setThemeModeGuarded(ThemeMode mode) {
+    // Defensive: nothing in the UI can pass `system` any more, but this makes
+    // that guarantee explicit rather than incidental.
+    assert(mode != ThemeMode.system, 'System theme mode was removed');
+    return setThemeMode(mode == ThemeMode.system ? ThemeMode.dark : mode);
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -108,16 +130,38 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
         themeAnimationDuration: AppMotion.medium,
         themeAnimationCurve: AppMotion.ease,
         builder: (context, child) {
-          // The offline notice is app-wide chrome, above every route, so it never
-          // has to be re-implemented per screen.
-          return Column(
-            children: [
-              if (_offline && !_offlineDismissed)
-                OfflineBanner(
-                  onDismiss: () => setState(() => _offlineDismissed = true),
+          // Two pieces of app-wide chrome, applied once here rather than
+          // re-implemented per screen: the offline notice, and the user's chosen
+          // text size as a scale over everything (including Material's own
+          // widgets, which theme tokens alone would miss).
+          return ListenableBuilder(
+            listenable: SettingsStore.instance,
+            builder: (context, _) {
+              final media = MediaQuery.of(context);
+              // Multiply, don't clamp: clamping would silently ignore a
+              // *smaller* preference whenever the OS scale already sat inside
+              // the range. Measuring a known size recovers the OS's effective
+              // linear factor, which the preference then scales.
+              final osFactor = media.textScaler.scale(100) / 100;
+              final effective =
+                  (osFactor * SettingsStore.instance.textSize.scale).clamp(
+                    0.8,
+                    2.2,
+                  );
+              return MediaQuery(
+                data: media.copyWith(textScaler: TextScaler.linear(effective)),
+                child: Column(
+                  children: [
+                    if (_offline && !_offlineDismissed)
+                      OfflineBanner(
+                        onDismiss: () =>
+                            setState(() => _offlineDismissed = true),
+                      ),
+                    Expanded(child: child ?? const SizedBox.shrink()),
+                  ],
                 ),
-              Expanded(child: child ?? const SizedBox.shrink()),
-            ],
+              );
+            },
           );
         },
         home: _sessionExpired
@@ -175,7 +219,7 @@ class SessionExpiredScreen extends StatelessWidget {
         child: ContentWidth(
           maxWidth: 360,
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.xl),
+            padding: const EdgeInsets.all(AppSpace.xl),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -255,6 +299,6 @@ class _StartupGateState extends State<_StartupGate> {
     if (_checking || !widget.splashComplete) {
       return AyreSplashScreen(onFinished: widget.onSplashComplete);
     }
-    return _loggedIn ? const HomeShell() : const LoginScreen();
+    return _loggedIn ? HomeShell() : const LoginScreen();
   }
 }

@@ -8,8 +8,10 @@ import '../widgets/ayre_icons.dart';
 import 'edit_profile_screen.dart';
 import 'home_shell.dart' show initialsFor;
 import 'login_screen.dart';
+import '../widgets/figure.dart';
+import 'notifications_screen.dart';
 import 'settings_screen.dart';
-import 'support_screen.dart';
+import 'support_screen.dart' show SupportScreen, kAppVersion, kAppBuild;
 
 /// Profile — a flat header block plus list rows, using the same row grammar as
 /// Learn and Settings rather than a distinct card treatment.
@@ -65,9 +67,9 @@ class _ProfileTabState extends State<ProfileTab> {
     );
     if (updated == null || !mounted) return;
     HapticFeedback.mediumImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile updated')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Profile updated')));
   }
 
   Future<void> _confirmSignOut() async {
@@ -97,19 +99,23 @@ class _ProfileTabState extends State<ProfileTab> {
     return ContentWidth(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          AppSpacing.lg,
-          AppSpacing.lg,
+          AppSpace.lg,
+          AppSpace.lg,
+          AppSpace.lg,
           120,
         ),
         children: [
           SafeArea(
             bottom: false,
-            child: Entrance(child: _IdentityBlock(name: _name, handle: _handle, tier: _tier)),
+            child: Entrance(
+              child: _IdentityBlock(name: _name, handle: _handle, tier: _tier),
+            ),
           ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpace.xl),
+          // ── Account ───────────────────────────────────────────────────────
+          Entrance(index: 1, child: const SectionLabel(label: 'Account')),
           Entrance(
-            index: 1,
+            index: 2,
             child: RowGroup(
               children: [
                 SettingRow(
@@ -119,9 +125,29 @@ class _ProfileTabState extends State<ProfileTab> {
                   onTap: _editProfile,
                 ),
                 SettingRow(
+                  glyph: AyreGlyph.account,
+                  title: 'Username',
+                  subtitle: 'Identifies the account and cannot be changed here',
+                  trailing: Text(
+                    _handle ?? '—',
+                    style: AppTypo.bodyStrong(t, color: t.textSecondary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Preferences ───────────────────────────────────────────────────
+          const SizedBox(height: AppSpace.lg),
+          Entrance(index: 3, child: const SectionLabel(label: 'Preferences')),
+          Entrance(
+            index: 4,
+            child: RowGroup(
+              children: [
+                SettingRow(
                   glyph: AyreGlyph.appearance,
                   title: 'Settings',
-                  subtitle: 'Alerts, appearance and account details',
+                  subtitle: 'Theme, text size and alerts',
                   onTap: () {
                     HapticFeedback.selectionClick();
                     Navigator.of(context).push(
@@ -129,6 +155,30 @@ class _ProfileTabState extends State<ProfileTab> {
                     );
                   },
                 ),
+                SettingRow(
+                  glyph: AyreGlyph.bell,
+                  title: 'Alerts',
+                  subtitle: 'What the app has recorded for you',
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationsScreen(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+
+          // ── Support ───────────────────────────────────────────────────────
+          const SizedBox(height: AppSpace.lg),
+          Entrance(index: 5, child: const SectionLabel(label: 'Support')),
+          Entrance(
+            index: 6,
+            child: RowGroup(
+              children: [
                 SettingRow(
                   glyph: AyreGlyph.support,
                   title: 'Help and support',
@@ -140,15 +190,24 @@ class _ProfileTabState extends State<ProfileTab> {
                     );
                   },
                 ),
-                // A "Saved / Watchlist" row belongs here once there's a
+                SettingRow(
+                  glyph: AyreGlyph.about,
+                  title: 'Version',
+                  trailing: Figure.static(
+                    '$kAppVersion ($kAppBuild)',
+                    fontSize: AppTextScale.caption,
+                    color: t.textSecondary,
+                  ),
+                ),
+                // A "Saved / Watchlist" row belongs here once there is a
                 // watchlist feature to open. There isn't, so it isn't shown.
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.xxl),
-          Entrance(index: 2, child: const SectionLabel(label: 'Session')),
+          const SizedBox(height: AppSpace.xxl),
+          Entrance(index: 7, child: const SectionLabel(label: 'Session')),
           Entrance(
-            index: 3,
+            index: 8,
             child: RowGroup(
               color: t.backgroundTint,
               children: [
@@ -163,7 +222,7 @@ class _ProfileTabState extends State<ProfileTab> {
                           width: 15,
                           child: CircularProgressIndicator(
                             strokeWidth: 1.6,
-                            color: t.garnet,
+                            color: t.loss,
                           ),
                         )
                       : null,
@@ -200,7 +259,7 @@ class _IdentityBlock extends StatelessWidget {
           width: 52,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: t.citrine,
+            color: t.accent,
             borderRadius: BorderRadius.circular(AppRadius.control),
             border: Border.all(color: t.textPrimary.withValues(alpha: 0.18)),
           ),
@@ -209,11 +268,11 @@ class _IdentityBlock extends StatelessWidget {
             style: AppTypo.ui(
               fontSize: 19,
               fontWeight: FontWeight.w800,
-              color: t.onCitrine,
+              color: t.onAccent,
             ),
           ),
         ),
-        const SizedBox(width: AppSpacing.md),
+        const SizedBox(width: AppSpace.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -224,7 +283,7 @@ class _IdentityBlock extends StatelessWidget {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              const SizedBox(height: AppSpacing.xxs),
+              const SizedBox(height: AppSpace.xxs),
               Row(
                 children: [
                   if (handle != null && handle!.isNotEmpty)
@@ -238,7 +297,7 @@ class _IdentityBlock extends StatelessWidget {
                     ),
                   if (tier != null && tier!.isNotEmpty) ...[
                     if (handle != null && handle!.isNotEmpty)
-                      const SizedBox(width: AppSpacing.sm),
+                      const SizedBox(width: AppSpace.sm),
                     AyreChip(label: tier!, tone: ChipTone.info),
                   ],
                 ],
@@ -261,28 +320,28 @@ class _SignOutSheet extends StatelessWidget {
     final t = context.tokens;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.xl,
-        AppSpacing.lg,
-        AppSpacing.xxl,
+        AppSpace.lg,
+        AppSpace.xl,
+        AppSpace.lg,
+        AppSpace.xxl,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text('Sign out?', style: AppTypo.sectionTitle(t)),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpace.sm),
           Text(
             'You will need your username and password to sign back in on this '
             'device.',
             style: AppTypo.body(t),
           ),
-          const SizedBox(height: AppSpacing.xl),
+          const SizedBox(height: AppSpace.xl),
           AyreButton(
             label: 'Cancel',
             onPressed: () => Navigator.of(context).pop(false),
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpace.sm),
           AyreButton(
             label: 'Sign out',
             kind: AyreButtonKind.danger,

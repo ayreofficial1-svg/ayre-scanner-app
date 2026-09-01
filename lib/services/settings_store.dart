@@ -19,11 +19,17 @@ class SettingsStore extends ChangeNotifier {
   static const _kNewSignals = 'alerts_new_signals';
   static const _kStaleData = 'alerts_stale_data';
   static const _kDisplayName = 'profile_display_name';
+  static const _kTextSize = 'appearance_text_size';
 
   bool _inAppAlerts = true;
   bool _newSignalAlerts = true;
   bool _staleDataWarnings = true;
   String? _displayNameOverride;
+  AppTextSize _textSize = AppTextSize.standard;
+
+  /// The user's chosen text size. Applied as a text scale over the whole app, so
+  /// it affects Material's own widgets too, not just our typography tokens.
+  AppTextSize get textSize => _textSize;
 
   /// The name shown across the app. The backend exposes session identity but no
   /// profile-update endpoint, so this is stored on the device — which is why
@@ -45,12 +51,29 @@ class SettingsStore extends ChangeNotifier {
     _newSignalAlerts = prefs.getBool(_kNewSignals) ?? true;
     _staleDataWarnings = prefs.getBool(_kStaleData) ?? true;
     _displayNameOverride = prefs.getString(_kDisplayName);
+    final storedSize = prefs.getString(_kTextSize);
+    _textSize = AppTextSize.values.firstWhere(
+      (size) => size.name == storedSize,
+      orElse: () => AppTextSize.standard,
+    );
     notifyListeners();
+  }
+
+  Future<void> setTextSize(AppTextSize value) async {
+    if (_textSize == value) return;
+    _textSize = value;
+    // Applied immediately — no restart, because the scale is read from this
+    // notifier at the top of the widget tree.
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kTextSize, value.name);
   }
 
   Future<void> setDisplayName(String? value) async {
     final trimmed = value?.trim();
-    _displayNameOverride = (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+    _displayNameOverride = (trimmed == null || trimmed.isEmpty)
+        ? null
+        : trimmed;
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     if (_displayNameOverride == null) {
@@ -75,6 +98,22 @@ class SettingsStore extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(key, value);
   }
+}
+
+/// The discrete text sizes offered in Settings.
+///
+/// Deliberately a short list of named steps rather than a slider: a slider
+/// invites fiddling and produces layouts nobody tested, whereas three steps can
+/// each be verified across every screen.
+enum AppTextSize {
+  compact(label: 'Small', scale: 0.90),
+  standard(label: 'Default', scale: 1.00),
+  large(label: 'Large', scale: 1.18);
+
+  const AppTextSize({required this.label, required this.scale});
+
+  final String label;
+  final double scale;
 }
 
 enum NoticeKind { signal, staleData }

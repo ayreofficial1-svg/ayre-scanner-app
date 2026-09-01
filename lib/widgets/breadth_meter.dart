@@ -57,7 +57,7 @@ class BreadthMeter extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: AppSpacing.md),
+        const SizedBox(height: AppSpace.md),
         SizedBox(
           height: 22,
           child: SpringValue(
@@ -76,7 +76,7 @@ class BreadthMeter extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: AppSpace.sm),
         // A labelled scale, so the number has somewhere to sit.
         Row(
           children: [

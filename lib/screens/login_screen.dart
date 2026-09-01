@@ -4,6 +4,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
+import '../widgets/ayre_logo.dart';
 import 'home_shell.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -43,9 +44,9 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = false);
 
     if (success) {
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeShell()),
-      );
+      await Navigator.of(
+        context,
+      ).pushReplacement(MaterialPageRoute(builder: (_) => HomeShell()));
     } else {
       setState(() => _error = 'Invalid username or password');
     }
@@ -62,21 +63,23 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpacing.xl),
+            padding: const EdgeInsets.all(AppSpace.xl),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 380),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('AYRE SCANNER', style: AppTypo.label(t, fontSize: 11)),
-                  const SizedBox(height: AppSpacing.sm),
+                  // A secondary placement: the mark heads the form once, and is
+                  // not repeated anywhere else in the flow.
+                  const Center(child: LogoMark(placement: LogoPlacement.auth)),
+                  const SizedBox(height: AppSpace.md),
                   Text('Sign in', style: AppTypo.pageTitle(t)),
-                  const SizedBox(height: AppSpacing.xxs),
+                  const SizedBox(height: AppSpace.xxs),
                   Text(
                     'Continue to your market terminal.',
                     style: AppTypo.body(t),
                   ),
-                  const SizedBox(height: AppSpacing.xxl),
+                  const SizedBox(height: AppSpace.xxl),
                   const SectionLabel(label: 'Username'),
                   TextField(
                     controller: _username,
@@ -89,7 +92,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       errorText: missingUser ? 'Enter your username' : null,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpace.lg),
                   const SectionLabel(label: 'Password'),
                   TextField(
                     controller: _password,
@@ -104,10 +107,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   if (_error != null) ...[
-                    const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: AppSpace.lg),
                     _LoginError(message: _error!),
                   ],
-                  const SizedBox(height: AppSpacing.xl),
+                  const SizedBox(height: AppSpace.xl),
                   AyreButton(
                     label: 'Sign in',
                     busy: _loading,
@@ -132,21 +135,18 @@ class _LoginError extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpace.md),
       decoration: BoxDecoration(
-        color: t.negativeBg,
-        border: Border.all(color: t.garnet.withValues(alpha: 0.4)),
+        color: t.lossSoft,
+        border: Border.all(color: t.loss.withValues(alpha: 0.4)),
         borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       child: Row(
         children: [
-          AyreIcon(AyreGlyph.disconnected, size: 15, color: t.garnet),
-          const SizedBox(width: AppSpacing.sm),
+          AyreIcon(AyreGlyph.disconnected, size: 15, color: t.loss),
+          const SizedBox(width: AppSpace.sm),
           Expanded(
-            child: Text(
-              message,
-              style: AppTypo.bodyStrong(t, color: t.garnet),
-            ),
+            child: Text(message, style: AppTypo.bodyStrong(t, color: t.loss)),
           ),
         ],
       ),

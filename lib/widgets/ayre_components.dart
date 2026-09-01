@@ -14,7 +14,7 @@ class AyreCard extends StatelessWidget {
   const AyreCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(AppSpacing.lg),
+    this.padding = const EdgeInsets.all(AppSpace.lg),
     this.color,
     this.borderColor,
     this.radius = AppRadius.card,
@@ -55,7 +55,7 @@ class AyreCard extends StatelessWidget {
                 top: 0,
                 bottom: 0,
                 width: 3,
-                child: ColoredBox(color: accentColor ?? t.citrine),
+                child: ColoredBox(color: accentColor ?? t.accent),
               ),
             ],
           )
@@ -86,8 +86,8 @@ class InkPanel extends StatelessWidget {
     super.key,
     required this.child,
     this.padding = const EdgeInsets.symmetric(
-      horizontal: AppSpacing.md,
-      vertical: AppSpacing.md,
+      horizontal: AppSpace.md,
+      vertical: AppSpace.md,
     ),
   });
 
@@ -116,7 +116,7 @@ class SectionLabel extends StatelessWidget {
     super.key,
     required this.label,
     this.trailing,
-    this.padding = const EdgeInsets.only(bottom: AppSpacing.sm),
+    this.padding = const EdgeInsets.only(bottom: AppSpace.sm),
   });
 
   final String label;
@@ -141,7 +141,7 @@ class SectionLabel extends StatelessWidget {
             ),
           ),
           if (trailing != null) ...[
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: AppSpace.sm),
             // Flex rather than a bare child: a non-flex Row child gets
             // unbounded width, which breaks any trailing widget that lays out
             // its own flexible children (the segmented control, for one).
@@ -230,9 +230,13 @@ class AyreButton extends StatelessWidget {
     final enabled = onPressed != null && !busy;
 
     final (Color bg, Color fg, Color? edge) = switch (kind) {
-      AyreButtonKind.primary => (t.citrine, t.onCitrine, null),
+      AyreButtonKind.primary => (t.accent, t.onAccent, null),
       AyreButtonKind.outline => (AppTheme.transparent, t.textPrimary, t.border),
-      AyreButtonKind.danger => (AppTheme.transparent, t.garnet, t.garnet.withValues(alpha: 0.5)),
+      AyreButtonKind.danger => (
+        AppTheme.transparent,
+        t.loss,
+        t.loss.withValues(alpha: 0.5),
+      ),
     };
 
     return Opacity(
@@ -244,8 +248,8 @@ class AyreButton extends StatelessWidget {
           width: expand ? double.infinity : null,
           constraints: const BoxConstraints(minHeight: 46),
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.md,
+            horizontal: AppSpace.lg,
+            vertical: AppSpace.md,
           ),
           decoration: BoxDecoration(
             color: bg,
@@ -269,7 +273,7 @@ class AyreButton extends StatelessWidget {
               else ...[
                 if (glyph != null) ...[
                   AyreIcon(glyph!, size: 16, color: fg),
-                  const SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: AppSpace.sm),
                 ],
                 Flexible(
                   child: Text(
@@ -330,12 +334,10 @@ class AyreSwitch extends StatelessWidget {
             height: _h,
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              color: value ? t.citrine : t.surfaceAlt,
+              color: value ? t.accent : t.surfaceAlt,
               borderRadius: BorderRadius.circular(AppRadius.chip),
               border: Border.all(
-                color: value
-                    ? t.citrine.withValues(alpha: 0.9)
-                    : t.border,
+                color: value ? t.accent.withValues(alpha: 0.9) : t.border,
               ),
             ),
             child: AnimatedAlign(
@@ -346,7 +348,7 @@ class AyreSwitch extends StatelessWidget {
                 width: _knob,
                 height: _knob,
                 decoration: BoxDecoration(
-                  color: value ? t.onCitrine : t.textTertiary,
+                  color: value ? t.onAccent : t.textTertiary,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -427,7 +429,7 @@ class _Segment<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final fg = selected ? t.onCitrine : t.textSecondary;
+    final fg = selected ? t.onAccent : t.textSecondary;
 
     return Semantics(
       button: true,
@@ -440,11 +442,11 @@ class _Segment<T> extends StatelessWidget {
           duration: AppMotion.fast,
           curve: AppMotion.ease,
           padding: EdgeInsets.symmetric(
-            vertical: compact ? AppSpacing.sm : AppSpacing.md,
-            horizontal: AppSpacing.xs,
+            vertical: compact ? AppSpace.sm : AppSpace.md,
+            horizontal: AppSpace.xs,
           ),
           decoration: BoxDecoration(
-            color: selected ? t.citrine : AppTheme.transparent,
+            color: selected ? t.accent : AppTheme.transparent,
             borderRadius: BorderRadius.circular(AppRadius.panel),
           ),
           child: Column(
@@ -452,7 +454,7 @@ class _Segment<T> extends StatelessWidget {
             children: [
               if (segment.glyph != null && !compact) ...[
                 AyreIcon(segment.glyph!, size: 16, color: fg, filled: selected),
-                const SizedBox(height: AppSpacing.xs),
+                const SizedBox(height: AppSpace.xs),
               ],
               FittedBox(
                 fit: BoxFit.scaleDown,
@@ -498,10 +500,10 @@ class AyreChip extends StatelessWidget {
     final t = context.tokens;
     final (Color fg, Color bg) = switch (tone) {
       ChipTone.neutral => (t.textTertiary, t.surfaceAlt),
-      ChipTone.live => (t.ember, t.emberBg),
-      ChipTone.attention => (t.ember, t.emberBg),
-      ChipTone.info => (t.slateViolet, t.slateViolet.withValues(alpha: 0.12)),
-      ChipTone.brand => (t.citrineInk, t.citrine.withValues(alpha: 0.16)),
+      ChipTone.live => (t.caution, t.cautionSoft),
+      ChipTone.attention => (t.caution, t.cautionSoft),
+      ChipTone.info => (t.info, t.info.withValues(alpha: 0.12)),
+      ChipTone.brand => (t.accentInk, t.accent.withValues(alpha: 0.16)),
     };
 
     return Container(
@@ -518,7 +520,7 @@ class AyreChip extends StatelessWidget {
           else if (glyph != null)
             AyreIcon(glyph!, size: 11, color: fg),
           if (tone == ChipTone.live || glyph != null)
-            const SizedBox(width: AppSpacing.xs),
+            const SizedBox(width: AppSpace.xs),
           Text(label.toUpperCase(), style: AppTypo.label(t, color: fg)),
         ],
       ),
@@ -585,12 +587,17 @@ class _LivePulseDotState extends State<LivePulseDot>
 
     if (!widget.animate || MediaQuery.disableAnimationsOf(context)) return dot;
 
-    return AnimatedBuilder(
-      animation: _controller,
-      child: dot,
-      builder: (context, child) => Opacity(
-        opacity: 0.45 + 0.55 * AppMotion.easeInOut.transform(_controller.value),
-        child: child,
+    // The "live" breath runs for as long as the screen is up, so it gets its own
+    // layer rather than dirtying the chip and card it sits in.
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _controller,
+        child: dot,
+        builder: (context, child) => Opacity(
+          opacity:
+              0.45 + 0.55 * AppMotion.easeInOut.transform(_controller.value),
+          child: child,
+        ),
       ),
     );
   }
@@ -642,8 +649,8 @@ class TickerRow extends StatelessWidget {
 
     final row = Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: dense ? AppSpacing.sm : AppSpacing.row,
+        horizontal: AppSpace.md,
+        vertical: dense ? AppSpace.sm : AppSpace.row,
       ),
       child: Row(
         children: [
@@ -656,11 +663,11 @@ class TickerRow extends StatelessWidget {
                 color: t.textTertiary,
               ),
             ),
-            const SizedBox(width: AppSpacing.xs),
+            const SizedBox(width: AppSpace.xs),
           ],
           if (leading != null) ...[
             leading!,
-            const SizedBox(width: AppSpacing.md),
+            const SizedBox(width: AppSpace.md),
           ],
           // The name column absorbs the remaining width and ellipsizes; long
           // listed-company names are the norm, not the exception.
@@ -686,7 +693,7 @@ class TickerRow extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: AppSpacing.sm),
+          const SizedBox(width: AppSpace.sm),
           Flexible(
             flex: 4,
             child: FittedBox(
@@ -700,7 +707,7 @@ class TickerRow extends StatelessWidget {
                     Figure(formatPrice(price), fontSize: 14)
                   else if (volume != null)
                     Figure(formatVolume(volume), fontSize: 14),
-                  const SizedBox(height: AppSpacing.xxs),
+                  const SizedBox(height: AppSpace.xxs),
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -710,14 +717,14 @@ class TickerRow extends StatelessWidget {
                           fontSize: 11,
                           color: t.textTertiary,
                         ),
-                        const SizedBox(width: AppSpacing.sm),
+                        const SizedBox(width: AppSpace.sm),
                       ] else if (changeAbsolute != null) ...[
                         Figure(
                           formatDelta(changeAbsolute!, percent: false),
                           fontSize: 11,
                           color: t.textTertiary,
                         ),
-                        const SizedBox(width: AppSpacing.sm),
+                        const SizedBox(width: AppSpace.sm),
                       ],
                       if (changePercent != null)
                         DeltaFigure(change: changePercent, fontSize: 12),
@@ -728,7 +735,7 @@ class TickerRow extends StatelessWidget {
             ),
           ),
           if (trailing != null) ...[
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: AppSpace.sm),
             trailing!,
           ],
         ],
@@ -766,19 +773,19 @@ class SettingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final tone = danger ? t.garnet : t.textSecondary;
+    final tone = danger ? t.loss : t.textSecondary;
 
     final row = Opacity(
       opacity: enabled ? 1 : 0.5,
       child: Padding(
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.md,
+          horizontal: AppSpace.md,
+          vertical: AppSpace.md,
         ),
         child: Row(
           children: [
             AyreIcon(glyph, size: 18, color: tone),
-            const SizedBox(width: AppSpacing.md),
+            const SizedBox(width: AppSpace.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -786,10 +793,7 @@ class SettingRow extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: AppTypo.rowLabel(
-                      t,
-                      color: danger ? t.garnet : null,
-                    ),
+                    style: AppTypo.rowLabel(t, color: danger ? t.loss : null),
                   ),
                   if (subtitle != null) ...[
                     const SizedBox(height: 1),
@@ -798,7 +802,7 @@ class SettingRow extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: AppSpace.sm),
             trailing ??
                 (onTap == null
                     ? const SizedBox.shrink()
@@ -833,7 +837,8 @@ class RowGroup extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < children.length; i++) ...[
-            if (i > 0) const HairlineDivider(indent: AppSpacing.md + 18 + AppSpacing.md),
+            if (i > 0)
+              const HairlineDivider(indent: AppSpace.md + 18 + AppSpace.md),
             children[i],
           ],
         ],
@@ -863,7 +868,7 @@ class SignalStrength extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final tone = color ?? t.citrineInk;
+    final tone = color ?? t.accentInk;
     return Semantics(
       label: 'Signal strength $level of $of',
       child: Row(
@@ -905,7 +910,7 @@ class ProgressRule extends StatelessWidget {
         value: value.clamp(0.0, 1.0),
         minHeight: height,
         backgroundColor: t.surfaceAlt,
-        valueColor: AlwaysStoppedAnimation(t.citrine),
+        valueColor: AlwaysStoppedAnimation(t.accent),
       ),
     );
   }
@@ -962,12 +967,16 @@ class _SkeletonBlockState extends State<SkeletonBlock>
       ),
     );
     if (MediaQuery.disableAnimationsOf(context)) return block;
-    return AnimatedBuilder(
-      animation: _controller,
-      child: block,
-      builder: (context, child) => Opacity(
-        opacity: 0.55 + 0.45 * AppMotion.easeInOut.transform(_controller.value),
-        child: child,
+    // Continuous animation: isolated so it repaints only itself.
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _controller,
+        child: block,
+        builder: (context, child) => Opacity(
+          opacity:
+              0.55 + 0.45 * AppMotion.easeInOut.transform(_controller.value),
+          child: child,
+        ),
       ),
     );
   }
@@ -983,8 +992,8 @@ class SkeletonTickerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: AppSpacing.md,
-        vertical: dense ? AppSpacing.sm : AppSpacing.row,
+        horizontal: AppSpace.md,
+        vertical: dense ? AppSpace.sm : AppSpace.row,
       ),
       child: Row(
         children: [
@@ -999,7 +1008,7 @@ class SkeletonTickerRow extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: AppSpacing.sm),
+          const SizedBox(width: AppSpace.sm),
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: const [

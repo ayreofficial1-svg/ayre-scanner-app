@@ -15,7 +15,8 @@ abstract final class AppBreakpoints {
   /// Widest the Fold's expanded dock is allowed to get before it centres.
   static const double dockMaxWidth = 480;
 
-  static double _width(BuildContext context) => MediaQuery.sizeOf(context).width;
+  static double _width(BuildContext context) =>
+      MediaQuery.sizeOf(context).width;
 
   /// Column count for list/card grids.
   ///

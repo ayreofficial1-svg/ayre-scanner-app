@@ -87,7 +87,8 @@ class AyreIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final resolved = color ?? IconTheme.of(context).color ?? const Color(0xFF000000);
+    final resolved =
+        color ?? IconTheme.of(context).color ?? const Color(0xFF000000);
     final icon = SizedBox(
       width: size,
       height: size,
@@ -145,10 +146,18 @@ class _AyreIconPainter extends CustomPainter {
         // A terminal window: a framed panel with a header rule.
         _rect(c, s, f, 4, 5, 16, 14, r: 2);
         c.drawLine(const Offset(4, 10), const Offset(20, 10), s);
-        if (!filled) c.drawLine(const Offset(7.5, 7.5), const Offset(8.5, 7.5), s);
+        if (!filled) {
+          c.drawLine(const Offset(7.5, 7.5), const Offset(8.5, 7.5), s);
+        }
       case AyreGlyph.signals:
         // Ascending signal bars — the scanner's output, not a generic chart.
-        _bars(c, s, f, const [7.0, 11.0, 15.0, 19.0], const [17.0, 13.5, 15.5, 8.0]);
+        _bars(
+          c,
+          s,
+          f,
+          const [7.0, 11.0, 15.0, 19.0],
+          const [17.0, 13.5, 15.5, 8.0],
+        );
       case AyreGlyph.insights:
         // A breadth meter: a scale with a marker on it.
         _rect(c, s, f, 3, 9, 18, 6, r: 1.5);
@@ -170,7 +179,10 @@ class _AyreIconPainter extends CustomPainter {
           c.drawCircle(const Offset(12, 9), 3.6, f);
           final path = Path()
             ..moveTo(5.5, 20.5)
-            ..arcToPoint(const Offset(18.5, 20.5), radius: const Radius.circular(7.5))
+            ..arcToPoint(
+              const Offset(18.5, 20.5),
+              radius: const Radius.circular(7.5),
+            )
             ..close();
           c.drawPath(path, f);
         } else {
@@ -313,8 +325,16 @@ class _AyreIconPainter extends CustomPainter {
         // A composite instrument: a scale with three plotted marks.
         c.drawLine(const Offset(4, 19), const Offset(20, 19), s);
         c.drawLine(const Offset(4, 19), const Offset(4, 5), s);
-        _bars(c, s, f, const [8.0, 12.5, 17.0], const [14.0, 9.0, 11.5],
-            baseline: 19, width: 2.6, forceFill: true);
+        _bars(
+          c,
+          s,
+          f,
+          const [8.0, 12.5, 17.0],
+          const [14.0, 9.0, 11.5],
+          baseline: 19,
+          width: 2.6,
+          forceFill: true,
+        );
       case AyreGlyph.equity:
         _rect(c, s, f, 4, 4, 16, 16, r: 2, forceStroke: true);
         c.drawPath(
@@ -374,7 +394,10 @@ class _AyreIconPainter extends CustomPainter {
         c.drawPath(
           Path()
             ..moveTo(12, 4.8)
-            ..arcToPoint(const Offset(12, 19.2), radius: const Radius.circular(7.2))
+            ..arcToPoint(
+              const Offset(12, 19.2),
+              radius: const Radius.circular(7.2),
+            )
             ..close(),
           f,
         );

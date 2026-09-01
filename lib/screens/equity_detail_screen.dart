@@ -64,7 +64,8 @@ class _EquityDetailScreenState extends State<EquityDetailScreen> {
     final t = context.tokens;
     final quote = _result?.value ?? widget.seed;
     // Only a hard failure with nothing to show at all takes over the screen.
-    final failedOutright = !_loading && _result?.isReady != true && quote == null;
+    final failedOutright =
+        !_loading && _result?.isReady != true && quote == null;
 
     return Scaffold(
       backgroundColor: t.background,
@@ -77,16 +78,16 @@ class _EquityDetailScreenState extends State<EquityDetailScreen> {
         title: Text(widget.symbol.toUpperCase()),
       ),
       body: RefreshIndicator(
-        color: t.citrineInk,
+        color: t.accentInk,
         backgroundColor: t.surface,
         onRefresh: _refresh,
         child: ContentWidth(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              AppSpacing.huge,
+              AppSpace.lg,
+              AppSpace.sm,
+              AppSpace.lg,
+              AppSpace.xxl,
             ),
             children: [
               if (_loading && quote == null)
@@ -95,9 +96,9 @@ class _EquityDetailScreenState extends State<EquityDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SkeletonBlock(width: 180, height: 14),
-                      SizedBox(height: AppSpacing.md),
+                      SizedBox(height: AppSpace.md),
                       SkeletonBlock(width: 150, height: 32),
-                      SizedBox(height: AppSpacing.lg),
+                      SizedBox(height: AppSpace.lg),
                       SkeletonBlock(height: 80, radius: AppRadius.panel),
                     ],
                   ),
@@ -110,11 +111,11 @@ class _EquityDetailScreenState extends State<EquityDetailScreen> {
                 )
               else if (quote != null) ...[
                 _EquityHeader(quote: quote, stale: _result?.stale ?? false),
-                const SizedBox(height: AppSpacing.xl),
+                const SizedBox(height: AppSpace.xl),
                 const SectionLabel(label: 'Key stats'),
                 _KeyStats(quote: quote),
                 if (_result?.isReady != true && !_loading) ...[
-                  const SizedBox(height: AppSpacing.md),
+                  const SizedBox(height: AppSpace.md),
                   // Partial state: the tapped row's values are still on screen,
                   // and this says plainly that the refresh didn't land.
                   StatePanel.failed(
@@ -146,7 +147,7 @@ class _EquityHeader extends StatelessWidget {
       accentEdge: true,
       padding: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.all(AppSpace.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -166,10 +167,13 @@ class _EquityHeader extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
+                const SizedBox(width: AppSpace.sm),
                 ShrinkTrailing(
                   child: stale
-                      ? const AyreChip(label: 'Delayed', tone: ChipTone.attention)
+                      ? const AyreChip(
+                          label: 'Delayed',
+                          tone: ChipTone.attention,
+                        )
                       : const AyreChip(
                           label: 'Live',
                           tone: ChipTone.live,
@@ -178,9 +182,9 @@ class _EquityHeader extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpace.sm),
             InkPanel(
-              padding: const EdgeInsets.all(AppSpacing.md),
+              padding: const EdgeInsets.all(AppSpace.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -194,7 +198,7 @@ class _EquityHeader extends StatelessWidget {
                       color: t.onInkPanel,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: AppSpace.xs),
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
@@ -205,13 +209,13 @@ class _EquityHeader extends StatelessWidget {
                           fontSize: 13,
                           color: t.onInkPanel.withValues(alpha: 0.75),
                         ),
-                        const SizedBox(width: AppSpacing.sm),
+                        const SizedBox(width: AppSpace.sm),
                         DeltaFigure(change: quote.percentChange, fontSize: 14),
                       ],
                     ),
                   ),
                   if (quote.trace.length >= 2) ...[
-                    const SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: AppSpace.md),
                     TickerTrace(
                       points: normaliseTrace(quote.trace),
                       height: 64,
@@ -223,7 +227,7 @@ class _EquityHeader extends StatelessWidget {
               ),
             ),
             if (stale) ...[
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpace.sm),
               const StaleNotice(),
             ],
           ],
@@ -262,8 +266,8 @@ class _KeyStats extends StatelessWidget {
 
     return AyreCard(
       child: Wrap(
-        spacing: AppSpacing.xxl,
-        runSpacing: AppSpacing.lg,
+        spacing: AppSpace.xxl,
+        runSpacing: AppSpace.lg,
         children: [
           for (final (label, value) in entries)
             SizedBox(

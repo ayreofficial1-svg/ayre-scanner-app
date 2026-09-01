@@ -12,7 +12,7 @@ import 'package:ayre_scanner/services/fault_injection.dart';
 import 'package:ayre_scanner/services/market_data_service.dart';
 import 'package:ayre_scanner/services/market_models.dart';
 import 'package:ayre_scanner/theme/app_theme.dart';
-import 'package:ayre_scanner/widgets/fold_nav.dart';
+import 'package:ayre_scanner/widgets/curved_nav_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -199,11 +199,11 @@ void main() {
     );
   });
 
-  group('the Fold', () {
-    // Five labelled destinations must fit legibly on the narrowest screen when
-    // expanded — the specific check §9.4 calls out.
+  group('the navigation bar', () {
     for (final scale in scales) {
-      testWidgets('expands legibly at 320pt · x$scale', (tester) async {
+      testWidgets('is always visible, icon-only, at 320pt · x$scale', (
+        tester,
+      ) async {
         tester.view.physicalSize = const Size(320, 568);
         tester.view.devicePixelRatio = 1.0;
         addTearDown(tester.view.reset);
@@ -217,27 +217,84 @@ void main() {
         );
         await tester.pump(const Duration(milliseconds: 900));
 
-        // Collapsed by default: one control, no labels.
-        expect(find.byKey(kFoldTriggerKey), findsOneWidget);
-        expect(find.text('Signals'), findsNothing);
-
-        await tester.tap(find.byKey(kFoldTriggerKey));
-        // The unfold is spring-driven, so it needs a run of frames rather than
-        // one long jump to cross the hand-off into the expanded row.
-        for (var i = 0; i < 40; i++) {
-          await tester.pump(const Duration(milliseconds: 16));
-        }
-
-        for (final destination in kFoldDestinations) {
+        // All five destinations are present without any interaction: there is no
+        // collapsed state to open.
+        for (final destination in kNavDestinations) {
           expect(
-            find.byKey(foldDestinationKey(destination.label)),
+            find.byKey(navDestinationKey(destination.label)),
             findsOneWidget,
-            reason: '${destination.label} must be present when expanded',
+            reason: '${destination.label} must always be on screen',
           );
         }
+
+        // Icons only — no destination renders its name as visible text.
+        for (final destination in kNavDestinations) {
+          expect(
+            find.descendant(
+              of: find.byKey(navDestinationKey(destination.label)),
+              matching: find.text(destination.label),
+            ),
+            findsNothing,
+            reason: '${destination.label} must not show a text label',
+          );
+        }
+
+        // ...but the name is still in the accessibility tree.
+        final handle = tester.ensureSemantics();
+        final semantics = tester.getSemantics(
+          find.byKey(navDestinationKey('Signals')),
+        );
+        expect(semantics.label, contains('Signals'));
+        // Disposed inline: the framework's end-of-test check runs before
+        // addTearDown callbacks would.
+        handle.dispose();
+
+        // Every target clears the 48dp minimum in both dimensions.
+        for (final destination in kNavDestinations) {
+          final size = tester.getSize(
+            find.byKey(navDestinationKey(destination.label)),
+          );
+          expect(
+            size.width,
+            greaterThanOrEqualTo(44),
+            reason: '${destination.label} target width',
+          );
+          expect(
+            size.height,
+            greaterThanOrEqualTo(48),
+            reason: '${destination.label} target height',
+          );
+        }
+
         expect(tester.takeException(), isNull);
       });
     }
+
+    testWidgets('the notch slides between destinations without jumping', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrap(
+          HomeShell(marketData: data()),
+          brightness: Brightness.dark,
+          scale: 1.0,
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 900));
+
+      await tester.tap(find.byKey(navDestinationKey('Learn')));
+      // Mid-flight: the shape is animating, and nothing has thrown.
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(tester.takeException(), isNull);
+
+      // A second tap mid-animation must re-target rather than restart.
+      await tester.tap(find.byKey(navDestinationKey('Home')));
+      await tester.pump(const Duration(milliseconds: 40));
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(tester.takeException(), isNull);
+    });
   });
 
   tearDownAll(() {

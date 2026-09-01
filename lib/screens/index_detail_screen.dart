@@ -106,16 +106,16 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
         title: Text(widget.index.label),
       ),
       body: RefreshIndicator(
-        color: t.citrineInk,
+        color: t.accentInk,
         backgroundColor: t.surface,
         onRefresh: _refresh,
         child: ContentWidth(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              AppSpacing.huge,
+              AppSpace.lg,
+              AppSpace.sm,
+              AppSpace.lg,
+              AppSpace.xxl,
             ),
             children: [
               if (_loadingQuote && quote == null)
@@ -124,9 +124,9 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SkeletonBlock(width: 150, height: 32),
-                      SizedBox(height: AppSpacing.md),
+                      SizedBox(height: AppSpace.md),
                       SkeletonBlock(width: 120, height: 12),
-                      SizedBox(height: AppSpacing.lg),
+                      SizedBox(height: AppSpace.lg),
                       SkeletonBlock(height: 90, radius: AppRadius.panel),
                     ],
                   ),
@@ -139,7 +139,7 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
                 )
               else
                 _IndexHeader(quote: quote, stale: _quote?.stale ?? false),
-              const SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpace.xl),
               SectionLabel(
                 label: 'Constituents',
                 trailing: _constituents?.isReady == true
@@ -154,7 +154,7 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
               ),
               if (_loadingConstituents)
                 const AyreCard(
-                  padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                  padding: EdgeInsets.symmetric(vertical: AppSpace.xs),
                   child: Column(
                     children: [
                       SkeletonTickerRow(),
@@ -182,7 +182,7 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
                   child: Column(
                     children: [
                       for (final (i, row) in _sorted.indexed) ...[
-                        if (i > 0) const HairlineDivider(indent: AppSpacing.md),
+                        if (i > 0) const HairlineDivider(indent: AppSpace.md),
                         TickerRow(
                           symbol: row.symbol,
                           name: row.name == row.symbol ? null : row.name,
@@ -229,7 +229,7 @@ class _IndexHeader extends StatelessWidget {
       accentEdge: true,
       padding: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.all(AppSpace.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -243,10 +243,13 @@ class _IndexHeader extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
+                const SizedBox(width: AppSpace.sm),
                 ShrinkTrailing(
                   child: stale
-                      ? const AyreChip(label: 'Delayed', tone: ChipTone.attention)
+                      ? const AyreChip(
+                          label: 'Delayed',
+                          tone: ChipTone.attention,
+                        )
                       : const AyreChip(
                           label: 'Live',
                           tone: ChipTone.live,
@@ -255,9 +258,9 @@ class _IndexHeader extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpace.sm),
             InkPanel(
-              padding: const EdgeInsets.all(AppSpacing.md),
+              padding: const EdgeInsets.all(AppSpace.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -271,7 +274,7 @@ class _IndexHeader extends StatelessWidget {
                       color: t.onInkPanel,
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: AppSpace.xs),
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
@@ -282,13 +285,13 @@ class _IndexHeader extends StatelessWidget {
                           fontSize: 13,
                           color: t.onInkPanel.withValues(alpha: 0.75),
                         ),
-                        const SizedBox(width: AppSpacing.sm),
+                        const SizedBox(width: AppSpace.sm),
                         DeltaFigure(change: quote.percentChange, fontSize: 14),
                       ],
                     ),
                   ),
                   if (quote.trace.length >= 2) ...[
-                    const SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: AppSpace.md),
                     TickerTrace(
                       points: normaliseTrace(quote.trace),
                       height: 76,
@@ -300,13 +303,13 @@ class _IndexHeader extends StatelessWidget {
               ),
             ),
             if (stale) ...[
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpace.sm),
               const StaleNotice(),
             ],
             if (quote.dayLow != null ||
                 quote.dayHigh != null ||
                 quote.previousClose != null) ...[
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpace.md),
               _StatsGrid(quote: quote),
             ],
           ],
@@ -335,8 +338,8 @@ class _StatsGrid extends StatelessWidget {
     if (entries.isEmpty) return const SizedBox.shrink();
 
     return Wrap(
-      spacing: AppSpacing.xl,
-      runSpacing: AppSpacing.md,
+      spacing: AppSpace.xl,
+      runSpacing: AppSpace.md,
       children: [
         for (final (label, value) in entries)
           LabelledFigure(label: label, value: value, fontSize: 13),
@@ -382,7 +385,7 @@ class _SortControl extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(_label(sort), style: AppTypo.label(t)),
-            const SizedBox(width: AppSpacing.xs),
+            const SizedBox(width: AppSpace.xs),
             AyreIcon(AyreGlyph.sort, size: 14, color: t.textTertiary),
           ],
         ),

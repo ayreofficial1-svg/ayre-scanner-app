@@ -10,7 +10,7 @@ library;
 enum IndexId {
   nifty50(id: 'NIFTY50', label: 'NIFTY 50', apiKey: 'nifty'),
   sensex(id: 'SENSEX', label: 'SENSEX', apiKey: 'sensex'),
-  bankNifty(id: 'BANKNIFTY', label: 'BANK NIFTY', apiKey: 'banknifty');
+  bankNifty(id: 'BANKNIFTY', label: 'BANK NIFTY', apiKey: 'bank_nifty');
 
   const IndexId({required this.id, required this.label, required this.apiKey});
 
@@ -78,7 +78,16 @@ class Quote {
     ]);
     if (symbol == null || symbol.isEmpty || last == null) return null;
 
-    final change = _num(json, const ['change', 'net_change', 'netChange']);
+    // `change_points` is what the backend calls the absolute change on a
+    // constituent row; its `change` field is the *percentage*, so it must not be
+    // read as an absolute here.
+    final change = _num(json, const [
+      'change_points',
+      'changePoints',
+      'points',
+      'net_change',
+      'netChange',
+    ]);
     final percent = _num(json, const [
       'percentChange',
       'percent_change',
@@ -88,22 +97,30 @@ class Quote {
     // A readout with no direction is not a readout; require at least one of the
     // two change figures and derive the other where possible.
     if (change == null && percent == null) return null;
-    final previous = _num(json, const ['previousClose', 'previous_close', 'prevClose']);
-    final resolvedChange = change ??
+    final previous = _num(json, const [
+      'previousClose',
+      'previous_close',
+      'prevClose',
+    ]);
+    final resolvedChange =
+        change ??
         (previous != null ? last - previous : (last * percent! / 100));
-    final resolvedPercent = percent ??
+    final resolvedPercent =
+        percent ??
         (previous != null && previous != 0
             ? (resolvedChange / previous) * 100
             : 0);
 
     return Quote(
       symbol: symbol,
-      name: _str(json, const ['name', 'companyName', 'company_name', 'label']) ??
+      name:
+          _str(json, const ['name', 'companyName', 'company_name', 'label']) ??
           symbol,
       lastPrice: last,
       change: resolvedChange,
       percentChange: resolvedPercent,
-      asOf: _time(json, const ['asOf', 'as_of', 'updated_at', 'timestamp']) ??
+      asOf:
+          _time(json, const ['asOf', 'as_of', 'updated_at', 'timestamp']) ??
           DateTime.now(),
       previousClose: previous,
       dayLow: _num(json, const ['dayLow', 'day_low', 'low']),
@@ -151,7 +168,8 @@ class Sentiment {
     if (score == null) return null;
     return Sentiment(
       score: score.round().clamp(0, 100),
-      asOf: _time(json, const ['asOf', 'as_of', 'updated_at', 'timestamp']) ??
+      asOf:
+          _time(json, const ['asOf', 'as_of', 'updated_at', 'timestamp']) ??
           DateTime.now(),
       note: _str(json, const ['note', 'summary', 'commentary']),
       advances: _num(json, const ['advances', 'advancing'])?.round(),
@@ -194,20 +212,27 @@ class Signal {
   static Signal? tryParse(Map<String, dynamic> json) {
     final symbol = _str(json, const ['symbol', 'ticker', 'scrip']);
     if (symbol == null || symbol.isEmpty) return null;
-    final percent = _num(json, const ['change_pct', 'percentChange', 'percent_change']);
+    final percent = _num(json, const [
+      'change_pct',
+      'percentChange',
+      'percent_change',
+    ]);
     final bias = _str(json, const ['bias', 'direction', 'side'])?.toLowerCase();
     return Signal(
       symbol: symbol,
-      rationale: _str(json, const ['rationale', 'reason', 'note', 'body']) ?? '',
+      rationale:
+          _str(json, const ['rationale', 'reason', 'note', 'body']) ?? '',
       name: _str(json, const ['name', 'companyName', 'company_name']),
       lastPrice: _num(json, const ['last_price', 'lastPrice', 'ltp', 'price']),
       percentChange: percent,
       entry: _num(json, const ['entry', 'entry_price']),
       target: _num(json, const ['target', 'target_price']),
       stop: _num(json, const ['stop', 'stop_loss', 'stoploss']),
-      strength: _num(json, const ['strength', 'score', 'conviction'])
-          ?.round()
-          .clamp(0, 4),
+      strength: _num(json, const [
+        'strength',
+        'score',
+        'conviction',
+      ])?.round().clamp(0, 4),
       bullish: bias != null
           ? (bias == 'long' || bias == 'buy' || bias == 'bullish')
           : (percent ?? 0) >= 0,
@@ -244,10 +269,19 @@ class Course {
     if (title == null || title.isEmpty) return null;
     return Course(
       title: title,
-      category: _str(json, const ['category', 'eyebrow', 'subject']) ?? 'Lesson',
+      category:
+          _str(json, const ['category', 'eyebrow', 'subject']) ?? 'Lesson',
       body: _str(json, const ['body', 'description', 'summary']) ?? '',
-      lessonsTotal: _num(json, const ['lessons', 'lessons_total', 'total'])?.round(),
-      lessonsDone: _num(json, const ['completed', 'lessons_done', 'done'])?.round(),
+      lessonsTotal: _num(json, const [
+        'lessons',
+        'lessons_total',
+        'total',
+      ])?.round(),
+      lessonsDone: _num(json, const [
+        'completed',
+        'lessons_done',
+        'done',
+      ])?.round(),
     );
   }
 }
@@ -293,7 +327,9 @@ num? _num(Map<String, dynamic> json, List<String> keys) {
     final value = json[key];
     if (value is num) return value;
     if (value is String) {
-      final parsed = num.tryParse(value.replaceAll(',', '').replaceAll('%', '').trim());
+      final parsed = num.tryParse(
+        value.replaceAll(',', '').replaceAll('%', '').trim(),
+      );
       if (parsed != null) return parsed;
     }
   }

@@ -52,7 +52,7 @@ class _LearnTabState extends State<LearnTab> {
     final columns = AppBreakpoints.columns(context);
 
     return RefreshIndicator(
-      color: t.citrineInk,
+      color: t.accentInk,
       backgroundColor: t.surface,
       onRefresh: _load,
       edgeOffset: 72,
@@ -60,9 +60,9 @@ class _LearnTabState extends State<LearnTab> {
         maxWidth: columns > 1 ? 960 : null,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
+            AppSpace.lg,
+            AppSpace.lg,
+            AppSpace.lg,
             120,
           ),
           children: [
@@ -73,9 +73,9 @@ class _LearnTabState extends State<LearnTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('TRADING LIBRARY', style: AppTypo.label(t)),
-                    const SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpace.xs),
                     Text('My courses', style: AppTypo.pageTitle(t)),
-                    const SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: AppSpace.md),
                     Row(
                       children: [
                         LabelledFigure(
@@ -83,7 +83,7 @@ class _LearnTabState extends State<LearnTab> {
                           value: '$subjects',
                           fontSize: 16,
                         ),
-                        const SizedBox(width: AppSpacing.xxl),
+                        const SizedBox(width: AppSpace.xxl),
                         LabelledFigure(
                           label: 'Courses',
                           value: '${courses.length}',
@@ -95,10 +95,10 @@ class _LearnTabState extends State<LearnTab> {
                 ),
               ),
             ),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpace.xl),
             if (_loading)
               const AyreCard(
-                padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                padding: EdgeInsets.symmetric(vertical: AppSpace.xs),
                 child: Column(
                   children: [
                     SkeletonTickerRow(),
@@ -123,7 +123,7 @@ class _LearnTabState extends State<LearnTab> {
                 child: Column(
                   children: [
                     for (final (i, course) in courses.indexed) ...[
-                      if (i > 0) const HairlineDivider(indent: AppSpacing.md),
+                      if (i > 0) const HairlineDivider(indent: AppSpace.md),
                       _CourseRow(course: course, onTap: () => _open(course)),
                     ],
                   ],
@@ -139,8 +139,8 @@ class _LearnTabState extends State<LearnTab> {
                 itemCount: courses.length,
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: columns,
-                  mainAxisSpacing: AppSpacing.md,
-                  crossAxisSpacing: AppSpacing.md,
+                  mainAxisSpacing: AppSpace.md,
+                  crossAxisSpacing: AppSpace.md,
                   // Height driven by content rather than a fixed extent, so a
                   // large accessibility text scale grows the tile instead of
                   // overflowing it.
@@ -162,9 +162,9 @@ class _LearnTabState extends State<LearnTab> {
 
   void _open(Course course) {
     HapticFeedback.selectionClick();
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => LessonScreen(course: course)),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => LessonScreen(course: course)));
   }
 }
 
@@ -182,7 +182,7 @@ class _CourseRow extends StatelessWidget {
     return PressableScaleRow(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.all(AppSpace.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -190,7 +190,7 @@ class _CourseRow extends StatelessWidget {
             Row(
               children: [
                 AyreIcon(AyreGlyph.course, size: 17, color: t.textTertiary),
-                const SizedBox(width: AppSpacing.sm),
+                const SizedBox(width: AppSpace.sm),
                 Expanded(
                   child: Text(
                     course.category.toUpperCase(),
@@ -202,7 +202,7 @@ class _CourseRow extends StatelessWidget {
                 AyreIcon(AyreGlyph.forward, size: 14, color: t.textTertiary),
               ],
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpace.sm),
             Text(
               course.title,
               style: AppTypo.cardTitle(t),
@@ -210,16 +210,16 @@ class _CourseRow extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             if (progress != null) ...[
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpace.sm),
               ProgressRule(value: progress),
-              const SizedBox(height: AppSpacing.xs),
+              const SizedBox(height: AppSpace.xs),
               Figure.static(
                 '${course.lessonsDone}/${course.lessonsTotal} lessons',
                 fontSize: 11,
                 color: t.textTertiary,
               ),
             ] else if (course.body.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xs),
+              const SizedBox(height: AppSpace.xs),
               Text(
                 course.body,
                 style: AppTypo.body(t),
@@ -252,9 +252,9 @@ class PressableScaleRow extends StatelessWidget {
       color: AppTheme.transparent,
       child: InkWell(
         onTap: onTap,
-        hoverColor: context.tokens.citrine.withValues(alpha: 0.05),
-        splashColor: context.tokens.citrine.withValues(alpha: 0.06),
-        highlightColor: context.tokens.citrine.withValues(alpha: 0.03),
+        hoverColor: context.tokens.accent.withValues(alpha: 0.05),
+        splashColor: context.tokens.accent.withValues(alpha: 0.06),
+        highlightColor: context.tokens.accent.withValues(alpha: 0.03),
         child: child,
       ),
     );

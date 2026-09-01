@@ -76,11 +76,28 @@ abstract interface class MarketDataService {
 
 /// Reads every surface from the Ayre backend.
 ///
-/// Endpoint paths are declared in one place here so the backend contract is
-/// legible and changeable without hunting through screens. Each call is guarded
-/// by [FaultInjector] so QA can force any of the seven conditions per surface.
+/// The endpoint map below was verified against the backend source rather than
+/// assumed. Three consequences shaped this class:
+///
+///  * **`/api/market` reports change as a percentage.** Its `change` field is
+///    `percentChange` and `points` is the absolute move — the opposite of the
+///    conventional naming. Read the wrong way round, the app showed a percentage
+///    where an absolute belonged and then derived a nonsense percentage from it.
+///
+///  * **There are no movers endpoints.** No `/gainers`, `/losers` or
+///    `/most-active` exists anywhere in the backend. They are derived here from
+///    the constituents endpoint, which returns 50 stocks with `change_pct` and
+///    `volume` — so Insights works end to end with no backend change.
+///
+///  * **`/api/sentiment` has no advance/decline counts.** It returns a single
+///    stored number. Since v3's Home leads with Advances and Declines, those are
+///    counted from the constituents data — which is what market breadth actually
+///    is — rather than left permanently unavailable.
+///
+/// Derived values are cached briefly so one screen doesn't fetch the same
+/// constituent list several times over.
 class RemoteMarketDataService implements MarketDataService {
-  const RemoteMarketDataService({
+  RemoteMarketDataService({
     this.baseUrl = ApiService.baseUrl,
     this.timeout = const Duration(seconds: 12),
     this.cadence = const Duration(minutes: 5),
@@ -92,114 +109,198 @@ class RemoteMarketDataService implements MarketDataService {
   /// How old a reading may be before its section is flagged as delayed.
   final Duration cadence;
 
-  // ── Endpoint contract ────────────────────────────────────────────────────
-  static const _indexBoard = '/api/market';
+  // ── Endpoint contract, as the backend actually exposes it ────────────────
+  static const _market = '/api/market';
   static const _sentiment = '/api/sentiment';
   static const _signals = '/api/signals';
   static const _courses = '/api/learn';
   static const _insightNotes = '/api/insights';
-  static String _index(IndexId i) => '/api/market/indices/${i.id.toLowerCase()}';
   static String _constituents(IndexId i) =>
-      '/api/market/indices/${i.id.toLowerCase()}/constituents';
-  static String _equity(String symbol) =>
-      '/api/market/equities/${Uri.encodeComponent(symbol.toUpperCase())}';
-  static const _gainers = '/api/market/gainers';
-  static const _losers = '/api/market/losers';
-  static const _mostActive = '/api/market/most-active';
+      '/api/market/${i.apiKey}/constituents';
+
+  /// Constituent lists are the source for movers, breadth and equity lookups,
+  /// so they are cached for a short window to keep one screen to one fetch.
+  static const _cacheTtl = Duration(seconds: 45);
+  final Map<IndexId, (DateTime, List<Quote>)> _constituentCache = {};
 
   @override
   Future<DataResult<List<Quote>>> getIndexBoard() {
-    return _listOrQuoteMap(
-      surface: DataSurface.indexBoard,
-      path: _indexBoard,
-      rootKeys: const ['indices', 'index_board', 'data'],
-      // The board is a fixed set of instruments; when the payload is a plain map
-      // keyed by index name, pull the three we show.
-      fromMap: (map) {
-        final out = <Quote>[];
-        for (final index in IndexId.values) {
-          final raw = map[index.apiKey] ??
-              map[index.apiKey.toUpperCase()] ??
-              map[index.id] ??
-              map[index.id.toLowerCase()];
-          if (raw is Map) {
-            final quote = Quote.tryParse(
-              raw.cast<String, dynamic>(),
-              fallbackSymbol: index.id,
-            );
-            if (quote != null) {
-              out.add(_named(quote, index.label));
-            }
-          }
-        }
-        return out;
-      },
+    return _run(DataSurface.indexBoard, () async {
+      final decoded = jsonDecode(await _get(_market));
+      if (decoded is! Map<String, dynamic>) throw const DataFailure.malformed();
+      final raw = decoded['markets'];
+      if (raw is! List) throw const DataFailure.malformed();
+
+      final asOf =
+          DateTime.tryParse(decoded['updated_at']?.toString() ?? '') ??
+          DateTime.now();
+
+      final byKey = <String, Quote>{};
+      for (final entry in raw) {
+        if (entry is! Map) continue;
+        final quote = _parseMarketRow(entry.cast<String, dynamic>(), asOf);
+        if (quote != null) byKey[quote.symbol] = quote;
+      }
+
+      // Fixed display order, and only the three instruments Home shows.
+      final rows = [
+        for (final index in IndexId.values)
+          if (byKey[index.id] != null) byKey[index.id]!,
+      ];
+      if (rows.isEmpty) return const DataResult<List<Quote>>.empty();
+      return DataResult.ready(
+        rows,
+        stale: _isStale(asOf, DataSurface.indexBoard),
+      );
+    }, onEmpty: () => const DataResult<List<Quote>>.empty());
+  }
+
+  /// One row of `/api/market`'s `markets` list.
+  ///
+  /// `change` is a percentage and `points` is the absolute move. Handled here
+  /// explicitly so the inversion can't be reintroduced by a generic parser.
+  Quote? _parseMarketRow(Map<String, dynamic> json, DateTime asOf) {
+    final key = json['key']?.toString();
+    final level = _asNum(json['value']);
+    if (key == null || level == null) return null;
+
+    final index = IndexId.values
+        .where((i) => i.apiKey == key)
+        .cast<IndexId?>()
+        .firstWhere((_) => true, orElse: () => null);
+
+    final percent = _asNum(json['change']) ?? 0;
+    final points = _asNum(json['points']) ?? (level * percent / 100);
+
+    return Quote(
+      symbol: index?.id ?? key.toUpperCase(),
+      // Prefer our own label so the board reads consistently with the rest of
+      // the app, and fall back to whatever the feed called it.
+      name: index?.label ?? (json['name']?.toString() ?? key),
+      lastPrice: level,
+      change: points,
+      percentChange: percent,
+      asOf: asOf,
     );
   }
 
   @override
-  Future<DataResult<Quote>> getIndex(IndexId index) {
-    return _single(
-      surface: DataSurface.indexDetail,
-      path: _index(index),
-      fallbackSymbol: index.id,
-      rename: index.label,
-    );
+  Future<DataResult<Quote>> getIndex(IndexId index) async {
+    // There is no per-index endpoint; the board carries every index's reading.
+    final board = await getIndexBoard();
+    if (board.isFailed) return DataResult.failed(board.failure!);
+    final match = board.value?.where((q) => q.symbol == index.id);
+    if (match == null || match.isEmpty) return const DataResult<Quote>.empty();
+    return DataResult.ready(match.first, stale: board.stale);
   }
 
   @override
   Future<DataResult<List<Quote>>> getConstituents(IndexId index) {
-    return _quoteList(
-      surface: DataSurface.indexConstituents,
-      path: _constituents(index),
-      rootKeys: const ['constituents', 'equities', 'data'],
-    );
+    return _run(DataSurface.indexConstituents, () async {
+      final rows = await _fetchConstituents(index);
+      if (rows.isEmpty) return const DataResult<List<Quote>>.empty();
+      return DataResult.ready(
+        rows,
+        stale: _isStale(_newest(rows), DataSurface.indexConstituents),
+      );
+    }, onEmpty: () => const DataResult<List<Quote>>.empty());
   }
 
   @override
   Future<DataResult<Quote>> getEquity(String symbol) {
-    return _single(
-      surface: DataSurface.equityDetail,
-      path: _equity(symbol),
-      fallbackSymbol: symbol.toUpperCase(),
-    );
+    return _run(DataSurface.equityDetail, () async {
+      // No per-equity endpoint exists. `/api/quotes` carries only a last price
+      // for signal/watchlist symbols, which isn't enough for the stats block, so
+      // the constituent rows — which do carry name, range and volume — are the
+      // source instead.
+      final wanted = symbol.toUpperCase();
+      for (final index in IndexId.values) {
+        final rows = await _fetchConstituents(index);
+        final match = rows.where((q) => q.symbol.toUpperCase() == wanted);
+        if (match.isNotEmpty) {
+          return DataResult.ready(
+            match.first,
+            stale: _isStale(match.first.asOf, DataSurface.equityDetail),
+          );
+        }
+      }
+      return const DataResult<Quote>.empty();
+    }, onEmpty: () => const DataResult<Quote>.empty());
   }
 
   @override
-  Future<DataResult<List<Quote>>> getTopGainers() => _quoteList(
-    surface: DataSurface.gainers,
-    path: _gainers,
-    rootKeys: const ['gainers', 'data'],
-    sort: (a, b) => b.percentChange.compareTo(a.percentChange),
+  Future<DataResult<List<Quote>>> getTopGainers() => _movers(
+    DataSurface.gainers,
+    (a, b) => b.percentChange.compareTo(a.percentChange),
+    keep: (q) => q.percentChange > 0,
   );
 
   @override
-  Future<DataResult<List<Quote>>> getTopLosers() => _quoteList(
-    surface: DataSurface.losers,
-    path: _losers,
-    rootKeys: const ['losers', 'data'],
-    sort: (a, b) => a.percentChange.compareTo(b.percentChange),
+  Future<DataResult<List<Quote>>> getTopLosers() => _movers(
+    DataSurface.losers,
+    (a, b) => a.percentChange.compareTo(b.percentChange),
+    keep: (q) => q.percentChange < 0,
   );
 
   @override
-  Future<DataResult<List<Quote>>> getMostActive() => _quoteList(
-    surface: DataSurface.mostActive,
-    path: _mostActive,
-    rootKeys: const ['most_active', 'mostActive', 'data'],
-    requireVolume: true,
-    sort: (a, b) => (b.volume ?? 0).compareTo(a.volume ?? 0),
+  Future<DataResult<List<Quote>>> getMostActive() => _movers(
+    DataSurface.mostActive,
+    (a, b) => (b.volume ?? 0).compareTo(a.volume ?? 0),
+    keep: (q) => q.volume != null && q.volume! > 0,
   );
 
+  /// Movers are ranked across every index's constituents, de-duplicated by
+  /// symbol, because no movers endpoint exists to ask.
+  Future<DataResult<List<Quote>>> _movers(
+    DataSurface surface,
+    Comparator<Quote> order, {
+    required bool Function(Quote) keep,
+  }) {
+    return _run(surface, () async {
+      final rows = await _allConstituents();
+      final eligible = rows.where(keep).toList()..sort(order);
+      if (eligible.isEmpty) return const DataResult<List<Quote>>.empty();
+      return DataResult.ready(
+        eligible.take(10).toList(),
+        stale: _isStale(_newest(rows), surface),
+      );
+    }, onEmpty: () => const DataResult<List<Quote>>.empty());
+  }
+
   @override
-  Future<DataResult<Sentiment>> getSentiment({required bool monthly}) async {
+  Future<DataResult<Sentiment>> getSentiment({required bool monthly}) {
     return _run(DataSurface.sentiment, () async {
-      final body = await _get('$_sentiment?window=${monthly ? 'monthly' : 'weekly'}');
-      final decoded = jsonDecode(body);
+      final decoded = jsonDecode(await _get(_sentiment));
       if (decoded is! Map<String, dynamic>) throw const DataFailure.malformed();
       final parsed = Sentiment.tryParse(decoded);
       if (parsed == null) throw const DataFailure.malformed();
+
+      // The endpoint carries no advance/decline counts, so they are counted
+      // from real per-stock changes rather than shown as unavailable. If the
+      // constituent fetch fails, the score still renders on its own.
+      int? advances;
+      int? declines;
+      int? unchanged;
+      try {
+        final rows = await _allConstituents();
+        if (rows.isNotEmpty) {
+          advances = rows.where((q) => q.percentChange > 0).length;
+          declines = rows.where((q) => q.percentChange < 0).length;
+          unchanged = rows.where((q) => q.percentChange == 0).length;
+        }
+      } on DataFailure {
+        // Breadth is a bonus here; a failed count must not fail the reading.
+      }
+
       return DataResult.ready(
-        parsed,
+        Sentiment(
+          score: parsed.score,
+          asOf: parsed.asOf,
+          note: parsed.note,
+          advances: advances ?? parsed.advances,
+          declines: declines ?? parsed.declines,
+          unchanged: unchanged ?? parsed.unchanged,
+        ),
         stale: _isStale(parsed.asOf, DataSurface.sentiment),
       );
     }, onEmpty: () => const DataResult<Sentiment>.empty());
@@ -237,19 +338,55 @@ class RemoteMarketDataService implements MarketDataService {
 
   // ── Plumbing ─────────────────────────────────────────────────────────────
 
-  Quote _named(Quote quote, String name) => Quote(
-    symbol: quote.symbol,
-    name: name,
-    lastPrice: quote.lastPrice,
-    change: quote.change,
-    percentChange: quote.percentChange,
-    asOf: quote.asOf,
-    previousClose: quote.previousClose,
-    dayLow: quote.dayLow,
-    dayHigh: quote.dayHigh,
-    volume: quote.volume,
-    trace: quote.trace,
-  );
+  Future<List<Quote>> _fetchConstituents(IndexId index) async {
+    final cached = _constituentCache[index];
+    if (cached != null && DateTime.now().difference(cached.$1) < _cacheTtl) {
+      return cached.$2;
+    }
+
+    final decoded = jsonDecode(await _get(_constituents(index)));
+    if (decoded is! Map<String, dynamic>) throw const DataFailure.malformed();
+    final raw = decoded['stocks'];
+    if (raw is! List) throw const DataFailure.malformed();
+
+    final asOf =
+        DateTime.tryParse(decoded['updated_at']?.toString() ?? '') ??
+        DateTime.now();
+
+    final rows = <Quote>[];
+    for (final entry in raw) {
+      if (entry is! Map) continue;
+      final json = entry.cast<String, dynamic>();
+      final quote = Quote.tryParse({...json, 'asOf': asOf.toIso8601String()});
+      if (quote != null) rows.add(quote);
+    }
+    _constituentCache[index] = (DateTime.now(), rows);
+    return rows;
+  }
+
+  /// Every index's constituents, de-duplicated by symbol. A single index failing
+  /// does not sink the whole set.
+  Future<List<Quote>> _allConstituents() async {
+    final bySymbol = <String, Quote>{};
+    var failures = 0;
+    for (final index in IndexId.values) {
+      try {
+        for (final quote in await _fetchConstituents(index)) {
+          bySymbol.putIfAbsent(quote.symbol.toUpperCase(), () => quote);
+        }
+      } on DataFailure {
+        failures++;
+      }
+    }
+    if (bySymbol.isEmpty && failures > 0) throw const DataFailure.api();
+    return bySymbol.values.toList();
+  }
+
+  static num? _asNum(Object? value) {
+    if (value is num) return value;
+    if (value is String) return num.tryParse(value.replaceAll(',', '').trim());
+    return null;
+  }
 
   /// Every HTTP concern lives here: the session cookie, the timeout, and the
   /// mapping from transport outcomes onto [DataFailure].
@@ -259,11 +396,13 @@ class RemoteMarketDataService implements MarketDataService {
           .get(Uri.parse('$baseUrl$path'), headers: ApiService.authHeaders())
           .timeout(timeout);
       if (response.statusCode == 401 || response.statusCode == 403) {
+        ApiService.notifySessionExpired();
         throw const DataFailure.session();
       }
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw DataFailure.api(statusCode: response.statusCode);
       }
+      ApiService.notifyReachable(true);
       return response.body;
     } on DataFailure {
       rethrow;
@@ -271,6 +410,7 @@ class RemoteMarketDataService implements MarketDataService {
       throw const DataFailure.timeout();
     } catch (_) {
       // DNS failure, socket error, malformed URL — all "we couldn't reach it".
+      ApiService.notifyReachable(false);
       throw const DataFailure.offline();
     }
   }
@@ -301,88 +441,6 @@ class RemoteMarketDataService implements MarketDataService {
     }
   }
 
-  List<dynamic> _rootList(Object? decoded, List<String> rootKeys) {
-    if (decoded is List) return decoded;
-    if (decoded is Map<String, dynamic>) {
-      for (final key in rootKeys) {
-        final value = decoded[key];
-        if (value is List) return value;
-      }
-    }
-    throw const DataFailure.malformed();
-  }
-
-  Future<DataResult<List<Quote>>> _quoteList({
-    required DataSurface surface,
-    required String path,
-    required List<String> rootKeys,
-    Comparator<Quote>? sort,
-    bool requireVolume = false,
-  }) {
-    return _run(surface, () async {
-      final decoded = jsonDecode(await _get(path));
-      final rows = <Quote>[];
-      for (final entry in _rootList(decoded, rootKeys)) {
-        if (entry is! Map) continue;
-        final quote = Quote.tryParse(entry.cast<String, dynamic>());
-        if (quote == null) continue;
-        if (requireVolume && quote.volume == null) continue;
-        rows.add(quote);
-      }
-      if (rows.isEmpty) return const DataResult<List<Quote>>.empty();
-      if (sort != null) rows.sort(sort);
-      return DataResult.ready(rows, stale: _isStale(_newest(rows), surface));
-    }, onEmpty: () => const DataResult<List<Quote>>.empty());
-  }
-
-  Future<DataResult<List<Quote>>> _listOrQuoteMap({
-    required DataSurface surface,
-    required String path,
-    required List<String> rootKeys,
-    required List<Quote> Function(Map<String, dynamic> map) fromMap,
-  }) {
-    return _run(surface, () async {
-      final decoded = jsonDecode(await _get(path));
-
-      List<Quote> rows;
-      if (decoded is Map<String, dynamic> &&
-          !rootKeys.any((k) => decoded[k] is List)) {
-        rows = fromMap(decoded);
-      } else {
-        rows = [
-          for (final entry in _rootList(decoded, rootKeys))
-            if (entry is Map)
-              ?Quote.tryParse(entry.cast<String, dynamic>()),
-        ];
-      }
-
-      if (rows.isEmpty) return const DataResult<List<Quote>>.empty();
-      return DataResult.ready(rows, stale: _isStale(_newest(rows), surface));
-    }, onEmpty: () => const DataResult<List<Quote>>.empty());
-  }
-
-  Future<DataResult<Quote>> _single({
-    required DataSurface surface,
-    required String path,
-    String? fallbackSymbol,
-    String? rename,
-  }) {
-    return _run(surface, () async {
-      final decoded = jsonDecode(await _get(path));
-      if (decoded is! Map<String, dynamic>) throw const DataFailure.malformed();
-      // Accept both a bare quote and one nested under a conventional key.
-      final raw = switch (decoded) {
-        {'quote': final Map<String, dynamic> q} => q,
-        {'data': final Map<String, dynamic> q} => q,
-        _ => decoded,
-      };
-      var quote = Quote.tryParse(raw, fallbackSymbol: fallbackSymbol);
-      if (quote == null) throw const DataFailure.malformed();
-      if (rename != null) quote = _named(quote, rename);
-      return DataResult.ready(quote, stale: _isStale(quote.asOf, surface));
-    }, onEmpty: () => const DataResult<Quote>.empty());
-  }
-
   Future<DataResult<List<T>>> _parsedList<T>({
     required DataSurface surface,
     required String path,
@@ -391,8 +449,21 @@ class RemoteMarketDataService implements MarketDataService {
   }) {
     return _run(surface, () async {
       final decoded = jsonDecode(await _get(path));
+      List<dynamic>? list;
+      if (decoded is List) {
+        list = decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        for (final key in rootKeys) {
+          if (decoded[key] is List) {
+            list = decoded[key] as List;
+            break;
+          }
+        }
+      }
+      if (list == null) throw const DataFailure.malformed();
+
       final rows = <T>[];
-      for (final entry in _rootList(decoded, rootKeys)) {
+      for (final entry in list) {
         if (entry is! Map) continue;
         final parsed = parse(entry.cast<String, dynamic>());
         if (parsed != null) rows.add(parsed);
@@ -402,7 +473,6 @@ class RemoteMarketDataService implements MarketDataService {
     }, onEmpty: () => DataResult<List<T>>.empty());
   }
 
-  DateTime _newest(List<Quote> rows) => rows
-      .map((r) => r.asOf)
-      .reduce((a, b) => a.isAfter(b) ? a : b);
+  DateTime _newest(List<Quote> rows) =>
+      rows.map((r) => r.asOf).reduce((a, b) => a.isAfter(b) ? a : b);
 }

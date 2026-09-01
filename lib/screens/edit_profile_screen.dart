@@ -71,7 +71,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         title: const Text('Edit profile'),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.md),
+            padding: const EdgeInsets.only(right: AppSpace.md),
             child: TextButton(
               onPressed: canSave
                   ? () {
@@ -83,7 +83,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 'Save',
                 style: AppTypo.button(
                   t,
-                  color: canSave ? t.citrineInk : t.textDisabled,
+                  color: canSave ? t.accentInk : t.textDisabled,
                 ),
               ),
             ),
@@ -93,10 +93,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       body: ContentWidth(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.md,
-            AppSpacing.lg,
-            AppSpacing.huge,
+            AppSpace.lg,
+            AppSpace.md,
+            AppSpace.lg,
+            AppSpace.xxl,
           ),
           children: [
             const SectionLabel(label: 'Display name'),
@@ -112,15 +112,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               onSubmitted: canSave ? (_) => _save() : null,
             ),
             if (widget.handle != null && widget.handle!.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpace.xl),
               const SectionLabel(label: 'Sign-in username'),
               AyreCard(
                 color: t.surfaceAlt,
-                padding: const EdgeInsets.all(AppSpacing.md),
+                padding: const EdgeInsets.all(AppSpace.md),
                 child: Row(
                   children: [
                     AyreIcon(AyreGlyph.lock, size: 16, color: t.textTertiary),
-                    const SizedBox(width: AppSpacing.md),
+                    const SizedBox(width: AppSpace.md),
                     Expanded(
                       child: Text(
                         widget.handle!,
@@ -130,7 +130,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.sm),
+              const SizedBox(height: AppSpace.sm),
               Text(
                 'Your username identifies the account and cannot be changed here.',
                 style: AppTypo.caption(t),

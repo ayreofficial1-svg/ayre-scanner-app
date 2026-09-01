@@ -10,8 +10,6 @@ import '../widgets/figure.dart';
 import '../widgets/state_views.dart';
 import 'equity_detail_screen.dart';
 
-enum _Window { weekly, monthly }
-
 /// Insights — the market intelligence desk.
 ///
 /// Sentiment, breadth and all three mover lists live here as one continuous feed:
@@ -30,8 +28,6 @@ class InsightsTab extends StatefulWidget {
 }
 
 class _InsightsTabState extends State<InsightsTab> {
-  _Window _window = _Window.weekly;
-
   DataResult<Sentiment>? _sentiment;
   DataResult<List<Quote>>? _gainers;
   DataResult<List<Quote>>? _losers;
@@ -48,7 +44,7 @@ class _InsightsTabState extends State<InsightsTab> {
   Future<void> _load({bool initial = false}) async {
     // Fired together so one slow section doesn't hold up the rest of the desk.
     final results = await Future.wait([
-      widget.marketData.getSentiment(monthly: _window == _Window.monthly),
+      widget.marketData.getSentiment(monthly: false),
       widget.marketData.getTopGainers(),
       widget.marketData.getTopLosers(),
       widget.marketData.getMostActive(),
@@ -67,21 +63,9 @@ class _InsightsTabState extends State<InsightsTab> {
   }
 
   Future<void> _reloadSentiment() async {
-    final result = await widget.marketData.getSentiment(
-      monthly: _window == _Window.monthly,
-    );
+    final result = await widget.marketData.getSentiment(monthly: false);
     if (!mounted) return;
     setState(() => _sentiment = result);
-  }
-
-  void _setWindow(_Window window) {
-    if (window == _window) return;
-    HapticFeedback.selectionClick();
-    setState(() {
-      _window = window;
-      _sentiment = null;
-    });
-    _reloadSentiment();
   }
 
   void _openEquity(Quote quote) {
@@ -102,16 +86,16 @@ class _InsightsTabState extends State<InsightsTab> {
     final t = context.tokens;
 
     return RefreshIndicator(
-      color: t.citrineInk,
+      color: t.accentInk,
       backgroundColor: t.surface,
       onRefresh: _load,
       edgeOffset: 72,
       child: ContentWidth(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
+            AppSpace.lg,
+            AppSpace.lg,
+            AppSpace.lg,
             120,
           ),
           children: [
@@ -122,7 +106,7 @@ class _InsightsTabState extends State<InsightsTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Insights', style: AppTypo.pageTitle(t)),
-                    const SizedBox(height: AppSpacing.xxs),
+                    const SizedBox(height: AppSpace.xxs),
                     Text(
                       "Breadth, sentiment, and the day's movers, in one feed.",
                       style: AppTypo.body(t),
@@ -131,23 +115,16 @@ class _InsightsTabState extends State<InsightsTab> {
                 ),
               ),
             ),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpace.xl),
 
             // ── Section 1: sentiment / breadth ──────────────────────────────
-            Entrance(
+            // The weekly/monthly toggle that used to sit here is gone: the
+            // backend stores a single sentiment value and accepts no window
+            // parameter, so both options returned identical data. Reinstate it
+            // when /api/sentiment genuinely supports a window.
+            const Entrance(
               index: 1,
-              child: SectionLabel(
-                label: 'Market sentiment',
-                trailing: AyreSegmented<_Window>(
-                  compact: true,
-                  value: _window,
-                  onChanged: _setWindow,
-                  segments: const [
-                    AyreSegment(value: _Window.weekly, label: 'Weekly'),
-                    AyreSegment(value: _Window.monthly, label: 'Monthly'),
-                  ],
-                ),
-              ),
+              child: SectionLabel(label: 'Market sentiment'),
             ),
             _SentimentSection(
               result: _loading ? null : _sentiment,
@@ -155,7 +132,7 @@ class _InsightsTabState extends State<InsightsTab> {
             ),
 
             // ── Sections 2–4: the movers lists ──────────────────────────────
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpace.xl),
             _MoversSection(
               label: 'Top gainers',
               result: _loading ? null : _gainers,
@@ -164,7 +141,7 @@ class _InsightsTabState extends State<InsightsTab> {
                   'No advancing equities reported for this session yet.',
               failedMessage: "Top Gainers didn't load.",
             ),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpace.xl),
             _MoversSection(
               label: 'Top losers',
               result: _loading ? null : _losers,
@@ -173,7 +150,7 @@ class _InsightsTabState extends State<InsightsTab> {
                   'No declining equities reported for this session yet.',
               failedMessage: "Top Losers didn't load.",
             ),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpace.xl),
             _MoversSection(
               label: 'Most active',
               result: _loading ? null : _mostActive,
@@ -185,11 +162,11 @@ class _InsightsTabState extends State<InsightsTab> {
 
             // ── Written notes, when the desk publishes them ─────────────────
             if (!_loading && _notes?.isReady == true) ...[
-              const SizedBox(height: AppSpacing.xl),
+              const SizedBox(height: AppSpace.xl),
               const SectionLabel(label: 'Desk notes'),
               for (final note in _notes!.value!) ...[
                 _NoteCard(note: note),
-                const SizedBox(height: AppSpacing.sm),
+                const SizedBox(height: AppSpace.sm),
               ],
             ],
           ],
@@ -215,9 +192,9 @@ class _SentimentSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SkeletonBlock(width: 110, height: 34),
-            SizedBox(height: AppSpacing.md),
+            SizedBox(height: AppSpace.md),
             SkeletonBlock(height: 10, radius: AppRadius.chip),
-            SizedBox(height: AppSpacing.md),
+            SizedBox(height: AppSpace.md),
             SkeletonBlock(width: 180, height: 10),
           ],
         ),
@@ -243,9 +220,9 @@ class _SentimentSection extends StatelessWidget {
 
     final sentiment = result!.value!;
     final tone = switch (sentiment.score) {
-      < 35 => t.garnet,
+      < 35 => t.loss,
       < 65 => t.textPrimary,
-      _ => t.jade,
+      _ => t.gain,
     };
 
     return AyreCard(
@@ -258,9 +235,9 @@ class _SentimentSection extends StatelessWidget {
             tone: tone,
           ),
           if (sentiment.advances != null || sentiment.declines != null) ...[
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpace.md),
             const HairlineDivider(),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpace.md),
             Row(
               children: [
                 Expanded(
@@ -269,7 +246,7 @@ class _SentimentSection extends StatelessWidget {
                     value: sentiment.advances == null
                         ? '—'
                         : '${sentiment.advances}',
-                    color: sentiment.advances == null ? null : t.jade,
+                    color: sentiment.advances == null ? null : t.gain,
                     fontSize: 15,
                   ),
                 ),
@@ -279,7 +256,7 @@ class _SentimentSection extends StatelessWidget {
                     value: sentiment.declines == null
                         ? '—'
                         : '${sentiment.declines}',
-                    color: sentiment.declines == null ? null : t.garnet,
+                    color: sentiment.declines == null ? null : t.loss,
                     fontSize: 15,
                   ),
                 ),
@@ -296,11 +273,11 @@ class _SentimentSection extends StatelessWidget {
             ),
           ],
           if (sentiment.note != null && sentiment.note!.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpace.md),
             Text(sentiment.note!, style: AppTypo.body(t)),
           ],
           if (result!.stale) ...[
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpace.sm),
             const StaleNotice(),
           ],
         ],
@@ -349,7 +326,7 @@ class _MoversSection extends StatelessWidget {
         ),
         if (result == null)
           const AyreCard(
-            padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+            padding: EdgeInsets.symmetric(vertical: AppSpace.xs),
             child: Column(
               children: [
                 SkeletonTickerRow(),
@@ -376,7 +353,7 @@ class _MoversSection extends StatelessWidget {
             child: Column(
               children: [
                 for (final (i, quote) in _rows.indexed) ...[
-                  if (i > 0) const HairlineDivider(indent: AppSpacing.md),
+                  if (i > 0) const HairlineDivider(indent: AppSpace.md),
                   TickerRow(
                     rank: i + 1,
                     symbol: quote.symbol,
@@ -430,10 +407,10 @@ class _NoteCard extends StatelessWidget {
                 const AyreChip(label: 'Featured', tone: ChipTone.attention),
             ],
           ),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpace.sm),
           Text(note.title, style: AppTypo.cardTitle(t)),
           if (note.body.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.xs),
+            const SizedBox(height: AppSpace.xs),
             Text(note.body, style: AppTypo.body(t)),
           ],
         ],

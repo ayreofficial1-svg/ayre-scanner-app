@@ -38,9 +38,10 @@ class TickerTrace extends StatefulWidget {
 }
 
 class _TickerTraceState extends State<TickerTrace>
-    // Two controllers — the initial draw-on and the shape morph — so this needs
-    // the multi-ticker mixin, not the single one.
-    with TickerProviderStateMixin {
+        // Two controllers — the initial draw-on and the shape morph — so this needs
+        // the multi-ticker mixin, not the single one.
+        with
+        TickerProviderStateMixin {
   late final AnimationController _draw;
   late final AnimationController _morph;
   late List<double> _from;
@@ -94,22 +95,24 @@ class _TickerTraceState extends State<TickerTrace>
   Widget build(BuildContext context) {
     final t = context.tokens;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    return SizedBox(
-      height: widget.height,
-      width: double.infinity,
-      child: AnimatedBuilder(
-        animation: Listenable.merge([_draw, _morph]),
-        builder: (context, _) => CustomPaint(
-          painter: _TracePainter(
-            points: _interpolated,
-            color: widget.color ?? t.chartLine,
-            gridColor: t.chartGrid,
-            strokeWidth: widget.strokeWidth,
-            showGrid: widget.showGrid,
-            showLastMarker: widget.showLastMarker,
-            drawn: reduceMotion
-                ? 1.0
-                : AppMotion.ease.transform(_draw.value.clamp(0.0, 1.0)),
+    return RepaintBoundary(
+      child: SizedBox(
+        height: widget.height,
+        width: double.infinity,
+        child: AnimatedBuilder(
+          animation: Listenable.merge([_draw, _morph]),
+          builder: (context, _) => CustomPaint(
+            painter: _TracePainter(
+              points: _interpolated,
+              color: widget.color ?? t.chartLine,
+              gridColor: t.chartGrid,
+              strokeWidth: widget.strokeWidth,
+              showGrid: widget.showGrid,
+              showLastMarker: widget.showLastMarker,
+              drawn: reduceMotion
+                  ? 1.0
+                  : AppMotion.ease.transform(_draw.value.clamp(0.0, 1.0)),
+            ),
           ),
         ),
       ),

@@ -28,14 +28,17 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     required this.surfaceRaised,
     required this.inkPanel,
     required this.onInkPanel,
-    required this.citrine,
-    required this.citrineInk,
-    required this.citrineMuted,
-    required this.onCitrine,
-    required this.jade,
-    required this.garnet,
-    required this.ember,
-    required this.slateViolet,
+    required this.accent,
+    required this.accentInk,
+    required this.accentSoft,
+    required this.onAccent,
+    required this.gain,
+    required this.loss,
+    required this.caution,
+    required this.info,
+    required this.fillMint,
+    required this.fillClay,
+    required this.fillSand,
     required this.textPrimary,
     required this.textSecondary,
     required this.textTertiary,
@@ -43,9 +46,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     required this.border,
     required this.borderSubtle,
     required this.hairline,
-    required this.positiveBg,
-    required this.negativeBg,
-    required this.emberBg,
+    required this.gainSoft,
+    required this.lossSoft,
+    required this.cautionSoft,
     required this.chartGrid,
     required this.chartLine,
     required this.skeleton,
@@ -71,33 +74,41 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
 
   /// The brand hue as a solid fill. Identity only: the Fold's focal control,
   /// primary buttons, selected states, the hero card's accent edge.
-  final Color citrine;
+  final Color accent;
 
   /// Citrine dark enough to be text or a thin line. The light-mode fill tone is
   /// too light to clear 4.5:1 as small text, so anything type-weight — links,
   /// selected labels, small icons — uses this instead.
-  final Color citrineInk;
+  final Color accentInk;
 
   /// Citrine held back for large, low-emphasis fills.
-  final Color citrineMuted;
+  final Color accentSoft;
 
   /// Ink text on a Citrine fill. Citrine is light, so inverted white text would
   /// under-perform; this is deliberately dark.
-  final Color onCitrine;
+  final Color onAccent;
 
   /// Gain. Cool and blue-leaning so it never reads as Citrine.
-  final Color jade;
+  final Color gain;
 
   /// Loss. Deep and wine-toned rather than a flat alert red.
-  final Color garnet;
+  final Color loss;
 
   /// Attention: the LIVE dot, delayed/stale chips, offline notices. Never a
   /// button fill, never navigation, never the brand.
-  final Color ember;
+  final Color caution;
 
   /// Informational secondary. Small-area only — a "NEW" tag, a category label.
   /// Never a large fill, never navigation, never a button.
-  final Color slateViolet;
+  final Color info;
+
+  /// Three soft, low-saturation card fills. Used to pick out a small number of
+  /// cards as gentle highlight blocks against the neutral canvas — the one place
+  /// colour does hierarchy work. Never more than two on a screen, and never for
+  /// a control, a chip, or anything semantic.
+  final Color fillMint;
+  final Color fillClay;
+  final Color fillSand;
 
   /// Cool graphite through muted grey. All clear 4.5:1 on their surfaces.
   final Color textPrimary;
@@ -111,9 +122,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   final Color hairline;
 
   /// Faint tint fields behind movers rows and semantic badges.
-  final Color positiveBg;
-  final Color negativeBg;
-  final Color emberBg;
+  final Color gainSoft;
+  final Color lossSoft;
+  final Color cautionSoft;
 
   /// Near-invisible chart grid; neutral trace for non-featured charts.
   final Color chartGrid;
@@ -130,14 +141,17 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     Color? surfaceRaised,
     Color? inkPanel,
     Color? onInkPanel,
-    Color? citrine,
-    Color? citrineInk,
-    Color? citrineMuted,
-    Color? onCitrine,
-    Color? jade,
-    Color? garnet,
-    Color? ember,
-    Color? slateViolet,
+    Color? accent,
+    Color? accentInk,
+    Color? accentSoft,
+    Color? onAccent,
+    Color? gain,
+    Color? loss,
+    Color? caution,
+    Color? info,
+    Color? fillMint,
+    Color? fillClay,
+    Color? fillSand,
     Color? textPrimary,
     Color? textSecondary,
     Color? textTertiary,
@@ -145,9 +159,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     Color? border,
     Color? borderSubtle,
     Color? hairline,
-    Color? positiveBg,
-    Color? negativeBg,
-    Color? emberBg,
+    Color? gainSoft,
+    Color? lossSoft,
+    Color? cautionSoft,
     Color? chartGrid,
     Color? chartLine,
     Color? skeleton,
@@ -160,14 +174,17 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       surfaceRaised: surfaceRaised ?? this.surfaceRaised,
       inkPanel: inkPanel ?? this.inkPanel,
       onInkPanel: onInkPanel ?? this.onInkPanel,
-      citrine: citrine ?? this.citrine,
-      citrineInk: citrineInk ?? this.citrineInk,
-      citrineMuted: citrineMuted ?? this.citrineMuted,
-      onCitrine: onCitrine ?? this.onCitrine,
-      jade: jade ?? this.jade,
-      garnet: garnet ?? this.garnet,
-      ember: ember ?? this.ember,
-      slateViolet: slateViolet ?? this.slateViolet,
+      accent: accent ?? this.accent,
+      accentInk: accentInk ?? this.accentInk,
+      accentSoft: accentSoft ?? this.accentSoft,
+      onAccent: onAccent ?? this.onAccent,
+      gain: gain ?? this.gain,
+      loss: loss ?? this.loss,
+      caution: caution ?? this.caution,
+      info: info ?? this.info,
+      fillMint: fillMint ?? this.fillMint,
+      fillClay: fillClay ?? this.fillClay,
+      fillSand: fillSand ?? this.fillSand,
       textPrimary: textPrimary ?? this.textPrimary,
       textSecondary: textSecondary ?? this.textSecondary,
       textTertiary: textTertiary ?? this.textTertiary,
@@ -175,9 +192,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       border: border ?? this.border,
       borderSubtle: borderSubtle ?? this.borderSubtle,
       hairline: hairline ?? this.hairline,
-      positiveBg: positiveBg ?? this.positiveBg,
-      negativeBg: negativeBg ?? this.negativeBg,
-      emberBg: emberBg ?? this.emberBg,
+      gainSoft: gainSoft ?? this.gainSoft,
+      lossSoft: lossSoft ?? this.lossSoft,
+      cautionSoft: cautionSoft ?? this.cautionSoft,
       chartGrid: chartGrid ?? this.chartGrid,
       chartLine: chartLine ?? this.chartLine,
       skeleton: skeleton ?? this.skeleton,
@@ -196,14 +213,17 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       surfaceRaised: c(surfaceRaised, other.surfaceRaised),
       inkPanel: c(inkPanel, other.inkPanel),
       onInkPanel: c(onInkPanel, other.onInkPanel),
-      citrine: c(citrine, other.citrine),
-      citrineInk: c(citrineInk, other.citrineInk),
-      citrineMuted: c(citrineMuted, other.citrineMuted),
-      onCitrine: c(onCitrine, other.onCitrine),
-      jade: c(jade, other.jade),
-      garnet: c(garnet, other.garnet),
-      ember: c(ember, other.ember),
-      slateViolet: c(slateViolet, other.slateViolet),
+      accent: c(accent, other.accent),
+      accentInk: c(accentInk, other.accentInk),
+      accentSoft: c(accentSoft, other.accentSoft),
+      onAccent: c(onAccent, other.onAccent),
+      gain: c(gain, other.gain),
+      loss: c(loss, other.loss),
+      caution: c(caution, other.caution),
+      info: c(info, other.info),
+      fillMint: c(fillMint, other.fillMint),
+      fillClay: c(fillClay, other.fillClay),
+      fillSand: c(fillSand, other.fillSand),
       textPrimary: c(textPrimary, other.textPrimary),
       textSecondary: c(textSecondary, other.textSecondary),
       textTertiary: c(textTertiary, other.textTertiary),
@@ -211,9 +231,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       border: c(border, other.border),
       borderSubtle: c(borderSubtle, other.borderSubtle),
       hairline: c(hairline, other.hairline),
-      positiveBg: c(positiveBg, other.positiveBg),
-      negativeBg: c(negativeBg, other.negativeBg),
-      emberBg: c(emberBg, other.emberBg),
+      gainSoft: c(gainSoft, other.gainSoft),
+      lossSoft: c(lossSoft, other.lossSoft),
+      cautionSoft: c(cautionSoft, other.cautionSoft),
       chartGrid: c(chartGrid, other.chartGrid),
       chartLine: c(chartLine, other.chartLine),
       skeleton: c(skeleton, other.skeleton),
@@ -225,38 +245,28 @@ extension AppThemeContext on BuildContext {
   AppThemeTokens get tokens => Theme.of(this).extension<AppThemeTokens>()!;
 }
 
-// ─── Spacing (8pt grid, retained as a system) ───────────────────────────────
-abstract final class AppSpacing {
-  static const double xxs = 2;
-  static const double xs = 4;
-  static const double sm = 8;
-  static const double md = 12;
-  static const double lg = 16;
-  static const double xl = 20;
-  static const double xxl = 24;
-  static const double xxxl = 32;
-  static const double huge = 40;
-
-  /// Terminal-row vertical padding — dense and scannable by design.
-  static const double row = 10;
-}
-
 // ─── Radii ─────────────────────────────────────────────────────────────────
 // Crisper than the previous identity: a terminal card, not a soft app card.
 // The full capsule is not a default anywhere — it survives only for genuinely
 // circular controls and small status chips.
 abstract final class AppRadius {
-  static const double chip = 3;
-  static const double panel = 4;
-  static const double card = 6;
-  static const double button = 6;
-  static const double control = 8;
-  static const double sheet = 12;
+  /// Chunky, generous corners — soft rounded rectangles rather than crisp ones.
+  /// A deliberate reversal of the previous identity's machined 4–6pt radii.
+  static const double chip = 10;
+  static const double panel = 14;
+  static const double control = 14;
+  static const double card = 20;
+  static const double hero = 26;
+  static const double sheet = 28;
 
-  /// The Fold's expanded tray.
-  static const double dock = 20;
-
+  /// Pill-shaped controls are a recurring pattern across the references, so the
+  /// capsule is a sanctioned button shape here rather than a retired one.
+  static const double pill = 999;
   static const double circle = 999;
+
+  /// Retained aliases so existing call sites keep their intent.
+  static const double button = pill;
+  static const double dock = 30;
 }
 
 // ─── Motion ────────────────────────────────────────────────────────────────
@@ -289,6 +299,61 @@ abstract final class AppMotion {
   static const Curve ease = Curves.easeOutCubic;
   static const Curve easeIn = Curves.easeInCubic;
   static const Curve easeInOut = Curves.easeInOutCubic;
+}
+
+/// The type scale.
+///
+/// φ (1.6180339887…) sets the two relationships that carry the hierarchy:
+/// body → section heading is one φ step (14 × φ ≈ 22.7 → 22), and body → hero
+/// figure is two (14 × φ² ≈ 36.6 → 38, nudged up so one oversized hero number
+/// per screen reads as genuinely oversized).
+///
+/// The intermediate sizes are chosen for legibility rather than derived, because
+/// a strict geometric run at this range produces steps too far apart to be
+/// usable. The golden ratio is a tool here, not a mandate — its design
+/// applications are partly documented and partly disputed, so it earns its place
+/// where it visibly helps and is set aside where it would hurt.
+abstract final class AppTextScale {
+  static const double phi = 1.6180339887;
+
+  static const double micro = 11;
+  static const double caption = 12;
+
+  /// The base size every other step is reasoned from.
+  static const double body = 14;
+
+  static const double rowLabel = 15;
+  static const double cardTitle = 17;
+
+  /// body × φ
+  static const double section = 22;
+  static const double page = 28;
+
+  /// ≈ body × φ²
+  static const double hero = 38;
+  static const double heroXL = 46;
+}
+
+/// The spacing scale.
+///
+/// Fibonacci steps, whose ratio converges on φ, chosen because they land on or
+/// near 8pt-grid values (8, 34) rather than fighting it. Touch targets and
+/// safe-area insets use the 8pt values directly.
+abstract final class AppSpace {
+  static const double xxs = 2;
+  static const double xs = 5;
+  static const double sm = 8;
+  static const double md = 13;
+  static const double lg = 21;
+  static const double xl = 34;
+  static const double xxl = 55;
+
+  /// Terminal-row vertical padding — dense and scannable by design.
+  static const double row = 10;
+
+  /// The minimum tappable dimension. 48 rather than a Fibonacci step, because
+  /// accessibility floors are not negotiable against a ratio.
+  static const double minTarget = 48;
 }
 
 // ─── Typography ────────────────────────────────────────────────────────────
@@ -345,7 +410,7 @@ abstract final class AppTypo {
   // ── Display roles ────────────────────────────────────────────────────────
 
   static TextStyle pageTitle(AppThemeTokens t, {Color? color}) => display(
-    fontSize: 26,
+    fontSize: AppTextScale.page,
     fontWeight: FontWeight.w700,
     color: color ?? t.textPrimary,
     height: 1.14,
@@ -353,7 +418,7 @@ abstract final class AppTypo {
   );
 
   static TextStyle sectionTitle(AppThemeTokens t, {Color? color}) => display(
-    fontSize: 18,
+    fontSize: AppTextScale.section,
     fontWeight: FontWeight.w700,
     color: color ?? t.textPrimary,
     height: 1.22,
@@ -361,7 +426,7 @@ abstract final class AppTypo {
   );
 
   static TextStyle cardTitle(AppThemeTokens t, {Color? color}) => display(
-    fontSize: 15,
+    fontSize: AppTextScale.cardTitle,
     fontWeight: FontWeight.w600,
     color: color ?? t.textPrimary,
     height: 1.25,
@@ -373,7 +438,7 @@ abstract final class AppTypo {
   /// The largest data text in the app — index and equity levels. Deliberately
   /// larger than any heading.
   static TextStyle heroValue(AppThemeTokens t, {Color? color}) => ticker(
-    fontSize: 32,
+    fontSize: AppTextScale.hero,
     fontWeight: FontWeight.w600,
     color: color ?? t.textPrimary,
     height: 1.0,
@@ -452,68 +517,74 @@ abstract final class AppTypo {
 abstract final class AppTheme {
   static const Color transparent = Color(0x00000000);
 
-  // Fogpaper — cool off-white with a graphite undertone. Not cream, not stark.
+  // Paper — a cool, deliberately-crafted light theme, not an inverted dark one.
   static const _light = AppThemeTokens(
-    background: Color(0xFFF4F5F7),
-    backgroundTint: Color(0xFFEBEDF1),
-    surface: Color(0xFFFBFBFD),
-    surfaceAlt: Color(0xFFEFF1F4),
+    background: Color(0xFFF5F6F8),
+    backgroundTint: Color(0xFFEBEEF2),
+    surface: Color(0xFFFFFFFF),
+    surfaceAlt: Color(0xFFF0F2F5),
     surfaceRaised: Color(0xFFFFFFFF),
-    inkPanel: Color(0xFF12151A),
-    onInkPanel: Color(0xFFEDEFF2),
-    citrine: Color(0xFFBFCB2E),
-    citrineInk: Color(0xFF65700C),
-    citrineMuted: Color(0xFFE4E9A8),
-    onCitrine: Color(0xFF141712),
-    jade: Color(0xFF0F7F5B),
-    garnet: Color(0xFFA32036),
-    ember: Color(0xFFA85B12),
-    slateViolet: Color(0xFF5B5488),
-    textPrimary: Color(0xFF14171C),
-    textSecondary: Color(0xFF565E6B),
-    textTertiary: Color(0xFF666E7A),
-    textDisabled: Color(0xFFA0A7B1),
-    border: Color(0x1F14171C),
-    borderSubtle: Color(0x1214171C),
-    hairline: Color(0x2E14171C),
-    positiveBg: Color(0x140F7F5B),
-    negativeBg: Color(0x14A32036),
-    emberBg: Color(0x16A85B12),
-    chartGrid: Color(0x1214171C),
-    chartLine: Color(0xFF565E6B),
+    inkPanel: Color(0xFF0F1318),
+    onInkPanel: Color(0xFFE5E7EB),
+    accent: Color(0xFF07C58F),
+    accentInk: Color(0xFF046B4E),
+    accentSoft: Color(0xFFD6F3E8),
+    onAccent: Color(0xFF04241A),
+    gain: Color(0xFF0A7A5A),
+    loss: Color(0xFFA82633),
+    caution: Color(0xFF9A5A0F),
+    info: Color(0xFF4C5B72),
+    fillMint: Color(0xFFDFF1E9),
+    fillClay: Color(0xFFF7E4E8),
+    fillSand: Color(0xFFF7EEDC),
+    textPrimary: Color(0xFF111418),
+    textSecondary: Color(0xFF4E5661),
+    textTertiary: Color(0xFF646D79),
+    textDisabled: Color(0xFFA8B0BA),
+    border: Color(0x1F111418),
+    borderSubtle: Color(0x14111418),
+    hairline: Color(0x2E111418),
+    gainSoft: Color(0x140A7A5A),
+    lossSoft: Color(0x14A82633),
+    cautionSoft: Color(0x169A5A0F),
+    chartGrid: Color(0x12111418),
+    chartLine: Color(0xFF4E5661),
     skeleton: Color(0xFFE4E7EC),
   );
 
-  // Cinder — a trading desk at night. True near-black, no warm undertone.
+  // Slate — the logo's own canvas, extended into a full dark theme.
   static const _dark = AppThemeTokens(
-    background: Color(0xFF0B0C0E),
-    backgroundTint: Color(0xFF101216),
-    surface: Color(0xFF14171B),
-    surfaceAlt: Color(0xFF1A1E23),
-    surfaceRaised: Color(0xFF22262C),
-    inkPanel: Color(0xFF0A0D11),
-    onInkPanel: Color(0xFFEDEFF2),
-    citrine: Color(0xFFC9D137),
-    citrineInk: Color(0xFFC9D137),
-    citrineMuted: Color(0xFF5C6220),
-    onCitrine: Color(0xFF0B0C0E),
-    jade: Color(0xFF22C58A),
-    garnet: Color(0xFFDE5B6A),
-    ember: Color(0xFFE08A3C),
-    slateViolet: Color(0xFF9A93C4),
-    textPrimary: Color(0xFFEDEFF2),
-    textSecondary: Color(0xFFA2A9B4),
-    textTertiary: Color(0xFF868E9A),
-    textDisabled: Color(0xFF4E545E),
-    border: Color(0x1FFFFFFF),
-    borderSubtle: Color(0x12FFFFFF),
-    hairline: Color(0x2EFFFFFF),
-    positiveBg: Color(0x1F22C58A),
-    negativeBg: Color(0x1FDE5B6A),
-    emberBg: Color(0x1FE08A3C),
-    chartGrid: Color(0x12FFFFFF),
-    chartLine: Color(0xFFA2A9B4),
-    skeleton: Color(0xFF1E2228),
+    background: Color(0xFF0A0C10),
+    backgroundTint: Color(0xFF0F1216),
+    surface: Color(0xFF14181D),
+    surfaceAlt: Color(0xFF1B2027),
+    surfaceRaised: Color(0xFF232932),
+    inkPanel: Color(0xFF07090C),
+    onInkPanel: Color(0xFFE5E7EB),
+    accent: Color(0xFF07C58F),
+    accentInk: Color(0xFF0FD79C),
+    accentSoft: Color(0xFF0B3D30),
+    onAccent: Color(0xFF04120D),
+    gain: Color(0xFF12CE95),
+    loss: Color(0xFFDE6B73),
+    caution: Color(0xFFE0A03C),
+    info: Color(0xFF8FA8C4),
+    fillMint: Color(0xFF16302A),
+    fillClay: Color(0xFF33222A),
+    fillSand: Color(0xFF302A1B),
+    textPrimary: Color(0xFFE5E7EB),
+    textSecondary: Color(0xFFA3ACB9),
+    textTertiary: Color(0xFF8A93A0),
+    textDisabled: Color(0xFF525A66),
+    border: Color(0x1FE5E7EB),
+    borderSubtle: Color(0x14E5E7EB),
+    hairline: Color(0x2EE5E7EB),
+    gainSoft: Color(0x1F12CE95),
+    lossSoft: Color(0x1FDE6B73),
+    cautionSoft: Color(0x1FE0A03C),
+    chartGrid: Color(0x12E5E7EB),
+    chartLine: Color(0xFFA3ACB9),
+    skeleton: Color(0xFF1D232B),
   );
 
   static AppThemeTokens get lightTokens => _light;
@@ -527,13 +598,13 @@ abstract final class AppTheme {
 
     final scheme = ColorScheme(
       brightness: brightness,
-      primary: t.citrine,
-      onPrimary: t.onCitrine,
-      secondary: t.slateViolet,
+      primary: t.accent,
+      onPrimary: t.onAccent,
+      secondary: t.info,
       onSecondary: isDark ? t.background : const Color(0xFFFFFFFF),
-      tertiary: t.ember,
+      tertiary: t.caution,
       onTertiary: isDark ? t.background : const Color(0xFFFFFFFF),
-      error: t.garnet,
+      error: t.loss,
       onError: isDark ? t.background : const Color(0xFFFFFFFF),
       surface: t.surface,
       onSurface: t.textPrimary,
@@ -543,20 +614,60 @@ abstract final class AppTheme {
     // Numerals never come from the TextTheme — they route through `Figure`
     // so the monospace rule cannot be bypassed.
     final text = TextTheme(
-      displayLarge: AppTypo.display(fontSize: 34, color: t.textPrimary, letterSpacing: -1.0),
-      displayMedium: AppTypo.display(fontSize: 29, color: t.textPrimary, letterSpacing: -0.8),
-      displaySmall: AppTypo.display(fontSize: 26, color: t.textPrimary, letterSpacing: -0.7),
-      headlineLarge: AppTypo.display(fontSize: 22, color: t.textPrimary, letterSpacing: -0.5),
-      headlineMedium: AppTypo.display(fontSize: 19, color: t.textPrimary, letterSpacing: -0.4),
-      headlineSmall: AppTypo.display(fontSize: 17, color: t.textPrimary, letterSpacing: -0.3),
-      titleLarge: AppTypo.display(fontSize: 16, color: t.textPrimary, letterSpacing: -0.2),
-      titleMedium: AppTypo.ui(fontSize: 14, fontWeight: FontWeight.w600, color: t.textPrimary),
-      titleSmall: AppTypo.ui(fontSize: 13, fontWeight: FontWeight.w600, color: t.textPrimary),
+      displayLarge: AppTypo.display(
+        fontSize: 34,
+        color: t.textPrimary,
+        letterSpacing: -1.0,
+      ),
+      displayMedium: AppTypo.display(
+        fontSize: 29,
+        color: t.textPrimary,
+        letterSpacing: -0.8,
+      ),
+      displaySmall: AppTypo.display(
+        fontSize: 26,
+        color: t.textPrimary,
+        letterSpacing: -0.7,
+      ),
+      headlineLarge: AppTypo.display(
+        fontSize: 22,
+        color: t.textPrimary,
+        letterSpacing: -0.5,
+      ),
+      headlineMedium: AppTypo.display(
+        fontSize: 19,
+        color: t.textPrimary,
+        letterSpacing: -0.4,
+      ),
+      headlineSmall: AppTypo.display(
+        fontSize: 17,
+        color: t.textPrimary,
+        letterSpacing: -0.3,
+      ),
+      titleLarge: AppTypo.display(
+        fontSize: 16,
+        color: t.textPrimary,
+        letterSpacing: -0.2,
+      ),
+      titleMedium: AppTypo.ui(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: t.textPrimary,
+      ),
+      titleSmall: AppTypo.ui(
+        fontSize: 13,
+        fontWeight: FontWeight.w600,
+        color: t.textPrimary,
+      ),
       bodyLarge: AppTypo.ui(fontSize: 15, color: t.textPrimary, height: 1.5),
       bodyMedium: AppTypo.body(t),
       bodySmall: AppTypo.caption(t),
       labelLarge: AppTypo.button(t, color: t.textPrimary),
-      labelMedium: AppTypo.ui(fontSize: 12, fontWeight: FontWeight.w600, color: t.textSecondary),
+      labelMedium: AppTypo.ui(
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        color: t.textSecondary,
+      ),
       labelSmall: AppTypo.label(t),
     );
 
@@ -591,11 +702,12 @@ abstract final class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        titleSpacing: AppSpacing.sm,
+        titleSpacing: AppSpace.sm,
         titleTextStyle: AppTypo.sectionTitle(t),
         surfaceTintColor: transparent,
-        systemOverlayStyle:
-            isDark ? SystemUiOverlayStyle.light : SystemUiOverlayStyle.dark,
+        systemOverlayStyle: isDark
+            ? SystemUiOverlayStyle.light
+            : SystemUiOverlayStyle.dark,
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: t.surface,
@@ -613,10 +725,10 @@ abstract final class AppTheme {
         fillColor: t.surfaceAlt,
         hintStyle: AppTypo.body(t, color: t.textTertiary),
         labelStyle: AppTypo.body(t),
-        floatingLabelStyle: AppTypo.body(t, color: t.citrineInk),
+        floatingLabelStyle: AppTypo.body(t, color: t.accentInk),
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.lg,
+          horizontal: AppSpace.md,
+          vertical: AppSpace.lg,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.control),
@@ -624,19 +736,19 @@ abstract final class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.control),
-          borderSide: BorderSide(color: t.citrineInk, width: 1.5),
+          borderSide: BorderSide(color: t.accentInk, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.control),
-          borderSide: BorderSide(color: t.garnet),
+          borderSide: BorderSide(color: t.loss),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.control),
-          borderSide: BorderSide(color: t.garnet, width: 1.5),
+          borderSide: BorderSide(color: t.loss, width: 1.5),
         ),
       ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
-        color: t.citrineInk,
+        color: t.accentInk,
         circularTrackColor: t.surfaceAlt,
         linearTrackColor: t.surfaceAlt,
         linearMinHeight: 3,
@@ -652,9 +764,9 @@ abstract final class AppTheme {
         ),
       ),
       textSelectionTheme: TextSelectionThemeData(
-        cursorColor: t.citrineInk,
-        selectionColor: t.citrine.withValues(alpha: 0.3),
-        selectionHandleColor: t.citrineInk,
+        cursorColor: t.accentInk,
+        selectionColor: t.accent.withValues(alpha: 0.3),
+        selectionHandleColor: t.accentInk,
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {

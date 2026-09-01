@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/market_data_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
-import '../widgets/fold_nav.dart';
+import '../widgets/curved_nav_bar.dart';
 import 'home_tab.dart';
 import 'insights_tab.dart';
 import 'learn_tab.dart';
@@ -14,7 +14,11 @@ import 'signals_tab.dart';
 /// the Fold's collapsed/expanded states rather than a static bar, but the
 /// mechanism is unchanged.
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key, this.marketData = const RemoteMarketDataService()});
+  // Not const: the remote service holds a short-lived constituents cache, which
+  // it needs because movers and breadth are derived from that data rather than
+  // served by dedicated endpoints.
+  HomeShell({super.key, MarketDataService? marketData})
+    : marketData = marketData ?? RemoteMarketDataService();
 
   /// Injected so every screen can be rendered with known data in tests.
   final MarketDataService marketData;
@@ -27,9 +31,6 @@ class _HomeShellState extends State<HomeShell> {
   int _index = 0;
   String _accountName = '';
 
-  /// Lets the Fold fold itself away while content is being scrolled.
-  final _ScrollPulse _scrollPulse = _ScrollPulse();
-
   void _select(int index) {
     if (index == _index) return;
     setState(() => _index = index);
@@ -38,12 +39,6 @@ class _HomeShellState extends State<HomeShell> {
   void _onAccountResolved(String name) {
     if (name == _accountName) return;
     setState(() => _accountName = name);
-  }
-
-  @override
-  void dispose() {
-    _scrollPulse.dispose();
-    super.dispose();
   }
 
   @override
@@ -78,30 +73,14 @@ class _HomeShellState extends State<HomeShell> {
     return Scaffold(
       backgroundColor: t.background,
       extendBody: true,
-      body: NotificationListener<ScrollUpdateNotification>(
-        onNotification: (notification) {
-          // Only a real drag should dismiss the dock, not a settle or a bounce.
-          if ((notification.scrollDelta ?? 0).abs() > 6) {
-            _scrollPulse.pulse();
-          }
-          return false;
-        },
-        child: _TabFade(index: _index, child: tabs),
-      ),
-      bottomNavigationBar: FoldNav(
+      body: _TabFade(index: _index, child: tabs),
+      // Always visible: no scroll listener, no idle timer, no collapsed state.
+      bottomNavigationBar: CurvedNavBar(
         selectedIndex: _index,
         onSelected: _select,
-        initials: initialsFor(name),
-        scrollNotifier: _scrollPulse,
       ),
     );
   }
-}
-
-/// A notifier the Fold can listen to without owning a ScrollController, so the
-/// dock gets out of the way when content moves.
-class _ScrollPulse extends ChangeNotifier {
-  void pulse() => notifyListeners();
 }
 
 /// The incoming tab's already-built content fades in — opacity only, additive to

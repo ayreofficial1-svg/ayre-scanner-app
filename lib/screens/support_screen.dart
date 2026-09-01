@@ -33,10 +33,10 @@ class SupportScreen extends StatelessWidget {
       body: ContentWidth(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.sm,
-            AppSpacing.lg,
-            AppSpacing.huge,
+            AppSpace.lg,
+            AppSpace.sm,
+            AppSpace.lg,
+            AppSpace.xxl,
           ),
           children: [
             Text(
@@ -44,7 +44,7 @@ class SupportScreen extends StatelessWidget {
               'instead. Including the version below usually saves a round trip.',
               style: AppTypo.body(t),
             ),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpace.xl),
             RowGroup(
               children: [
                 SettingRow(

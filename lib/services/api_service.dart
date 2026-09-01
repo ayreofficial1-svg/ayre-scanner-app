@@ -89,7 +89,12 @@ class ApiService {
       headers: _headers(),
     );
     if (response.statusCode == 200) {
-      return jsonDecode(response.body) as Map<String, dynamic>;
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      // The endpoint answers 200 with `authenticated: false` when there is no
+      // session, so a successful status alone does not mean signed in. Treating
+      // it that way let an unauthenticated user straight past the startup gate.
+      if (body['authenticated'] == true) return body;
+      return null;
     }
     return null;
   }

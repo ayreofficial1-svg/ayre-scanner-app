@@ -22,3 +22,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    # The authoritative brand mark, used as-is rather than recreated.
+    - assets/brand/ayre_logo.png

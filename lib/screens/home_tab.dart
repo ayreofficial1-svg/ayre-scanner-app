@@ -8,9 +8,11 @@ import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
+import '../widgets/ayre_logo.dart';
 import '../widgets/figure.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/responsive.dart';
+import '../widgets/spring.dart';
 import '../widgets/state_views.dart';
 import '../widgets/ticker_trace.dart';
 import 'home_shell.dart' show initialsFor;
@@ -74,7 +76,8 @@ class _HomeTabState extends State<HomeTab> {
         Notice(
           kind: NoticeKind.staleData,
           title: 'Index feed is behind',
-          body: 'Levels are older than their usual update interval. '
+          body:
+              'Levels are older than their usual update interval. '
               'Last known values are still shown.',
           at: DateTime.now(),
         ),
@@ -92,16 +95,16 @@ class _HomeTabState extends State<HomeTab> {
         SettingsStore.instance.displayNameOverride ?? _accountName;
 
     return RefreshIndicator(
-      color: t.citrineInk,
+      color: t.accentInk,
       backgroundColor: t.surface,
       onRefresh: _load,
       edgeOffset: 72,
       child: ContentWidth(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
+            AppSpace.lg,
+            AppSpace.lg,
+            AppSpace.lg,
             120,
           ),
           children: [
@@ -114,7 +117,7 @@ class _HomeTabState extends State<HomeTab> {
                 ),
               ),
             ),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpace.xl),
             Entrance(
               index: 1,
               child: SectionLabel(
@@ -134,9 +137,12 @@ class _HomeTabState extends State<HomeTab> {
               onOpen: _openIndex,
               onRetry: _load,
             ),
-            const SizedBox(height: AppSpacing.xl),
-            Entrance(index: 2, child: const SectionLabel(label: 'Scanner')),
-            _ScannerSummary(result: _loading ? null : _breadth),
+            const SizedBox(height: AppSpace.xl),
+            Entrance(
+              index: 2,
+              child: const SectionLabel(label: 'Market breadth'),
+            ),
+            _ScannerSummary(result: _loading ? null : _breadth, onRetry: _load),
           ],
         ),
       ),
@@ -144,7 +150,8 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   void _openIndex(Quote quote) {
-    final index = IndexId.fromId(quote.symbol) ??
+    final index =
+        IndexId.fromId(quote.symbol) ??
         IndexId.values.firstWhere(
           (i) => i.label == quote.name,
           orElse: () => IndexId.nifty50,
@@ -180,8 +187,20 @@ class _Header extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('WELCOME BACK', style: AppTypo.label(t)),
-              const SizedBox(height: AppSpacing.xs),
+              // The only in-app brand placement: a small wordmark, sized to sit
+              // beneath the live content rather than compete with it.
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  children: [
+                    const LogoWordmark(fontSize: 15),
+                    const SizedBox(width: AppSpace.xs),
+                    Text('SCANNER', style: AppTypo.label(t)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpace.xs),
               Text(
                 resolved.isEmpty ? 'Hi there' : 'Hi, $resolved',
                 style: AppTypo.pageTitle(t),
@@ -191,7 +210,7 @@ class _Header extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(width: AppSpacing.sm),
+        const SizedBox(width: AppSpace.sm),
         ListenableBuilder(
           listenable: NotificationLog.instance,
           builder: (context, _) => _HeaderControl(
@@ -206,7 +225,7 @@ class _Header extends StatelessWidget {
             },
           ),
         ),
-        const SizedBox(width: AppSpacing.sm),
+        const SizedBox(width: AppSpace.sm),
         _AccountControl(name: resolved, onTap: onOpenProfile),
       ],
     );
@@ -258,7 +277,7 @@ class _HeaderControl extends StatelessWidget {
                     height: 6,
                     width: 6,
                     decoration: BoxDecoration(
-                      color: t.slateViolet,
+                      color: t.info,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -328,7 +347,7 @@ class _IndexBoard extends StatelessWidget {
       return Column(
         children: [
           for (var i = 0; i < 3; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpacing.md),
+            if (i > 0) const SizedBox(height: AppSpace.md),
             const _IndexCardSkeleton(),
           ],
         ],
@@ -359,7 +378,7 @@ class _IndexBoard extends StatelessWidget {
       return Column(
         children: [
           for (var i = 0; i < quotes.length; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpacing.md),
+            if (i > 0) const SizedBox(height: AppSpace.md),
             Entrance(
               index: i + 1,
               child: _IndexCard(
@@ -380,7 +399,7 @@ class _IndexBoard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i < quotes.length; i++) ...[
-            if (i > 0) const SizedBox(width: AppSpacing.md),
+            if (i > 0) const SizedBox(width: AppSpace.md),
             Expanded(
               child: Entrance(
                 index: i + 1,
@@ -418,7 +437,7 @@ class _IndexCard extends StatelessWidget {
       padding: EdgeInsets.zero,
       accentEdge: true,
       child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.md),
+        padding: const EdgeInsets.all(AppSpace.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -433,10 +452,13 @@ class _IndexCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
+                const SizedBox(width: AppSpace.sm),
                 ShrinkTrailing(
                   child: stale
-                      ? const AyreChip(label: 'Delayed', tone: ChipTone.attention)
+                      ? const AyreChip(
+                          label: 'Delayed',
+                          tone: ChipTone.attention,
+                        )
                       : const AyreChip(
                           label: 'Live',
                           tone: ChipTone.live,
@@ -445,7 +467,7 @@ class _IndexCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpace.sm),
             // The readout panel: the live figures sit on ink, so they read as
             // coming off a feed rather than being page content.
             InkPanel(
@@ -464,7 +486,7 @@ class _IndexCard extends StatelessWidget {
                           '${quote.name} at ${formatPrice(quote.lastPrice)}',
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.xs),
+                  const SizedBox(height: AppSpace.xs),
                   Row(
                     children: [
                       Flexible(
@@ -478,13 +500,16 @@ class _IndexCard extends StatelessWidget {
                                 fontSize: 12,
                                 color: t.onInkPanel.withValues(alpha: 0.75),
                               ),
-                              const SizedBox(width: AppSpacing.sm),
-                              DeltaFigure(change: quote.percentChange, fontSize: 13),
+                              const SizedBox(width: AppSpace.sm),
+                              DeltaFigure(
+                                change: quote.percentChange,
+                                fontSize: 13,
+                              ),
                             ],
                           ),
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.sm),
+                      const SizedBox(width: AppSpace.sm),
                       // The clock is a non-flex child, so it would otherwise be
                       // measured against unbounded width and push the row over
                       // in a narrow multi-column card at a large text scale.
@@ -500,7 +525,7 @@ class _IndexCard extends StatelessWidget {
                     ],
                   ),
                   if (quote.trace.length >= 2) ...[
-                    const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: AppSpace.sm),
                     TickerTrace(
                       points: normaliseTrace(quote.trace),
                       height: 34,
@@ -510,7 +535,7 @@ class _IndexCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpace.sm),
             Row(
               children: [
                 Expanded(
@@ -521,7 +546,7 @@ class _IndexCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.xs),
+                const SizedBox(width: AppSpace.xs),
                 AyreIcon(AyreGlyph.forward, size: 12, color: t.textTertiary),
               ],
             ),
@@ -545,14 +570,14 @@ class _IndexCardSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const AyreCard(
-      padding: EdgeInsets.all(AppSpacing.md),
+      padding: EdgeInsets.all(AppSpace.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SkeletonBlock(width: 96, height: 13),
-          SizedBox(height: AppSpacing.md),
+          SizedBox(height: AppSpace.md),
           SkeletonBlock(height: 30, radius: AppRadius.panel),
-          SizedBox(height: AppSpacing.sm),
+          SizedBox(height: AppSpace.sm),
           SkeletonBlock(width: 140, height: 11),
         ],
       ),
@@ -560,12 +585,20 @@ class _IndexCardSkeleton extends StatelessWidget {
   }
 }
 
-/// The scanner summary, restyled as a readout row. The circular momentum ring
-/// belonged to the previous identity and is retired.
+/// Market breadth — the Home page's primary overview figures.
+///
+/// Advances and Declines lead: they are the two numbers that actually say what
+/// the market did today, whereas a single composite sentiment score says it at
+/// one remove. The score is kept as a supporting figure rather than dropped, so
+/// nothing is lost — Insights remains its fuller home.
+///
+/// A ring shows the advance/decline split, which is the one place a proportion
+/// genuinely reads better as a shape than as two numbers side by side.
 class _ScannerSummary extends StatelessWidget {
-  const _ScannerSummary({required this.result});
+  const _ScannerSummary({required this.result, required this.onRetry});
 
   final DataResult<Sentiment>? result;
+  final Future<void> Function() onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -575,18 +608,36 @@ class _ScannerSummary extends StatelessWidget {
       return const AyreCard(
         child: Row(
           children: [
-            Expanded(child: SkeletonBlock(width: 70, height: 26)),
-            Expanded(child: SkeletonBlock(width: 70, height: 26)),
-            Expanded(child: SkeletonBlock(width: 70, height: 26)),
+            SkeletonBlock(width: 72, height: 72, radius: AppRadius.circle),
+            SizedBox(width: AppSpace.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBlock(width: 110, height: 26),
+                  SizedBox(height: AppSpace.sm),
+                  SkeletonBlock(width: 150, height: 11),
+                ],
+              ),
+            ),
           ],
         ),
       );
     }
 
-    if (!result!.isReady) {
+    if (result!.isFailed) {
       return StatePanel.failed(
-        headline: 'Scanner summary unavailable',
+        headline: "Market breadth didn't load",
         message: 'Pull down to try again.',
+        compact: true,
+        onRetry: onRetry,
+      );
+    }
+
+    if (result!.isEmpty) {
+      return const StatePanel.empty(
+        headline: 'No breadth reading yet',
+        message: 'Advances and declines appear once the session is under way.',
         compact: true,
       );
     }
@@ -595,54 +646,248 @@ class _ScannerSummary extends StatelessWidget {
     final advances = sentiment.advances;
     final declines = sentiment.declines;
 
+    // With no counts there is nothing to lead with, so say that plainly rather
+    // than rendering zeroes as if they were real.
+    if (advances == null && declines == null) {
+      return StatePanel.empty(
+        headline: 'Breadth counts unavailable',
+        message:
+            'The feed returned a sentiment reading but no advance or '
+            'decline counts. Score: ${sentiment.score}.',
+        compact: true,
+      );
+    }
+
+    final up = advances ?? 0;
+    final down = declines ?? 0;
+    final total = up + down + (sentiment.unchanged ?? 0);
+
     return AyreCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
+              _BreadthRing(advances: up, declines: down, total: total),
+              const SizedBox(width: AppSpace.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _BreadthFigure(
+                      label: 'Advances',
+                      value: advances,
+                      tone: t.gain,
+                      up: true,
+                    ),
+                    const SizedBox(height: AppSpace.sm),
+                    _BreadthFigure(
+                      label: 'Declines',
+                      value: declines,
+                      tone: t.loss,
+                      up: false,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.md),
+          const HairlineDivider(),
+          const SizedBox(height: AppSpace.md),
+          Row(
+            children: [
+              Expanded(
+                child: LabelledFigure(
+                  label: 'Unchanged',
+                  value: sentiment.unchanged == null
+                      ? '—'
+                      : '${sentiment.unchanged}',
+                  fontSize: AppTextScale.body,
+                ),
+              ),
+              // The composite score, demoted to a supporting figure.
               Expanded(
                 child: LabelledFigure(
                   label: 'Sentiment',
                   value: '${sentiment.score}',
-                ),
-              ),
-              Container(width: 1, height: 30, color: t.hairline),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: AppSpacing.md),
-                  child: LabelledFigure(
-                    label: 'Advances',
-                    value: advances == null ? '—' : '$advances',
-                    color: advances == null ? null : t.jade,
-                  ),
-                ),
-              ),
-              Container(width: 1, height: 30, color: t.hairline),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(left: AppSpacing.md),
-                  child: LabelledFigure(
-                    label: 'Declines',
-                    value: declines == null ? '—' : '$declines',
-                    color: declines == null ? null : t.garnet,
-                  ),
+                  fontSize: AppTextScale.body,
                 ),
               ),
             ],
           ),
           if (sentiment.note != null && sentiment.note!.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            const HairlineDivider(),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpace.md),
             Text(sentiment.note!, style: AppTypo.body(t)),
           ],
           if (result!.stale) ...[
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpace.sm),
             const StaleNotice(),
           ],
         ],
       ),
     );
   }
+}
+
+/// One oversized breadth figure with its direction carried by a caret and a
+/// sign-free count — a count has no sign, so the glyph does that work alone.
+class _BreadthFigure extends StatelessWidget {
+  const _BreadthFigure({
+    required this.label,
+    required this.value,
+    required this.tone,
+    required this.up,
+  });
+
+  final String label;
+  final int? value;
+  final Color tone;
+  final bool up;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Row(
+      children: [
+        DirectionGlyph(up: up, color: tone, size: 13),
+        const SizedBox(width: AppSpace.xs),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label.toUpperCase(),
+                style: AppTypo.label(t),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Figure(
+                  value == null ? '—' : '$value',
+                  fontSize: AppTextScale.section,
+                  fontWeight: FontWeight.w600,
+                  color: tone,
+                  semanticsLabel: '$label ${value ?? 'unavailable'}',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The advance/decline split as a ring, with the traded count in the middle.
+class _BreadthRing extends StatelessWidget {
+  const _BreadthRing({
+    required this.advances,
+    required this.declines,
+    required this.total,
+  });
+
+  final int advances;
+  final int declines;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final denominator = total > 0 ? total : (advances + declines);
+    final share = denominator > 0 ? advances / denominator : 0.0;
+
+    return RepaintBoundary(
+      child: SizedBox(
+        height: 76,
+        width: 76,
+        child: SpringValue(
+          value: share,
+          animateOnMount: true,
+          builder: (context, progress, _) => CustomPaint(
+            painter: _RingPainter(
+              advanceShare: progress.clamp(0.0, 1.0),
+              gain: t.gain,
+              loss: t.loss,
+              track: t.surfaceAlt,
+            ),
+            child: Center(
+              // The ring is a fixed 76pt, so its centre label scales down inside
+              // it rather than growing past it at a large text size.
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Figure(
+                        denominator == 0 ? '—' : '$denominator',
+                        fontSize: AppTextScale.body,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      Text('TRADED', style: AppTypo.label(t, fontSize: 8)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  const _RingPainter({
+    required this.advanceShare,
+    required this.gain,
+    required this.loss,
+    required this.track,
+  });
+
+  final double advanceShare;
+  final Color gain;
+  final Color loss;
+  final Color track;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const stroke = 7.0;
+    final rect = Rect.fromCircle(
+      center: size.center(Offset.zero),
+      radius: size.shortestSide / 2 - stroke / 2,
+    );
+    const start = -1.5708;
+    const full = 6.28319;
+
+    Paint arc(Color c) => Paint()
+      ..color = c
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.butt;
+
+    canvas.drawArc(rect, 0, full, false, arc(track));
+    // Declines fill the remainder, so the ring always reads as a whole.
+    canvas.drawArc(
+      rect,
+      start + full * advanceShare,
+      full * (1 - advanceShare),
+      false,
+      arc(loss),
+    );
+    canvas.drawArc(rect, start, full * advanceShare, false, arc(gain));
+  }
+
+  @override
+  bool shouldRepaint(covariant _RingPainter old) =>
+      old.advanceShare != advanceShare ||
+      old.gain != gain ||
+      old.loss != loss ||
+      old.track != track;
 }

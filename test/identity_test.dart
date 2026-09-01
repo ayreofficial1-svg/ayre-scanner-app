@@ -37,47 +37,50 @@ void main() {
       }
     });
 
-    test('Citrine is a warm yellow-green, not a fintech blue/mint/violet', () {
+    test('the accent is the logo\'s own green, sampled from the asset', () {
+      // The logo is the fixed brand asset, so the theme's accent is reconciled
+      // to it rather than the other way round. This value was sampled from
+      // assets/brand/ayre_logo.png, and both themes use it as the fill tone —
+      // so a drifting "second brand green" can't be introduced silently.
+      const brandGreen = Color(0xFF07C58F);
+      expect(AppTheme.lightTokens.accent, brandGreen);
+      expect(AppTheme.darkTokens.accent, brandGreen);
+    });
+
+    test('the accent is a cool, blue-leaning green', () {
+      // A deliberate reversal of the previous identity, whose accent was a warm
+      // yellow-green. The logo's green sits in the spring/emerald band.
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
-        for (final citrine in [t.citrine, t.citrineInk]) {
-          // Yellow-green: red and green both well above blue, and red close to
-          // green. A blue, mint or violet primary fails all three.
-          expect(citrine.b, lessThan(citrine.g), reason: '$name citrine hue');
-          expect(citrine.b, lessThan(citrine.r), reason: '$name citrine hue');
+        for (final tone in [t.accent, t.accentInk, t.gain]) {
           expect(
-            (citrine.r - citrine.g).abs(),
-            lessThan(0.22),
-            reason: '$name citrine must stay yellow-leaning, not lime or olive',
+            _hue(tone),
+            inInclusiveRange(140, 180),
+            reason: '$name accent family must be blue-leaning green',
           );
         }
       }
     });
 
-    test('Citrine and Jade are unmistakably different greens', () {
+    test('gain shares the accent family, and loss is far from both', () {
+      // v2 kept brand and gain as two deliberately different greens. v3 reverses
+      // that on purpose: the brief calls for one ownable accent used for brand
+      // and positive alike, and the logo fixes which green that is. What still
+      // must hold is that gain and loss are unmistakable.
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
-        final citrineHue = _hue(t.citrine);
-        final jadeHue = _hue(t.jade);
-        // Citrine sits in the yellow-green band, Jade in the blue-green band.
+        final gainHue = _hue(t.gain);
+        final accentHue = _hue(t.accent);
         expect(
-          citrineHue,
-          inInclusiveRange(50, 85),
-          reason: '$name citrine should be yellow-green',
+          (gainHue - accentHue).abs(),
+          lessThan(20),
+          reason: '$name gain should read as the brand green',
         );
+
+        final lossHue = _hue(t.loss);
+        final gap = (gainHue - lossHue).abs();
         expect(
-          jadeHue,
-          inInclusiveRange(140, 180),
-          reason: '$name jade should be blue-leaning green',
-        );
-        expect(
-          (citrineHue - jadeHue).abs(),
-          greaterThan(60),
-          reason: '$name brand and gain greens must not drift together',
-        );
-        // And Jade is the more saturated of the two, as specified.
-        expect(
-          _saturation(t.jade),
-          greaterThan(_saturation(t.citrine)),
-          reason: '$name jade is saturated where citrine is mineral/muted',
+          math.min(gap, 360 - gap),
+          greaterThan(90),
+          reason: '$name gain and loss must never be confusable',
         );
       }
     });
@@ -86,19 +89,19 @@ void main() {
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
         // Red wraps through 360; Garnet's wine undertone sits just below it
         // rather than on the pure-red axis, which is the point of the hue.
-        final garnetHue = _hue(t.garnet);
+        final garnetHue = _hue(t.loss);
         expect(
           garnetHue > 335 || garnetHue < 20,
           isTrue,
-          reason: '$name garnet must be a wine-leaning red, got $garnetHue',
+          reason: '$name loss must be a wine-leaning red, got $garnetHue',
         );
         expect(
-          _hue(t.ember),
+          _hue(t.caution),
           inInclusiveRange(20, 45),
-          reason: '$name ember is copper-amber',
+          reason: '$name caution is copper-amber',
         );
         // Compared on the wrapped axis so 350° vs 30° reads as 40° apart.
-        final gap = (garnetHue - _hue(t.ember)).abs();
+        final gap = (garnetHue - _hue(t.caution)).abs();
         expect(
           math.min(gap, 360 - gap),
           greaterThan(8),
@@ -131,12 +134,12 @@ void main() {
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
         for (final surface in [t.background, t.surface]) {
           for (final (role, color) in [
-            ('jade', t.jade),
-            ('garnet', t.garnet),
-            ('ember', t.ember),
-            ('slateViolet', t.slateViolet),
+            ('gain', t.gain),
+            ('loss', t.loss),
+            ('caution', t.caution),
+            ('info', t.info),
             // The type-weight Citrine — the reason a separate token exists.
-            ('citrineInk', t.citrineInk),
+            ('accentInk', t.accentInk),
           ]) {
             expect(
               _contrast(color, surface),
@@ -151,7 +154,7 @@ void main() {
     test('ink text on a Citrine fill clears 4.5:1', () {
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
         expect(
-          _contrast(t.onCitrine, t.citrine),
+          _contrast(t.onAccent, t.accent),
           greaterThanOrEqualTo(4.5),
           reason: '$name primary button label',
         );
@@ -179,7 +182,7 @@ void main() {
         expect(
           _contrast(edge, t.background),
           greaterThanOrEqualTo(1.4),
-          reason: '$name citrine fills need a visible boundary',
+          reason: '$name accent fills need a visible boundary',
         );
       }
     });
@@ -345,9 +348,3 @@ double _hue(Color c) {
   return h < 0 ? h + 360 : h;
 }
 
-double _saturation(Color c) {
-  final max = math.max(c.r, math.max(c.g, c.b));
-  final min = math.min(c.r, math.min(c.g, c.b));
-  if (max == 0) return 0;
-  return (max - min) / max;
-}

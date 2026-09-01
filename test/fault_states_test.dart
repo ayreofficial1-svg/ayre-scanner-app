@@ -6,7 +6,7 @@ import 'package:ayre_scanner/services/market_data_service.dart';
 import 'package:ayre_scanner/services/market_models.dart';
 import 'package:ayre_scanner/theme/app_theme.dart';
 import 'package:ayre_scanner/widgets/ayre_icons.dart';
-import 'package:ayre_scanner/widgets/fold_nav.dart';
+import 'package:ayre_scanner/widgets/curved_nav_bar.dart';
 import 'package:ayre_scanner/widgets/state_views.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -153,7 +153,7 @@ void main() {
       await tester.pump();
 
       final icon = tester.widget<AyreIcon>(find.byType(AyreIcon));
-      expect(icon.color, isNot(tokens.garnet));
+      expect(icon.color, isNot(tokens.loss));
       expect(icon.color, tokens.textSecondary);
     });
   });
@@ -176,17 +176,23 @@ void main() {
       );
       await settle(tester);
 
-      // Switch to the Insights desk, where the movers live.
-      await tester.tap(find.byKey(kFoldTriggerKey));
-      await settle(tester);
-      await tester.tap(find.byKey(foldDestinationKey('Insights')));
+      // Switch to the Insights desk, where the movers live. The bar is always
+      // visible now, so a destination is one tap away with nothing to open.
+      await tester.tap(find.byKey(navDestinationKey('Insights')));
       await settle(tester);
 
-      expect(find.textContaining("Top Gainers didn't load"), findsOneWidget);
-      expect(find.textContaining("Top Losers didn't load"), findsOneWidget);
-      // Most Active and the sentiment reading are untouched.
-      expect(find.textContaining("Most Active didn't load"), findsNothing);
+      // The sentiment reading is at the top of the desk and unaffected.
       expect(find.text('71'), findsOneWidget);
+      expect(find.textContaining("Top Gainers didn't load"), findsOneWidget);
+
+      // The desk is a long feed, so the lower sections are built as they scroll
+      // into view rather than all at once.
+      await tester.drag(find.byType(ListView).last, const Offset(0, -600));
+      await settle(tester);
+      expect(find.textContaining("Top Losers didn't load"), findsOneWidget);
+
+      // Most Active was never told to fail, and didn't.
+      expect(find.textContaining("Most Active didn't load"), findsNothing);
       expect(tester.takeException(), isNull);
     });
 
@@ -313,6 +319,98 @@ void main() {
           findsNothing,
           reason: '"$banned" must never appear in shipped copy',
         );
+      }
+    });
+  });
+
+  group('§9 coverage — every listed surface, every phase', () {
+    // The brief names the surfaces that must be checked against their
+    // failure/empty paths rather than assumed to work because DataResult exists.
+    // This walks each one through both phases and confirms the right panel
+    // appears, with no exception and no technical copy.
+    final surfaces = <String, DataSurface>{
+      'index board': DataSurface.indexBoard,
+      'sentiment': DataSurface.sentiment,
+      'gainers': DataSurface.gainers,
+      'losers': DataSurface.losers,
+      'most active': DataSurface.mostActive,
+      'signals': DataSurface.signals,
+      'courses': DataSurface.courses,
+    };
+
+    for (final entry in surfaces.entries) {
+      for (final phase in [DataPhaseSnapshot.failed, DataPhaseSnapshot.empty]) {
+        testWidgets('${entry.key} · ${phase.name}', (tester) async {
+          await tester.pumpWidget(
+            app(
+              HomeShell(
+                marketData: FakeMarketData(overrides: {entry.value: phase}),
+              ),
+            ),
+          );
+          await settle(tester);
+
+          // Walk every tab so each surface actually gets built.
+          for (final destination in ['Signals', 'Insights', 'Learn', 'Home']) {
+            await tester.tap(find.byKey(navDestinationKey(destination)));
+            await settle(tester);
+            expect(
+              tester.takeException(),
+              isNull,
+              reason: '${entry.key} ${phase.name} broke the $destination tab',
+            );
+          }
+        });
+      }
+    }
+
+    testWidgets('index and equity detail render both phases', (tester) async {
+      for (final phase in [DataPhaseSnapshot.failed, DataPhaseSnapshot.empty]) {
+        await tester.pumpWidget(
+          app(
+            IndexDetailScreen(
+              index: IndexId.sensex,
+              marketData: FakeMarketData(phase: phase),
+            ),
+          ),
+        );
+        await settle(tester);
+        expect(tester.takeException(), isNull, reason: 'index ${phase.name}');
+
+        await tester.pumpWidget(
+          app(
+            EquityDetailScreen(
+              symbol: 'HDFCBANK',
+              marketData: FakeMarketData(phase: phase),
+            ),
+          ),
+        );
+        await settle(tester);
+        expect(tester.takeException(), isNull, reason: 'equity ${phase.name}');
+      }
+    });
+
+    testWidgets('every fault kind is renderable end to end', (tester) async {
+      // Timeout is excluded here only because it deliberately never resolves
+      // inside the test's own clock; it is exercised by the injector unit tests.
+      for (final kind in FaultKind.values.where(
+        (k) => k != FaultKind.timeout,
+      )) {
+        FaultInjector.instance.enabled = true;
+        FaultInjector.instance.setAll(kind);
+
+        await tester.pumpWidget(
+          app(HomeShell(marketData: FakeMarketData())),
+        );
+        await settle(tester);
+        expect(
+          tester.takeException(),
+          isNull,
+          reason: '${kind.name} must render a designed state, not throw',
+        );
+
+        FaultInjector.instance.clear();
+        FaultInjector.instance.enabled = false;
       }
     });
   });

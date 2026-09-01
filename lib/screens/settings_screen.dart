@@ -10,11 +10,11 @@ import '../widgets/ayre_icons.dart';
 import '../widgets/figure.dart';
 import 'support_screen.dart';
 
-/// Settings — same information architecture (Alerts / Appearance / Account /
-/// About), fully restyled.
+/// Settings — grouped by what the user is actually trying to change, with the
+/// most-adjusted groups first and the account/session facts last.
 ///
-/// Every row maps to behaviour that works today. A control with nothing behind
-/// it is left out rather than shipped inert.
+/// Every row is backed by working behaviour. Where a plausible setting has no
+/// backing capability it is absent rather than shipped inert.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -23,25 +23,29 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  String? _handle;
+  Map<String, dynamic>? _session;
+  bool _loadingSession = true;
 
   @override
   void initState() {
     super.initState();
-    _loadIdentity();
+    _loadSession();
   }
 
-  Future<void> _loadIdentity() async {
+  Future<void> _loadSession() async {
     final session = await ApiService.getSession();
     if (!mounted) return;
-    setState(() => _handle = session?['username']?.toString());
+    setState(() {
+      _session = session;
+      _loadingSession = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final settings = SettingsStore.instance;
-    final themeController = AppThemeController.of(context);
+    final theme = AppThemeController.of(context);
 
     return Scaffold(
       backgroundColor: t.background,
@@ -58,61 +62,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
           listenable: settings,
           builder: (context, _) => ListView(
             padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              AppSpacing.huge,
+              AppSpace.md,
+              AppSpace.sm,
+              AppSpace.md,
+              AppSpace.xxl,
             ),
             children: [
-              const SectionLabel(label: 'Alerts'),
-              RowGroup(
-                children: [
-                  _SwitchRow(
-                    glyph: AyreGlyph.bell,
-                    title: 'In-app alerts',
-                    subtitle: 'Keep a list of what changed while you were away, '
-                        'reachable from the bell on Home.',
-                    value: settings.inAppAlerts,
-                    onChanged: settings.setInAppAlerts,
-                  ),
-                  _SwitchRow(
-                    glyph: AyreGlyph.alerts,
-                    title: 'New signal alerts',
-                    subtitle: 'Record an entry when the scanner returns a pick '
-                        'you have not seen before.',
-                    value: settings.newSignalAlerts,
-                    enabled: settings.inAppAlerts,
-                    onChanged: settings.setNewSignalAlerts,
-                  ),
-                  _SwitchRow(
-                    glyph: AyreGlyph.delayed,
-                    title: 'Delayed-data warnings',
-                    subtitle: 'Record an entry when market data falls behind its '
-                        'normal update interval.',
-                    value: settings.staleDataWarnings,
-                    enabled: settings.inAppAlerts,
-                    onChanged: settings.setStaleDataWarnings,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xl),
+              // ── Appearance ─────────────────────────────────────────────────
               const SectionLabel(label: 'Appearance'),
               AyreCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text('THEME', style: AppTypo.label(t)),
+                    const SizedBox(height: AppSpace.sm),
+                    // Light and Dark only. The System option is gone, and stored
+                    // "system" values are migrated on load.
                     AyreSegmented<ThemeMode>(
-                      value: themeController.themeMode,
+                      value: theme.themeMode == ThemeMode.system
+                          ? ThemeMode.dark
+                          : theme.themeMode,
                       onChanged: (mode) {
                         HapticFeedback.selectionClick();
-                        themeController.setThemeMode(mode);
+                        theme.setThemeMode(mode);
                       },
                       segments: const [
-                        AyreSegment(
-                          value: ThemeMode.system,
-                          label: 'System',
-                          glyph: AyreGlyph.appearance,
-                        ),
                         AyreSegment(
                           value: ThemeMode.light,
                           label: 'Light',
@@ -125,34 +99,101 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: AppSpace.md),
                     Text(
-                      'Light and dark are tuned separately — each is designed '
-                      'against its own background rather than inverted from the '
-                      'other.',
+                      'Light and dark are designed separately — each is tuned '
+                      'against its own background rather than inverted.',
                       style: AppTypo.caption(t),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: AppSpacing.xl),
-              const SectionLabel(label: 'Account'),
+              const SizedBox(height: AppSpace.md),
+              _TextSizeCard(
+                value: settings.textSize,
+                onChanged: (size) {
+                  HapticFeedback.selectionClick();
+                  settings.setTextSize(size);
+                },
+              ),
+
+              // ── Alerts ─────────────────────────────────────────────────────
+              const SizedBox(height: AppSpace.lg),
+              const SectionLabel(label: 'Alerts'),
+              RowGroup(
+                children: [
+                  _SwitchRow(
+                    glyph: AyreGlyph.bell,
+                    title: 'In-app alerts',
+                    subtitle:
+                        'Keep a list of what changed while you were away, '
+                        'reachable from the bell on Home.',
+                    value: settings.inAppAlerts,
+                    onChanged: settings.setInAppAlerts,
+                  ),
+                  _SwitchRow(
+                    glyph: AyreGlyph.alerts,
+                    title: 'New signal alerts',
+                    subtitle:
+                        'Record an entry when the scanner returns a pick '
+                        'you have not seen before.',
+                    value: settings.newSignalAlerts,
+                    enabled: settings.inAppAlerts,
+                    onChanged: settings.setNewSignalAlerts,
+                  ),
+                  _SwitchRow(
+                    glyph: AyreGlyph.delayed,
+                    title: 'Delayed-data warnings',
+                    subtitle:
+                        'Record an entry when market data falls behind its '
+                        'normal update interval.',
+                    value: settings.staleDataWarnings,
+                    enabled: settings.inAppAlerts,
+                    onChanged: settings.setStaleDataWarnings,
+                  ),
+                ],
+              ),
+
+              // ── Account & session ──────────────────────────────────────────
+              const SizedBox(height: AppSpace.lg),
+              const SectionLabel(label: 'Account and session'),
               RowGroup(
                 children: [
                   SettingRow(
                     glyph: AyreGlyph.account,
                     title: 'Signed in as',
-                    subtitle: _handle == null
+                    subtitle: _loadingSession
                         ? "Checking this device's session"
                         : 'The identity the scanner uses',
-                    trailing: Text(
-                      _handle ?? '—',
-                      style: AppTypo.bodyStrong(t, color: t.textSecondary),
+                    trailing: _loadingSession
+                        ? const SkeletonBlock(width: 72, height: 11)
+                        : Text(
+                            _session?['username']?.toString() ??
+                                'Not signed in',
+                            style: AppTypo.bodyStrong(
+                              t,
+                              color: t.textSecondary,
+                            ),
+                          ),
+                  ),
+                  SettingRow(
+                    glyph: AyreGlyph.lock,
+                    title: 'Session',
+                    subtitle: _session == null
+                        ? 'No active session on this device'
+                        : 'Signed in on this device only',
+                    trailing: AyreChip(
+                      label: _session == null ? 'Inactive' : 'Active',
+                      tone: _session == null
+                          ? ChipTone.neutral
+                          : ChipTone.brand,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: AppSpacing.xl),
+
+              // ── About ──────────────────────────────────────────────────────
+              const SizedBox(height: AppSpace.lg),
               const SectionLabel(label: 'About'),
               RowGroup(
                 children: [
@@ -163,17 +204,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () {
                       HapticFeedback.selectionClick();
                       Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const SupportScreen()),
+                        MaterialPageRoute(
+                          builder: (_) => const SupportScreen(),
+                        ),
                       );
                     },
                   ),
                   SettingRow(
                     glyph: AyreGlyph.about,
                     title: 'Version',
-                    // Numbers stay tabular even here, for system consistency.
+                    subtitle: 'Include this when you report a problem',
                     trailing: Figure.static(
                       '$kAppVersion ($kAppBuild)',
-                      fontSize: 13,
+                      fontSize: AppTextScale.caption,
                       color: t.textSecondary,
                     ),
                   ),
@@ -187,9 +230,105 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
+/// The font-size control, with a live preview above the picker so the effect is
+/// visible before committing rather than only after.
+class _TextSizeCard extends StatelessWidget {
+  const _TextSizeCard({required this.value, required this.onChanged});
+
+  final AppTextSize value;
+  final ValueChanged<AppTextSize> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+
+    return AyreCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('TEXT SIZE', style: AppTypo.label(t)),
+          const SizedBox(height: AppSpace.sm),
+          // The preview renders at the *selected* scale specifically, rather
+          // than inheriting the app scale, so it still previews correctly at the
+          // moment of choosing.
+          _Preview(scale: value.scale),
+          const SizedBox(height: AppSpace.md),
+          AyreSegmented<AppTextSize>(
+            compact: true,
+            value: value,
+            onChanged: onChanged,
+            segments: [
+              for (final size in AppTextSize.values)
+                AyreSegment(value: size, label: size.label),
+            ],
+          ),
+          const SizedBox(height: AppSpace.sm),
+          Text(
+            'Applies across the app straight away, on top of your device’s own '
+            'text-size setting.',
+            style: AppTypo.caption(t),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Preview extends StatelessWidget {
+  const _Preview({required this.scale});
+
+  final double scale;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: t.surfaceAlt,
+        borderRadius: BorderRadius.circular(AppRadius.panel),
+        border: Border.all(color: t.borderSubtle),
+      ),
+      // A fixed scale for the sample, so the card demonstrates the choice rather
+      // than reflecting whatever is already applied.
+      child: MediaQuery.withNoTextScaling(
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpace.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'NIFTY 50',
+                style: AppTypo.label(t).copyWith(fontSize: 10 * scale),
+              ),
+              const SizedBox(height: AppSpace.xxs),
+              Text(
+                '24,518.40',
+                style: AppTypo.ticker(
+                  fontSize: AppTextScale.section * scale,
+                  fontWeight: FontWeight.w600,
+                  color: t.textPrimary,
+                ),
+              ),
+              const SizedBox(height: AppSpace.xxs),
+              Text(
+                'Breadth is constructive across large-cap financials.',
+                style: AppTypo.body(
+                  t,
+                ).copyWith(fontSize: AppTextScale.body * scale),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Every toggle carries a one-line description of what it changes, and a switch
-/// as its disclosure affordance. Confirmation-weight haptic fires on the
-/// completed change, not the press.
+/// as its disclosure affordance. Confirmation-weight haptic on the completed
+/// change, not the press.
 class _SwitchRow extends StatelessWidget {
   const _SwitchRow({
     required this.glyph,

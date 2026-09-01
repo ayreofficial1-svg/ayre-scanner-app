@@ -55,7 +55,8 @@ class _SignalsTabState extends State<SignalsTab> {
         title: fresh.length == 1
             ? 'New scanner pick: ${fresh.first}'
             : '${fresh.length} new scanner picks',
-        body: '${fresh.take(4).join(', ')}'
+        body:
+            '${fresh.take(4).join(', ')}'
             '${fresh.length > 4 ? ', and more' : ''}',
         at: DateTime.now(),
       ),
@@ -79,16 +80,16 @@ class _SignalsTabState extends State<SignalsTab> {
     final t = context.tokens;
 
     return RefreshIndicator(
-      color: t.citrineInk,
+      color: t.accentInk,
       backgroundColor: t.surface,
       onRefresh: _load,
       edgeOffset: 72,
       child: ContentWidth(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
+            AppSpace.lg,
+            AppSpace.lg,
+            AppSpace.lg,
             120,
           ),
           children: [
@@ -99,9 +100,9 @@ class _SignalsTabState extends State<SignalsTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('LIVE SCANNER', style: AppTypo.label(t)),
-                    const SizedBox(height: AppSpacing.xs),
+                    const SizedBox(height: AppSpace.xs),
                     Text('Signal board', style: AppTypo.pageTitle(t)),
-                    const SizedBox(height: AppSpacing.xxs),
+                    const SizedBox(height: AppSpace.xxs),
                     Text(
                       'Curated setups with live movement and compact rationale.',
                       style: AppTypo.body(t),
@@ -110,10 +111,10 @@ class _SignalsTabState extends State<SignalsTab> {
                 ),
               ),
             ),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpace.xl),
             if (_loading)
               const AyreCard(
-                padding: EdgeInsets.symmetric(vertical: AppSpacing.xs),
+                padding: EdgeInsets.symmetric(vertical: AppSpace.xs),
                 child: Column(
                   children: [
                     SkeletonTickerRow(),
@@ -135,7 +136,7 @@ class _SignalsTabState extends State<SignalsTab> {
               )
             else
               for (final (i, signal) in _result!.value!.indexed) ...[
-                if (i > 0) const SizedBox(height: AppSpacing.sm),
+                if (i > 0) const SizedBox(height: AppSpace.sm),
                 Entrance(
                   index: i + 1,
                   child: _SignalRowCard(
@@ -160,11 +161,11 @@ class _SignalRowCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final tone = signal.bullish ? t.jade : t.garnet;
+    final tone = signal.bullish ? t.gain : t.loss;
 
     return AyreCard(
       onTap: onTap,
-      padding: const EdgeInsets.all(AppSpacing.md),
+      padding: const EdgeInsets.all(AppSpace.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -176,7 +177,7 @@ class _SignalRowCard extends StatelessWidget {
                 size: 17,
                 color: tone,
               ),
-              const SizedBox(width: AppSpacing.sm),
+              const SizedBox(width: AppSpace.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -197,7 +198,7 @@ class _SignalRowCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
+              const SizedBox(width: AppSpace.sm),
               Flexible(
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
@@ -207,7 +208,7 @@ class _SignalRowCard extends StatelessWidget {
                     children: [
                       if (signal.lastPrice != null)
                         Figure(formatPrice(signal.lastPrice), fontSize: 14),
-                      const SizedBox(height: AppSpacing.xxs),
+                      const SizedBox(height: AppSpace.xxs),
                       DeltaFigure(change: signal.percentChange, fontSize: 12),
                     ],
                   ),
@@ -216,7 +217,7 @@ class _SignalRowCard extends StatelessWidget {
             ],
           ),
           if (signal.rationale.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpace.sm),
             Text(
               signal.rationale,
               style: AppTypo.body(t),
@@ -224,17 +225,17 @@ class _SignalRowCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ],
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpace.sm),
           const HairlineDivider(),
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpace.sm),
           // The levels row only renders the figures the feed actually provided.
           Row(
             children: [
               if (signal.strength != null) ...[
                 Text('CONVICTION', style: AppTypo.label(t)),
-                const SizedBox(width: AppSpacing.xs),
+                const SizedBox(width: AppSpace.xs),
                 SignalStrength(level: signal.strength!, color: tone),
-                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpace.md),
               ],
               Expanded(
                 child: FittedBox(
@@ -245,9 +246,13 @@ class _SignalRowCard extends StatelessWidget {
                       if (signal.entry != null)
                         _Level(label: 'Entry', value: signal.entry),
                       if (signal.target != null)
-                        _Level(label: 'Target', value: signal.target, tone: t.jade),
+                        _Level(
+                          label: 'Target',
+                          value: signal.target,
+                          tone: t.gain,
+                        ),
                       if (signal.stop != null)
-                        _Level(label: 'Stop', value: signal.stop, tone: t.garnet),
+                        _Level(label: 'Stop', value: signal.stop, tone: t.loss),
                       if (signal.entry == null &&
                           signal.target == null &&
                           signal.stop == null &&
@@ -279,11 +284,11 @@ class _Level extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return Padding(
-      padding: const EdgeInsets.only(left: AppSpacing.md),
+      padding: const EdgeInsets.only(left: AppSpace.md),
       child: Row(
         children: [
           Text(label.toUpperCase(), style: AppTypo.label(t)),
-          const SizedBox(width: AppSpacing.xs),
+          const SizedBox(width: AppSpace.xs),
           Figure(formatPrice(value), fontSize: 12, color: tone),
         ],
       ),

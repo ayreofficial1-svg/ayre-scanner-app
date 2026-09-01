@@ -85,23 +85,27 @@ class StatePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    // Failures are ink-toned, not red. Ember is reserved for the
-    // "attention but not broken" tier (delayed feed, stale data).
+    // Failure is ink-toned, not red: red means "the market went down", never
+    // "the app broke". The soft plate behind the glyph is where the palette's
+    // muted fills do their one job on this surface.
     final tone = failed ? t.textSecondary : t.textTertiary;
+    final plate = failed ? t.surfaceAlt : t.fillMint;
 
     return AyreCard(
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? AppSpacing.lg : AppSpacing.xl,
-        vertical: compact ? AppSpacing.xl : AppSpacing.xxxl,
+        horizontal: compact ? AppSpace.md : AppSpace.lg,
+        vertical: compact ? AppSpace.lg : AppSpace.xl,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            padding: EdgeInsets.all(compact ? 9 : 12),
+            padding: EdgeInsets.all(compact ? 11 : 15),
             decoration: BoxDecoration(
-              border: Border.all(color: t.border),
-              borderRadius: BorderRadius.circular(AppRadius.panel),
+              color: plate,
+              // A generous rounded plate, matching the card language rather
+              // than the previous identity's crisp square.
+              borderRadius: BorderRadius.circular(AppRadius.card),
             ),
             child: AyreIcon(
               glyph ?? (failed ? AyreGlyph.disconnected : AyreGlyph.empty),
@@ -109,18 +113,16 @@ class StatePanel extends StatelessWidget {
               color: tone,
             ),
           ),
-          SizedBox(height: compact ? AppSpacing.md : AppSpacing.lg),
+          SizedBox(height: compact ? AppSpace.md : AppSpace.lg),
           Text(
             headline,
             textAlign: TextAlign.center,
-            style: compact
-                ? AppTypo.cardTitle(t)
-                : AppTypo.sectionTitle(t),
+            style: compact ? AppTypo.cardTitle(t) : AppTypo.sectionTitle(t),
           ),
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: AppSpace.xs),
           Text(message, textAlign: TextAlign.center, style: AppTypo.body(t)),
           if (onRetry != null) ...[
-            SizedBox(height: compact ? AppSpacing.md : AppSpacing.lg),
+            SizedBox(height: compact ? AppSpace.md : AppSpace.lg),
             AyreButton(
               label: retryLabel,
               glyph: AyreGlyph.refresh,
@@ -129,11 +131,11 @@ class StatePanel extends StatelessWidget {
               onPressed: onRetry,
             ),
           ] else if (pullToRefreshHint) ...[
-            const SizedBox(height: AppSpacing.sm),
+            const SizedBox(height: AppSpace.sm),
             Text(
               'Pull down to try again',
               textAlign: TextAlign.center,
-              style: AppTypo.label(t, fontSize: 10),
+              style: AppTypo.label(t),
             ),
           ],
         ],
@@ -154,27 +156,27 @@ class OfflineBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return Material(
-      color: t.emberBg,
+      color: t.cautionSoft,
       child: SafeArea(
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm,
+            horizontal: AppSpace.md,
+            vertical: AppSpace.sm,
           ),
           child: Row(
             children: [
-              AyreIcon(AyreGlyph.offline, size: 16, color: t.ember),
-              const SizedBox(width: AppSpacing.sm),
+              AyreIcon(AyreGlyph.offline, size: 16, color: t.caution),
+              const SizedBox(width: AppSpace.sm),
               Expanded(
                 child: Text(
                   "You're offline — showing the last saved data",
-                  style: AppTypo.bodyStrong(t, color: t.ember),
+                  style: AppTypo.bodyStrong(t, color: t.caution),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
+              const SizedBox(width: AppSpace.sm),
               Semantics(
                 button: true,
                 label: 'Dismiss offline notice',
@@ -182,11 +184,11 @@ class OfflineBanner extends StatelessWidget {
                   behavior: HitTestBehavior.opaque,
                   onTap: onDismiss,
                   child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.xs),
+                    padding: const EdgeInsets.all(AppSpace.xs),
                     child: AyreIcon(
                       AyreGlyph.close,
                       size: 15,
-                      color: t.ember,
+                      color: t.caution,
                     ),
                   ),
                 ),
@@ -214,12 +216,12 @@ class StaleNotice extends StatelessWidget {
     final t = context.tokens;
     return Row(
       children: [
-        AyreIcon(AyreGlyph.delayed, size: 13, color: t.ember),
-        const SizedBox(width: AppSpacing.xs),
+        AyreIcon(AyreGlyph.delayed, size: 13, color: t.caution),
+        const SizedBox(width: AppSpace.xs),
         Expanded(
           child: Text(
             message,
-            style: AppTypo.caption(t, color: t.ember),
+            style: AppTypo.caption(t, color: t.caution),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -258,7 +260,7 @@ class FreshnessStamp extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text('AS OF', style: AppTypo.label(t)),
-          const SizedBox(width: AppSpacing.xs),
+          const SizedBox(width: AppSpace.xs),
           Text(_clock(asOf!), style: AppTypo.valueSmall(t)),
         ],
       ),
