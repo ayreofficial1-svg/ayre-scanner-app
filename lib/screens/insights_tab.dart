@@ -6,7 +6,6 @@ import '../services/market_models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_charts.dart';
 import '../widgets/ayre_components.dart';
-import '../widgets/figure.dart';
 import '../widgets/state_views.dart';
 import 'equity_detail_screen.dart';
 

@@ -344,15 +344,22 @@ class OfflineBanner extends StatelessWidget {
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTap: onDismiss,
-                  child: Padding(
-                    // 8px around a 15px glyph is a ~31px target — under the
-                    // 44pt floor. Raising every target app-wide is Phase 7's
-                    // pass; noted here so it isn't missed.
-                    padding: const EdgeInsets.all(AppSpace.xs),
-                    child: AyreIcon(
-                      AyreGlyph.close,
-                      size: 15,
-                      color: t.foregroundMuted,
+                  // Phase 7: was an 8px pad around a 15px glyph (~31px,
+                  // under the 44pt floor). A fixed 44x44 hit box, glyph
+                  // centred, closes the gap without changing the glyph's
+                  // visual size — the banner grows slightly taller to
+                  // accommodate it, which is the correct trade (a
+                  // dismiss control earns the room a decorative element
+                  // wouldn't).
+                  child: SizedBox(
+                    width: AppSpace.minTarget,
+                    height: AppSpace.minTarget,
+                    child: Center(
+                      child: AyreIcon(
+                        AyreGlyph.close,
+                        size: 15,
+                        color: t.foregroundMuted,
+                      ),
                     ),
                   ),
                 ),
@@ -406,10 +413,25 @@ class StaleNotice extends StatelessWidget {
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: onRefresh,
-              child: Text(
-                StateAction.refreshNow.label,
-                style: AppTypo.caption(t, color: t.accentInk).copyWith(
-                  fontWeight: FontWeight.w700,
+              // Phase 7: an inline caption-sized text link had a hit area of
+              // its own text bounds only (~16px tall) — under the 44pt
+              // floor. A minHeight box with the same left-aligned text
+              // keeps the caption's visual size but gives the row itself
+              // (and every StaleNotice call site, none of which pass
+              // onRefresh today, per the constructor default) enough
+              // height to meet the floor the moment one does.
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minHeight: AppSpace.minTarget,
+                ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    StateAction.refreshNow.label,
+                    style: AppTypo.caption(t, color: t.accentInk).copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
               ),
             ),

@@ -57,10 +57,9 @@ class _ArcGeometry {
 /// wraps its painter in one of these rather than each growing its own
 /// controller and its own `disableAnimationsOf` check.
 class _DrawOn extends StatefulWidget {
-  const _DrawOn({required this.builder, this.duration});
+  const _DrawOn({required this.builder});
 
   final Widget Function(BuildContext context, double progress) builder;
-  final Duration? duration;
 
   @override
   State<_DrawOn> createState() => _DrawOnState();
@@ -74,7 +73,7 @@ class _DrawOnState extends State<_DrawOn> with SingleTickerProviderStateMixin {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: widget.duration ?? AppMotion.chartDraw,
+      duration: AppMotion.chartDraw,
     );
     // MediaQuery isn't readable in initState — decide on the first frame.
     WidgetsBinding.instance.addPostFrameCallback((_) {
