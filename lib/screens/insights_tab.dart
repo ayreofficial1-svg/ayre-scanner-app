@@ -5,7 +5,7 @@ import '../services/market_data_service.dart';
 import '../services/market_models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
-import '../widgets/breadth_meter.dart';
+import '../widgets/ayre_charts.dart';
 import '../widgets/figure.dart';
 import '../widgets/state_views.dart';
 import 'equity_detail_screen.dart';
@@ -229,10 +229,18 @@ class _SentimentSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          BreadthMeter(
-            value: sentiment.score,
-            band: sentiment.band,
-            tone: tone,
+          // Phase 3 swap only: `BreadthMeter` was deleted with this phase, so
+          // its one call site is moved onto the component that inherits its
+          // job. This screen's actual rebuild against Spec §13.3 — including
+          // whether the reading belongs centred, and wiring the advance/
+          // decline counts into a `BreadthDonut` instead of the two
+          // `LabelledFigure`s below — is still Phase 5's.
+          Center(
+            child: SentimentGauge(
+              score: sentiment.score,
+              band: sentiment.band,
+              tone: tone,
+            ),
           ),
           if (sentiment.advances != null || sentiment.declines != null) ...[
             const SizedBox(height: AppSpace.md),

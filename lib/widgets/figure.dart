@@ -177,6 +177,139 @@ class _RollingChar extends StatelessWidget {
   }
 }
 
+/// A figure that counts up to its value rather than rolling its digits.
+///
+/// Spec §12.3/§15.2 asks for a count-up — the *number* interpolates and is
+/// re-formatted every frame — over ~900ms on the Ayre ease. That is a
+/// different animation from [Figure]'s per-character glyph roll, not a
+/// retuning of it: a roll animates the shape of the text, a count-up animates
+/// the quantity. Plan §4 decided the count-up is the primary hero-metric
+/// animation and the roll is retired for that job, so hero readings (the
+/// donut's centre label, the gauge's score, an index level) use this and
+/// secondary live tickers keep [Figure].
+///
+/// Interpolation runs from the previous value, not from zero, on any change
+/// after the first — counting a 12,480 index level back down to zero and up
+/// again every tick would be absurd. Only the first appearance starts at
+/// [from].
+///
+/// Under reduced motion the value is simply rendered at its final state: the
+/// information still arrives, only the way it communicates changes.
+class CountUpFigure extends StatefulWidget {
+  const CountUpFigure({
+    super.key,
+    required this.value,
+    required this.format,
+    this.from = 0,
+    this.fontSize = 14,
+    this.fontWeight = FontWeight.w600,
+    this.color,
+    this.semanticsLabel,
+    this.textAlign = TextAlign.left,
+    this.duration = AppMotion.countUp,
+  });
+
+  final double value;
+
+  /// Applied to the interpolated value every frame. Keep it cheap — this runs
+  /// at frame rate — and keep the digit count stable across the range, or the
+  /// text will change width as it counts (the reason [AppTypo.num] is tabular
+  /// in the first place).
+  final String Function(double value) format;
+
+  /// Where the first appearance counts from. Zero for a percentage or a score;
+  /// a caller showing a large absolute level may want to pass something nearer
+  /// the target so the count reads as a settle rather than a slot machine.
+  final double from;
+
+  final double fontSize;
+  final FontWeight fontWeight;
+  final Color? color;
+  final String? semanticsLabel;
+  final TextAlign textAlign;
+  final Duration duration;
+
+  @override
+  State<CountUpFigure> createState() => _CountUpFigureState();
+}
+
+class _CountUpFigureState extends State<CountUpFigure>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late double _from;
+  late double _to;
+
+  @override
+  void initState() {
+    super.initState();
+    _from = widget.from;
+    _to = widget.value;
+    _controller = AnimationController(vsync: this, duration: widget.duration);
+    // MediaQuery isn't readable in initState, so the reduced-motion check
+    // happens on the first frame rather than here.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _controller.value = 1;
+      } else {
+        _controller.forward();
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(CountUpFigure oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value == widget.value) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _from = widget.value;
+      _to = widget.value;
+      _controller.value = 1;
+      return;
+    }
+    // Continue from whatever is on screen now, so a second update mid-count
+    // carries on rather than snapping back to the old start.
+    _from = _current;
+    _to = widget.value;
+    _controller.forward(from: 0);
+  }
+
+  double get _current {
+    final t = AppMotion.ease.transform(_controller.value.clamp(0.0, 1.0));
+    return _from + (_to - _from) * t;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.tokens;
+    final style = AppTypo.num(
+      fontSize: widget.fontSize,
+      fontWeight: widget.fontWeight,
+      color: widget.color ?? tokens.textPrimary,
+      height: 1.0,
+    );
+    return Semantics(
+      label: widget.semanticsLabel ?? widget.format(widget.value),
+      excludeSemantics: true,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) => Text(
+          widget.format(_current),
+          style: style,
+          textAlign: widget.textAlign,
+          maxLines: 1,
+        ),
+      ),
+    );
+  }
+}
+
 /// A signed change figure. Color is always a confirming second channel: the sign
 /// lives in the string and a directional caret sits beside it, so direction
 /// survives with color removed entirely.

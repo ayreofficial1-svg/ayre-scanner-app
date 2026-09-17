@@ -949,7 +949,13 @@ class SignalStrength extends StatelessWidget {
               width: 3,
               height: height * (i < steps.length ? steps[i] : 1.0),
               decoration: BoxDecoration(
-                color: i < level ? tone : t.hairline,
+                // Unfilled bars sit on `surfaceSunken`, not `hairline`.
+                // Hairline is a ~6% alpha edge tone — correct for a 1px
+                // divider, effectively invisible as a 3px-wide filled bar, and
+                // an unread bar that can't be seen isn't a meter, it's a
+                // shorter meter. Retinted in Phase 3 alongside the rest of the
+                // data-viz family.
+                color: i < level ? tone : t.surfaceSunken,
                 borderRadius: BorderRadius.circular(1),
               ),
             ),
@@ -1009,13 +1015,21 @@ class _SkeletonBlockState extends State<SkeletonBlock>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
+  /// §14.4: one sweep every 1.7s, eased in and out.
+  static const Duration _sweep = Duration(milliseconds: 1700);
+
+  /// How wide the highlight band is, as a fraction of the sweep's travel. Wide
+  /// enough to read as a soft wash moving across the block rather than a hard
+  /// glint crossing it.
+  static const double _bandWidth = 0.22;
+
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1100),
-    )..repeat(reverse: true);
+    // Not `reverse: true`. A reversing sweep travels back the way it came,
+    // which reads as something scrubbing rather than loading. Because the band
+    // is fully off-block at both ends of the travel, the restart is invisible.
+    _controller = AnimationController(vsync: this, duration: _sweep)..repeat();
   }
 
   @override
@@ -1027,25 +1041,58 @@ class _SkeletonBlockState extends State<SkeletonBlock>
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final block = Container(
-      width: widget.width,
-      height: widget.height,
-      decoration: BoxDecoration(
-        color: t.skeleton,
-        borderRadius: BorderRadius.circular(widget.radius),
-      ),
+    final base = t.skeleton;
+
+    BoxDecoration decoration({Gradient? gradient}) => BoxDecoration(
+      color: gradient == null ? base : null,
+      gradient: gradient,
+      borderRadius: BorderRadius.circular(widget.radius),
     );
-    if (MediaQuery.disableAnimationsOf(context)) return block;
+
+    if (MediaQuery.disableAnimationsOf(context)) {
+      return Container(
+        width: widget.width,
+        height: widget.height,
+        decoration: decoration(),
+      );
+    }
+
+    // A soft foreground-tinted highlight over the skeleton fill (§14.4),
+    // replacing the previous identity's whole-block opacity pulse. A pulse
+    // dims the layout it is standing in for; a sweep leaves the shape at a
+    // constant weight and only moves light across it, which is what keeps a
+    // loading screen calm rather than throbbing.
+    final highlight = Color.alphaBlend(
+      t.textPrimary.withValues(alpha: 0.07),
+      base,
+    );
+
     // Continuous animation: isolated so it repaints only itself.
     return RepaintBoundary(
       child: AnimatedBuilder(
         animation: _controller,
-        child: block,
-        builder: (context, child) => Opacity(
-          opacity:
-              0.55 + 0.45 * AppMotion.easeInOut.transform(_controller.value),
-          child: child,
-        ),
+        builder: (context, _) {
+          final p = AppMotion.easeInOut.transform(_controller.value);
+          // Travel from fully off the left edge to fully off the right, so the
+          // band never pops into or out of existence mid-block.
+          final centre = -_bandWidth + p * (1 + _bandWidth * 2);
+          return Container(
+            width: widget.width,
+            height: widget.height,
+            decoration: decoration(
+              gradient: LinearGradient(
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+                colors: [base, highlight, base],
+                stops: [
+                  (centre - _bandWidth).clamp(0.0, 1.0),
+                  centre.clamp(0.0, 1.0),
+                  (centre + _bandWidth).clamp(0.0, 1.0),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

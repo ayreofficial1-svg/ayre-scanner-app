@@ -13,6 +13,9 @@ import 'package:ayre_scanner/services/market_data_service.dart';
 import 'package:ayre_scanner/services/market_models.dart';
 import 'package:ayre_scanner/theme/app_theme.dart';
 import 'package:ayre_scanner/widgets/ayre_bottom_nav.dart';
+import 'package:ayre_scanner/widgets/ayre_charts.dart';
+import 'package:ayre_scanner/widgets/state_views.dart';
+import 'package:ayre_scanner/widgets/ticker_trace.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -199,6 +202,145 @@ void main() {
     );
   });
 
+  // ── Phase 3: data visualization ──────────────────────────────────────────
+  //
+  // The radial charts are the first components in the app whose layout is
+  // driven by arc arithmetic rather than by the box model, so the failure mode
+  // the rest of this file hunts for (overflow at 2× text) is joined by a new
+  // one: a sweep computed as a negative number, which Flutter paints as an arc
+  // running backwards rather than throwing. The degenerate-input test below
+  // covers the boundaries where that arithmetic goes wrong — zero total, a
+  // slice too thin to survive its own round caps, and both ends of the range.
+  group('data visualization', () {
+    sweep(
+      'ChartGallery',
+      () => const Scaffold(
+        body: SingleChildScrollView(
+          padding: EdgeInsets.all(AppSpace.lg),
+          child: Column(
+            children: [
+              BreadthDonut(advances: 1284, declines: 967, unchanged: 143),
+              SizedBox(height: AppSpace.xl),
+              SentimentGauge(score: 62, band: 'Constructive'),
+              SizedBox(height: AppSpace.xl),
+              ProgressRing(value: 0.35),
+              SizedBox(height: AppSpace.xl),
+              _Trace(),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    testWidgets('the radial charts survive their degenerate inputs', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrap(
+          const Scaffold(
+            body: SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Nothing to divide by.
+                  BreadthDonut(advances: 0, declines: 0),
+                  // One slice far too thin to draw with round caps and a 2px
+                  // gap — it must be dropped from the ring, not smeared.
+                  BreadthDonut(advances: 4000, declines: 1, unchanged: 0),
+                  // Both ends of the ring: an empty arc and a closed one.
+                  ProgressRing(value: 0),
+                  ProgressRing(value: 1),
+                  // Both ends of the gauge, where the marker sits exactly on a
+                  // rounded track end.
+                  SentimentGauge(score: 0, band: 'Bearish'),
+                  SentimentGauge(score: 100, band: 'Bullish'),
+                ],
+              ),
+            ),
+          ),
+          brightness: Brightness.dark,
+          scale: 1.0,
+        ),
+      );
+      for (var i = 0; i < 90; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a count-up arrives at its value, not near it', (tester) async {
+      await tester.pumpWidget(
+        wrap(
+          const Scaffold(
+            body: Center(child: SentimentGauge(score: 62, band: 'Neutral')),
+          ),
+          brightness: Brightness.dark,
+          scale: 1.0,
+        ),
+      );
+      // Mid-count: something is on screen and it isn't the final value yet.
+      await tester.pump(const Duration(milliseconds: 120));
+      expect(find.text('62'), findsNothing);
+      // Settled: the reading is exact. A count-up that lands on 61 because of
+      // curve rounding is worse than no animation at all.
+      for (var i = 0; i < 90; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      expect(find.text('62'), findsOneWidget);
+    });
+  });
+
+  // ── Phase 4: system states ───────────────────────────────────────────────
+  group('state panels', () {
+    sweep(
+      'StateGallery',
+      () => const Scaffold(
+        body: SingleChildScrollView(
+          padding: EdgeInsets.all(AppSpace.lg),
+          child: Column(
+            children: [
+              StatePanel.empty(
+                headline: 'No signals published yet',
+                message: 'The desk publishes through the trading session.',
+              ),
+              SizedBox(height: AppSpace.md),
+              StatePanel.noResults(),
+              SizedBox(height: AppSpace.md),
+              StatePanel.failed(
+                headline: "The movers list didn't come through",
+                message: 'Nothing else on this screen is affected.',
+              ),
+              SizedBox(height: AppSpace.md),
+              StatePanel.offline(),
+              SizedBox(height: AppSpace.md),
+              StatePanel.sessionExpired(),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    test('§14.5 — each state carries its own verb, and they stay distinct', () {
+      // The point of the enum is that these four never collapse into each
+      // other. A regression here looks harmless in a diff and reads as sloppy
+      // on screen: "Retry" offered for an expired session, "Try again" for a
+      // connection that never dropped.
+      expect(StatePreset.failed.action, StateAction.tryAgain);
+      expect(StatePreset.offline.action, StateAction.retry);
+      expect(StatePreset.sessionExpired.action, StateAction.signInAgain);
+
+      final labels = StateAction.values.map((a) => a.label).toSet();
+      expect(labels.length, StateAction.values.length);
+    });
+
+    test('empty and failed are distinguishable without reading the copy', () {
+      final glyphs = StatePreset.values.map((p) => p.glyph).toSet();
+      expect(glyphs.length, StatePreset.values.length);
+      expect(StatePreset.empty.isFault, isFalse);
+      expect(StatePreset.noResults.isFault, isFalse);
+      expect(StatePreset.failed.isFault, isTrue);
+    });
+  });
+
   group('the navigation bar', () {
     for (final scale in scales) {
       testWidgets('is always visible with icon and label, at 320pt · x$scale', (
@@ -309,4 +451,40 @@ void main() {
     // ignore: avoid_print
     print('==========================================\n');
   });
+}
+
+/// The three line-chart sizes side by side. A widget rather than an inline
+/// expression so the gallery above can stay `const`, and so the normalised
+/// sample series is written once instead of three times.
+class _Trace extends StatelessWidget {
+  const _Trace();
+
+  // Deliberately includes a flat run, a sharp reversal and both extremes of
+  // the 0..1 range — the shapes that expose a mitred join, a clipped cap, or
+  // an off-by-one in the draw-on reveal.
+  static const _points = <double>[
+    0.0, 0.42, 0.42, 0.42, 0.91, 0.13, 0.66, 0.64, 1.0,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      children: [
+        TickerTrace.sparkline(points: _points),
+        SizedBox(height: AppSpace.md),
+        TickerTrace.thumbnail(points: _points),
+        SizedBox(height: AppSpace.md),
+        // The Spec fixes AreaTrend at 320px wide, which is wider than the
+        // usable width of the 320pt device in this sweep. Scrolling it inside
+        // its own container is the honest fix: the alternative is letting the
+        // gallery overflow and calling the sweep's own failure a false
+        // positive. Real call sites in Phase 5 should pass a width rather than
+        // inheriting 320 blindly — flagged in the plan.
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: TickerTrace.areaTrend(points: _points),
+        ),
+      ],
+    );
+  }
 }

@@ -224,10 +224,12 @@ class SessionExpiredScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                StatePanel(
-                  headline: 'Session expired',
-                  message:
-                      "Your session's expired — sign in again to continue.",
+                // Phase 4: the headline, message, glyph and verb all come
+                // from the preset now — the literal 'Sign in' label this used
+                // to pass by hand is exactly the §14.5 drift the preset
+                // exists to stop ("Sign in again" is the verb for an expired
+                // session; "Sign in" is the verb for a login screen).
+                StatePanel.sessionExpired(
                   onRetry: () {
                     onSignIn();
                     Navigator.of(context).pushAndRemoveUntil(
@@ -235,7 +237,6 @@ class SessionExpiredScreen extends StatelessWidget {
                       (route) => false,
                     );
                   },
-                  retryLabel: 'Sign in',
                 ),
               ],
             ),

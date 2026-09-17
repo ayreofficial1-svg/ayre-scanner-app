@@ -280,13 +280,13 @@ abstract final class AppMotion {
   /// retires this concept.
   static const Duration livePulse = Duration(milliseconds: 1600);
 
-  /// `TickerTrace`'s own draw-on, distinct from [chartDraw] (which several
-  /// painters may end up sharing once Phase 3 confirms whether one
-  /// parametrized painter serves both Sparkline and AreaTrend — see plan §6).
-  /// Left at its pre-v4 value here; retune in Phase 3 against the Spec's
-  /// actual per-chart-type timing rather than assuming it should just become
-  /// [chartDraw].
-  static const Duration traceDraw = Duration(milliseconds: 620);
+  // `traceDraw` (620ms) lived here as `TickerTrace`'s own pre-v4 draw-on,
+  // pending Phase 3's decision on whether the line and radial families need
+  // separate timings. They don't: Phase 3 confirmed one parametrized painter
+  // serves Sparkline and AreaTrend, and every chart in the app now draws on
+  // over [chartDraw]. Two chart durations would only have meant two places to
+  // drift. Deleted rather than aliased — 620ms was the previous identity's
+  // "feed ticking in" pace and is not a v4 value worth keeping reachable.
 
   /// Generic fallback duration, unchanged from before v4 — kept for call
   /// sites not yet reconciled against a named v4 duration above.
