@@ -115,16 +115,24 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               const SizedBox(height: AppSpace.xl),
               const SectionLabel(label: 'Sign-in username'),
               AyreCard(
-                color: t.surfaceAlt,
+                // Sunken, not raised: this reads as a locked, inactive
+                // field, so it takes the same tonal fill a disabled text
+                // field would (InputDecorationTheme.fillColor) rather than
+                // a lifted tile.
+                color: t.surfaceSunken,
                 padding: const EdgeInsets.all(AppSpace.md),
                 child: Row(
                   children: [
-                    AyreIcon(AyreGlyph.lock, size: 16, color: t.textTertiary),
+                    AyreIcon(
+                      AyreGlyph.lock,
+                      size: 16,
+                      color: t.foregroundSubtle,
+                    ),
                     const SizedBox(width: AppSpace.md),
                     Expanded(
                       child: Text(
                         widget.handle!,
-                        style: AppTypo.bodyStrong(t, color: t.textSecondary),
+                        style: AppTypo.bodyStrong(t, color: t.foregroundMuted),
                       ),
                     ),
                   ],

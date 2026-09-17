@@ -54,7 +54,7 @@ class SupportScreen extends StatelessWidget {
                   trailing: AyreIcon(
                     AyreGlyph.copy,
                     size: 16,
-                    color: t.textTertiary,
+                    color: t.foregroundSubtle,
                   ),
                   onTap: () async {
                     HapticFeedback.selectionClick();
@@ -74,7 +74,7 @@ class SupportScreen extends StatelessWidget {
                   trailing: Figure.static(
                     '$kAppVersion ($kAppBuild)',
                     fontSize: 13,
-                    color: t.textSecondary,
+                    color: t.foregroundMuted,
                   ),
                 ),
               ],

@@ -44,7 +44,7 @@ class LessonScreen extends StatelessWidget {
               spacing: AppSpace.sm,
               runSpacing: AppSpace.xs,
               children: [
-                AyreIcon(AyreGlyph.course, size: 16, color: t.textTertiary),
+                AyreIcon(AyreGlyph.course, size: 16, color: t.foregroundSubtle),
                 Text(course.category.toUpperCase(), style: AppTypo.label(t)),
               ],
             ),
@@ -57,7 +57,7 @@ class LessonScreen extends StatelessWidget {
               Figure.static(
                 '${course.lessonsDone}/${course.lessonsTotal} lessons complete',
                 fontSize: 11,
-                color: t.textTertiary,
+                color: t.foregroundSubtle,
               ),
             ],
             const SizedBox(height: AppSpace.lg),

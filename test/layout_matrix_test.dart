@@ -428,6 +428,55 @@ void main() {
     });
   });
 
+  // ── Phase 6: settings & secondary screens ────────────────────────────────
+  //
+  // The static-screens sweep above already covers every Phase 6 file at every
+  // width/theme/scale — this phase was a token retint, not new structure, so
+  // it needed no new branches there. What it did change is a real bug: the
+  // equity/index header trace was hardcoded to a faded ink tone instead of
+  // following §12.1's "a chart inherits the colour of its subject" rule. This
+  // checks the fix on both signs, not just the FakeMarketData default (which
+  // is always a gainer) — a regression back to a fixed tone would pass every
+  // other sweep in this file silently.
+  group('detail header traces inherit their subject\'s colour (§12.1)', () {
+    testWidgets('a losing equity draws its header trace in `negative`', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrap(
+          EquityDetailScreen(
+            symbol: 'HDFCLIFE',
+            marketData: _LosingQuoteMarketData(),
+          ),
+          brightness: Brightness.dark,
+          scale: 1.0,
+        ),
+      );
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      final trace = tester.widget<TickerTrace>(find.byType(TickerTrace));
+      expect(trace.color, AppTheme.darkTokens.negative);
+    });
+
+    testWidgets('a rising index draws its header trace in `positive`', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        wrap(
+          IndexDetailScreen(index: IndexId.nifty50, marketData: data()),
+          brightness: Brightness.dark,
+          scale: 1.0,
+        ),
+      );
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      final trace = tester.widget<TickerTrace>(find.byType(TickerTrace));
+      expect(trace.color, AppTheme.darkTokens.positive);
+    });
+  });
+
   group('the navigation bar', () {
     for (final scale in scales) {
       testWidgets('is always visible with icon and label, at 320pt · x$scale', (
@@ -538,6 +587,26 @@ void main() {
     // ignore: avoid_print
     print('==========================================\n');
   });
+}
+
+/// `FakeMarketData.getEquity` is always a gainer, which is exactly why it
+/// can't be used to check §12.1's colour-follows-direction rule — a hardcoded
+/// `positive` would pass it too. This overrides just the one surface needed.
+class _LosingQuoteMarketData extends FakeMarketData {
+  @override
+  Future<DataResult<Quote>> getEquity(String symbol) async {
+    return DataResult.ready(
+      Quote(
+        symbol: symbol,
+        name: 'HDFC Life Insurance Company',
+        lastPrice: 642.15,
+        change: -13.6,
+        percentChange: -2.08,
+        asOf: DateTime(2026, 8, 30, 15, 31, 42),
+        trace: [for (var i = 0; i < 24; i++) 650.0 - i * 0.4],
+      ),
+    );
+  }
 }
 
 /// The three line-chart sizes side by side. A widget rather than an inline

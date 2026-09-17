@@ -172,7 +172,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                 'Not signed in',
                             style: AppTypo.bodyStrong(
                               t,
-                              color: t.textSecondary,
+                              color: t.foregroundMuted,
                             ),
                           ),
                   ),
@@ -216,8 +216,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: 'Include this when you report a problem',
                     trailing: Figure.static(
                       '$kAppVersion ($kAppBuild)',
-                      fontSize: AppTextScale.caption,
-                      color: t.textSecondary,
+                      fontSize: AppTextScale.hint,
+                      color: t.foregroundMuted,
                     ),
                   ),
                 ],
@@ -284,9 +284,9 @@ class _Preview extends StatelessWidget {
     final t = context.tokens;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: t.surfaceAlt,
-        borderRadius: BorderRadius.circular(AppRadius.panel),
-        border: Border.all(color: t.borderSubtle),
+        color: t.surfaceRaised,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: t.hairline),
       ),
       // A fixed scale for the sample, so the card demonstrates the choice rather
       // than reflecting whatever is already applied.
@@ -303,8 +303,8 @@ class _Preview extends StatelessWidget {
               const SizedBox(height: AppSpace.xxs),
               Text(
                 '24,518.40',
-                style: AppTypo.ticker(
-                  fontSize: AppTextScale.section * scale,
+                style: AppTypo.num(
+                  fontSize: AppTextScale.cardTitle * scale,
                   fontWeight: FontWeight.w600,
                   color: t.textPrimary,
                 ),

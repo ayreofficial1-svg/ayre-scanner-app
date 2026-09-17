@@ -87,9 +87,10 @@ class _NoticeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    // Delayed data is time-sensitive attention, which is Ember's job.
+    // Delayed data is time-sensitive attention, which is the muted-gold
+    // `neutral` tone's job — never a market-direction colour.
     final (glyph, tone) = switch (notice.kind) {
-      NoticeKind.staleData => (AyreGlyph.delayed, t.caution),
+      NoticeKind.staleData => (AyreGlyph.delayed, t.neutral),
       NoticeKind.signal => (AyreGlyph.alerts, t.accentInk),
     };
 
@@ -114,7 +115,7 @@ class _NoticeCard extends StatelessWidget {
                     Figure.static(
                       formatClockShort(notice.at),
                       fontSize: 11,
-                      color: t.textTertiary,
+                      color: t.foregroundSubtle,
                     ),
                   ],
                 ),

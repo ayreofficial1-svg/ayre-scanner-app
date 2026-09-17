@@ -127,14 +127,17 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
                       SizedBox(height: AppSpace.md),
                       SkeletonBlock(width: 120, height: 12),
                       SizedBox(height: AppSpace.lg),
-                      SkeletonBlock(height: 90, radius: AppRadius.panel),
+                      SkeletonBlock(height: 90, radius: AppRadius.inset),
                     ],
                   ),
                 )
               else if (quote == null)
                 StatePanel.failed(
+                  // With an explicit onRetry, the button itself already
+                  // carries the "Try again" verb (§14.5) — the message
+                  // doesn't need to repeat it.
                   headline: 'Index feed unavailable right now',
-                  message: 'Pull down to try again.',
+                  message: "The reading didn't come through this time.",
                   onRetry: _loadQuote,
                 )
               else
@@ -271,7 +274,7 @@ class _IndexHeader extends StatelessWidget {
                       formatPrice(quote.lastPrice),
                       fontSize: 34,
                       fontWeight: FontWeight.w600,
-                      color: t.onInkPanel,
+                      color: t.textPrimary,
                     ),
                   ),
                   const SizedBox(height: AppSpace.xs),
@@ -283,7 +286,7 @@ class _IndexHeader extends StatelessWidget {
                         Figure(
                           formatDelta(quote.change, percent: false),
                           fontSize: 13,
-                          color: t.onInkPanel.withValues(alpha: 0.75),
+                          color: t.foregroundMuted,
                         ),
                         const SizedBox(width: AppSpace.sm),
                         DeltaFigure(change: quote.percentChange, fontSize: 14),
@@ -292,11 +295,12 @@ class _IndexHeader extends StatelessWidget {
                   ),
                   if (quote.trace.length >= 2) ...[
                     const SizedBox(height: AppSpace.md),
+                    // §12.1: a chart inherits the colour of its subject — no
+                    // fixed neutral chart-line token in v4.
                     TickerTrace(
                       points: normaliseTrace(quote.trace),
                       height: 76,
-                      showGrid: true,
-                      color: t.onInkPanel.withValues(alpha: 0.8),
+                      color: quote.isUp ? t.positive : t.negative,
                     ),
                   ],
                 ],
@@ -365,7 +369,7 @@ class _SortControl extends StatelessWidget {
       color: t.surfaceRaised,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.card),
-        side: BorderSide(color: t.border),
+        side: BorderSide(color: t.hairline),
       ),
       itemBuilder: (context) => [
         for (final entry in const [
@@ -386,7 +390,7 @@ class _SortControl extends StatelessWidget {
           children: [
             Text(_label(sort), style: AppTypo.label(t)),
             const SizedBox(width: AppSpace.xs),
-            AyreIcon(AyreGlyph.sort, size: 14, color: t.textTertiary),
+            AyreIcon(AyreGlyph.sort, size: 14, color: t.foregroundSubtle),
           ],
         ),
       ),

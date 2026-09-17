@@ -5,8 +5,8 @@ import 'package:ayre_scanner/services/fault_injection.dart';
 import 'package:ayre_scanner/services/market_data_service.dart';
 import 'package:ayre_scanner/services/market_models.dart';
 import 'package:ayre_scanner/theme/app_theme.dart';
+import 'package:ayre_scanner/widgets/ayre_bottom_nav.dart';
 import 'package:ayre_scanner/widgets/ayre_icons.dart';
-import 'package:ayre_scanner/widgets/curved_nav_bar.dart';
 import 'package:ayre_scanner/widgets/state_views.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -242,7 +242,7 @@ void main() {
   });
 
   group('pushed screens get an explicit retry', () {
-    testWidgets('equity detail offers Retry, not a pull-down hint', (
+    testWidgets('equity detail offers Try again, not a pull-down hint', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -259,7 +259,14 @@ void main() {
         find.textContaining("This company's data didn't come through"),
         findsOneWidget,
       );
-      expect(find.text('Retry'), findsOneWidget);
+      // §14.5: a failed *request* takes "Try again" — "Retry" belongs to a
+      // dropped *connection* (StatePanel.offline), not a request that ran and
+      // came back wrong. This assertion was previously "Retry" and, per plan
+      // §9's Phase 5 entry, was recorded as already fixed when it wasn't
+      // (open decision #17) — corrected here, in Phase 6, the phase that
+      // actually touches this file's screen.
+      expect(find.text('Try again'), findsOneWidget);
+      expect(find.text('Retry'), findsNothing);
       expect(find.text('Pull down to try again'), findsNothing);
     });
 

@@ -136,17 +136,23 @@ class _LoginError extends StatelessWidget {
     final t = context.tokens;
     return Container(
       padding: const EdgeInsets.all(AppSpace.md),
+      // Ink-toned, not rose (state_views.dart / §14 convention, Phase 4):
+      // an auth failure is the app rejecting a credential, not a market
+      // move, so it doesn't borrow the negative/loss colour.
       decoration: BoxDecoration(
-        color: t.lossSoft,
-        border: Border.all(color: t.loss.withValues(alpha: 0.4)),
+        color: t.surfaceRaised,
+        border: Border.all(color: t.hairline),
         borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       child: Row(
         children: [
-          AyreIcon(AyreGlyph.disconnected, size: 15, color: t.loss),
+          AyreIcon(AyreGlyph.disconnected, size: 15, color: t.foregroundMuted),
           const SizedBox(width: AppSpace.sm),
           Expanded(
-            child: Text(message, style: AppTypo.bodyStrong(t, color: t.loss)),
+            child: Text(
+              message,
+              style: AppTypo.bodyStrong(t, color: t.textPrimary),
+            ),
           ),
         ],
       ),

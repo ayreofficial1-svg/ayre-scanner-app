@@ -99,14 +99,17 @@ class _EquityDetailScreenState extends State<EquityDetailScreen> {
                       SizedBox(height: AppSpace.md),
                       SkeletonBlock(width: 150, height: 32),
                       SizedBox(height: AppSpace.lg),
-                      SkeletonBlock(height: 80, radius: AppRadius.panel),
+                      SkeletonBlock(height: 80, radius: AppRadius.inset),
                     ],
                   ),
                 )
               else if (failedOutright)
                 StatePanel.failed(
                   headline: "This company's data didn't come through",
-                  message: 'Try again in a moment.',
+                  // Was "Try again in a moment." directly above a button
+                  // labelled "Try again" — redundant with the action itself
+                  // (plan §9, Phase 6 copy snag).
+                  message: 'The request to the feed did not go through.',
                   onRetry: _load,
                 )
               else if (quote != null) ...[
@@ -195,7 +198,7 @@ class _EquityHeader extends StatelessWidget {
                       formatPrice(quote.lastPrice),
                       fontSize: 32,
                       fontWeight: FontWeight.w600,
-                      color: t.onInkPanel,
+                      color: t.textPrimary,
                     ),
                   ),
                   const SizedBox(height: AppSpace.xs),
@@ -207,7 +210,7 @@ class _EquityHeader extends StatelessWidget {
                         Figure(
                           formatDelta(quote.change, percent: false),
                           fontSize: 13,
-                          color: t.onInkPanel.withValues(alpha: 0.75),
+                          color: t.foregroundMuted,
                         ),
                         const SizedBox(width: AppSpace.sm),
                         DeltaFigure(change: quote.percentChange, fontSize: 14),
@@ -216,11 +219,12 @@ class _EquityHeader extends StatelessWidget {
                   ),
                   if (quote.trace.length >= 2) ...[
                     const SizedBox(height: AppSpace.md),
+                    // §12.1: a chart inherits the colour of its subject —
+                    // no fixed neutral chart-line token in v4.
                     TickerTrace(
                       points: normaliseTrace(quote.trace),
                       height: 64,
-                      showGrid: true,
-                      color: t.onInkPanel.withValues(alpha: 0.8),
+                      color: quote.isUp ? t.positive : t.negative,
                     ),
                   ],
                 ],
