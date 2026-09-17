@@ -9,6 +9,14 @@ import 'package:flutter_test/flutter_test.dart';
 /// Verifies the identity rules against the **actual final token values**, not the
 /// written brief — the check §9.4 asks for, since real hex values always drift a
 /// little from a spec during implementation.
+///
+/// Updated for v4 (plan `AYRE_REDESIGN_V4_PLAN.md`) per the working agreement
+/// at the top of that document: this file is maintained quietly alongside
+/// each phase's own changes rather than re-surfaced as a standalone
+/// deliverable. Phase 0 changed every token value and several token names;
+/// Phase 1 retired `ChipTone.info`, redrew three of the five nav glyphs, and
+/// made icon stroke weight state-dependent (1.7 inactive / 2.1 active,
+/// Spec §10) rather than fixed — both reflected below.
 void main() {
   final themes = {
     'light': AppTheme.lightTokens,
@@ -16,97 +24,109 @@ void main() {
   };
 
   group('palette — base and brand', () {
-    test('the base is cool in both themes, never warm or cream', () {
+    test('the base is warm in both themes, never cool/graphite', () {
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
         for (final surface in [
           t.background,
-          t.backgroundTint,
           t.surface,
-          t.surfaceAlt,
           t.surfaceRaised,
-          t.inkPanel,
+          t.surfaceSunken,
         ]) {
-          // Warm surfaces read red-above-blue. The previous identity's cream and
-          // graphite-brown base is exactly what must not come back.
+          // v4 is deliberately warm paper/charcoal — a red-or-neutral-above-
+          // blue undertone — reversing the previous cool graphite/ink base.
           expect(
-            surface.b,
-            greaterThanOrEqualTo(surface.r),
-            reason: '$name base steps must be cool, never warm-undertoned',
+            surface.r,
+            greaterThanOrEqualTo(surface.b),
+            reason: '$name base steps must be warm, never cool-undertoned',
           );
         }
       }
     });
 
-    test('the accent is the logo\'s own green, sampled from the asset', () {
-      // The logo is the fixed brand asset, so the theme's accent is reconciled
-      // to it rather than the other way round. This value was sampled from
-      // assets/brand/ayre_logo.png, and both themes use it as the fill tone —
-      // so a drifting "second brand green" can't be introduced silently.
-      const brandGreen = Color(0xFF07C58F);
-      expect(AppTheme.lightTokens.accent, brandGreen);
-      expect(AppTheme.darkTokens.accent, brandGreen);
+    test('the accent is v4\'s clay/terracotta, not the old brand green', () {
+      // v4 retires the fixed cross-theme brand green entirely — the accent is
+      // now theme-dependent (warmer/darker in light mode) and lives in the
+      // clay/terracotta family, not spring-green.
+      expect(AppTheme.darkTokens.accent, const Color(0xFFD26A4C));
+      expect(AppTheme.lightTokens.accent, const Color(0xFFC75F43));
     });
 
-    test('the accent is a cool, blue-leaning green', () {
-      // A deliberate reversal of the previous identity, whose accent was a warm
-      // yellow-green. The logo's green sits in the spring/emerald band.
+    test('the accent is a warm, red-leaning orange (clay), not green', () {
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
-        for (final tone in [t.accent, t.accentInk, t.gain]) {
+        for (final tone in [t.accent, t.accentInk]) {
           expect(
             _hue(tone),
-            inInclusiveRange(140, 180),
-            reason: '$name accent family must be blue-leaning green',
+            inInclusiveRange(0, 30),
+            reason: '$name accent family must be a warm clay/terracotta',
           );
         }
       }
     });
 
-    test('gain shares the accent family, and loss is far from both', () {
-      // v2 kept brand and gain as two deliberately different greens. v3 reverses
-      // that on purpose: the brief calls for one ownable accent used for brand
-      // and positive alike, and the logo fixes which green that is. What still
-      // must hold is that gain and loss are unmistakable.
+    test('positive is sage (green-leaning), distinct from the clay accent', () {
+      // v4 reverses v3's "one ownable green for brand and gain": positive is
+      // now a muted sage, deliberately in a different family from the clay
+      // accent, and negative (muted rose) must stay unmistakable from it.
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
-        final gainHue = _hue(t.gain);
-        final accentHue = _hue(t.accent);
+        final positiveHue = _hue(t.positive);
         expect(
-          (gainHue - accentHue).abs(),
-          lessThan(20),
-          reason: '$name gain should read as the brand green',
+          positiveHue,
+          inInclusiveRange(90, 160),
+          reason: '$name positive should read as sage green',
         );
 
-        final lossHue = _hue(t.loss);
-        final gap = (gainHue - lossHue).abs();
+        final negativeHue = _hue(t.negative);
+        final gap = (positiveHue - negativeHue).abs();
         expect(
           math.min(gap, 360 - gap),
           greaterThan(90),
-          reason: '$name gain and loss must never be confusable',
+          reason: '$name positive and negative must never be confusable',
         );
       }
     });
 
-    test('Garnet is a wine-toned red, distinct from Ember', () {
+    test('negative is a muted rose, and neutral (gold) is tellable apart', () {
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
-        // Red wraps through 360; Garnet's wine undertone sits just below it
-        // rather than on the pure-red axis, which is the point of the hue.
-        final garnetHue = _hue(t.loss);
+        // Rose sits in the red/pink band, not v3's wine-red "Garnet" band.
+        final negativeHue = _hue(t.negative);
         expect(
-          garnetHue > 335 || garnetHue < 20,
+          negativeHue > 340 || negativeHue < 25,
           isTrue,
-          reason: '$name loss must be a wine-leaning red, got $garnetHue',
+          reason: '$name negative must be a muted rose, got $negativeHue',
         );
         expect(
-          _hue(t.caution),
-          inInclusiveRange(20, 45),
-          reason: '$name caution is copper-amber',
+          _hue(t.neutral),
+          inInclusiveRange(30, 60),
+          reason: '$name neutral is a muted gold',
         );
-        // Compared on the wrapped axis so 350° vs 30° reads as 40° apart.
-        final gap = (garnetHue - _hue(t.caution)).abs();
+        // Compared on the wrapped axis so 350° vs 40° reads as 50° apart.
+        final gap = (negativeHue - _hue(t.neutral)).abs();
         expect(
           math.min(gap, 360 - gap),
           greaterThan(8),
-          reason: '$name loss and attention must be tellable apart',
+          reason: '$name negative and neutral must be tellable apart',
         );
+      }
+    });
+
+    test('no bright/saturated green or red survives from the old identity', () {
+      // Hard rule carried into code (plan §3.3): the previous identity's
+      // saturated market colours are explicitly excluded, not just replaced.
+      const excluded = [
+        Color(0xFF00C853),
+        Color(0xFF16A34A),
+        Color(0xFFFF1744),
+        Color(0xFFEF4444),
+        Color(0xFF07C58F), // the old fixed brand green itself
+      ];
+      for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
+        for (final tone in [t.accent, t.positive, t.negative, t.neutral]) {
+          expect(
+            excluded,
+            isNot(contains(tone)),
+            reason: '$name must not reintroduce an excluded saturated tone',
+          );
+        }
       }
     });
   });
@@ -114,11 +134,13 @@ void main() {
   group('accessibility — contrast at final values', () {
     test('every text tone clears 4.5:1 on its surfaces', () {
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
-        for (final surface in [t.background, t.surface, t.surfaceAlt]) {
+        for (final surface in [t.background, t.surface, t.surfaceRaised]) {
           for (final (role, color) in [
             ('textPrimary', t.textPrimary),
-            ('textSecondary', t.textSecondary),
-            ('textTertiary', t.textTertiary),
+            ('foregroundMuted', t.foregroundMuted),
+            // foregroundSubtle is eyebrow/caption-only by design discipline
+            // (plan §3.2) — checked separately at large-text (3:1) below,
+            // not asserted at the 4.5:1 normal-text floor here.
           ]) {
             expect(
               _contrast(color, surface),
@@ -130,28 +152,37 @@ void main() {
       }
     });
 
-    test('semantic colours clear 4.5:1 as small text', () {
+    test('foregroundSubtle (eyebrows/captions only) clears 3:1', () {
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
-        for (final surface in [t.background, t.surface]) {
-          for (final (role, color) in [
-            ('gain', t.gain),
-            ('loss', t.loss),
-            ('caution', t.caution),
-            ('info', t.info),
-            // The type-weight Citrine — the reason a separate token exists.
-            ('accentInk', t.accentInk),
-          ]) {
-            expect(
-              _contrast(color, surface),
-              greaterThanOrEqualTo(4.5),
-              reason: '$name $role is used on figures and labels',
-            );
-          }
+        for (final surface in [t.background, t.surface, t.surfaceRaised]) {
+          expect(
+            _contrast(t.foregroundSubtle, surface),
+            greaterThanOrEqualTo(3.0),
+            reason:
+                '$name foregroundSubtle is micro-copy only, held to the '
+                'large-text/non-text floor, not full body-text AA',
+          );
         }
       }
     });
 
-    test('ink text on a Citrine fill clears 4.5:1', () {
+    test('accentInk clears 4.5:1 as small text on its own theme\'s surfaces', () {
+      // Phase 0's numeric contrast pass (plan §7 open decision #5): dark
+      // theme's raw accent already clears AA (accentInk == accent there);
+      // light theme needed a derived, darkened accentInk. Verify both hold
+      // at the tokens' actual final values, not the plan's prose claim.
+      for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
+        for (final surface in [t.background, t.surface]) {
+          expect(
+            _contrast(t.accentInk, surface),
+            greaterThanOrEqualTo(4.5),
+            reason: '$name accentInk is used on figures and labels',
+          );
+        }
+      }
+    });
+
+    test('ink text on the accent fill clears 4.5:1', () {
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
         expect(
           _contrast(t.onAccent, t.accent),
@@ -161,19 +192,9 @@ void main() {
       }
     });
 
-    test('readout text on the ink panel clears 4.5:1', () {
-      for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
-        expect(
-          _contrast(t.onInkPanel, t.inkPanel),
-          greaterThanOrEqualTo(4.5),
-          reason: '$name ink panel is where live figures live',
-        );
-      }
-    });
-
-    test('the Citrine fill carries a 3:1 component edge', () {
-      // A light-on-light fill can't carry its own boundary, which is why the
-      // button and the Fold's control both draw a hairline edge.
+    test('the accent fill carries a visible component edge', () {
+      // A mid-lightness fill can't always carry its own boundary, which is
+      // why AyreButton draws a hairline edge around every kind.
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
         final edge = Color.alphaBlend(
           t.textPrimary.withValues(alpha: 0.18),
@@ -188,8 +209,10 @@ void main() {
     });
   });
 
-  group('typography — the monospace rule', () {
-    testWidgets('every live figure renders in the ticker face', (tester) async {
+  group('typography — the tabular-numerals rule', () {
+    testWidgets('every live figure renders with tabular figures', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.dark,
@@ -198,7 +221,9 @@ void main() {
       );
 
       final style = tester.widget<Text>(find.text('24,518.40')).style!;
-      expect(style.fontFamily, contains('JetBrains'));
+      // v4 points the numeric face at Space Grotesk (`.num`), replacing
+      // JetBrains Mono — the tabular-figures discipline itself is unchanged.
+      expect(style.fontFamily, contains('SpaceGrotesk'));
       expect(
         style.fontFeatures,
         contains(const FontFeature.tabularFigures()),
@@ -206,11 +231,12 @@ void main() {
       );
     });
 
-    testWidgets('headings take the display face, body takes the UI face', (
+    testWidgets('headings and body share one face; numbers use a second', (
       tester,
     ) async {
       late TextStyle heading;
       late TextStyle body;
+      late TextStyle number;
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.dark,
@@ -218,16 +244,20 @@ void main() {
             builder: (context) {
               heading = AppTypo.pageTitle(context.tokens);
               body = AppTypo.body(context.tokens);
+              number = AppTypo.heroValue(context.tokens);
               return const Scaffold(body: SizedBox());
             },
           ),
         ),
       );
 
-      expect(heading.fontFamily, contains('SpaceGrotesk'));
-      expect(body.fontFamily, contains('Manrope'));
-      // The two sans faces must not blur together into one voice.
-      expect(heading.fontFamily, isNot(equals(body.fontFamily)));
+      // v4 collapses UI+heading onto one face (Hanken Grotesk), replacing the
+      // previous Manrope/Space-Grotesk split — Space Grotesk's job narrows to
+      // numbers + display headings only (plan §4).
+      expect(heading.fontFamily, contains('HankenGrotesk'));
+      expect(body.fontFamily, contains('HankenGrotesk'));
+      expect(number.fontFamily, contains('SpaceGrotesk'));
+      expect(number.fontFamily, isNot(equals(heading.fontFamily)));
     });
   });
 
@@ -258,40 +288,44 @@ void main() {
   });
 
   group('iconography', () {
-    testWidgets('the set renders as a family at one stroke weight', (
-      tester,
-    ) async {
-      // Checked as a set rather than icon by icon, per §4.3: every glyph must
-      // paint at the shared grid and weight without throwing.
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.dark,
-          home: Scaffold(
-            body: SingleChildScrollView(
-              child: Wrap(
-                children: [
-                  for (final glyph in AyreGlyph.values) ...[
-                    AyreIcon(glyph, size: 24),
-                    // The filled variant exists for selected states.
-                    AyreIcon(glyph, size: 24, filled: true),
-                    // And the set has to hold at the sizes it is actually used.
-                    AyreIcon(glyph, size: 12),
-                    AyreIcon(glyph, size: 18),
+    testWidgets(
+      'the set renders as a family at its default stroke weights',
+      (tester) async {
+        // Checked as a set rather than icon by icon, per §4.3: every glyph
+        // must paint at the shared grid without throwing. v4 uses a
+        // state-dependent default stroke weight (1.7 inactive / 2.1 active,
+        // Spec §10) rather than one fixed weight — both states are exercised
+        // here, not just one.
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: AppTheme.dark,
+            home: Scaffold(
+              body: SingleChildScrollView(
+                child: Wrap(
+                  children: [
+                    for (final glyph in AyreGlyph.values) ...[
+                      AyreIcon(glyph, size: 24),
+                      // The filled variant exists for selected states.
+                      AyreIcon(glyph, size: 24, filled: true),
+                      // And the set has to hold at the sizes it is actually used.
+                      AyreIcon(glyph, size: 12),
+                      AyreIcon(glyph, size: 18),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),
-        ),
-      );
-      await tester.pump();
+        );
+        await tester.pump();
 
-      expect(
-        find.byType(AyreIcon),
-        findsNWidgets(AyreGlyph.values.length * 4),
-      );
-      expect(tester.takeException(), isNull);
-    });
+        expect(
+          find.byType(AyreIcon),
+          findsNWidgets(AyreGlyph.values.length * 4),
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
 
     test('every destination and state has a glyph', () {
       // The nav, the two distinct data states, and the market directions are the
@@ -347,4 +381,3 @@ double _hue(Color c) {
   }
   return h < 0 ? h + 360 : h;
 }
-

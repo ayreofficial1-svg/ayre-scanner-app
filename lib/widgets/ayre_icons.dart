@@ -10,8 +10,21 @@ import 'package:flutter/material.dart';
 /// weight, the same square-ish cap treatment and the same corner radius, so the
 /// set reads as one family cut from one die. Icons are line-based at rest; a
 /// small number gain a solid variant used *only* to mark an active/selected
-/// state (most visibly in the Fold's nav — filled-on-select, line-at-rest is
+/// state (most visibly in the bottom nav — filled-on-select, line-at-rest is
 /// the one state rule used everywhere an icon has a selected condition).
+///
+/// **v4 redraw vs. reuse (plan §7 open decision #1):** the three nav glyphs
+/// that read as distinctly "terminal" against the calm/editorial v4 identity
+/// — [AyreGlyph.home] (was a literal terminal-window frame), [AyreGlyph.signals]
+/// (was blocky ascending bars) and [AyreGlyph.insights] (was a literal breadth-
+/// meter scale, i.e. themed screen content leaking into the icon) — were
+/// redrawn to match lucide's `House`/`Radio`/`Sparkles` silhouettes.
+/// [AyreGlyph.learn] and [AyreGlyph.profile] were judged close enough to
+/// lucide's `BookOpen`/`CircleUserRound` already (a document face, a rounded
+/// head-and-shoulders mark) and were left as-is — this was a mixed decision,
+/// not an all-or-nothing set replacement. Every other glyph in this file is a
+/// chrome/status/settings icon the Spec doesn't name explicitly, so those are
+/// unchanged.
 enum AyreGlyph {
   // Navigation
   home,
@@ -76,8 +89,10 @@ class AyreIcon extends StatelessWidget {
   /// The solid variant, reserved for active/selected states.
   final bool filled;
 
-  /// Defaults to a consistent 1.6 at 24pt, scaled with [size] so optical weight
-  /// stays even across sizes.
+  /// Defaults per Spec §10's stroke-weight rule: 1.7 for a line-at-rest
+  /// (inactive) glyph, 2.1 when [filled] marks it active/selected — never
+  /// mixed within one group. Pass an explicit value only to opt out of this
+  /// default (e.g. a decorative one-off that isn't part of a state pair).
   final double? strokeWidth;
 
   final String? semanticLabel;
@@ -97,7 +112,7 @@ class AyreIcon extends StatelessWidget {
           glyph: glyph,
           color: resolved,
           filled: filled,
-          strokeWidth: strokeWidth ?? 1.6,
+          strokeWidth: strokeWidth ?? (filled ? 2.1 : 1.7),
         ),
       ),
     );
@@ -143,28 +158,82 @@ class _AyreIconPainter extends CustomPainter {
     switch (glyph) {
       // ── Navigation ─────────────────────────────────────────────────────────
       case AyreGlyph.home:
-        // A terminal window: a framed panel with a header rule.
-        _rect(c, s, f, 4, 5, 16, 14, r: 2);
-        c.drawLine(const Offset(4, 10), const Offset(20, 10), s);
-        if (!filled) {
-          c.drawLine(const Offset(7.5, 7.5), const Offset(8.5, 7.5), s);
+        // v4 redraw (plan §7 open decision #1): the v3 path drew a literal
+        // terminal window (framed panel + header rule + prompt-cursor tick)
+        // — the single most "terminal" glyph in the old set, and the one
+        // most visible since it's the first nav item. Replaced with a plain
+        // roofline pictogram (a peaked roof over a simple house body, no
+        // door/window detail) to match lucide's `House` silhouette and the
+        // calm/rounded reading the rest of the set already has.
+        {
+          final roof = Path()
+            ..moveTo(3.5, 11.5)
+            ..lineTo(12, 4)
+            ..lineTo(20.5, 11.5);
+          c.drawPath(roof, s);
+          if (filled) {
+            final body = Path()
+              ..moveTo(6, 10.5)
+              ..lineTo(6, 19.5)
+              ..lineTo(18, 19.5)
+              ..lineTo(18, 10.5)
+              ..lineTo(12, 5.5)
+              ..close();
+            c.drawPath(body, f);
+          } else {
+            c.drawLine(const Offset(6, 10.5), const Offset(6, 19.5), s);
+            c.drawLine(const Offset(18, 10.5), const Offset(18, 19.5), s);
+            c.drawLine(const Offset(6, 19.5), const Offset(18, 19.5), s);
+          }
         }
       case AyreGlyph.signals:
-        // Ascending signal bars — the scanner's output, not a generic chart.
-        _bars(
-          c,
-          s,
-          f,
-          const [7.0, 11.0, 15.0, 19.0],
-          const [17.0, 13.5, 15.5, 8.0],
-        );
+        // v4 redraw (plan §7 open decision #1): the v3 path was ascending
+        // bar-chart bars — sharp, blocky, and closer to a generic analytics
+        // icon than a "signal". Replaced with a soft radiating-arcs mark
+        // (a dot with two concentric open arcs) matching lucide's `Radio`
+        // silhouette — reads as "broadcast/pulse" rather than "chart".
+        {
+          c.drawCircle(const Offset(7, 17), 1.8, f);
+          c.drawArc(
+            Rect.fromCircle(center: const Offset(7, 17), radius: 6.2),
+            math.pi * 1.05,
+            math.pi * 0.9,
+            false,
+            s,
+          );
+          c.drawArc(
+            Rect.fromCircle(center: const Offset(7, 17), radius: 10.4),
+            math.pi * 1.12,
+            math.pi * 0.76,
+            false,
+            s,
+          );
+        }
       case AyreGlyph.insights:
-        // A breadth meter: a scale with a marker on it.
-        _rect(c, s, f, 3, 9, 18, 6, r: 1.5);
-        if (filled) {
-          c.drawRect(const Rect.fromLTRB(3, 9, 14, 15), f);
-        } else {
-          c.drawLine(const Offset(14, 6.5), const Offset(14, 17.5), s);
+        // v4 redraw (plan §7 open decision #1): the v3 path was a literal
+        // breadth-meter scale-with-marker — themed content (what the
+        // Insights tab's data viz shows) leaking into the icon, rather than
+        // a neutral pictogram for the destination. Replaced with a simple
+        // four-point sparkle/spark mark, matching lucide's `Sparkles`
+        // silhouette used for "insights/highlights" wayfinding.
+        {
+          Path sparkPath(Offset center, double r) => Path()
+            ..moveTo(center.dx, center.dy - r)
+            ..quadraticBezierTo(center.dx, center.dy, center.dx + r, center.dy)
+            ..quadraticBezierTo(center.dx, center.dy, center.dx, center.dy + r)
+            ..quadraticBezierTo(center.dx, center.dy, center.dx - r, center.dy)
+            ..quadraticBezierTo(center.dx, center.dy, center.dx, center.dy - r)
+            ..close();
+
+          final big = sparkPath(const Offset(12, 11), 6.5);
+          final small = sparkPath(const Offset(18.5, 18.5), 2.6);
+          if (filled) {
+            c.drawPath(big, f);
+            c.drawPath(small, f);
+          } else {
+            c.drawPath(big, s);
+            c.drawPath(small, s);
+          }
         }
       case AyreGlyph.learn:
         // Stacked rules under a header — a document, not an open book.

@@ -212,12 +212,12 @@ class DeltaFigure extends StatelessWidget {
         '—',
         fontSize: fontSize,
         fontWeight: fontWeight,
-        color: t.textTertiary,
+        color: t.foregroundSubtle,
       );
     }
 
     final up = change! >= 0;
-    final tone = color ?? (up ? t.gain : t.loss);
+    final tone = color ?? (up ? t.positive : t.negative);
 
     return Row(
       mainAxisSize: MainAxisSize.min,

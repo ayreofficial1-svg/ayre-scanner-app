@@ -410,6 +410,11 @@ abstract final class AppSpace {
   /// Vertical padding for a hairline-divided list row.
   static const double hairlineRowPadding = 14;
 
+  /// Retained alias for call sites (`ayre_components.dart`'s `TickerRow`/
+  /// `SkeletonTickerRow`) not yet migrated onto the named constant above —
+  /// identical to [hairlineRowPadding].
+  static const double row = hairlineRowPadding;
+
   /// The minimum tappable dimension. Already at/above the Apple HIG 44pt
   /// floor the Spec's own button/chip minimums fall under — kept unchanged
   /// (44pt+ enforcement across buttons/chips is a Phase 7 whole-app pass, not

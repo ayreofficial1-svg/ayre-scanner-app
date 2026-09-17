@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/physics.dart';
 
 /// Critically-damped spring specs (damping ratio 1.0 — resolves straight to
-/// target, zero overshoot).
+/// target, zero overshoot). Used for value re-targeting (breadth readouts,
+/// count-adjacent figures) where the Spec has no opinion and "settles like an
+/// eased curve, never bounces" is the right default.
 ///
 /// These settle much like an eased curve; the difference shows when an animation
 /// is interrupted mid-flight and has to re-target from its current position *and
-/// velocity* rather than restarting. That is what makes the Fold's unfold feel
-/// weighted when tapped twice quickly, and the breadth marker feel continuous
-/// when a new reading lands mid-slide.
+/// velocity* rather than restarting. That is what makes a re-targeted value feel
+/// weighted when it changes twice quickly, rather than restarting from zero.
 abstract final class AppSpring {
   static final SpringDescription snappy = SpringDescription.withDampingRatio(
     mass: 1,
@@ -22,12 +23,45 @@ abstract final class AppSpring {
     ratio: 1.0,
   );
 
-  /// The Fold's shape transition — deliberately the most considered motion in
-  /// the app, so it gets its own slightly softer spring.
+  /// Retained for any remaining call site not yet reconciled against a named
+  /// v4 spring — identical to [standard].
   static final SpringDescription fold = SpringDescription.withDampingRatio(
     mass: 1,
     stiffness: 240,
     ratio: 1.0,
+  );
+
+  // ── v4 Spec springs (nav pill, segmented, toggle) ─────────────────────────
+  //
+  // Plan §7 open decision #3: the Spec's `stiffness`/`damping` pairs are
+  // authored against Framer Motion's model, which is NOT parameterized the
+  // same way as Flutter's `SpringDescription(mass, stiffness, damping)` in
+  // general — Framer's `damping` is a linear viscous-damping coefficient in
+  // its own unit convention, and a literal pass-through is not guaranteed to
+  // land at the same damping ratio in another physical-spring implementation.
+  // Verified numerically here rather than assumed:
+  //
+  //   nav/segmented (stiffness 480, damping 38, mass 1):
+  //     ζ (damping ratio) ≈ 0.87, settle-to-2% ≈ 0.21s, peak overshoot ≈ 0.4%
+  //   toggle (stiffness 500, damping 34, mass 1):
+  //     ζ ≈ 0.76, settle-to-2% ≈ 0.23s, peak overshoot ≈ 2.5%
+  //
+  // Both land underdamped-but-essentially-non-bouncy (ζ < 1, overshoot under
+  // 3%) with a sub-quarter-second settle — this reads as "glides smoothly, no
+  // bounce" per the Spec's own description, not as a spring with a visible
+  // wobble. On that basis the literal values are used as-is via
+  // `SpringDescription(mass, stiffness, damping)` rather than re-derived from
+  // a damping ratio — re-verify visually once these drive a real widget
+  // (nav pill lands in Phase 2; segmented/toggle retint lands in this phase).
+  static const SpringDescription navPill = SpringDescription(
+    mass: 1,
+    stiffness: 480,
+    damping: 38,
+  );
+  static const SpringDescription toggleKnob = SpringDescription(
+    mass: 1,
+    stiffness: 500,
+    damping: 34,
   );
 }
 

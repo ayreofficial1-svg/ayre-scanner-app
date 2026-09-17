@@ -298,7 +298,15 @@ class _IdentityBlock extends StatelessWidget {
                   if (tier != null && tier!.isNotEmpty) ...[
                     if (handle != null && handle!.isNotEmpty)
                       const SizedBox(width: AppSpace.sm),
-                    AyreChip(label: tier!, tone: ChipTone.info),
+                    // `ChipTone.info` was retired in Phase 1 (plan §3.3/§7 —
+                    // v4 has no separate "info" accent role); a tier badge is
+                    // non-market identity metadata, which maps onto
+                    // `ChipTone.neutral` rather than `brand` (brand is
+                    // reserved for accent-toned tags, and a tier isn't a
+                    // market-direction or promotional signal). This is a
+                    // one-line fix to keep the screen compiling, not a
+                    // Phase 5 rebuild of `profile_tab.dart` itself.
+                    AyreChip(label: tier!, tone: ChipTone.neutral),
                   ],
                 ],
               ),

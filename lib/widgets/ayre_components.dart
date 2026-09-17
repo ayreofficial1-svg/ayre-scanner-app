@@ -7,14 +7,18 @@ import 'ayre_icons.dart';
 import 'figure.dart';
 import 'pressable_scale.dart';
 import 'responsive.dart';
+import 'spring.dart';
 
-/// The app's card material: flat fill, crisp radius, 1px hairline, no shadow and
-/// no gradient. A terminal card, not a soft app card.
+/// The app's card material: warm surface fill, 18px radius, 1px hairline, and
+/// a soft two-layer shadow (§8 of the Spec — v4 re-introduces shadows; the
+/// identity this replaces had none). Never nested — a card inside a card is
+/// always a hairline-divided row group ([RowGroup]) or a sunken/raised tonal
+/// fill ([InkPanel]) instead.
 class AyreCard extends StatelessWidget {
   const AyreCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(AppSpace.lg),
+    this.padding = const EdgeInsets.all(AppSpace.cardPadding),
     this.color,
     this.borderColor,
     this.radius = AppRadius.card,
@@ -30,8 +34,10 @@ class AyreCard extends StatelessWidget {
   final double radius;
   final VoidCallback? onTap;
 
-  /// A 3px Citrine bar down the leading edge — the hero card's signature accent.
-  /// Used sparingly: identity, not decoration.
+  /// An accent-tinted border (§8.4) marking a featured card — emphasis comes
+  /// from the tinted edge itself, never a solid tint fill behind the card.
+  /// Renders as a 1.5px full-perimeter accent-toned border, not a leading-edge
+  /// bar (that was the previous identity's device; v4 has no equivalent).
   final bool accentEdge;
   final Color? accentColor;
 
@@ -39,37 +45,34 @@ class AyreCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final borderRadius = BorderRadius.circular(radius);
-
-    final Widget body = Padding(padding: padding, child: child);
-
-    // The accent bar is a positioned child inside the card's own clip. A
-    // non-uniform Border can't take a radius, and a stretched Row child would
-    // force an infinite height inside a list — this does neither: positioned
-    // children don't contribute to the Stack's size.
-    final Widget contents = accentEdge
-        ? Stack(
-            children: [
-              body,
-              Positioned(
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: 3,
-                child: ColoredBox(color: accentColor ?? t.accent),
-              ),
-            ],
-          )
-        : body;
+    final edgeColor = accentColor ?? t.accent;
 
     final card = DecoratedBox(
       decoration: BoxDecoration(
         color: color ?? t.surface,
         borderRadius: borderRadius,
-        border: Border.all(color: borderColor ?? t.borderSubtle),
+        border: Border.all(
+          color: accentEdge
+              ? edgeColor.withValues(alpha: 0.55)
+              : (borderColor ?? t.hairline),
+          width: accentEdge ? 1.5 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: t.shadowColor.withValues(alpha: 0.10),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+          BoxShadow(
+            color: t.shadowColor.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(radius - 1),
-        child: contents,
+        child: Padding(padding: padding, child: child),
       ),
     );
 
@@ -78,9 +81,18 @@ class AyreCard extends StatelessWidget {
   }
 }
 
-/// The terminal readout embedded inside a card — the one deliberately near-black
-/// surface in light mode, and a cooler inset panel in dark. Live figures sit
-/// here so they read as coming off a feed rather than being page content.
+/// A tonal fill nested inside a card (Spec §8.3, `.ayre-inset`) — either
+/// recessed into the surface ([raised] false, the default: a track, an inset
+/// readout region) or lifted slightly off it ([raised] true: a nested tonal
+/// block, an icon tile backing). This is a repurposing of the previous
+/// "terminal readout panel" concept, not a rename-only pass — v4 has no
+/// "live feed" semantics for this component, just a plain sub-surface fill at
+/// the Spec's 12px inset radius. The class name is kept as `InkPanel` (rather
+/// than introducing e.g. `AyreInset`) so the existing call sites in
+/// `equity_detail_screen.dart`, `home_tab.dart` and `index_detail_screen.dart`
+/// — none of which are in this phase's file list — don't need touching to
+/// keep compiling; consider a rename when one of those screens' own phase
+/// (5/6) is in progress.
 class InkPanel extends StatelessWidget {
   const InkPanel({
     super.key,
@@ -89,10 +101,15 @@ class InkPanel extends StatelessWidget {
       horizontal: AppSpace.md,
       vertical: AppSpace.md,
     ),
+    this.raised = false,
   });
 
   final Widget child;
   final EdgeInsetsGeometry padding;
+
+  /// False (default): recessed/sunken fill ([AppThemeTokens.surfaceSunken]).
+  /// True: lifted/raised fill ([AppThemeTokens.surfaceRaised]).
+  final bool raised;
 
   @override
   Widget build(BuildContext context) {
@@ -101,8 +118,8 @@ class InkPanel extends StatelessWidget {
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: t.inkPanel,
-        borderRadius: BorderRadius.circular(AppRadius.panel),
+        color: raised ? t.surfaceRaised : t.surfaceSunken,
+        borderRadius: BorderRadius.circular(AppRadius.inset),
       ),
       child: child,
     );
@@ -204,8 +221,11 @@ class HairlineDivider extends StatelessWidget {
 
 enum AyreButtonKind { primary, outline, danger }
 
-/// Flat, rounded-rect (never a capsule). Primary is a solid Citrine fill with
-/// ink text, because Citrine is light enough that white text would under-perform.
+/// A fully-rounded pill (Spec §11.1 — buttons are pills, not rounded rects, in
+/// v4). Primary is a solid accent fill with dark ink text: the accent sits at
+/// a mid lightness in both themes, so inverted white text under-performs
+/// against the darker ink (see the Phase 0 contrast note on
+/// [AppThemeTokens.onAccent]).
 class AyreButton extends StatelessWidget {
   const AyreButton({
     super.key,
@@ -231,11 +251,15 @@ class AyreButton extends StatelessWidget {
 
     final (Color bg, Color fg, Color? edge) = switch (kind) {
       AyreButtonKind.primary => (t.accent, t.onAccent, null),
-      AyreButtonKind.outline => (AppTheme.transparent, t.textPrimary, t.border),
+      AyreButtonKind.outline => (
+        AppTheme.transparent,
+        t.textPrimary,
+        t.hairline,
+      ),
       AyreButtonKind.danger => (
         AppTheme.transparent,
-        t.loss,
-        t.loss.withValues(alpha: 0.5),
+        t.negative,
+        t.negative.withValues(alpha: 0.5),
       ),
     };
 
@@ -254,8 +278,10 @@ class AyreButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(AppRadius.button),
-            // A Citrine fill on Fogpaper is a light-on-light boundary, so the
-            // hairline is what carries the component's 3:1 edge contrast.
+            // An accent fill against warm paper/charcoal is a mid-lightness
+            // fill in both themes, so a hairline still carries the
+            // component's edge definition rather than relying on the fill
+            // alone to read as a distinct shape.
             border: Border.all(
               color: edge ?? t.textPrimary.withValues(alpha: 0.18),
             ),
@@ -295,8 +321,13 @@ class AyreButton extends StatelessWidget {
 
 // ─── Switch ────────────────────────────────────────────────────────────────
 
-/// A flat switch. "On" is Citrine, deliberately never Jade — a toggle turning on
-/// must never be visually confusable with a security going up.
+/// A flat switch. "On" is the brand accent, deliberately never [positive] — a
+/// toggle turning on must never be visually confusable with a security going
+/// up. The knob's slide is driven by the Spec's toggle spring
+/// ([AppSpring.toggleKnob], numerically checked in `spring.dart`) via
+/// [SpringValue] rather than a plain eased tween — this is the one place in
+/// this file a spring actually drives motion, per plan §7 open decision #2's
+/// sibling guidance that springs are reserved for nav/segmented/toggle only.
 class AyreSwitch extends StatelessWidget {
   const AyreSwitch({
     super.key,
@@ -312,6 +343,7 @@ class AyreSwitch extends StatelessWidget {
   static const double _w = 44;
   static const double _h = 24;
   static const double _knob = 18;
+  static const double _travel = _w - _knob - 2 * 3; // track minus padding
 
   @override
   Widget build(BuildContext context) {
@@ -328,28 +360,32 @@ class AyreSwitch extends StatelessWidget {
         child: Opacity(
           opacity: enabled ? 1 : 0.45,
           child: AnimatedContainer(
-            duration: AppMotion.fast,
+            duration: AppMotion.buttonPress,
             curve: AppMotion.ease,
             width: _w,
             height: _h,
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              color: value ? t.accent : t.surfaceAlt,
+              color: value ? t.accent : t.surfaceRaised,
               borderRadius: BorderRadius.circular(AppRadius.chip),
               border: Border.all(
-                color: value ? t.accent.withValues(alpha: 0.9) : t.border,
+                color: value ? t.accent.withValues(alpha: 0.9) : t.hairline,
               ),
             ),
-            child: AnimatedAlign(
-              duration: AppMotion.fast,
-              curve: AppMotion.ease,
-              alignment: value ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                width: _knob,
-                height: _knob,
-                decoration: BoxDecoration(
-                  color: value ? t.onAccent : t.textTertiary,
-                  borderRadius: BorderRadius.circular(2),
+            child: SpringValue(
+              value: value ? _travel : 0,
+              spring: AppSpring.toggleKnob,
+              builder: (context, dx, child) =>
+                  Transform.translate(offset: Offset(dx, 0), child: child),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  width: _knob,
+                  height: _knob,
+                  decoration: BoxDecoration(
+                    color: value ? t.onAccent : t.foregroundSubtle,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ),
             ),
@@ -392,9 +428,9 @@ class AyreSegmented<T> extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(2),
       decoration: BoxDecoration(
-        color: t.surfaceAlt,
+        color: t.surfaceSunken,
         borderRadius: BorderRadius.circular(AppRadius.control),
-        border: Border.all(color: t.borderSubtle),
+        border: Border.all(color: t.hairline),
       ),
       child: Row(
         children: [
@@ -426,10 +462,19 @@ class _Segment<T> extends StatelessWidget {
   final bool compact;
   final VoidCallback onTap;
 
+  // Note (plan §7 open decision #2 sibling item, resolved in Phase 1): this
+  // toggles each segment's own fill rather than sliding one shared pill
+  // behind the row (a `layoutId`-equivalent shared-element transition, which
+  // Flutter has no direct primitive for outside `Hero` — wrong tool here per
+  // the plan's own note). Kept as-is: with only 2–3 segments and every
+  // segment animating its own fill on the same `AppMotion.buttonPress`
+  // timing, the visual result reads as one control changing state, not three
+  // separate ones — a sliding-pill rebuild is not warranted by the Spec's
+  // "glides smoothly" description, which this already satisfies.
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final fg = selected ? t.onAccent : t.textSecondary;
+    final fg = selected ? t.onAccent : t.foregroundMuted;
 
     return Semantics(
       button: true,
@@ -437,9 +482,9 @@ class _Segment<T> extends StatelessWidget {
       label: segment.label,
       child: PressableScale(
         onTap: onTap,
-        borderRadius: AppRadius.panel,
+        borderRadius: AppRadius.control,
         child: AnimatedContainer(
-          duration: AppMotion.fast,
+          duration: AppMotion.buttonPress,
           curve: AppMotion.ease,
           padding: EdgeInsets.symmetric(
             vertical: compact ? AppSpace.sm : AppSpace.md,
@@ -447,7 +492,7 @@ class _Segment<T> extends StatelessWidget {
           ),
           decoration: BoxDecoration(
             color: selected ? t.accent : AppTheme.transparent,
-            borderRadius: BorderRadius.circular(AppRadius.panel),
+            borderRadius: BorderRadius.circular(AppRadius.control),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -475,10 +520,17 @@ class _Segment<T> extends StatelessWidget {
 
 // ─── Status chips ──────────────────────────────────────────────────────────
 
-enum ChipTone { neutral, live, attention, info, brand }
+/// `info` is retired in v4 (plan §3.3 / §7 open decision — the Spec's fixed
+/// accent set is accent/positive/negative/neutral only, with no separate
+/// "info" role). The one real call site using it
+/// (`profile_tab.dart`'s tier badge — a non-market identity tag) is
+/// reconciled onto [neutral], since a tier label is attention-worthy
+/// metadata, not a brand or market-direction signal.
+enum ChipTone { neutral, live, attention, brand }
 
-/// Small, flat, caps chip for states like LIVE, DELAYED, CLOSED, NEW. Ember
-/// carries attention; Slate Violet carries non-market informational tags only.
+/// Small, flat, caps chip for states like LIVE, DELAYED, CLOSED, NEW. Neutral
+/// (muted gold) carries attention/LIVE; the brand accent carries non-market
+/// identity tags only (tiers, badges) — never a market-direction signal.
 class AyreChip extends StatelessWidget {
   const AyreChip({
     super.key,
@@ -499,10 +551,9 @@ class AyreChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final (Color fg, Color bg) = switch (tone) {
-      ChipTone.neutral => (t.textTertiary, t.surfaceAlt),
-      ChipTone.live => (t.caution, t.cautionSoft),
-      ChipTone.attention => (t.caution, t.cautionSoft),
-      ChipTone.info => (t.info, t.info.withValues(alpha: 0.12)),
+      ChipTone.neutral => (t.foregroundSubtle, t.surfaceRaised),
+      ChipTone.live => (t.neutral, t.neutralSoft),
+      ChipTone.attention => (t.neutral, t.neutralSoft),
       ChipTone.brand => (t.accentInk, t.accent.withValues(alpha: 0.16)),
     };
 
@@ -660,7 +711,7 @@ class TickerRow extends StatelessWidget {
               child: Figure.static(
                 '$rank',
                 fontSize: 11,
-                color: t.textTertiary,
+                color: t.foregroundSubtle,
               ),
             ),
             const SizedBox(width: AppSpace.xs),
@@ -715,14 +766,14 @@ class TickerRow extends StatelessWidget {
                         Figure(
                           formatVolume(volume),
                           fontSize: 11,
-                          color: t.textTertiary,
+                          color: t.foregroundSubtle,
                         ),
                         const SizedBox(width: AppSpace.sm),
                       ] else if (changeAbsolute != null) ...[
                         Figure(
                           formatDelta(changeAbsolute!, percent: false),
                           fontSize: 11,
-                          color: t.textTertiary,
+                          color: t.foregroundSubtle,
                         ),
                         const SizedBox(width: AppSpace.sm),
                       ],
@@ -773,7 +824,7 @@ class SettingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final tone = danger ? t.loss : t.textSecondary;
+    final tone = danger ? t.negative : t.foregroundMuted;
 
     final row = Opacity(
       opacity: enabled ? 1 : 0.5,
@@ -793,7 +844,10 @@ class SettingRow extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: AppTypo.rowLabel(t, color: danger ? t.loss : null),
+                    style: AppTypo.rowLabel(
+                      t,
+                      color: danger ? t.negative : null,
+                    ),
                   ),
                   if (subtitle != null) ...[
                     const SizedBox(height: 1),
@@ -809,7 +863,7 @@ class SettingRow extends StatelessWidget {
                     : AyreIcon(
                         AyreGlyph.forward,
                         size: 16,
-                        color: t.textTertiary,
+                        color: t.foregroundSubtle,
                       )),
           ],
         ),
@@ -849,7 +903,13 @@ class RowGroup extends StatelessWidget {
 
 // ─── Signal strength ───────────────────────────────────────────────────────
 
-/// Filled/unfilled terminal ticks — "signal bars", deliberately not a dial.
+/// Filled/unfilled bars — deliberately not a dial. Heights step at the Spec's
+/// own 40/55/70/85/100% band (§11.6) rather than the previous formula-derived
+/// curve — with the default `of: 4` this plan inherited from v3, the last
+/// four of those five steps are used (55/70/85/100%) so the tallest bar still
+/// reads as "full". Retinted to the caller's direction color (gain/loss) by
+/// default via [color]; falls back to the brand accent only when no direction
+/// applies.
 class SignalStrength extends StatelessWidget {
   const SignalStrength({
     super.key,
@@ -865,10 +925,18 @@ class SignalStrength extends StatelessWidget {
   final Color? color;
   final double height;
 
+  /// The Spec's exact bar-height percentages (§11.6), tallest last.
+  static const List<double> _heightSteps = [0.40, 0.55, 0.70, 0.85, 1.00];
+
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final tone = color ?? t.accentInk;
+    // Sample the last `of` steps of the Spec's 5-step band so a smaller bar
+    // count still ends on "full height" rather than re-deriving a new curve.
+    final steps = _heightSteps.sublist(
+      (_heightSteps.length - of).clamp(0, _heightSteps.length),
+    );
     return Semantics(
       label: 'Signal strength $level of $of',
       child: Row(
@@ -879,9 +947,9 @@ class SignalStrength extends StatelessWidget {
             if (i > 0) const SizedBox(width: 2),
             Container(
               width: 3,
-              height: height * (0.42 + 0.58 * ((i + 1) / of)),
+              height: height * (i < steps.length ? steps[i] : 1.0),
               decoration: BoxDecoration(
-                color: i < level ? tone : t.border,
+                color: i < level ? tone : t.hairline,
                 borderRadius: BorderRadius.circular(1),
               ),
             ),
@@ -892,8 +960,9 @@ class SignalStrength extends StatelessWidget {
   }
 }
 
-/// A thin progress rule — Learn's lesson progress. Citrine, because progress is
-/// a brand-carrying affirmative, not a market gain.
+/// A thin progress rule — Learn's lesson progress. The brand accent, because
+/// progress is a brand-carrying affirmative, not a market gain (so it never
+/// borrows [AppThemeTokens.positive]).
 class ProgressRule extends StatelessWidget {
   const ProgressRule({super.key, required this.value, this.height = 3});
 
@@ -909,7 +978,7 @@ class ProgressRule extends StatelessWidget {
       child: LinearProgressIndicator(
         value: value.clamp(0.0, 1.0),
         minHeight: height,
-        backgroundColor: t.surfaceAlt,
+        backgroundColor: t.surfaceSunken,
         valueColor: AlwaysStoppedAnimation(t.accent),
       ),
     );
@@ -1115,6 +1184,105 @@ class ContentWidth extends StatelessWidget {
           maxWidth: maxWidth ?? AppBreakpoints.contentMaxWidth,
         ),
         child: child,
+      ),
+    );
+  }
+}
+
+// ─── Direction badge ───────────────────────────────────────────────────────
+
+/// A signed market direction shown as icon + label on a tint-on-wash fill —
+/// never a solid fill (Spec §11.5, §20.7: exactly one reused component for
+/// this, never inlined per-screen). Extracted in Phase 1 per plan §6/§9 as a
+/// **new** shared component: no equivalent existed as an isolated widget
+/// before — [DeltaFigure] (`figure.dart`) renders a signed *figure* inline
+/// with a caret, and `home_tab.dart`'s private `_BreadthFigure` does its own
+/// bespoke direction rendering; neither is this component. This widget is
+/// additive in this phase — rewiring call sites onto it (including
+/// `home_tab.dart`'s inline pattern) is Phase 5/6 work, done screen by screen
+/// against its own Spec subsection rather than here.
+///
+/// Color is never the only channel: the caret glyph and the upper-case label
+/// both carry direction independently of the tint.
+class DirectionBadge extends StatelessWidget {
+  const DirectionBadge({
+    super.key,
+    required this.up,
+    required this.label,
+    this.neutral = false,
+  });
+
+  /// Ignored when [neutral] is true.
+  final bool up;
+  final String label;
+
+  /// Renders in the neutral/gold tone instead of positive/negative — for a
+  /// flat/unchanged reading that still needs a badge (e.g. "UNCHANGED").
+  final bool neutral;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final (Color fg, Color bg) = neutral
+        ? (t.neutral, t.neutralSoft)
+        : up
+        ? (t.positive, t.positiveSoft)
+        : (t.negative, t.negativeSoft);
+
+    return Semantics(
+      label: '${neutral ? 'unchanged' : (up ? 'up' : 'down')} $label',
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!neutral) ...[
+              DirectionGlyph(up: up, color: fg, size: 11),
+              const SizedBox(width: 4),
+            ],
+            Text(label.toUpperCase(), style: AppTypo.label(t, color: fg)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Tag pill ──────────────────────────────────────────────────────────────
+
+/// A small, neutral, non-market informational tag — the category label on an
+/// Insights note, a topic marker. Distinct from [AyreChip]: chips carry a
+/// state (LIVE, DELAYED, a tier), tags label a piece of content and never
+/// pulse, animate, or carry a glyph. Extracted in Phase 1 per plan §6 as a
+/// **new** shared component: `insights_tab.dart`'s `note.category` label was
+/// previously rendered as a bare uppercase [Text] with no pill/fill at all,
+/// not an inlined variant of this widget — nothing is retired by adding this.
+/// Rewiring that call site onto [TagPill] is Phase 5 work (`insights_tab.dart`
+/// against Spec §13.3), not done here.
+class TagPill extends StatelessWidget {
+  const TagPill({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: t.surfaceRaised,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: AppTypo.label(t, color: t.foregroundMuted),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

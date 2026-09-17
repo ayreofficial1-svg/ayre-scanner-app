@@ -153,8 +153,8 @@ void main() {
       await tester.pump();
 
       final icon = tester.widget<AyreIcon>(find.byType(AyreIcon));
-      expect(icon.color, isNot(tokens.loss));
-      expect(icon.color, tokens.textSecondary);
+      expect(icon.color, isNot(tokens.negative));
+      expect(icon.color, tokens.foregroundMuted);
     });
   });
 
