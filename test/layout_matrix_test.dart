@@ -12,7 +12,7 @@ import 'package:ayre_scanner/services/fault_injection.dart';
 import 'package:ayre_scanner/services/market_data_service.dart';
 import 'package:ayre_scanner/services/market_models.dart';
 import 'package:ayre_scanner/theme/app_theme.dart';
-import 'package:ayre_scanner/widgets/curved_nav_bar.dart';
+import 'package:ayre_scanner/widgets/ayre_bottom_nav.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -201,7 +201,7 @@ void main() {
 
   group('the navigation bar', () {
     for (final scale in scales) {
-      testWidgets('is always visible, icon-only, at 320pt · x$scale', (
+      testWidgets('is always visible with icon and label, at 320pt · x$scale', (
         tester,
       ) async {
         tester.view.physicalSize = const Size(320, 568);
@@ -227,19 +227,20 @@ void main() {
           );
         }
 
-        // Icons only — no destination renders its name as visible text.
+        // v4 reverses v3's icon-only nav (Spec §9): every destination now
+        // shows its name as a visible label, not just an accessibility one.
         for (final destination in kNavDestinations) {
           expect(
             find.descendant(
               of: find.byKey(navDestinationKey(destination.label)),
               matching: find.text(destination.label),
             ),
-            findsNothing,
-            reason: '${destination.label} must not show a text label',
+            findsOneWidget,
+            reason: '${destination.label} must show a visible text label',
           );
         }
 
-        // ...but the name is still in the accessibility tree.
+        // The visible label doubles as the accessibility name.
         final handle = tester.ensureSemantics();
         final semantics = tester.getSemantics(
           find.byKey(navDestinationKey('Signals')),
@@ -270,7 +271,7 @@ void main() {
       });
     }
 
-    testWidgets('the notch slides between destinations without jumping', (
+    testWidgets('the pill slides between destinations without jumping', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -283,7 +284,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 900));
 
       await tester.tap(find.byKey(navDestinationKey('Learn')));
-      // Mid-flight: the shape is animating, and nothing has thrown.
+      // Mid-flight: the pill is animating, and nothing has thrown.
       await tester.pump(const Duration(milliseconds: 80));
       expect(tester.takeException(), isNull);
 

@@ -307,23 +307,14 @@ abstract final class AppMotion {
   static const Duration entrance = cardEntrance;
   static const Duration stagger = entranceStagger;
 
-  /// Framer Motion's `stiffness`/`damping` model and Flutter's
-  /// `SpringDescription(mass, stiffness, damping)` are both physical
-  /// mass-spring-damper models, but the Spec's numbers were authored against
-  /// the former — these are a first-pass literal carry-over (mass 1), NOT yet
-  /// verified against Flutter's simulation. Per plan §7 open decision #3,
-  /// build the spring, watch it settle, and compare to "glides smoothly, no
-  /// bounce" at the start of Phase 1 before trusting these numerically.
-  static const SpringDescription navSpring = SpringDescription(
-    mass: 1,
-    stiffness: 480,
-    damping: 38,
-  );
-  static const SpringDescription toggleSpring = SpringDescription(
-    mass: 1,
-    stiffness: 500,
-    damping: 34,
-  );
+  // Plan §7 open decision #9: Phase 0 put a literal carry-over of the Spec's
+  // nav/toggle spring numbers here; Phase 1 numerically verified the same
+  // values and moved the checked, documented version onto `AppSpring.navPill`
+  // / `AppSpring.toggleKnob` in `spring.dart` (which is what `AyreSwitch` and,
+  // as of this phase, `AyreBottomNav` actually animate with). Consolidated on
+  // that single location now that both call sites exist — the copies that
+  // used to live here (`navSpring`/`toggleSpring`) are deleted rather than
+  // kept as unused duplicates.
 }
 
 /// The type scale.

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/market_data_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
-import '../widgets/curved_nav_bar.dart';
+import '../widgets/ayre_bottom_nav.dart';
 import 'home_tab.dart';
 import 'insights_tab.dart';
 import 'learn_tab.dart';
@@ -75,7 +75,7 @@ class _HomeShellState extends State<HomeShell> {
       extendBody: true,
       body: _TabFade(index: _index, child: tabs),
       // Always visible: no scroll listener, no idle timer, no collapsed state.
-      bottomNavigationBar: CurvedNavBar(
+      bottomNavigationBar: AyreBottomNav(
         selectedIndex: _index,
         onSelected: _select,
       ),
@@ -83,8 +83,13 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
-/// The incoming tab's already-built content fades in — opacity only, additive to
-/// the Fold's own motion.
+/// The incoming tab's already-built content fades **and shifts** in — per
+/// Spec §15.4, tab-to-tab switches inside this shell are a fade+shift, not
+/// the route-level slide `TerminalPageTransitions` uses for overlay pushes
+/// (Settings, detail screens). A small upward settle (8px, [AppSpace.xs])
+/// reads as "the new content arrives" rather than a hard cut, without the
+/// directional left/right implication a full slide would give two
+/// same-level tabs.
 class _TabFade extends StatefulWidget {
   const _TabFade({required this.index, required this.child});
 
@@ -97,13 +102,17 @@ class _TabFade extends StatefulWidget {
 
 class _TabFadeState extends State<_TabFade>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _fade;
+  late final AnimationController _controller;
+  late final Animation<double> _curved;
 
   @override
   void initState() {
     super.initState();
-    _fade = AnimationController(vsync: this, duration: AppMotion.fast)
-      ..value = 1.0;
+    _controller = AnimationController(
+      vsync: this,
+      duration: AppMotion.pageTransition,
+    )..value = 1.0;
+    _curved = CurvedAnimation(parent: _controller, curve: AppMotion.ease);
   }
 
   @override
@@ -111,23 +120,26 @@ class _TabFadeState extends State<_TabFade>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.index == widget.index) return;
     if (MediaQuery.disableAnimationsOf(context)) {
-      _fade.value = 1.0;
+      _controller.value = 1.0;
     } else {
-      _fade.forward(from: 0.4);
+      _controller.forward(from: 0);
     }
   }
 
   @override
   void dispose() {
-    _fade.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return FadeTransition(
-      opacity: CurvedAnimation(parent: _fade, curve: AppMotion.ease),
-      child: widget.child,
+      opacity: _curved,
+      child: Transform.translate(
+        offset: Offset(0, (1 - _curved.value) * AppSpace.xs),
+        child: widget.child,
+      ),
     );
   }
 }
