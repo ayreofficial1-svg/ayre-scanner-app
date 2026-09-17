@@ -8,14 +8,21 @@ import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
 import '../widgets/figure.dart';
+import '../widgets/pressable_scale.dart';
 import '../widgets/state_views.dart';
 import 'equity_detail_screen.dart';
 
-/// Signals — the signal board.
+/// Signals — the signal board (Spec §13.2).
 ///
-/// Dense terminal rows rather than generously-spaced editorial cards: this is a
-/// data-desk screen. Conviction reads as filled/unfilled signal ticks, never a
-/// dial.
+/// Rebuilt in Phase 5 to §13.2's four parts: filter chips, a featured signal
+/// card, a compact signal list, and the bar strength meter.
+///
+/// v3 rendered every signal as an identical mid-weight card, which meant the
+/// board had no shape — twelve equally loud things and no way in. §13.2's
+/// featured-plus-list structure gives the highest-conviction pick the
+/// accent-edged card (§8.4) and drops the rest to compact hairline-divided
+/// rows inside one card, so the screen reads as "here's the one, here are the
+/// others" rather than as a wall.
 class SignalsTab extends StatefulWidget {
   const SignalsTab({super.key, required this.marketData});
 
@@ -25,9 +32,30 @@ class SignalsTab extends StatefulWidget {
   State<SignalsTab> createState() => _SignalsTabState();
 }
 
+/// The board's filters. Bias, not sector or timeframe — bias is the one axis
+/// every signal is guaranteed to carry (`Signal.bullish` is non-nullable),
+/// so a filter on it can never produce a silently-empty board because the
+/// feed omitted a field.
+enum _Filter {
+  all('All'),
+  bullish('Bullish'),
+  bearish('Bearish');
+
+  const _Filter(this.label);
+
+  final String label;
+
+  bool matches(Signal s) => switch (this) {
+    _Filter.all => true,
+    _Filter.bullish => s.bullish,
+    _Filter.bearish => !s.bullish,
+  };
+}
+
 class _SignalsTabState extends State<SignalsTab> {
   DataResult<List<Signal>>? _result;
   bool _loading = true;
+  _Filter _filter = _Filter.all;
 
   @override
   void initState() {
@@ -78,6 +106,7 @@ class _SignalsTabState extends State<SignalsTab> {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final all = _result?.value ?? const <Signal>[];
 
     return RefreshIndicator(
       color: t.accentInk,
@@ -87,9 +116,9 @@ class _SignalsTabState extends State<SignalsTab> {
       child: ContentWidth(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
-            AppSpace.lg,
-            AppSpace.lg,
-            AppSpace.lg,
+            AppSpace.pageHorizontal,
+            AppSpace.pageTop,
+            AppSpace.pageHorizontal,
             120,
           ),
           children: [
@@ -100,60 +129,173 @@ class _SignalsTabState extends State<SignalsTab> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('LIVE SCANNER', style: AppTypo.label(t)),
-                    const SizedBox(height: AppSpace.xs),
+                    const SizedBox(height: AppSpace.xxs),
                     Text('Signal board', style: AppTypo.pageTitle(t)),
                     const SizedBox(height: AppSpace.xxs),
                     Text(
-                      'Curated setups with live movement and compact rationale.',
+                      'Curated setups with live movement and compact '
+                      'rationale.',
                       style: AppTypo.body(t),
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: AppSpace.xl),
-            if (_loading)
-              const AyreCard(
-                padding: EdgeInsets.symmetric(vertical: AppSpace.xs),
-                child: Column(
-                  children: [
-                    SkeletonTickerRow(),
-                    SkeletonTickerRow(),
-                    SkeletonTickerRow(),
-                    SkeletonTickerRow(),
-                  ],
-                ),
-              )
-            else if (_result!.isFailed)
-              StatePanel.failed(
-                headline: "The scanner couldn't refresh",
-                message: 'Pull down to sweep again.',
-              )
-            else if (_result!.isEmpty)
-              const StatePanel.empty(
-                headline: 'No fresh setups right now',
-                message: 'Pull down when you want the scanner to sweep again.',
-              )
-            else
-              for (final (i, signal) in _result!.value!.indexed) ...[
-                if (i > 0) const SizedBox(height: AppSpace.sm),
-                Entrance(
-                  index: i + 1,
-                  child: _SignalRowCard(
-                    signal: signal,
-                    onTap: () => _openEquity(signal),
-                  ),
-                ),
-              ],
+            const SizedBox(height: AppSpace.md),
+            // Chips render even while loading, greyed by their own zero
+            // counts — a filter row that appears only after data lands makes
+            // the header jump, which is the reflow skeletons exist to avoid.
+            Entrance(index: 1, child: _FilterRow(
+              selected: _filter,
+              signals: all,
+              onSelect: (f) {
+                HapticFeedback.selectionClick();
+                setState(() => _filter = f);
+              },
+            )),
+            const SizedBox(height: AppSpace.sectionGap),
+            ..._board(),
           ],
         ),
       ),
     );
   }
+
+  List<Widget> _board() {
+    if (_loading) return const [_SignalsSkeleton()];
+
+    if (_result!.isFailed) {
+      return [
+        StatePanel.failed(
+          headline: "The scanner couldn't refresh",
+          message: 'The last sweep is still shown below where available.',
+          onRetry: _load,
+        ),
+      ];
+    }
+
+    if (_result!.isEmpty) {
+      return const [
+        StatePanel.empty(
+          headline: 'No fresh setups right now',
+          message: 'Pull down when you want the scanner to sweep again.',
+        ),
+      ];
+    }
+
+    final matching = _result!.value!.where(_filter.matches).toList();
+
+    // A filtered-to-nothing board is not an empty feed and must not read like
+    // one: the data arrived, the query is too narrow, and the action is the
+    // user's. That distinction is exactly what Phase 4 added `noResults` for.
+    if (matching.isEmpty) {
+      return [
+        StatePanel.noResults(
+          headline: 'No ${_filter.label.toLowerCase()} setups in this sweep',
+          message: 'The scanner found setups, just none on this side.',
+          retryLabel: 'Show all',
+          onRetry: () => setState(() => _filter = _Filter.all),
+        ),
+      ];
+    }
+
+    // The featured slot goes to the highest conviction, and ties break toward
+    // the largest move — otherwise the "featured" pick would silently be
+    // whichever the feed happened to list first.
+    final ranked = [...matching]
+      ..sort((a, b) {
+        final byStrength = (b.strength ?? 0).compareTo(a.strength ?? 0);
+        if (byStrength != 0) return byStrength;
+        return (b.percentChange ?? 0).abs().compareTo(
+          (a.percentChange ?? 0).abs(),
+        );
+      });
+    final featured = ranked.first;
+    final rest = ranked.skip(1).toList();
+
+    return [
+      Entrance(
+        index: 2,
+        child: _FeaturedSignal(
+          signal: featured,
+          onTap: () => _openEquity(featured),
+        ),
+      ),
+      if (rest.isNotEmpty) ...[
+        const SizedBox(height: AppSpace.sectionGap),
+        const Entrance(index: 3, child: SectionLabel(label: 'Also on watch')),
+        Entrance(
+          index: 4,
+          // `RowGroup` *is* the card — it wraps its rows in one `AyreCard`
+          // with hairline dividers between them (§8.3). Wrapping it in
+          // another card would nest cards, which §19 forbids outright; a
+          // stack of sibling cards for what is one list was the structural
+          // mistake v3 made here.
+          child: RowGroup(
+            children: [
+              for (final signal in rest)
+                _CompactSignalRow(
+                  signal: signal,
+                  onTap: () => _openEquity(signal),
+                ),
+            ],
+          ),
+        ),
+      ],
+      if (_result!.stale) ...[
+        const SizedBox(height: AppSpace.md),
+        const StaleNotice(),
+      ],
+    ];
+  }
 }
 
-class _SignalRowCard extends StatelessWidget {
-  const _SignalRowCard({required this.signal, required this.onTap});
+// ─── Filters ───────────────────────────────────────────────────────────────
+
+class _FilterRow extends StatelessWidget {
+  const _FilterRow({
+    required this.selected,
+    required this.signals,
+    required this.onSelect,
+  });
+
+  final _Filter selected;
+  final List<Signal> signals;
+  final ValueChanged<_Filter> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    // Scrolls rather than wraps: at a large text scale three chips plus their
+    // counts exceed a 320pt width, and a wrapped filter row changes the
+    // header's height as the text scale changes.
+    return SizedBox(
+      height: 44,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        clipBehavior: Clip.none,
+        children: [
+          for (final filter in _Filter.values) ...[
+            if (filter != _Filter.values.first)
+              const SizedBox(width: AppSpace.xs),
+            AyreFilterChip(
+              label: filter.label,
+              selected: filter == selected,
+              count: signals.where(filter.matches).length,
+              onTap: () => onSelect(filter),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Featured signal ───────────────────────────────────────────────────────
+
+/// The board's lead pick (§13.2). An accent-tinted border marks it featured
+/// (§8.4) — never a tinted fill behind it, which is the pattern v4 retired.
+class _FeaturedSignal extends StatelessWidget {
+  const _FeaturedSignal({required this.signal, required this.onTap});
 
   final Signal signal;
   final VoidCallback onTap;
@@ -161,37 +303,45 @@ class _SignalRowCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final tone = signal.bullish ? t.gain : t.loss;
+    final tone = signal.bullish ? t.positive : t.negative;
 
     return AyreCard(
       onTap: onTap,
-      padding: const EdgeInsets.all(AppSpace.md),
+      accentEdge: true,
+      padding: const EdgeInsets.all(AppSpace.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              // The bias glyph carries direction alongside the colour.
-              AyreIcon(
-                signal.bullish ? AyreGlyph.trendUp : AyreGlyph.trendDown,
-                size: 17,
-                color: tone,
+              Text('TOP CONVICTION', style: AppTypo.label(t, color: t.accentInk)),
+              const Spacer(),
+              ShrinkTrailing(
+                child: DirectionBadge(
+                  up: signal.bullish,
+                  label: signal.bullish ? 'Bullish' : 'Bearish',
+                ),
               ),
-              const SizedBox(width: AppSpace.sm),
+            ],
+          ),
+          const SizedBox(height: AppSpace.inCardGap),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       signal.symbol,
-                      style: AppTypo.rowLabel(t),
+                      style: AppTypo.featuredHeadline(t),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     if (signal.name != null && signal.name!.isNotEmpty)
                       Text(
                         signal.name!,
-                        style: AppTypo.caption(t),
+                        style: AppTypo.body(t),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -207,9 +357,16 @@ class _SignalRowCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       if (signal.lastPrice != null)
-                        Figure(formatPrice(signal.lastPrice), fontSize: 14),
+                        Figure(
+                          formatPrice(signal.lastPrice),
+                          fontSize: AppTextScale.cardTitle,
+                          fontWeight: FontWeight.w600,
+                        ),
                       const SizedBox(height: AppSpace.xxs),
-                      DeltaFigure(change: signal.percentChange, fontSize: 12),
+                      DeltaFigure(
+                        change: signal.percentChange,
+                        fontSize: AppTextScale.body,
+                      ),
                     ],
                   ),
                 ),
@@ -217,57 +374,151 @@ class _SignalRowCard extends StatelessWidget {
             ],
           ),
           if (signal.rationale.isNotEmpty) ...[
-            const SizedBox(height: AppSpace.sm),
+            const SizedBox(height: AppSpace.inCardGap),
             Text(
               signal.rationale,
               style: AppTypo.body(t),
-              maxLines: 2,
+              maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),
           ],
-          const SizedBox(height: AppSpace.sm),
-          const HairlineDivider(),
-          const SizedBox(height: AppSpace.sm),
-          // The levels row only renders the figures the feed actually provided.
-          Row(
-            children: [
-              if (signal.strength != null) ...[
+          if (signal.strength != null) ...[
+            const SizedBox(height: AppSpace.inCardGap),
+            Row(
+              children: [
                 Text('CONVICTION', style: AppTypo.label(t)),
                 const SizedBox(width: AppSpace.xs),
-                SignalStrength(level: signal.strength!, color: tone),
-                const SizedBox(width: AppSpace.md),
+                SignalStrength(level: signal.strength!, color: tone, height: 18),
               ],
-              Expanded(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerRight,
-                  child: Row(
-                    children: [
-                      if (signal.entry != null)
-                        _Level(label: 'Entry', value: signal.entry),
-                      if (signal.target != null)
-                        _Level(
-                          label: 'Target',
-                          value: signal.target,
-                          tone: t.gain,
-                        ),
-                      if (signal.stop != null)
-                        _Level(label: 'Stop', value: signal.stop, tone: t.loss),
-                      if (signal.entry == null &&
-                          signal.target == null &&
-                          signal.stop == null &&
-                          signal.addedOn != null)
-                        Text(
-                          'ADDED ${signal.addedOn!.toUpperCase()}',
-                          style: AppTypo.label(t),
-                        ),
-                    ],
+            ),
+          ],
+          if (signal.entry != null ||
+              signal.target != null ||
+              signal.stop != null) ...[
+            const SizedBox(height: AppSpace.md),
+            // A sunken inset, not a nested card (§8.3) — the levels are a
+            // sub-region of this card, and v4 forbids a card inside a card.
+            InkPanel(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpace.md,
+                vertical: AppSpace.sm,
+              ),
+              child: Row(
+                children: [
+                  if (signal.entry != null)
+                    Expanded(child: _Level(label: 'Entry', value: signal.entry)),
+                  if (signal.target != null)
+                    Expanded(
+                      child: _Level(
+                        label: 'Target',
+                        value: signal.target,
+                        tone: t.positive,
+                      ),
+                    ),
+                  if (signal.stop != null)
+                    Expanded(
+                      child: _Level(
+                        label: 'Stop',
+                        value: signal.stop,
+                        tone: t.negative,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ] else if (signal.addedOn != null) ...[
+            const SizedBox(height: AppSpace.sm),
+            Text('ADDED ${signal.addedOn!.toUpperCase()}',
+                style: AppTypo.label(t)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Compact list ──────────────────────────────────────────────────────────
+
+/// One row of the "also on watch" list (§13.2's compact signal list, §11.7's
+/// row convention). Deliberately thinner than the featured card: symbol,
+/// direction, move, conviction. The rationale and the levels live one tap
+/// away, on Equity Detail.
+class _CompactSignalRow extends StatelessWidget {
+  const _CompactSignalRow({required this.signal, required this.onTap});
+
+  final Signal signal;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final tone = signal.bullish ? t.positive : t.negative;
+
+    return PressableScaleRow(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.md,
+          vertical: AppSpace.hairlineRowPadding,
+        ),
+        child: Row(
+          children: [
+            AyreIcon(
+              signal.bullish ? AyreGlyph.trendUp : AyreGlyph.trendDown,
+              size: 17,
+              color: tone,
+            ),
+            const SizedBox(width: AppSpace.sm),
+            Expanded(
+              flex: 5,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    signal.symbol,
+                    style: AppTypo.rowLabel(t),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  if (signal.name != null && signal.name!.isNotEmpty)
+                    Text(
+                      signal.name!,
+                      style: AppTypo.hint(t),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpace.sm),
+            if (signal.strength != null) ...[
+              SignalStrength(level: signal.strength!, color: tone),
+              const SizedBox(width: AppSpace.sm),
+            ],
+            Flexible(
+              flex: 3,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    if (signal.lastPrice != null)
+                      Figure(
+                        formatPrice(signal.lastPrice),
+                        fontSize: AppTextScale.body,
+                      ),
+                    const SizedBox(height: AppSpace.xxs),
+                    DeltaFigure(
+                      change: signal.percentChange,
+                      fontSize: AppTextScale.hint,
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -283,15 +534,71 @@ class _Level extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Padding(
-      padding: const EdgeInsets.only(left: AppSpace.md),
-      child: Row(
-        children: [
-          Text(label.toUpperCase(), style: AppTypo.label(t)),
-          const SizedBox(width: AppSpace.xs),
-          Figure(formatPrice(value), fontSize: 12, color: tone),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: AppTypo.label(t),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: AppSpace.xxs),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Figure(
+            formatPrice(value),
+            fontSize: AppTextScale.body,
+            fontWeight: FontWeight.w600,
+            color: tone,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Mirrors the featured-plus-list shape, so nothing jumps when data lands.
+class _SignalsSkeleton extends StatelessWidget {
+  const _SignalsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AyreCard(
+          padding: EdgeInsets.all(AppSpace.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SkeletonBlock(width: 120, height: 11),
+              SizedBox(height: AppSpace.inCardGap),
+              SkeletonBlock(width: 160, height: 24),
+              SizedBox(height: AppSpace.xs),
+              SkeletonBlock(height: 12),
+              SizedBox(height: AppSpace.xxs),
+              SkeletonBlock(width: 220, height: 12),
+              SizedBox(height: AppSpace.md),
+              SkeletonBlock(height: 48, radius: AppRadius.inset),
+            ],
+          ),
+        ),
+        SizedBox(height: AppSpace.sectionGap),
+        AyreCard(
+          padding: EdgeInsets.symmetric(vertical: AppSpace.xs),
+          child: Column(
+            children: [
+              SkeletonTickerRow(),
+              SkeletonTickerRow(),
+              SkeletonTickerRow(),
+              SkeletonTickerRow(),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

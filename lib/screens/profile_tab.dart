@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/api_service.dart';
+import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
+import '../widgets/figure.dart';
 import 'edit_profile_screen.dart';
 import 'home_shell.dart' show initialsFor;
 import 'login_screen.dart';
-import '../widgets/figure.dart';
 import 'notifications_screen.dart';
 import 'settings_screen.dart';
 import 'support_screen.dart' show SupportScreen, kAppVersion, kAppBuild;
@@ -99,9 +100,9 @@ class _ProfileTabState extends State<ProfileTab> {
     return ContentWidth(
       child: ListView(
         padding: const EdgeInsets.fromLTRB(
-          AppSpace.lg,
-          AppSpace.lg,
-          AppSpace.lg,
+          AppSpace.pageHorizontal,
+          AppSpace.pageTop,
+          AppSpace.pageHorizontal,
           120,
         ),
         children: [
@@ -111,9 +112,11 @@ class _ProfileTabState extends State<ProfileTab> {
               child: _IdentityBlock(name: _name, handle: _handle, tier: _tier),
             ),
           ),
-          const SizedBox(height: AppSpace.xl),
+          const SizedBox(height: AppSpace.sectionGap),
+          const Entrance(index: 1, child: _StatsRow()),
+          const SizedBox(height: AppSpace.sectionGap),
           // ── Account ───────────────────────────────────────────────────────
-          Entrance(index: 1, child: const SectionLabel(label: 'Account')),
+          Entrance(index: 2, child: const SectionLabel(label: 'Account')),
           Entrance(
             index: 2,
             child: RowGroup(
@@ -130,7 +133,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   subtitle: 'Identifies the account and cannot be changed here',
                   trailing: Text(
                     _handle ?? '—',
-                    style: AppTypo.bodyStrong(t, color: t.textSecondary),
+                    style: AppTypo.bodyStrong(t, color: t.foregroundMuted),
                   ),
                 ),
               ],
@@ -139,7 +142,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
           // ── Preferences ───────────────────────────────────────────────────
           const SizedBox(height: AppSpace.lg),
-          Entrance(index: 3, child: const SectionLabel(label: 'Preferences')),
+          Entrance(index: 4, child: const SectionLabel(label: 'Preferences')),
           Entrance(
             index: 4,
             child: RowGroup(
@@ -174,7 +177,7 @@ class _ProfileTabState extends State<ProfileTab> {
 
           // ── Support ───────────────────────────────────────────────────────
           const SizedBox(height: AppSpace.lg),
-          Entrance(index: 5, child: const SectionLabel(label: 'Support')),
+          Entrance(index: 6, child: const SectionLabel(label: 'Support')),
           Entrance(
             index: 6,
             child: RowGroup(
@@ -195,8 +198,8 @@ class _ProfileTabState extends State<ProfileTab> {
                   title: 'Version',
                   trailing: Figure.static(
                     '$kAppVersion ($kAppBuild)',
-                    fontSize: AppTextScale.caption,
-                    color: t.textSecondary,
+                    fontSize: AppTextScale.hint,
+                    color: t.foregroundMuted,
                   ),
                 ),
                 // A "Saved / Watchlist" row belongs here once there is a
@@ -205,11 +208,15 @@ class _ProfileTabState extends State<ProfileTab> {
             ),
           ),
           const SizedBox(height: AppSpace.xxl),
-          Entrance(index: 7, child: const SectionLabel(label: 'Session')),
+          Entrance(index: 8, child: const SectionLabel(label: 'Session')),
           Entrance(
             index: 8,
             child: RowGroup(
-              color: t.backgroundTint,
+              // `backgroundTint` was retired in Phase 0 and has no v4
+              // equivalent: emphasis comes from the row's own danger styling
+              // and the confirmation sheet, never a tinted plate behind a
+              // group (§8.4). The group takes the ordinary surface.
+              color: null,
               children: [
                 SettingRow(
                   glyph: AyreGlyph.signOut,
@@ -222,7 +229,7 @@ class _ProfileTabState extends State<ProfileTab> {
                           width: 15,
                           child: CircularProgressIndicator(
                             strokeWidth: 1.6,
-                            color: t.loss,
+                            color: t.negative,
                           ),
                         )
                       : null,
@@ -255,19 +262,22 @@ class _IdentityBlock extends StatelessWidget {
     return Row(
       children: [
         Container(
-          height: 52,
-          width: 52,
+          height: 56,
+          width: 56,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: t.accent,
-            borderRadius: BorderRadius.circular(AppRadius.control),
-            border: Border.all(color: t.textPrimary.withValues(alpha: 0.18)),
+            // §7 reserves circles for avatars and the toggle knob. This is an
+            // avatar — it was a rounded square in v3 because that identity had
+            // no such rule. Home's header control matches.
+            shape: BoxShape.circle,
+            border: Border.all(color: t.hairline),
           ),
           child: Text(
             initialsFor(name),
             style: AppTypo.ui(
-              fontSize: 19,
-              fontWeight: FontWeight.w800,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
               color: t.onAccent,
             ),
           ),
@@ -279,7 +289,11 @@ class _IdentityBlock extends StatelessWidget {
             children: [
               Text(
                 name,
-                style: AppTypo.pageTitle(t).copyWith(fontSize: 21),
+                style: AppTypo.display(
+                  fontSize: AppTextScale.featuredHeadline,
+                  fontWeight: FontWeight.w700,
+                  color: t.textPrimary,
+                ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -318,8 +332,53 @@ class _IdentityBlock extends StatelessWidget {
   }
 }
 
+/// §13.5's stats row.
+///
+/// Built only from figures the app genuinely holds locally — alerts logged on
+/// this device, and whether the notification log has anything unread. There is
+/// no account-statistics endpoint, so the obvious candidates (signals acted
+/// on, lessons completed, member-since) have no source. Per plan §8 that is a
+/// backend request to flag, not a reason to invent a number that looks
+/// authoritative; the row shows what is real and no more.
+class _StatsRow extends StatelessWidget {
+  const _StatsRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: NotificationLog.instance,
+      builder: (context, _) {
+        final entries = NotificationLog.instance.entries;
+        final unread = NotificationLog.instance.hasUnread;
+        return AyreCard(
+          child: Row(
+            children: [
+              Expanded(
+                child: LabelledFigure(
+                  label: 'Alerts logged',
+                  value: '${entries.length}',
+                  fontSize: AppTextScale.cardTitle,
+                ),
+              ),
+              Expanded(
+                child: LabelledFigure(
+                  label: 'Unread',
+                  value: unread ? 'Yes' : 'No',
+                  fontSize: AppTextScale.cardTitle,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Destructive confirmation. Cancel is the visually primary action; Sign out
-/// carries the Garnet weight.
+/// carries the negative tone — the one place in the app where that colour
+/// means "this is destructive" rather than "the market went down", and it is
+/// confined to an explicit confirmation sheet for exactly that reason.
 class _SignOutSheet extends StatelessWidget {
   const _SignOutSheet();
 

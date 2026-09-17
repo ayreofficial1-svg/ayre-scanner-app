@@ -4,8 +4,8 @@ import 'package:flutter/services.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
 import '../theme/app_theme.dart';
-import '../widgets/ayre_components.dart';
 import '../widgets/ayre_charts.dart';
+import '../widgets/ayre_components.dart';
 import '../widgets/figure.dart';
 import '../widgets/state_views.dart';
 import 'equity_detail_screen.dart';
@@ -81,6 +81,39 @@ class _InsightsTabState extends State<InsightsTab> {
     );
   }
 
+  /// §13.3: one featured article card, then the rest as a list.
+  ///
+  /// "Featured" is the feed's own flag where it sets one, and otherwise the
+  /// first note — a desk that publishes three notes and marks none of them
+  /// featured still has a lead story, and picking one is better than showing
+  /// three identical cards and calling that a hierarchy.
+  List<Widget> _deskNotes() {
+    final notes = _notes!.value!;
+    if (notes.isEmpty) {
+      return const [
+        StatePanel.empty(
+          headline: 'No notes published today',
+          message: 'The desk publishes written notes through the session.',
+          compact: true,
+        ),
+      ];
+    }
+
+    final featured = notes.firstWhere(
+      (n) => n.featured,
+      orElse: () => notes.first,
+    );
+    final rest = notes.where((n) => n != featured).toList();
+
+    return [
+      _FeaturedNote(note: featured),
+      if (rest.isNotEmpty) ...[
+        const SizedBox(height: AppSpace.cardGap),
+        RowGroup(children: [for (final note in rest) _NoteRow(note: note)]),
+      ],
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
@@ -93,9 +126,9 @@ class _InsightsTabState extends State<InsightsTab> {
       child: ContentWidth(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
-            AppSpace.lg,
-            AppSpace.lg,
-            AppSpace.lg,
+            AppSpace.pageHorizontal,
+            AppSpace.pageTop,
+            AppSpace.pageHorizontal,
             120,
           ),
           children: [
@@ -115,7 +148,7 @@ class _InsightsTabState extends State<InsightsTab> {
                 ),
               ),
             ),
-            const SizedBox(height: AppSpace.xl),
+            const SizedBox(height: AppSpace.sectionGap),
 
             // ── Section 1: sentiment / breadth ──────────────────────────────
             // The weekly/monthly toggle that used to sit here is gone: the
@@ -132,7 +165,7 @@ class _InsightsTabState extends State<InsightsTab> {
             ),
 
             // ── Sections 2–4: the movers lists ──────────────────────────────
-            const SizedBox(height: AppSpace.xl),
+            const SizedBox(height: AppSpace.sectionGap),
             _MoversSection(
               label: 'Top gainers',
               result: _loading ? null : _gainers,
@@ -141,7 +174,7 @@ class _InsightsTabState extends State<InsightsTab> {
                   'No advancing equities reported for this session yet.',
               failedMessage: "Top Gainers didn't load.",
             ),
-            const SizedBox(height: AppSpace.xl),
+            const SizedBox(height: AppSpace.sectionGap),
             _MoversSection(
               label: 'Top losers',
               result: _loading ? null : _losers,
@@ -150,7 +183,7 @@ class _InsightsTabState extends State<InsightsTab> {
                   'No declining equities reported for this session yet.',
               failedMessage: "Top Losers didn't load.",
             ),
-            const SizedBox(height: AppSpace.xl),
+            const SizedBox(height: AppSpace.sectionGap),
             _MoversSection(
               label: 'Most active',
               result: _loading ? null : _mostActive,
@@ -160,14 +193,19 @@ class _InsightsTabState extends State<InsightsTab> {
               failedMessage: "Most Active didn't load.",
             ),
 
-            // ── Written notes, when the desk publishes them ─────────────────
+            // ── Desk notes: §13.3's featured-article card + article list ────
+            //
+            // Ordered after the market sections rather than before them, which
+            // is a deliberate departure from reading §13.3's component list as
+            // a page order: notes are frequently absent (the feed publishes
+            // them irregularly), and leading a screen with a section that is
+            // usually empty would make Insights look broken on most days.
+            // The card *structures* are §13.3's; the sequence is this
+            // screen's own. Flagged in the plan.
             if (!_loading && _notes?.isReady == true) ...[
-              const SizedBox(height: AppSpace.xl),
+              const SizedBox(height: AppSpace.sectionGap),
               const SectionLabel(label: 'Desk notes'),
-              for (final note in _notes!.value!) ...[
-                _NoteCard(note: note),
-                const SizedBox(height: AppSpace.sm),
-              ],
+              ..._deskNotes(),
             ],
           ],
         ),
@@ -219,22 +257,22 @@ class _SentimentSection extends StatelessWidget {
     }
 
     final sentiment = result!.value!;
+    // §12.1 over §12.2 on the gauge's fill, same call Home makes: a sentiment
+    // reading's subject is direction, so a bearish gauge reads rose. Open
+    // decision #12.
     final tone = switch (sentiment.score) {
-      < 35 => t.loss,
-      < 65 => t.textPrimary,
-      _ => t.gain,
+      < 35 => t.negative,
+      < 65 => t.neutral,
+      _ => t.positive,
     };
+    final hasCounts =
+        sentiment.advances != null || sentiment.declines != null;
 
     return AyreCard(
+      padding: const EdgeInsets.all(AppSpace.lg),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Phase 3 swap only: `BreadthMeter` was deleted with this phase, so
-          // its one call site is moved onto the component that inherits its
-          // job. This screen's actual rebuild against Spec §13.3 — including
-          // whether the reading belongs centred, and wiring the advance/
-          // decline counts into a `BreadthDonut` instead of the two
-          // `LabelledFigure`s below — is still Phase 5's.
           Center(
             child: SentimentGauge(
               score: sentiment.score,
@@ -242,50 +280,31 @@ class _SentimentSection extends StatelessWidget {
               tone: tone,
             ),
           ),
-          if (sentiment.advances != null || sentiment.declines != null) ...[
-            const SizedBox(height: AppSpace.md),
+          if (hasCounts) ...[
+            const SizedBox(height: AppSpace.lg),
             const HairlineDivider(),
-            const SizedBox(height: AppSpace.md),
-            Row(
-              children: [
-                Expanded(
-                  child: LabelledFigure(
-                    label: 'Advances',
-                    value: sentiment.advances == null
-                        ? '—'
-                        : '${sentiment.advances}',
-                    color: sentiment.advances == null ? null : t.gain,
-                    fontSize: 15,
-                  ),
-                ),
-                Expanded(
-                  child: LabelledFigure(
-                    label: 'Declines',
-                    value: sentiment.declines == null
-                        ? '—'
-                        : '${sentiment.declines}',
-                    color: sentiment.declines == null ? null : t.loss,
-                    fontSize: 15,
-                  ),
-                ),
-                Expanded(
-                  child: LabelledFigure(
-                    label: 'Unchanged',
-                    value: sentiment.unchanged == null
-                        ? '—'
-                        : '${sentiment.unchanged}',
-                    fontSize: 15,
-                  ),
-                ),
-              ],
+            const SizedBox(height: AppSpace.lg),
+            // Phase 5 completes the Phase 3 swap: the advance/decline counts
+            // were three `LabelledFigure`s reading as a table. They are a
+            // proportion, and §12.2's donut is the component for that — the
+            // legend still names and counts every segment, so nothing that
+            // was legible as a number stops being one.
+            Center(
+              child: BreadthDonut(
+                advances: sentiment.advances ?? 0,
+                declines: sentiment.declines ?? 0,
+                unchanged: sentiment.unchanged ?? 0,
+              ),
             ),
           ],
           if (sentiment.note != null && sentiment.note!.isNotEmpty) ...[
-            const SizedBox(height: AppSpace.md),
+            const SizedBox(height: AppSpace.lg),
+            const HairlineDivider(),
+            const SizedBox(height: AppSpace.inCardGap),
             Text(sentiment.note!, style: AppTypo.body(t)),
           ],
           if (result!.stale) ...[
-            const SizedBox(height: AppSpace.sm),
+            const SizedBox(height: AppSpace.inCardGap),
             const StaleNotice(),
           ],
         ],
@@ -294,8 +313,98 @@ class _SentimentSection extends StatelessWidget {
   }
 }
 
-/// A ranked ticker list. All three movers sections use this, which is what makes
-/// the desk read as one feed rather than three relocated cards.
+// ─── Desk notes ────────────────────────────────────────────────────────────
+
+/// §13.3's featured article card: accent-tinted edge (§8.4), category as a
+/// [TagPill], headline at the featured size.
+///
+/// **Flagged, not invented:** §13.3 pairs this card with an `AreaTrend` chart
+/// and the article rows with sparkline thumbnails. `InsightNote` carries only
+/// title, body, category and a featured flag — there is no per-note series in
+/// the model and no endpoint that supplies one. Per plan §8, a UI element that
+/// needs a new backend field is a blocker to flag, not a reason to invent a
+/// parallel API or to plot an unrelated series next to a headline and let it
+/// imply a relationship. The cards ship without charts; the chart slot is a
+/// backend request.
+class _FeaturedNote extends StatelessWidget {
+  const _FeaturedNote({required this.note});
+
+  final InsightNote note;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return AyreCard(
+      accentEdge: true,
+      padding: const EdgeInsets.all(AppSpace.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              if (note.category != null && note.category!.isNotEmpty)
+                Flexible(child: TagPill(label: note.category!))
+              else
+                const Spacer(),
+              const SizedBox(width: AppSpace.xs),
+              Text('FEATURED', style: AppTypo.label(t, color: t.accentInk)),
+            ],
+          ),
+          const SizedBox(height: AppSpace.inCardGap),
+          Text(note.title, style: AppTypo.featuredHeadline(t)),
+          if (note.body.isNotEmpty) ...[
+            const SizedBox(height: AppSpace.xs),
+            Text(note.body, style: AppTypo.body(t)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One row of §13.3's article list. A row, not a card — the notes below the
+/// featured one are one list, and §8.3 makes that one card with hairlines.
+class _NoteRow extends StatelessWidget {
+  const _NoteRow({required this.note});
+
+  final InsightNote note;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.md,
+        vertical: AppSpace.hairlineRowPadding,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (note.category != null && note.category!.isNotEmpty) ...[
+            TagPill(label: note.category!),
+            const SizedBox(height: AppSpace.xs),
+          ],
+          Text(
+            note.title,
+            style: AppTypo.rowLabel(t),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (note.body.isNotEmpty) ...[
+            const SizedBox(height: AppSpace.xxs),
+            Text(
+              note.body,
+              style: AppTypo.hint(t),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _MoversSection extends StatelessWidget {
   const _MoversSection({
     required this.label,
@@ -346,7 +455,7 @@ class _MoversSection extends StatelessWidget {
         else if (result!.isFailed)
           StatePanel.failed(
             headline: failedMessage,
-            message: 'Pull down to retry.',
+            message: 'The other sections on this page are unaffected.',
             compact: true,
           )
         else if (result!.isEmpty)
@@ -356,25 +465,22 @@ class _MoversSection extends StatelessWidget {
             compact: true,
           )
         else
-          AyreCard(
-            padding: EdgeInsets.zero,
-            child: Column(
-              children: [
-                for (final (i, quote) in _rows.indexed) ...[
-                  if (i > 0) const HairlineDivider(indent: AppSpace.md),
-                  TickerRow(
-                    rank: i + 1,
-                    symbol: quote.symbol,
-                    name: quote.name == quote.symbol ? null : quote.name,
-                    price: quote.lastPrice,
-                    changePercent: quote.percentChange,
-                    changeAbsolute: byVolume ? null : quote.change,
-                    volume: byVolume ? quote.volume : null,
-                    onTap: () => onOpen(quote),
-                  ),
-                ],
-              ],
-            ),
+          RowGroup(
+            children: [
+              // Indexed rather than `indexOf`: two identical symbols in one
+              // feed would otherwise both take the first one's rank.
+              for (final (i, quote) in _rows.indexed)
+                TickerRow(
+                  rank: i + 1,
+                  symbol: quote.symbol,
+                  name: quote.name == quote.symbol ? null : quote.name,
+                  price: quote.lastPrice,
+                  changePercent: quote.percentChange,
+                  changeAbsolute: byVolume ? null : quote.change,
+                  volume: byVolume ? quote.volume : null,
+                  onTap: () => onOpen(quote),
+                ),
+            ],
           ),
       ],
     );
@@ -383,46 +489,5 @@ class _MoversSection extends StatelessWidget {
   List<Quote> get _rows {
     final rows = result!.value!;
     return rows.length <= maxRows ? rows : rows.sublist(0, maxRows);
-  }
-}
-
-class _NoteCard extends StatelessWidget {
-  const _NoteCard({required this.note});
-
-  final InsightNote note;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return AyreCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              if (note.category != null && note.category!.isNotEmpty)
-                Expanded(
-                  child: Text(
-                    note.category!.toUpperCase(),
-                    style: AppTypo.label(t),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                )
-              else
-                const Spacer(),
-              if (note.featured)
-                const AyreChip(label: 'Featured', tone: ChipTone.attention),
-            ],
-          ),
-          const SizedBox(height: AppSpace.sm),
-          Text(note.title, style: AppTypo.cardTitle(t)),
-          if (note.body.isNotEmpty) ...[
-            const SizedBox(height: AppSpace.xs),
-            Text(note.body, style: AppTypo.body(t)),
-          ],
-        ],
-      ),
-    );
   }
 }

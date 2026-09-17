@@ -65,3 +65,38 @@ class _PressableScaleState extends State<PressableScale> {
     );
   }
 }
+/// A row-shaped tap target with press feedback and no rounded clip of its own,
+/// so it sits flush inside a [RowGroup] or a card.
+///
+/// Moved here in Phase 5 from `learn_tab.dart`, where it was a public class
+/// living inside a screen file. Signals' compact list needs the same
+/// behaviour, and the alternative — importing a screen to reach a widget —
+/// is the kind of dependency that turns a screen rebuild into a cascade.
+/// Deliberately not [PressableScale]: that one scales and clips to a radius,
+/// which pulls a row visibly away from the hairline dividers above and below
+/// it. A row presses by tinting, not by shrinking.
+class PressableScaleRow extends StatelessWidget {
+  const PressableScaleRow({
+    super.key,
+    required this.child,
+    required this.onTap,
+  });
+
+  final Widget child;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Material(
+      color: AppTheme.transparent,
+      child: InkWell(
+        onTap: onTap,
+        hoverColor: t.accent.withValues(alpha: 0.05),
+        splashColor: t.accent.withValues(alpha: 0.06),
+        highlightColor: t.accent.withValues(alpha: 0.03),
+        child: child,
+      ),
+    );
+  }
+}

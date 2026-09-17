@@ -63,6 +63,15 @@ enum AyreGlyph {
   // Settings and profile
   alerts,
   appearance,
+
+  /// The Home theme toggle's two faces (Spec §13.1). New in Phase 5 —
+  /// `appearance` is a half-filled contrast disc, correct for a Settings row
+  /// labelled "Appearance" but wrong for a control whose whole job is to show
+  /// which mode you're in at a glance. Drawn to lucide's `Moon`/`Sun`
+  /// silhouettes, matching the geometry decision recorded for the nav glyphs
+  /// in plan §7 open decision #1.
+  moon,
+  sun,
   account,
   about,
   signOut,
@@ -470,6 +479,44 @@ class _AyreIconPainter extends CustomPainter {
             ..close(),
           f,
         );
+      case AyreGlyph.moon:
+        // A crescent as one closed path: the outer disc's arc, returned along
+        // a second, offset arc. Drawn rather than punched out with a
+        // difference operation so it paints identically stroked or filled.
+        {
+          final crescent = Path()
+            ..moveTo(19.2, 14.6)
+            ..arcToPoint(
+              const Offset(9.4, 4.8),
+              radius: const Radius.circular(8.2),
+              clockwise: false,
+            )
+            ..arcToPoint(
+              const Offset(19.2, 14.6),
+              radius: const Radius.circular(10.4),
+              clockwise: false,
+            )
+            ..close();
+          c.drawPath(crescent, filled ? f : s);
+        }
+      case AyreGlyph.sun:
+        if (filled) {
+          c.drawCircle(const Offset(12, 12), 4.6, f);
+        } else {
+          c.drawCircle(const Offset(12, 12), 4.6, s);
+        }
+        // Eight rays on the 45° diagonals and the cardinals, drawn from a
+        // common inset so they read as one ring rather than eight lines.
+        for (var i = 0; i < 8; i++) {
+          final angle = i * 3.14159265 / 4;
+          final dx = math.cos(angle);
+          final dy = math.sin(angle);
+          c.drawLine(
+            Offset(12 + dx * 7.4, 12 + dy * 7.4),
+            Offset(12 + dx * 9.6, 12 + dy * 9.6),
+            s,
+          );
+        }
       case AyreGlyph.account:
         _rect(c, s, f, 3.5, 6, 17, 12, r: 2, forceStroke: true);
         c.drawLine(const Offset(3.5, 10), const Offset(20.5, 10), s);

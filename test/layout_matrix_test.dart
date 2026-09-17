@@ -14,6 +14,7 @@ import 'package:ayre_scanner/services/market_models.dart';
 import 'package:ayre_scanner/theme/app_theme.dart';
 import 'package:ayre_scanner/widgets/ayre_bottom_nav.dart';
 import 'package:ayre_scanner/widgets/ayre_charts.dart';
+import 'package:ayre_scanner/widgets/ayre_components.dart';
 import 'package:ayre_scanner/widgets/state_views.dart';
 import 'package:ayre_scanner/widgets/ticker_trace.dart';
 import 'package:flutter/material.dart';
@@ -338,6 +339,92 @@ void main() {
       expect(StatePreset.empty.isFault, isFalse);
       expect(StatePreset.noResults.isFault, isFalse);
       expect(StatePreset.failed.isFault, isTrue);
+    });
+  });
+
+  // ── Phase 5: the five tab screens ────────────────────────────────────────
+  //
+  // The sweeps above already render all five through `HomeShell` at every
+  // width, theme and text scale. What they can't catch is behaviour that only
+  // appears after an interaction, which is where §13's new structures live.
+  group('tab screens', () {
+    testWidgets('Signals filters the board, and says so when it empties', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        wrap(
+          HomeShell(marketData: data()),
+          brightness: Brightness.dark,
+          scale: 1.0,
+        ),
+      );
+      for (var i = 0; i < 90; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+      await tester.tap(find.byKey(navDestinationKey('Signals')));
+      for (var i = 0; i < 90; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      // §13.2's filter chips are present before any interaction.
+      expect(find.byType(AyreFilterChip), findsNWidgets(3));
+      expect(tester.takeException(), isNull);
+
+      // Filtering to a side with nothing in it must read as "your query is
+      // narrow", never as "the feed is empty" — the distinction Phase 4 added
+      // `StatePreset.noResults` for. Whichever side empties first, the panel
+      // that appears is the no-results one and it offers a way back.
+      for (final label in ['Bullish', 'Bearish']) {
+        await tester.tap(find.text(label));
+        for (var i = 0; i < 30; i++) {
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        expect(tester.takeException(), isNull);
+        if (find.text('Show all').evaluate().isNotEmpty) {
+          await tester.tap(find.text('Show all'));
+          for (var i = 0; i < 30; i++) {
+            await tester.pump(const Duration(milliseconds: 16));
+          }
+          expect(tester.takeException(), isNull);
+        }
+      }
+    });
+
+    testWidgets('Home theme toggle drives the same setter Settings does', (
+      tester,
+    ) async {
+      final written = <ThemeMode>[];
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        AppThemeController(
+          themeMode: ThemeMode.dark,
+          setThemeMode: written.add,
+          child: MaterialApp(
+            theme: AppTheme.dark,
+            home: HomeShell(marketData: data()),
+          ),
+        ),
+      );
+      for (var i = 0; i < 90; i++) {
+        await tester.pump(const Duration(milliseconds: 16));
+      }
+
+      // Icon-only, so the semantic label is the only name it has — and it
+      // states what tapping does rather than which mode is active.
+      await tester.tap(find.bySemanticsLabel('Switch to light theme'));
+      await tester.pump();
+
+      // One setter, shared with the Settings segmented control, so the two
+      // controls can never disagree (§13.6/§20.11 — and no System option to
+      // fall through to).
+      expect(written, [ThemeMode.light]);
     });
   });
 

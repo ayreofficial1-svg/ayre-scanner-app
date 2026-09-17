@@ -1,29 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../main.dart' show AppThemeController;
 import '../services/api_service.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ayre_charts.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
 import '../widgets/ayre_logo.dart';
 import '../widgets/figure.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/responsive.dart';
-import '../widgets/spring.dart';
 import '../widgets/state_views.dart';
 import '../widgets/ticker_trace.dart';
 import 'home_shell.dart' show initialsFor;
 import 'index_detail_screen.dart';
 import 'notifications_screen.dart';
 
-/// Home — the market gateway.
+/// Home — the market gateway (Spec §13.1).
 ///
-/// Greets, shows the three primary instruments as tappable cards, gives one
-/// high-level scanner summary, and routes onward. The movers lists used to live
-/// here and now belong to the Insights desk.
+/// Rebuilt in Phase 5 against §13.1's own list: greeting header with a theme
+/// toggle, the index strip, a breadth donut, a sentiment gauge, and a footer
+/// line. The screen's *information* is unchanged from v3 — the same board, the
+/// same breadth reading — but almost every component rendering it is new, and
+/// three v3 devices are gone for good:
+///
+/// * **The ink readout panel.** v3 sat each index's live figures on a dark
+///   "terminal feed" plate. v4 has no such concept (`inkPanel`/`onInkPanel`
+///   were retired in Phase 0); the figures sit on the card, and what marks
+///   them as live is the LIVE chip and the trace, not a plate behind them.
+/// * **The bespoke breadth ring.** `_BreadthRing`/`_RingPainter` were a
+///   private, one-screen donut written before there was a shared one. Phase 3
+///   built `BreadthDonut` to §12.2; this screen now uses it and the private
+///   pair is deleted rather than kept as a near-duplicate.
+/// * **The inlined direction rendering.** `_BreadthFigure` did its own
+///   caret-plus-tinted-count layout, which is exactly what §20.7 says must be
+///   one reused component. Advances/declines now read through the donut's own
+///   labelled legend, and `DirectionBadge` carries direction wherever a badge
+///   is what's wanted.
 class HomeTab extends StatefulWidget {
   const HomeTab({
     super.key,
@@ -101,10 +118,12 @@ class _HomeTabState extends State<HomeTab> {
       edgeOffset: 72,
       child: ContentWidth(
         child: ListView(
+          // §6.1's page padding: 20 horizontal, 12 top. The bottom leaves room
+          // for the glass nav bar, which the shell draws over the body.
           padding: const EdgeInsets.fromLTRB(
-            AppSpace.lg,
-            AppSpace.lg,
-            AppSpace.lg,
+            AppSpace.pageHorizontal,
+            AppSpace.pageTop,
+            AppSpace.pageHorizontal,
             120,
           ),
           children: [
@@ -117,7 +136,7 @@ class _HomeTabState extends State<HomeTab> {
                 ),
               ),
             ),
-            const SizedBox(height: AppSpace.xl),
+            const SizedBox(height: AppSpace.sectionGap),
             Entrance(
               index: 1,
               child: SectionLabel(
@@ -137,12 +156,14 @@ class _HomeTabState extends State<HomeTab> {
               onOpen: _openIndex,
               onRetry: _load,
             ),
-            const SizedBox(height: AppSpace.xl),
+            const SizedBox(height: AppSpace.sectionGap),
             Entrance(
               index: 2,
               child: const SectionLabel(label: 'Market breadth'),
             ),
-            _ScannerSummary(result: _loading ? null : _breadth, onRetry: _load),
+            _BreadthCard(result: _loading ? null : _breadth, onRetry: _load),
+            const SizedBox(height: AppSpace.sectionGap),
+            const Entrance(index: 3, child: _FooterLine()),
           ],
         ),
       ),
@@ -169,6 +190,8 @@ class _HomeTabState extends State<HomeTab> {
   }
 }
 
+// ─── Header ────────────────────────────────────────────────────────────────
+
 class _Header extends StatelessWidget {
   const _Header({required this.name, required this.onOpenProfile});
 
@@ -187,8 +210,8 @@ class _Header extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // The only in-app brand placement: a small wordmark, sized to sit
-              // beneath the live content rather than compete with it.
+              // The only in-app brand placement: a small wordmark, sized to
+              // sit beneath the live content rather than compete with it.
               FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
@@ -200,7 +223,7 @@ class _Header extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: AppSpace.xs),
+              const SizedBox(height: AppSpace.xxs),
               Text(
                 resolved.isEmpty ? 'Hi there' : 'Hi, $resolved',
                 style: AppTypo.pageTitle(t),
@@ -211,6 +234,8 @@ class _Header extends StatelessWidget {
           ),
         ),
         const SizedBox(width: AppSpace.sm),
+        const _ThemeToggle(),
+        const SizedBox(width: AppSpace.xs),
         ListenableBuilder(
           listenable: NotificationLog.instance,
           builder: (context, _) => _HeaderControl(
@@ -225,14 +250,46 @@ class _Header extends StatelessWidget {
             },
           ),
         ),
-        const SizedBox(width: AppSpace.sm),
+        const SizedBox(width: AppSpace.xs),
         _AccountControl(name: resolved, onTap: onOpenProfile),
       ],
     );
   }
 }
 
-/// Header controls are flat and hairline-bordered — no circular soft fills.
+/// The Home theme toggle (§13.1).
+///
+/// Writes to the same `setThemeMode` the Settings segmented control does, so
+/// the two can never disagree — this is the re-verification Phase 0 asked for
+/// and it holds: there is one setter, on `AppThemeController`, and both call
+/// it. No System option exists to fall through to (§13.6/§20.11).
+///
+/// Icon-only, so unlike the nav it genuinely needs a semantic label — and the
+/// label states what tapping *does*, not what mode you're in, since "Dark" as
+/// a button name is ambiguous about direction.
+class _ThemeToggle extends StatelessWidget {
+  const _ThemeToggle();
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = AppThemeController.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return _HeaderControl(
+      // Shows the mode you are about to move to, which is the convention that
+      // makes a single-button toggle legible.
+      glyph: isDark ? AyreGlyph.sun : AyreGlyph.moon,
+      label: isDark ? 'Switch to light theme' : 'Switch to dark theme',
+      onTap: () {
+        HapticFeedback.selectionClick();
+        controller.setThemeMode(isDark ? ThemeMode.light : ThemeMode.dark);
+      },
+    );
+  }
+}
+
+/// Header controls: a rounded-square tile with a hairline edge (§7 — icon
+/// tiles are rounded squares, never circles), sized to the 44pt floor rather
+/// than the 40px this used to be.
 class _HeaderControl extends StatelessWidget {
   const _HeaderControl({
     required this.glyph,
@@ -254,31 +311,36 @@ class _HeaderControl extends StatelessWidget {
       label: label,
       child: PressableScale(
         onTap: onTap,
-        borderRadius: AppRadius.control,
+        borderRadius: AppRadius.iconTile,
         child: Container(
-          height: 40,
-          width: 40,
+          height: 44,
+          width: 44,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: t.surface,
-            borderRadius: BorderRadius.circular(AppRadius.control),
-            border: Border.all(color: t.border),
+            borderRadius: BorderRadius.circular(AppRadius.iconTile),
+            border: Border.all(color: t.hairline),
           ),
           child: Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
-              AyreIcon(glyph, size: 18, color: t.textSecondary),
+              AyreIcon(glyph, size: 18, color: t.foregroundMuted),
               if (badge)
                 Positioned(
-                  top: 1,
-                  right: 1,
+                  top: 2,
+                  right: 2,
                   child: Container(
-                    height: 6,
-                    width: 6,
+                    height: 7,
+                    width: 7,
                     decoration: BoxDecoration(
-                      color: t.info,
+                      // v4 has no "info" accent (retired in Phase 0). An
+                      // unread marker is the brand asking for attention, not a
+                      // market signal, so it takes the accent — not `neutral`,
+                      // which is reserved for delayed/offline states.
+                      color: t.accent,
                       shape: BoxShape.circle,
+                      border: Border.all(color: t.surface, width: 1.5),
                     ),
                   ),
                 ),
@@ -304,21 +366,23 @@ class _AccountControl extends StatelessWidget {
       label: 'Profile',
       child: PressableScale(
         onTap: onTap,
-        borderRadius: AppRadius.control,
+        borderRadius: AppRadius.circle,
         child: Container(
-          height: 40,
-          width: 40,
+          height: 44,
+          width: 44,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: t.surface,
-            borderRadius: BorderRadius.circular(AppRadius.control),
-            border: Border.all(color: t.border),
+            color: t.surfaceRaised,
+            // The one circle §7 allows alongside the toggle knob: this is an
+            // avatar, not an icon tile.
+            shape: BoxShape.circle,
+            border: Border.all(color: t.hairline),
           ),
           child: Text(
             initialsFor(name),
             style: AppTypo.ui(
               fontSize: 13,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               color: t.textPrimary,
             ),
           ),
@@ -328,8 +392,9 @@ class _AccountControl extends StatelessWidget {
   }
 }
 
-/// The three instruments, each a physical-card-like block with an embedded ink
-/// readout. The whole card is the tap target into Index Detail.
+// ─── Index board ───────────────────────────────────────────────────────────
+
+/// The three instruments. The whole card is the tap target into Index Detail.
 class _IndexBoard extends StatelessWidget {
   const _IndexBoard({
     required this.result,
@@ -347,7 +412,7 @@ class _IndexBoard extends StatelessWidget {
       return Column(
         children: [
           for (var i = 0; i < 3; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpace.md),
+            if (i > 0) const SizedBox(height: AppSpace.cardGap),
             const _IndexCardSkeleton(),
           ],
         ],
@@ -357,7 +422,7 @@ class _IndexBoard extends StatelessWidget {
     if (result!.isFailed) {
       return StatePanel.failed(
         headline: 'Index feed unavailable',
-        message: 'Pull down to try again.',
+        message: "The levels below couldn't be fetched for this session.",
         onRetry: onRetry,
       );
     }
@@ -378,7 +443,7 @@ class _IndexBoard extends StatelessWidget {
       return Column(
         children: [
           for (var i = 0; i < quotes.length; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpace.md),
+            if (i > 0) const SizedBox(height: AppSpace.cardGap),
             Entrance(
               index: i + 1,
               child: _IndexCard(
@@ -399,7 +464,7 @@ class _IndexBoard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i < quotes.length; i++) ...[
-            if (i > 0) const SizedBox(width: AppSpace.md),
+            if (i > 0) const SizedBox(width: AppSpace.cardGap),
             Expanded(
               child: Entrance(
                 index: i + 1,
@@ -431,171 +496,163 @@ class _IndexCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final up = quote.percentChange >= 0;
+    // §12.1: the trace inherits the colour of its subject. This is the one
+    // decision that makes the sparkline informative rather than decorative.
+    final tone = up ? t.positive : t.negative;
 
     return AyreCard(
       onTap: onTap,
-      padding: EdgeInsets.zero,
-      accentEdge: true,
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpace.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: Text(
-                    quote.name,
-                    style: AppTypo.cardTitle(t),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: AppSpace.sm),
-                ShrinkTrailing(
-                  child: stale
-                      ? const AyreChip(
-                          label: 'Delayed',
-                          tone: ChipTone.attention,
-                        )
-                      : const AyreChip(
-                          label: 'Live',
-                          tone: ChipTone.live,
-                          pulse: true,
-                        ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpace.sm),
-            // The readout panel: the live figures sit on ink, so they read as
-            // coming off a feed rather than being page content.
-            InkPanel(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Figure(
-                      formatPrice(quote.lastPrice),
-                      fontSize: 30,
-                      fontWeight: FontWeight.w600,
-                      color: t.onInkPanel,
-                      semanticsLabel:
-                          '${quote.name} at ${formatPrice(quote.lastPrice)}',
-                    ),
-                  ),
-                  const SizedBox(height: AppSpace.xs),
-                  Row(
-                    children: [
-                      Flexible(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Row(
-                            children: [
-                              Figure(
-                                formatDelta(quote.change, percent: false),
-                                fontSize: 12,
-                                color: t.onInkPanel.withValues(alpha: 0.75),
-                              ),
-                              const SizedBox(width: AppSpace.sm),
-                              DeltaFigure(
-                                change: quote.percentChange,
-                                fontSize: 13,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpace.sm),
-                      // The clock is a non-flex child, so it would otherwise be
-                      // measured against unbounded width and push the row over
-                      // in a narrow multi-column card at a large text scale.
-                      ShrinkTrailing(
-                        child: Text(
-                          _clock(quote.asOf),
-                          style: AppTypo.valueSmall(
-                            t,
-                            color: t.onInkPanel.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (quote.trace.length >= 2) ...[
-                    const SizedBox(height: AppSpace.sm),
-                    TickerTrace(
-                      points: normaliseTrace(quote.trace),
-                      height: 34,
-                      color: t.onInkPanel.withValues(alpha: 0.7),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpace.sm),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'VIEW CONSTITUENTS',
-                    style: AppTypo.label(t),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: AppSpace.xs),
-                AyreIcon(AyreGlyph.forward, size: 12, color: t.textTertiary),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static String _clock(DateTime at) {
-    final local = at.toLocal();
-    return '${local.hour.toString().padLeft(2, '0')}:'
-        '${local.minute.toString().padLeft(2, '0')}:'
-        '${local.second.toString().padLeft(2, '0')}';
-  }
-}
-
-class _IndexCardSkeleton extends StatelessWidget {
-  const _IndexCardSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return const AyreCard(
-      padding: EdgeInsets.all(AppSpace.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SkeletonBlock(width: 96, height: 13),
-          SizedBox(height: AppSpace.md),
-          SkeletonBlock(height: 30, radius: AppRadius.panel),
-          SizedBox(height: AppSpace.sm),
-          SkeletonBlock(width: 140, height: 11),
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: Text(
+                  quote.name,
+                  style: AppTypo.cardTitle(t),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: AppSpace.sm),
+              ShrinkTrailing(
+                child: stale
+                    ? const AyreChip(
+                        label: 'Delayed',
+                        tone: ChipTone.attention,
+                      )
+                    : const AyreChip(
+                        label: 'Live',
+                        tone: ChipTone.live,
+                        pulse: true,
+                      ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.inCardGap),
+          // The level counts up (§12.3/§15.2) rather than rolling its digits.
+          // `formatPrice` keeps Indian grouping while it counts, so the string
+          // doesn't change shape as it arrives.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: CountUpFigure(
+              value: quote.lastPrice.toDouble(),
+              // Counting a five-figure index level up from zero would be a
+              // slot machine, so it starts within sight of the target — the
+              // exact case `CountUpFigure`'s `from` exists for.
+              from: quote.lastPrice.toDouble() - quote.change.toDouble(),
+              format: (v) => formatPrice(v),
+              fontSize: AppTextScale.hero,
+              color: t.textPrimary,
+              semanticsLabel:
+                  '${quote.name} at ${formatPrice(quote.lastPrice)}',
+            ),
+          ),
+          const SizedBox(height: AppSpace.xs),
+          Row(
+            children: [
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    children: [
+                      DeltaFigure(
+                        change: quote.percentChange,
+                        fontSize: AppTextScale.rowLabel,
+                      ),
+                      const SizedBox(width: AppSpace.xs),
+                      Figure(
+                        formatDelta(quote.change, percent: false),
+                        fontSize: AppTextScale.hint,
+                        color: t.foregroundMuted,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpace.sm),
+              // The clock is a non-flex child, so it would otherwise be
+              // measured against unbounded width and push the row over in a
+              // narrow multi-column card at a large text scale.
+              ShrinkTrailing(
+                child: Text(
+                  formatClock(quote.asOf),
+                  style: AppTypo.valueSmall(t),
+                ),
+              ),
+            ],
+          ),
+          if (quote.trace.length >= 2) ...[
+            const SizedBox(height: AppSpace.inCardGap),
+            // Full card width rather than §12.2's fixed 96px sparkline box:
+            // this is the card's own trend, not an inline marker beside a row.
+            TickerTrace(
+              points: normaliseTrace(quote.trace),
+              height: 36,
+              color: tone,
+              fill: true,
+            ),
+          ],
+          const SizedBox(height: AppSpace.inCardGap),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'VIEW CONSTITUENTS',
+                  style: AppTypo.label(t, color: t.accentInk),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: AppSpace.xs),
+              AyreIcon(AyreGlyph.forward, size: 12, color: t.accentInk),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-/// Market breadth — the Home page's primary overview figures.
+/// The skeleton mirrors the real card's shape, block for block (§14.4).
+class _IndexCardSkeleton extends StatelessWidget {
+  const _IndexCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const AyreCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkeletonBlock(width: 96, height: 15),
+          SizedBox(height: AppSpace.inCardGap),
+          SkeletonBlock(width: 170, height: 34, radius: AppRadius.inset),
+          SizedBox(height: AppSpace.xs),
+          SkeletonBlock(width: 140, height: 12),
+          SizedBox(height: AppSpace.inCardGap),
+          SkeletonBlock(height: 36, radius: AppRadius.inset),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Breadth ───────────────────────────────────────────────────────────────
+
+/// Market breadth (§13.1): the advance/decline split as a donut, with the
+/// composite sentiment reading beside it as a gauge.
 ///
-/// Advances and Declines lead: they are the two numbers that actually say what
-/// the market did today, whereas a single composite sentiment score says it at
-/// one remove. The score is kept as a supporting figure rather than dropped, so
-/// nothing is lost — Insights remains its fuller home.
-///
-/// A ring shows the advance/decline split, which is the one place a proportion
-/// genuinely reads better as a shape than as two numbers side by side.
-class _ScannerSummary extends StatelessWidget {
-  const _ScannerSummary({required this.result, required this.onRetry});
+/// The two charts answer different questions and §13.1 asks for both, so they
+/// sit side by side rather than one being demoted to a figure the way v3 did:
+/// the donut says *how many* went each way, the gauge says *how the desk reads
+/// it*. Stacked on a phone, paired once there's width for it.
+class _BreadthCard extends StatelessWidget {
+  const _BreadthCard({required this.result, required this.onRetry});
 
   final DataResult<Sentiment>? result;
   final Future<void> Function() onRetry;
@@ -604,31 +661,12 @@ class _ScannerSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
 
-    if (result == null) {
-      return const AyreCard(
-        child: Row(
-          children: [
-            SkeletonBlock(width: 72, height: 72, radius: AppRadius.circle),
-            SizedBox(width: AppSpace.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SkeletonBlock(width: 110, height: 26),
-                  SizedBox(height: AppSpace.sm),
-                  SkeletonBlock(width: 150, height: 11),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
+    if (result == null) return const _BreadthSkeleton();
 
     if (result!.isFailed) {
       return StatePanel.failed(
         headline: "Market breadth didn't load",
-        message: 'Pull down to try again.',
+        message: 'The index levels above are unaffected.',
         compact: true,
         onRetry: onRetry,
       );
@@ -647,7 +685,8 @@ class _ScannerSummary extends StatelessWidget {
     final declines = sentiment.declines;
 
     // With no counts there is nothing to lead with, so say that plainly rather
-    // than rendering zeroes as if they were real.
+    // than rendering zeroes as if they were real. The donut would otherwise
+    // draw an empty ring around a confident-looking "0%".
     if (advances == null && declines == null) {
       return StatePanel.empty(
         headline: 'Breadth counts unavailable',
@@ -658,236 +697,127 @@ class _ScannerSummary extends StatelessWidget {
       );
     }
 
-    final up = advances ?? 0;
-    final down = declines ?? 0;
-    final total = up + down + (sentiment.unchanged ?? 0);
+    final donut = BreadthDonut(
+      advances: advances ?? 0,
+      declines: declines ?? 0,
+      unchanged: sentiment.unchanged ?? 0,
+    );
+    final gauge = SentimentGauge(
+      score: sentiment.score,
+      band: _band(sentiment.score),
+      // §12.1 over §12.2 here, deliberately: a sentiment reading's subject is
+      // direction, and tinting a bearish gauge with the brand accent would
+      // make the one chart on this screen that has an opinion the one chart
+      // that doesn't show it. Open decision #12 — this is the call this screen
+      // makes; revisit if the Spec says otherwise.
+      tone: switch (sentiment.score) {
+        < 35 => t.negative,
+        < 65 => t.neutral,
+        _ => t.positive,
+      },
+    );
 
     return AyreCard(
+      padding: const EdgeInsets.all(AppSpace.lg),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              _BreadthRing(advances: up, declines: down, total: total),
-              const SizedBox(width: AppSpace.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              // Paired only where both charts fit at their fixed widths
+              // (132 + 176 + gap) without either being squeezed. Below that
+              // they stack — a donut compressed to 90px stops being readable
+              // long before it stops fitting.
+              final paired = constraints.maxWidth >= 132 + 176 + AppSpace.lg;
+              if (!paired) {
+                return Column(
                   children: [
-                    _BreadthFigure(
-                      label: 'Advances',
-                      value: advances,
-                      tone: t.gain,
-                      up: true,
-                    ),
-                    const SizedBox(height: AppSpace.sm),
-                    _BreadthFigure(
-                      label: 'Declines',
-                      value: declines,
-                      tone: t.loss,
-                      up: false,
-                    ),
+                    Center(child: donut),
+                    const SizedBox(height: AppSpace.lg),
+                    const HairlineDivider(),
+                    const SizedBox(height: AppSpace.lg),
+                    Center(child: gauge),
                   ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpace.md),
-          const HairlineDivider(),
-          const SizedBox(height: AppSpace.md),
-          Row(
-            children: [
-              Expanded(
-                child: LabelledFigure(
-                  label: 'Unchanged',
-                  value: sentiment.unchanged == null
-                      ? '—'
-                      : '${sentiment.unchanged}',
-                  fontSize: AppTextScale.body,
-                ),
-              ),
-              // The composite score, demoted to a supporting figure.
-              Expanded(
-                child: LabelledFigure(
-                  label: 'Sentiment',
-                  value: '${sentiment.score}',
-                  fontSize: AppTextScale.body,
-                ),
-              ),
-            ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(child: Center(child: donut)),
+                  const SizedBox(width: AppSpace.lg),
+                  Expanded(child: Center(child: gauge)),
+                ],
+              );
+            },
           ),
           if (sentiment.note != null && sentiment.note!.isNotEmpty) ...[
-            const SizedBox(height: AppSpace.md),
+            const SizedBox(height: AppSpace.lg),
+            const HairlineDivider(),
+            const SizedBox(height: AppSpace.inCardGap),
             Text(sentiment.note!, style: AppTypo.body(t)),
           ],
           if (result!.stale) ...[
-            const SizedBox(height: AppSpace.sm),
+            const SizedBox(height: AppSpace.inCardGap),
             const StaleNotice(),
           ],
         ],
       ),
     );
   }
+
+  /// The band the score falls in. Named here rather than taken from the feed
+  /// because `Sentiment` carries no band field — v3's `BreadthMeter` was
+  /// handed one by `insights_tab.dart`, which derived it the same way.
+  static String _band(int score) => switch (score) {
+    < 20 => 'Bearish',
+    < 40 => 'Cautious',
+    < 60 => 'Neutral',
+    < 80 => 'Constructive',
+    _ => 'Bullish',
+  };
 }
 
-/// One oversized breadth figure with its direction carried by a caret and a
-/// sign-free count — a count has no sign, so the glyph does that work alone.
-class _BreadthFigure extends StatelessWidget {
-  const _BreadthFigure({
-    required this.label,
-    required this.value,
-    required this.tone,
-    required this.up,
-  });
-
-  final String label;
-  final int? value;
-  final Color tone;
-  final bool up;
+class _BreadthSkeleton extends StatelessWidget {
+  const _BreadthSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Row(
-      children: [
-        DirectionGlyph(up: up, color: tone, size: 13),
-        const SizedBox(width: AppSpace.xs),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label.toUpperCase(),
-                style: AppTypo.label(t),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Figure(
-                  value == null ? '—' : '$value',
-                  fontSize: AppTextScale.section,
-                  fontWeight: FontWeight.w600,
-                  color: tone,
-                  semanticsLabel: '$label ${value ?? 'unavailable'}',
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// The advance/decline split as a ring, with the traded count in the middle.
-class _BreadthRing extends StatelessWidget {
-  const _BreadthRing({
-    required this.advances,
-    required this.declines,
-    required this.total,
-  });
-
-  final int advances;
-  final int declines;
-  final int total;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final denominator = total > 0 ? total : (advances + declines);
-    final share = denominator > 0 ? advances / denominator : 0.0;
-
-    return RepaintBoundary(
-      child: SizedBox(
-        height: 76,
-        width: 76,
-        child: SpringValue(
-          value: share,
-          animateOnMount: true,
-          builder: (context, progress, _) => CustomPaint(
-            painter: _RingPainter(
-              advanceShare: progress.clamp(0.0, 1.0),
-              gain: t.gain,
-              loss: t.loss,
-              track: t.surfaceAlt,
-            ),
-            child: Center(
-              // The ring is a fixed 76pt, so its centre label scales down inside
-              // it rather than growing past it at a large text size.
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Figure(
-                        denominator == 0 ? '—' : '$denominator',
-                        fontSize: AppTextScale.body,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      Text('TRADED', style: AppTypo.label(t, fontSize: 8)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
+    return const AyreCard(
+      padding: EdgeInsets.all(AppSpace.lg),
+      child: Column(
+        children: [
+          // Circular, because what it stands in for is: a skeleton that
+          // doesn't share the real layout's shape just moves the reflow later.
+          SkeletonBlock(width: 132, height: 132, radius: AppRadius.circle),
+          SizedBox(height: AppSpace.md),
+          SkeletonBlock(width: 190, height: 12),
+          SizedBox(height: AppSpace.lg),
+          SkeletonBlock(width: 176, height: 88, radius: AppRadius.inset),
+        ],
       ),
     );
   }
 }
 
-class _RingPainter extends CustomPainter {
-  const _RingPainter({
-    required this.advanceShare,
-    required this.gain,
-    required this.loss,
-    required this.track,
-  });
-
-  final double advanceShare;
-  final Color gain;
-  final Color loss;
-  final Color track;
+/// The footer line (§13.1) — the quiet last word on the page, stating what the
+/// data is rather than advertising anything.
+class _FooterLine extends StatelessWidget {
+  const _FooterLine();
 
   @override
-  void paint(Canvas canvas, Size size) {
-    const stroke = 7.0;
-    final rect = Rect.fromCircle(
-      center: size.center(Offset.zero),
-      radius: size.shortestSide / 2 - stroke / 2,
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Column(
+      children: [
+        const HairlineDivider(),
+        const SizedBox(height: AppSpace.md),
+        Text(
+          'Levels are indicative and may be delayed. '
+          'Nothing here is investment advice.',
+          textAlign: TextAlign.center,
+          style: AppTypo.hint(t),
+        ),
+      ],
     );
-    const start = -1.5708;
-    const full = 6.28319;
-
-    Paint arc(Color c) => Paint()
-      ..color = c
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.butt;
-
-    canvas.drawArc(rect, 0, full, false, arc(track));
-    // Declines fill the remainder, so the ring always reads as a whole.
-    canvas.drawArc(
-      rect,
-      start + full * advanceShare,
-      full * (1 - advanceShare),
-      false,
-      arc(loss),
-    );
-    canvas.drawArc(rect, start, full * advanceShare, false, arc(gain));
   }
-
-  @override
-  bool shouldRepaint(covariant _RingPainter old) =>
-      old.advanceShare != advanceShare ||
-      old.gain != gain ||
-      old.loss != loss ||
-      old.track != track;
 }

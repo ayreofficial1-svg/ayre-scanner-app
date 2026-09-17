@@ -970,11 +970,23 @@ class SignalStrength extends StatelessWidget {
 /// progress is a brand-carrying affirmative, not a market gain (so it never
 /// borrows [AppThemeTokens.positive]).
 class ProgressRule extends StatelessWidget {
-  const ProgressRule({super.key, required this.value, this.height = 3});
+  const ProgressRule({
+    super.key,
+    required this.value,
+    this.height = 3,
+    this.color,
+  });
 
   /// 0..1
   final double value;
   final double height;
+
+  /// Overrides the brand accent. Added in Phase 5 for Learn's completion
+  /// state (§13.4), where a finished course reads in
+  /// [AppThemeTokens.positive] — the one case where progress genuinely is an
+  /// outcome rather than a brand-carrying action, matching the same switch
+  /// `ProgressRing` makes at 100%.
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
@@ -985,7 +997,7 @@ class ProgressRule extends StatelessWidget {
         value: value.clamp(0.0, 1.0),
         minHeight: height,
         backgroundColor: t.surfaceSunken,
-        valueColor: AlwaysStoppedAnimation(t.accent),
+        valueColor: AlwaysStoppedAnimation(color ?? t.accent),
       ),
     );
   }
@@ -1294,6 +1306,97 @@ class DirectionBadge extends StatelessWidget {
             ],
             Text(label.toUpperCase(), style: AppTypo.label(t, color: fg)),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Filter chip ───────────────────────────────────────────────────────────
+
+/// A selectable filter chip (Spec §11.2, used by §13.2's Signals board).
+///
+/// Added in Phase 5, and deliberately a **third** chip-family component rather
+/// than a flag on an existing one. The three do genuinely different jobs and
+/// conflating them produces nonsense:
+///
+/// * [AyreChip] reports a **state** the user cannot change — LIVE, DELAYED, a
+///   tier. A "selected" LIVE chip means nothing.
+/// * [TagPill] labels a **piece of content** — an article's category. It never
+///   pulses, animates, or responds to touch.
+/// * This carries a **choice the user makes**, so it is the only one of the
+///   three that is tappable, has a selected state, and needs a 44pt target.
+///
+/// Selection is not colour-only: the selected chip also gains a filled border
+/// and heavier text weight, so the active filter survives with colour removed.
+class AyreFilterChip extends StatelessWidget {
+  const AyreFilterChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.count,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  /// An optional match count. Rendered through [Figure] like every other
+  /// number in the app rather than interpolated into the label string.
+  final int? count;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final fg = selected ? t.onAccent : t.foregroundMuted;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: PressableScale(
+        onTap: onTap,
+        borderRadius: AppRadius.pill,
+        child: AnimatedContainer(
+          duration: AppMotion.buttonPress,
+          curve: AppMotion.ease,
+          // 44pt tall, not §17's 32px chip minimum — plan §8 resolved that
+          // conflict in favour of the HIG floor, since an accessibility
+          // minimum isn't a place to split the difference.
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? t.accent : t.surface,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            border: Border.all(
+              color: selected ? t.accent : t.hairline,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: AppTypo.ui(
+                  fontSize: AppTextScale.body,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  color: fg,
+                ),
+              ),
+              if (count != null) ...[
+                const SizedBox(width: AppSpace.xs),
+                Figure.static(
+                  '$count',
+                  fontSize: AppTextScale.hint,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? fg : t.foregroundSubtle,
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

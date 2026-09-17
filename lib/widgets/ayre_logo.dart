@@ -54,17 +54,31 @@ class LogoMark extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.all(clearSpace),
         child: ClipRRect(
-          // A rounded field, matching the app's card language, so the mark reads
-          // as a placed brand element rather than a pasted rectangle.
+          // A rounded field, matching the app's card language, so the mark
+          // reads as a placed brand element rather than a pasted rectangle.
+          //
+          // Phase 5 owns this file, closing plan §7 open decision #8: it was
+          // flagged unowned in Phases 1–4 because no phase's file list claimed
+          // it, and Home is where the brand mark is actually placed. The old
+          // `AppRadius.panel`/`hero` pair was retired in Phase 0 and has no
+          // 1:1 successor — v4 has one card radius and one inner radius, so
+          // the header mark takes the inner radius (it sits inline with text)
+          // and a standalone placement takes the card radius.
           borderRadius: BorderRadius.circular(
             placement == LogoPlacement.header
-                ? AppRadius.panel
-                : AppRadius.hero,
+                ? AppRadius.inset
+                : AppRadius.card,
           ),
           child: ColoredBox(
-            // The artwork carries its own dark field; this matches it so no seam
-            // shows, in either theme.
-            color: t.inkPanel,
+            // The artwork carries its own dark field; this matches it so no
+            // seam shows, in either theme. `inkPanel` was the v3 terminal
+            // readout tone and is retired — `surfaceSunken` is v4's recessed
+            // fill and is the closest match in job, though in light theme it
+            // is a warm paper tone rather than near-black. **Flag for visual
+            // QA:** if the asset's own dark field shows a seam against it in
+            // light mode, the fix is a transparent-background asset, not a
+            // new token (§19).
+            color: t.surfaceSunken,
             child: Image.asset(
               assetPath,
               width: size,
@@ -105,7 +119,7 @@ class _Fallback extends StatelessWidget {
           style: AppTypo.display(
             fontSize: size * 0.26,
             fontWeight: FontWeight.w700,
-            color: t.onInkPanel,
+            color: t.textPrimary,
           ),
         ),
       ),

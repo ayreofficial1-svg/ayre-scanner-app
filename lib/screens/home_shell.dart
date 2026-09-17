@@ -134,11 +134,21 @@ class _TabFadeState extends State<_TabFade>
 
   @override
   Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _curved,
-      child: Transform.translate(
-        offset: Offset(0, (1 - _curved.value) * AppSpace.xs),
-        child: widget.child,
+    // AnimatedBuilder, not a bare read of `_curved.value` inside a
+    // `FadeTransition`'s child. The child subtree of a transition is built
+    // once and reused every frame, so the previous version sampled the curve
+    // a single time and the 8px shift §15.4 asks for never actually
+    // happened — the tab only ever cross-faded. Caught in Phase 5 while
+    // rebuilding the screens this transition carries.
+    return AnimatedBuilder(
+      animation: _curved,
+      child: widget.child,
+      builder: (context, child) => Opacity(
+        opacity: _curved.value,
+        child: Transform.translate(
+          offset: Offset(0, (1 - _curved.value) * AppSpace.xs),
+          child: child,
+        ),
       ),
     );
   }
