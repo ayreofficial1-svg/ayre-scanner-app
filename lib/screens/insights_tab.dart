@@ -35,6 +35,7 @@ class _InsightsTabState extends State<InsightsTab> {
   DataResult<List<InsightNote>>? _notes;
   bool _loading = true;
   Timer? _liveTimer;
+  bool _liveRefreshInFlight = false;
 
   @override
   void initState() {
@@ -58,20 +59,27 @@ class _InsightsTabState extends State<InsightsTab> {
   }
 
   Future<void> _refreshLive() async {
-    if (!mounted) return;
-    final results = await Future.wait([
-      widget.marketData.getSentiment(monthly: false),
-      widget.marketData.getTopGainers(),
-      widget.marketData.getTopLosers(),
-      widget.marketData.getMostActive(),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _sentiment = results[0] as DataResult<Sentiment>;
-      _gainers = results[1] as DataResult<List<Quote>>;
-      _losers = results[2] as DataResult<List<Quote>>;
-      _mostActive = results[3] as DataResult<List<Quote>>;
-    });
+    // See HomeTab._refreshLive: skips a tick rather than let it stack behind
+    // a still-running one.
+    if (!mounted || _liveRefreshInFlight) return;
+    _liveRefreshInFlight = true;
+    try {
+      final results = await Future.wait([
+        widget.marketData.getSentiment(monthly: false),
+        widget.marketData.getTopGainers(),
+        widget.marketData.getTopLosers(),
+        widget.marketData.getMostActive(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _sentiment = results[0] as DataResult<Sentiment>;
+        _gainers = results[1] as DataResult<List<Quote>>;
+        _losers = results[2] as DataResult<List<Quote>>;
+        _mostActive = results[3] as DataResult<List<Quote>>;
+      });
+    } finally {
+      _liveRefreshInFlight = false;
+    }
   }
 
   Future<void> _load({bool initial = false}) async {

@@ -64,6 +64,7 @@ class _HomeTabState extends State<HomeTab> {
   String _accountName = '';
   bool _loading = true;
   Timer? _liveTimer;
+  bool _liveRefreshInFlight = false;
 
   @override
   void initState() {
@@ -86,14 +87,25 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _refreshLive() async {
-    if (!mounted) return;
-    final board = await widget.marketData.getIndexBoard();
-    final breadth = await widget.marketData.getSentiment(monthly: false);
-    if (!mounted) return;
-    setState(() {
-      _board = board;
-      _breadth = breadth;
-    });
+    // A tick that fires while the previous one is still awaiting its
+    // response would otherwise pile a second request on top of the first —
+    // harmless individually, but across every live-refreshing screen it's
+    // how a single slow response turns into an ever-growing backlog of
+    // in-flight requests. Skipping the tick is enough: the next one four
+    // seconds later picks up cleanly.
+    if (!mounted || _liveRefreshInFlight) return;
+    _liveRefreshInFlight = true;
+    try {
+      final board = await widget.marketData.getIndexBoard();
+      final breadth = await widget.marketData.getSentiment(monthly: false);
+      if (!mounted) return;
+      setState(() {
+        _board = board;
+        _breadth = breadth;
+      });
+    } finally {
+      _liveRefreshInFlight = false;
+    }
   }
 
   Future<void> _load({bool initial = false}) async {

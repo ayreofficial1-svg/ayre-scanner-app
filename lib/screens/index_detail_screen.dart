@@ -46,6 +46,8 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
   bool _loadingConstituents = true;
   _ConstituentSort _sort = _ConstituentSort.changeDesc;
   Timer? _liveTimer;
+  bool _liveQuoteInFlight = false;
+  bool _liveConstituentsInFlight = false;
 
   @override
   void initState() {
@@ -56,8 +58,11 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
     // Fyers' single live WebSocket feed, so this never adds extra
     // Fyers/NSE requests no matter how frequently it ticks.
     _liveTimer = Timer.periodic(liveMarketRefreshInterval, (_) {
-      _loadQuote(silent: true);
-      _loadConstituents(silent: true);
+      // Each guarded independently: quote and constituents are two separate
+      // requests with independent latency, so one running long shouldn't
+      // hold back the other from ticking again on schedule.
+      if (!_liveQuoteInFlight) _loadQuote(silent: true);
+      if (!_liveConstituentsInFlight) _loadConstituents(silent: true);
     });
   }
 
@@ -72,12 +77,17 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
   /// spinner every few seconds. Matches the original behavior otherwise:
   /// a manual reload never re-shows the quote's loading state either.
   Future<void> _loadQuote({bool silent = false}) async {
-    final result = await widget.marketData.getIndex(widget.index);
-    if (!mounted) return;
-    setState(() {
-      _quote = result;
-      _loadingQuote = false;
-    });
+    _liveQuoteInFlight = true;
+    try {
+      final result = await widget.marketData.getIndex(widget.index);
+      if (!mounted) return;
+      setState(() {
+        _quote = result;
+        _loadingQuote = false;
+      });
+    } finally {
+      _liveQuoteInFlight = false;
+    }
   }
 
   Future<void> _loadConstituents({bool silent = false}) async {
@@ -85,12 +95,17 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
       if (!mounted) return;
       setState(() => _loadingConstituents = true);
     }
-    final result = await widget.marketData.getConstituents(widget.index);
-    if (!mounted) return;
-    setState(() {
-      _constituents = result;
-      _loadingConstituents = false;
-    });
+    _liveConstituentsInFlight = true;
+    try {
+      final result = await widget.marketData.getConstituents(widget.index);
+      if (!mounted) return;
+      setState(() {
+        _constituents = result;
+        _loadingConstituents = false;
+      });
+    } finally {
+      _liveConstituentsInFlight = false;
+    }
   }
 
   Future<void> _refresh() async {

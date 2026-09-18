@@ -49,12 +49,13 @@ enum DataPhaseSnapshot { ready, empty, failed }
 
 /// How often screens showing live market data should poll.
 ///
-/// Safe to keep short: the backend serves this from a single, always-open
-/// Fyers WebSocket connection (see BACKEND_ANALYSIS.md / the Fyers-stream
-/// work), so polling faster does not create extra Fyers or NSE requests —
-/// it only reads memory the backend already has. This constant is the one
-/// place to change the cadence for every live-refreshing screen at once.
-const Duration liveMarketRefreshInterval = Duration(seconds: 4);
+/// The backend serves this from a single, always-open Fyers WebSocket
+/// connection (see BACKEND_ANALYSIS.md / the Fyers-stream work) plus a
+/// threaded dev server that can now actually handle concurrent requests, so
+/// polling doesn't create extra Fyers or NSE requests — it only reads memory
+/// the backend already has. 10 seconds is the agreed cadence for every
+/// live-refreshing screen; this constant is the one place to change it.
+const Duration liveMarketRefreshInterval = Duration(seconds: 10);
 
 /// Everything the app needs from a market feed. Screens depend on this interface
 /// only, so the concrete source — the Ayre backend, a vendor API, an exchange
@@ -137,6 +138,18 @@ class RemoteMarketDataService implements MarketDataService {
   /// answer for longer than that.
   static const _cacheTtl = Duration(seconds: 3);
   final Map<IndexId, (DateTime, List<Quote>)> _constituentCache = {};
+
+  /// In-flight request per index, so concurrent callers within the same
+  /// refresh tick share one HTTP round trip instead of each firing their
+  /// own. Without this, one `_refreshLive()` tick on Insights alone starts
+  /// gainers + losers + most-active + sentiment essentially simultaneously
+  /// (`Future.wait`), and each independently finds the 3s cache empty or
+  /// expired and fetches all three indices itself — up to a dozen duplicate
+  /// requests for the same three URLs on a single tick, worse still once
+  /// Home's own tick lands nearby. This doesn't change what any caller sees
+  /// (every caller still gets the same fresh rows once the shared fetch
+  /// resolves) — it only removes the duplicate network round trips.
+  final Map<IndexId, Future<List<Quote>>> _constituentFetchesInFlight = {};
 
   @override
   Future<DataResult<List<Quote>>> getIndexBoard() {
@@ -353,12 +366,25 @@ class RemoteMarketDataService implements MarketDataService {
 
   // ── Plumbing ─────────────────────────────────────────────────────────────
 
-  Future<List<Quote>> _fetchConstituents(IndexId index) async {
+  Future<List<Quote>> _fetchConstituents(IndexId index) {
     final cached = _constituentCache[index];
     if (cached != null && DateTime.now().difference(cached.$1) < _cacheTtl) {
-      return cached.$2;
+      return Future.value(cached.$2);
     }
 
+    // Join an already-running fetch for this index rather than starting a
+    // second one — see the field doc on `_constituentFetchesInFlight`.
+    final inFlight = _constituentFetchesInFlight[index];
+    if (inFlight != null) return inFlight;
+
+    final future = _fetchConstituentsNow(index).whenComplete(() {
+      _constituentFetchesInFlight.remove(index);
+    });
+    _constituentFetchesInFlight[index] = future;
+    return future;
+  }
+
+  Future<List<Quote>> _fetchConstituentsNow(IndexId index) async {
     final decoded = jsonDecode(await _get(_constituents(index)));
     if (decoded is! Map<String, dynamic>) throw const DataFailure.malformed();
     final raw = decoded['stocks'];

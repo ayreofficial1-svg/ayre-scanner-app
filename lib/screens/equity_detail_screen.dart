@@ -39,6 +39,7 @@ class _EquityDetailScreenState extends State<EquityDetailScreen> {
   DataResult<Quote>? _result;
   bool _loading = true;
   Timer? _liveTimer;
+  bool _liveRefreshInFlight = false;
 
   @override
   void initState() {
@@ -63,13 +64,21 @@ class _EquityDetailScreenState extends State<EquityDetailScreen> {
   /// without flipping the loading flag, so the screen doesn't flash a
   /// spinner every few seconds.
   Future<void> _load({bool silent = false}) async {
+    // See HomeTab._refreshLive: a tick that fires while the previous one is
+    // still awaiting its response skips rather than stacks on top of it.
+    if (silent && _liveRefreshInFlight) return;
     if (!silent) setState(() => _loading = true);
-    final result = await widget.marketData.getEquity(widget.symbol);
-    if (!mounted) return;
-    setState(() {
-      _result = result;
-      _loading = false;
-    });
+    _liveRefreshInFlight = true;
+    try {
+      final result = await widget.marketData.getEquity(widget.symbol);
+      if (!mounted) return;
+      setState(() {
+        _result = result;
+        _loading = false;
+      });
+    } finally {
+      _liveRefreshInFlight = false;
+    }
   }
 
   Future<void> _refresh() async {
