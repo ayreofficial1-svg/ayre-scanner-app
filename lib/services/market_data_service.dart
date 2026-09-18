@@ -94,10 +94,17 @@ abstract interface class MarketDataService {
 ///    conventional naming. Read the wrong way round, the app showed a percentage
 ///    where an absolute belonged and then derived a nonsense percentage from it.
 ///
-///  * **There are no movers endpoints.** No `/gainers`, `/losers` or
-///    `/most-active` exists anywhere in the backend. They are derived here from
-///    the constituents endpoint, which returns 50 stocks with `change_pct` and
-///    `volume` — so Insights works end to end with no backend change.
+///  * **Movers have dedicated endpoints, backed by Fyers only.** `/api/market/
+///    gainers`, `/losers` and `/most-active` each return the top 10 from
+///    `_fyers_stream.movers()` — one live-tick read across the full
+///    deduplicated Nifty 50 + Sensex 30 + Bank Nifty universe (~140 symbols),
+///    all from a single source. This intentionally does NOT reuse
+///    `_fetchConstituents()`: that endpoint is capped at 50 stocks per index
+///    and, because each index's constituents call picks its own source
+///    independently, three concurrent constituent fetches can silently blend
+///    live Fyers rows for one index with NSE/hardcoded-fallback rows for
+///    another — exactly the "which source is this actually from" problem a
+///    movers list must not have.
 ///
 ///  * **`/api/sentiment` has no advance/decline counts.** It returns a single
 ///    stored number. Since v3's Home leads with Advances and Declines, those are
@@ -125,6 +132,9 @@ class RemoteMarketDataService implements MarketDataService {
   static const _signals = '/api/signals';
   static const _courses = '/api/learn';
   static const _insightNotes = '/api/insights';
+  static const _gainers = '/api/market/gainers';
+  static const _losers = '/api/market/losers';
+  static const _mostActive = '/api/market/most-active';
   static String _constituents(IndexId i) =>
       '/api/market/${i.apiKey}/constituents';
 
@@ -259,6 +269,7 @@ class RemoteMarketDataService implements MarketDataService {
   @override
   Future<DataResult<List<Quote>>> getTopGainers() => _movers(
     DataSurface.gainers,
+    _gainers,
     (a, b) => b.percentChange.compareTo(a.percentChange),
     keep: (q) => q.percentChange > 0,
   );
@@ -266,6 +277,7 @@ class RemoteMarketDataService implements MarketDataService {
   @override
   Future<DataResult<List<Quote>>> getTopLosers() => _movers(
     DataSurface.losers,
+    _losers,
     (a, b) => a.percentChange.compareTo(b.percentChange),
     keep: (q) => q.percentChange < 0,
   );
@@ -273,24 +285,48 @@ class RemoteMarketDataService implements MarketDataService {
   @override
   Future<DataResult<List<Quote>>> getMostActive() => _movers(
     DataSurface.mostActive,
+    _mostActive,
     (a, b) => (b.volume ?? 0).compareTo(a.volume ?? 0),
     keep: (q) => q.volume != null && q.volume! > 0,
   );
 
-  /// Movers are ranked across every index's constituents, de-duplicated by
-  /// symbol, because no movers endpoint exists to ask.
+  /// Fetches one mover list straight from its dedicated backend endpoint —
+  /// a single, homogeneous read from `_fyers_stream.movers()`, never a blend
+  /// of per-index sources. `keep` re-applies the gainer/loser/volume
+  /// condition locally (the backend's top-10-by-metric ranking doesn't
+  /// itself guarantee every row is strictly positive/negative/traded, e.g.
+  /// on a day where the whole market is red), and the result is re-sorted
+  /// locally so a stale-but-still-served response can't show out-of-order
+  /// rows.
   Future<DataResult<List<Quote>>> _movers(
     DataSurface surface,
+    String path,
     Comparator<Quote> order, {
     required bool Function(Quote) keep,
   }) {
     return _run(surface, () async {
-      final rows = await _allConstituents();
+      final decoded = jsonDecode(await _get(path));
+      if (decoded is! Map<String, dynamic>) throw const DataFailure.malformed();
+      final raw = decoded['stocks'];
+      if (raw is! List) throw const DataFailure.malformed();
+
+      final asOf =
+          DateTime.tryParse(decoded['updated_at']?.toString() ?? '') ??
+          DateTime.now();
+
+      final rows = <Quote>[];
+      for (final entry in raw) {
+        if (entry is! Map) continue;
+        final json = entry.cast<String, dynamic>();
+        final quote = Quote.tryParse({...json, 'asOf': asOf.toIso8601String()});
+        if (quote != null) rows.add(quote);
+      }
+
       final eligible = rows.where(keep).toList()..sort(order);
       if (eligible.isEmpty) return const DataResult<List<Quote>>.empty();
       return DataResult.ready(
         eligible.take(10).toList(),
-        stale: _isStale(_newest(rows), surface),
+        stale: _isStale(asOf, surface),
       );
     }, onEmpty: () => const DataResult<List<Quote>>.empty());
   }
