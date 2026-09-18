@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
@@ -33,11 +34,44 @@ class _InsightsTabState extends State<InsightsTab> {
   DataResult<List<Quote>>? _mostActive;
   DataResult<List<InsightNote>>? _notes;
   bool _loading = true;
+  Timer? _liveTimer;
 
   @override
   void initState() {
     super.initState();
     _load(initial: true);
+    // Sentiment/gainers/losers/most-active only — not _notes, which is
+    // editorially authored content that doesn't change tick to tick.
+    // Safe to poll this often: the backend serves the market-data pieces
+    // from Fyers' single live WebSocket feed, so this never adds extra
+    // Fyers/NSE requests no matter how frequently it ticks.
+    _liveTimer = Timer.periodic(
+      liveMarketRefreshInterval,
+      (_) => _refreshLive(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _liveTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshLive() async {
+    if (!mounted) return;
+    final results = await Future.wait([
+      widget.marketData.getSentiment(monthly: false),
+      widget.marketData.getTopGainers(),
+      widget.marketData.getTopLosers(),
+      widget.marketData.getMostActive(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _sentiment = results[0] as DataResult<Sentiment>;
+      _gainers = results[1] as DataResult<List<Quote>>;
+      _losers = results[2] as DataResult<List<Quote>>;
+      _mostActive = results[3] as DataResult<List<Quote>>;
+    });
   }
 
   Future<void> _load({bool initial = false}) async {

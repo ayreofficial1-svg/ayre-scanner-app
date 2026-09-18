@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
@@ -37,15 +38,32 @@ class EquityDetailScreen extends StatefulWidget {
 class _EquityDetailScreenState extends State<EquityDetailScreen> {
   DataResult<Quote>? _result;
   bool _loading = true;
+  Timer? _liveTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    // Safe to poll this often: the backend serves this quote from Fyers'
+    // single live WebSocket feed, so this never adds extra Fyers/NSE
+    // requests no matter how frequently it ticks.
+    _liveTimer = Timer.periodic(
+      liveMarketRefreshInterval,
+      (_) => _load(silent: true),
+    );
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    _liveTimer?.cancel();
+    super.dispose();
+  }
+
+  /// [silent]: used by the periodic live-refresh tick — updates the data
+  /// without flipping the loading flag, so the screen doesn't flash a
+  /// spinner every few seconds.
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) setState(() => _loading = true);
     final result = await widget.marketData.getEquity(widget.symbol);
     if (!mounted) return;
     setState(() {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 
 import '../main.dart' show AppThemeController;
 import '../services/api_service.dart';
@@ -62,11 +63,37 @@ class _HomeTabState extends State<HomeTab> {
   DataResult<Sentiment>? _breadth;
   String _accountName = '';
   bool _loading = true;
+  Timer? _liveTimer;
 
   @override
   void initState() {
     super.initState();
     _load(initial: true);
+    // Board + breadth only — session is already resolved above, and this
+    // fires often enough that re-checking it every tick would be wasted
+    // work. Safe to poll this often: the backend serves it from Fyers'
+    // single live WebSocket, so this never adds extra Fyers/NSE requests.
+    _liveTimer = Timer.periodic(
+      liveMarketRefreshInterval,
+      (_) => _refreshLive(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _liveTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _refreshLive() async {
+    if (!mounted) return;
+    final board = await widget.marketData.getIndexBoard();
+    final breadth = await widget.marketData.getSentiment(monthly: false);
+    if (!mounted) return;
+    setState(() {
+      _board = board;
+      _breadth = breadth;
+    });
   }
 
   Future<void> _load({bool initial = false}) async {

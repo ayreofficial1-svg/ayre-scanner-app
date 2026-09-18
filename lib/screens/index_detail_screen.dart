@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
@@ -44,15 +45,33 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
   bool _loadingQuote = true;
   bool _loadingConstituents = true;
   _ConstituentSort _sort = _ConstituentSort.changeDesc;
+  Timer? _liveTimer;
 
   @override
   void initState() {
     super.initState();
     _loadQuote();
     _loadConstituents();
+    // Safe to poll this often: the backend serves both of these from
+    // Fyers' single live WebSocket feed, so this never adds extra
+    // Fyers/NSE requests no matter how frequently it ticks.
+    _liveTimer = Timer.periodic(liveMarketRefreshInterval, (_) {
+      _loadQuote(silent: true);
+      _loadConstituents(silent: true);
+    });
   }
 
-  Future<void> _loadQuote() async {
+  @override
+  void dispose() {
+    _liveTimer?.cancel();
+    super.dispose();
+  }
+
+  /// [silent]: used by the periodic live-refresh tick — updates the data
+  /// without flipping the loading flag, so the screen doesn't flash a
+  /// spinner every few seconds. Matches the original behavior otherwise:
+  /// a manual reload never re-shows the quote's loading state either.
+  Future<void> _loadQuote({bool silent = false}) async {
     final result = await widget.marketData.getIndex(widget.index);
     if (!mounted) return;
     setState(() {
@@ -61,8 +80,11 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
     });
   }
 
-  Future<void> _loadConstituents() async {
-    setState(() => _loadingConstituents = true);
+  Future<void> _loadConstituents({bool silent = false}) async {
+    if (!silent) {
+      if (!mounted) return;
+      setState(() => _loadingConstituents = true);
+    }
     final result = await widget.marketData.getConstituents(widget.index);
     if (!mounted) return;
     setState(() {

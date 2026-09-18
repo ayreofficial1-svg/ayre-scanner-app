@@ -47,6 +47,15 @@ class DataResult<T> {
 
 enum DataPhaseSnapshot { ready, empty, failed }
 
+/// How often screens showing live market data should poll.
+///
+/// Safe to keep short: the backend serves this from a single, always-open
+/// Fyers WebSocket connection (see BACKEND_ANALYSIS.md / the Fyers-stream
+/// work), so polling faster does not create extra Fyers or NSE requests —
+/// it only reads memory the backend already has. This constant is the one
+/// place to change the cadence for every live-refreshing screen at once.
+const Duration liveMarketRefreshInterval = Duration(seconds: 4);
+
 /// Everything the app needs from a market feed. Screens depend on this interface
 /// only, so the concrete source — the Ayre backend, a vendor API, an exchange
 /// wrapper, or a QA double — is swappable without touching a widget.
@@ -118,9 +127,15 @@ class RemoteMarketDataService implements MarketDataService {
   static String _constituents(IndexId i) =>
       '/api/market/${i.apiKey}/constituents';
 
-  /// Constituent lists are the source for movers, breadth and equity lookups,
-  /// so they are cached for a short window to keep one screen to one fetch.
-  static const _cacheTtl = Duration(seconds: 45);
+  /// Constituent lists are the source for movers, breadth and equity lookups.
+  /// Cached only very briefly — just long enough to de-duplicate the several
+  /// calls one screen's own load can make to the same index in one pass
+  /// (e.g. Insights checking all three indices, or Equity Detail searching
+  /// each one for a symbol) — not to throttle refreshes across polling
+  /// ticks. The backend now answers this from a live WebSocket feed with no
+  /// extra cost per request, so there is no reason to hold onto a stale
+  /// answer for longer than that.
+  static const _cacheTtl = Duration(seconds: 3);
   final Map<IndexId, (DateTime, List<Quote>)> _constituentCache = {};
 
   @override
