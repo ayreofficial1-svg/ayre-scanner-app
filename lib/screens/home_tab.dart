@@ -61,6 +61,15 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   DataResult<List<Quote>>? _board;
   DataResult<Sentiment>? _breadth;
+  // The donut's source (spec §4): the full Nifty-500 count from
+  // `/api/breadth/full`, not `_breadth`'s ~140-stock live-tick count.
+  // Refreshes on its own fixed hourly schedule server-side — cache-only on
+  // every request — so it's loaded in `_load` alongside everything else but
+  // deliberately left out of `_refreshLive`'s 10s tick, the same way
+  // Insights treats its own scan-cadence surfaces (volatility/momentum/
+  // volume-surge): polling a cache that only changes hourly would just
+  // re-fetch the same numbers.
+  DataResult<FullBreadth>? _fullBreadth;
   String _accountName = '';
   bool _loading = true;
   Timer? _liveTimer;
@@ -112,6 +121,7 @@ class _HomeTabState extends State<HomeTab> {
     final session = await ApiService.getSession();
     final board = await widget.marketData.getIndexBoard();
     final breadth = await widget.marketData.getSentiment(monthly: false);
+    final fullBreadth = await widget.marketData.getFullBreadth();
     if (!mounted) return;
 
     final name =
@@ -123,6 +133,7 @@ class _HomeTabState extends State<HomeTab> {
       _accountName = name;
       _board = board;
       _breadth = breadth;
+      _fullBreadth = fullBreadth;
       _loading = false;
     });
     widget.onAccountResolved?.call(name);
@@ -200,7 +211,11 @@ class _HomeTabState extends State<HomeTab> {
               index: 2,
               child: const SectionLabel(label: 'Market breadth'),
             ),
-            _BreadthCard(result: _loading ? null : _breadth, onRetry: _load),
+            _BreadthCard(
+              sentimentResult: _loading ? null : _breadth,
+              breadthResult: _loading ? null : _fullBreadth,
+              onRetry: _load,
+            ),
             const SizedBox(height: AppSpace.sectionGap),
             const Entrance(index: 3, child: _FooterLine()),
           ],
@@ -683,35 +698,61 @@ class _IndexCardSkeleton extends StatelessWidget {
 
 // ─── Breadth ───────────────────────────────────────────────────────────────
 
-/// Market breadth (§13.1): the advance/decline split as a donut, with the
-/// composite sentiment reading beside it as a gauge.
+/// Market breadth (§13.1): the full Nifty-500 advance/decline split as a
+/// donut, with the composite sentiment reading beside it as a gauge.
 ///
 /// The two charts answer different questions and §13.1 asks for both, so they
 /// sit side by side rather than one being demoted to a figure the way v3 did:
 /// the donut says *how many* went each way, the gauge says *how the desk reads
 /// it*. Stacked on a phone, paired once there's width for it.
+///
+/// **Two independent sources, one card (backend spec §4).** The donut used to
+/// read `advances`/`declines` off the same `Sentiment` object the gauge
+/// reads — a live tick across only the ~140 stocks Home's own board and
+/// movers lists already touch. It now reads [FullBreadth]
+/// (`GET /api/breadth/full`), a separate hourly poll across the entire
+/// Nifty 500. The two can therefore be ready, empty or failed independently,
+/// and each slot degrades on its own rather than one section's failure
+/// blanking the whole card — same rule Insights already follows for its own
+/// multi-source sections.
 class _BreadthCard extends StatelessWidget {
-  const _BreadthCard({required this.result, required this.onRetry});
+  const _BreadthCard({
+    required this.sentimentResult,
+    required this.breadthResult,
+    required this.onRetry,
+  });
 
-  final DataResult<Sentiment>? result;
+  final DataResult<Sentiment>? sentimentResult;
+  final DataResult<FullBreadth>? breadthResult;
   final Future<void> Function() onRetry;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
 
-    if (result == null) return const _BreadthSkeleton();
-
-    if (result!.isFailed) {
-      return StatePanel.failed(
-        headline: "Market breadth didn't load",
-        message: 'The index levels above are unaffected.',
-        compact: true,
-        onRetry: onRetry,
-      );
+    // Both surfaces load together in `_load`, so they're null together too —
+    // one skeleton for the whole card while either is still in flight.
+    if (sentimentResult == null && breadthResult == null) {
+      return const _BreadthSkeleton();
     }
 
-    if (result!.isEmpty) {
+    final sentimentFailed = sentimentResult?.isFailed ?? false;
+    final sentimentEmpty = sentimentResult?.isEmpty ?? false;
+    final breadthFailed = breadthResult?.isFailed ?? false;
+    final breadthEmpty = breadthResult?.isEmpty ?? false;
+
+    // Neither side has anything to show — this is the whole-card failure/
+    // empty case the original single-source card handled.
+    if ((sentimentFailed || sentimentEmpty) &&
+        (breadthFailed || breadthEmpty)) {
+      if (sentimentFailed || breadthFailed) {
+        return StatePanel.failed(
+          headline: "Market breadth didn't load",
+          message: 'The index levels above are unaffected.',
+          compact: true,
+          onRetry: onRetry,
+        );
+      }
       return const StatePanel.empty(
         headline: 'No breadth reading yet',
         message: 'Advances and declines appear once the session is under way.',
@@ -719,14 +760,16 @@ class _BreadthCard extends StatelessWidget {
       );
     }
 
-    final sentiment = result!.value!;
-    final advances = sentiment.advances;
-    final declines = sentiment.declines;
+    final sentiment = sentimentResult?.value;
+    final fullBreadth = breadthResult?.value;
 
-    // With no counts there is nothing to lead with, so say that plainly rather
-    // than rendering zeroes as if they were real. The donut would otherwise
-    // draw an empty ring around a confident-looking "0%".
-    if (advances == null && declines == null) {
+    // With no counts there is nothing to lead with, so say that plainly
+    // rather than rendering zeroes as if they were real — the gauge would
+    // otherwise show a confident-looking score with no breadth behind it.
+    if (sentiment != null &&
+        sentiment.advances == null &&
+        sentiment.declines == null &&
+        fullBreadth == null) {
       return StatePanel.empty(
         headline: 'Breadth counts unavailable',
         message:
@@ -736,25 +779,37 @@ class _BreadthCard extends StatelessWidget {
       );
     }
 
-    final donut = BreadthDonut(
-      advances: advances ?? 0,
-      declines: declines ?? 0,
-      unchanged: sentiment.unchanged ?? 0,
-    );
-    final gauge = SentimentGauge(
-      score: sentiment.score,
-      band: _band(sentiment.score),
-      // §12.1 over §12.2 here, deliberately: a sentiment reading's subject is
-      // direction, and tinting a bearish gauge with the brand accent would
-      // make the one chart on this screen that has an opinion the one chart
-      // that doesn't show it. Open decision #12 — this is the call this screen
-      // makes; revisit if the Spec says otherwise.
-      tone: switch (sentiment.score) {
-        < 35 => t.negative,
-        < 65 => t.neutral,
-        _ => t.positive,
-      },
-    );
+    final donutSlot = fullBreadth != null
+        ? BreadthDonut(
+            advances: fullBreadth.advances,
+            declines: fullBreadth.declines,
+            unchanged: fullBreadth.unchanged,
+          )
+        : _BreadthSlotNotice(
+            failed: breadthFailed,
+            label: breadthFailed ? "Breadth didn't load" : 'No breadth yet',
+          );
+
+    final gaugeSlot = sentiment != null
+        ? SentimentGauge(
+            score: sentiment.score,
+            band: _band(sentiment.score),
+            // §12.1 over §12.2 here, deliberately: a sentiment reading's
+            // subject is direction, and tinting a bearish gauge with the
+            // brand accent would make the one chart on this screen that has
+            // an opinion the one chart that doesn't show it. Open decision
+            // #12 — this is the call this screen makes; revisit if the Spec
+            // says otherwise.
+            tone: switch (sentiment.score) {
+              < 35 => t.negative,
+              < 65 => t.neutral,
+              _ => t.positive,
+            },
+          )
+        : _BreadthSlotNotice(
+            failed: sentimentFailed,
+            label: sentimentFailed ? "Sentiment didn't load" : 'No sentiment yet',
+          );
 
     return AyreCard(
       padding: const EdgeInsets.all(AppSpace.lg),
@@ -771,31 +826,41 @@ class _BreadthCard extends StatelessWidget {
               if (!paired) {
                 return Column(
                   children: [
-                    Center(child: donut),
+                    Center(child: donutSlot),
                     const SizedBox(height: AppSpace.lg),
                     const HairlineDivider(),
                     const SizedBox(height: AppSpace.lg),
-                    Center(child: gauge),
+                    Center(child: gaugeSlot),
                   ],
                 );
               }
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Expanded(child: Center(child: donut)),
+                  Expanded(child: Center(child: donutSlot)),
                   const SizedBox(width: AppSpace.lg),
-                  Expanded(child: Center(child: gauge)),
+                  Expanded(child: Center(child: gaugeSlot)),
                 ],
               );
             },
           ),
-          if (sentiment.note != null && sentiment.note!.isNotEmpty) ...[
+          if (fullBreadth != null) ...[
+            const SizedBox(height: AppSpace.inCardGap),
+            Center(
+              child: Text(
+                'Full Nifty 500 · ${fullBreadth.coverage} stocks tracked',
+                style: AppTypo.hint(t, color: t.foregroundMuted),
+              ),
+            ),
+          ],
+          if (sentiment?.note != null && sentiment!.note!.isNotEmpty) ...[
             const SizedBox(height: AppSpace.lg),
             const HairlineDivider(),
             const SizedBox(height: AppSpace.inCardGap),
             Text(sentiment.note!, style: AppTypo.body(t)),
           ],
-          if (result!.stale) ...[
+          if ((sentimentResult?.stale ?? false) ||
+              (breadthResult?.stale ?? false)) ...[
             const SizedBox(height: AppSpace.inCardGap),
             const StaleNotice(),
           ],
@@ -814,6 +879,36 @@ class _BreadthCard extends StatelessWidget {
     < 80 => 'Constructive',
     _ => 'Bullish',
   };
+}
+
+/// Fills one half of [_BreadthCard] when that half's own source failed or
+/// came back empty while the other half still has something to show — the
+/// card stays up and legible rather than the whole thing dropping to a
+/// single [StatePanel].
+class _BreadthSlotNotice extends StatelessWidget {
+  const _BreadthSlotNotice({required this.failed, required this.label});
+
+  final bool failed;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return SizedBox(
+      width: 132,
+      height: 132,
+      child: Center(
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: AppTypo.hint(
+            t,
+            color: failed ? t.negative : t.foregroundSubtle,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _BreadthSkeleton extends StatelessWidget {

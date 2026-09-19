@@ -17,6 +17,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import '../services/market_models.dart';
+import 'ayre_components.dart';
 import 'figure.dart';
 
 // ─── Shared arc geometry ───────────────────────────────────────────────────
@@ -131,11 +133,25 @@ class BreadthDonut extends StatelessWidget {
     this.size = 132,
     this.thickness = 12,
     this.showLegend = true,
+    this.centerLabel = 'ADVANCING',
+    this.primaryLabel = 'Up',
+    this.secondaryLabel = 'Down',
+    this.neutralLabel = 'Flat',
   });
 
   final int advances;
   final int declines;
   final int unchanged;
+
+  /// Labels below the ring's centre reading and in its legend. Defaulted to
+  /// the original market-breadth wording so every existing call site is
+  /// unaffected; Insights' momentum-tilt reading (bullish/bearish rather
+  /// than advancing/declining stocks) is the one other reading this shape
+  /// fits, and overrides these four instead of duplicating the whole widget.
+  final String centerLabel;
+  final String primaryLabel;
+  final String secondaryLabel;
+  final String neutralLabel;
 
   /// Outer diameter. The Spec fixes a size for [ProgressRing] (64) and
   /// [SentimentGauge] (176) but not for the donut; 132 sits between them and
@@ -201,11 +217,14 @@ class BreadthDonut extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                           color: t.textPrimary,
                           semanticsLabel:
-                              '${share.round()} percent advancing, $advances '
-                              'up, $declines down, $unchanged unchanged',
+                              '${share.round()} percent '
+                              '${centerLabel.toLowerCase()}, $advances '
+                              '${primaryLabel.toLowerCase()}, $declines '
+                              '${secondaryLabel.toLowerCase()}, $unchanged '
+                              '${neutralLabel.toLowerCase()}',
                         ),
                         const SizedBox(height: 2),
-                        Text('ADVANCING', style: AppTypo.label(t)),
+                        Text(centerLabel, style: AppTypo.label(t)),
                       ],
                     ),
                   ),
@@ -219,14 +238,22 @@ class BreadthDonut extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _LegendKey(color: t.positive, label: 'Up', value: advances),
+              _LegendKey(
+                color: t.positive,
+                label: primaryLabel,
+                value: advances,
+              ),
               const SizedBox(width: AppSpace.md),
-              _LegendKey(color: t.negative, label: 'Down', value: declines),
+              _LegendKey(
+                color: t.negative,
+                label: secondaryLabel,
+                value: declines,
+              ),
               if (unchanged > 0) ...[
                 const SizedBox(width: AppSpace.md),
                 _LegendKey(
                   color: t.foregroundSubtle,
-                  label: 'Flat',
+                  label: neutralLabel,
                   value: unchanged,
                 ),
               ],
@@ -706,5 +733,287 @@ class _GaugePainter extends CustomPainter {
         old.track != track ||
         old.markerFill != markerFill ||
         old.thickness != thickness;
+  }
+}
+
+// ─── VolatilityBars ────────────────────────────────────────────────────────
+
+/// ATR% distribution across the tracked universe, as a small bar histogram
+/// (Insights: `GET /api/insights/volatility`).
+///
+/// No existing widget in this file has this shape — it isn't radial like the
+/// three above it — so this is hand-painted from scratch, but keeps this
+/// file's rules: tokens only, no gridlines or third-party chart package, and
+/// the same `_DrawOn` draw-on used everywhere else here.
+///
+/// Volatility has no "direction" the way breadth or momentum do — a wide
+/// ATR% bucket isn't bullish or bearish — so bars use the brand accent
+/// rather than [AppThemeTokens.positive]/[negative], the same call
+/// [SentimentGauge] makes for its own non-directional fill.
+class VolatilityBars extends StatelessWidget {
+  const VolatilityBars({
+    super.key,
+    required this.buckets,
+    this.barMaxHeight = 76,
+  });
+
+  /// Ordered bucket label → stock count, e.g. {"0-1%": 120, "1-2%": 90, ...}.
+  final Map<String, int> buckets;
+  final double barMaxHeight;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final maxCount = buckets.values.fold<int>(0, math.max);
+
+    return _DrawOn(
+      builder: (context, progress) => Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          for (final entry in buckets.entries) ...[
+            Expanded(
+              child: _VolatilityBar(
+                label: entry.key,
+                count: entry.value,
+                fraction: maxCount == 0 ? 0.0 : entry.value / maxCount,
+                progress: progress,
+                barMaxHeight: barMaxHeight,
+                fill: t.accent,
+                track: t.surfaceSunken,
+              ),
+            ),
+            if (entry.key != buckets.keys.last)
+              const SizedBox(width: AppSpace.sm),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _VolatilityBar extends StatelessWidget {
+  const _VolatilityBar({
+    required this.label,
+    required this.count,
+    required this.fraction,
+    required this.progress,
+    required this.barMaxHeight,
+    required this.fill,
+    required this.track,
+  });
+
+  final String label;
+  final int count;
+
+  /// This bucket's share of the tallest bucket, 0..1.
+  final double fraction;
+
+  /// The shared draw-on progress, 0..1.
+  final double progress;
+  final double barMaxHeight;
+  final Color fill;
+  final Color track;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final drawnFraction = (fraction * progress).clamp(0.0, 1.0);
+    // A bucket with any stocks in it still shows a sliver — a real zero-height
+    // bar and "there are stocks here, just very few" must not look the same.
+    final barHeight = count > 0
+        ? math.max(4.0, barMaxHeight * drawnFraction)
+        : 0.0;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Figure.static(
+          '$count',
+          fontSize: AppTextScale.hint,
+          fontWeight: FontWeight.w600,
+          color: t.textPrimary,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpace.xxs),
+        SizedBox(
+          height: barMaxHeight,
+          child: Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              // Track: the full-height backdrop every bucket sits in, so an
+              // empty bucket is still visibly "a column with nothing in it"
+              // rather than absent.
+              Container(
+                width: double.infinity,
+                height: barMaxHeight,
+                decoration: BoxDecoration(
+                  color: track,
+                  borderRadius: BorderRadius.circular(AppRadius.chip / 2),
+                ),
+              ),
+              Container(
+                width: double.infinity,
+                height: barHeight,
+                decoration: BoxDecoration(
+                  color: fill,
+                  borderRadius: BorderRadius.circular(AppRadius.chip / 2),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpace.xxs),
+        Text(
+          label,
+          style: AppTypo.label(t),
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+  }
+}
+
+// ─── VolumeSurgeLeaderboard ────────────────────────────────────────────────
+
+/// Top stocks by today's-volume ÷ 20-day-average, descending (Insights:
+/// `GET /api/insights/volume-surge`) — a ranked horizontal-bar list.
+///
+/// Another genuinely new shape: not radial, and not a histogram either (each
+/// row is its own independently-scaled magnitude, ranked, with a symbol
+/// rather than a bucket label). The backend supplies no per-row direction —
+/// a volume surge isn't itself bullish or bearish — so bars use the brand
+/// accent, same reasoning as [VolatilityBars].
+class VolumeSurgeLeaderboard extends StatelessWidget {
+  const VolumeSurgeLeaderboard({
+    super.key,
+    required this.rows,
+    this.onTap,
+  });
+
+  /// Already ranked (descending) by the caller/backend — this widget does
+  /// not re-sort, so a caller that wants a different order controls it.
+  final List<VolumeSurgeRow> rows;
+  final ValueChanged<VolumeSurgeRow>? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final maxSurge = rows.fold<double>(
+      0,
+      (max, r) => math.max(max, r.surge.toDouble()),
+    );
+
+    return _DrawOn(
+      builder: (context, progress) => Column(
+        children: [
+          for (final (i, row) in rows.indexed) ...[
+            if (i > 0) const HairlineDivider(),
+            _VolumeSurgeRowTile(
+              rank: i + 1,
+              row: row,
+              fraction: maxSurge <= 0 ? 0.0 : row.surge / maxSurge,
+              progress: progress,
+              fill: t.accent,
+              track: t.surfaceSunken,
+              onTap: onTap == null ? null : () => onTap!(row),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _VolumeSurgeRowTile extends StatelessWidget {
+  const _VolumeSurgeRowTile({
+    required this.rank,
+    required this.row,
+    required this.fraction,
+    required this.progress,
+    required this.fill,
+    required this.track,
+    this.onTap,
+  });
+
+  final int rank;
+  final VolumeSurgeRow row;
+  final double fraction;
+  final double progress;
+  final Color fill;
+  final Color track;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final drawnFraction = (fraction * progress).clamp(0.0, 1.0);
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.md,
+          vertical: AppSpace.hairlineRowPadding,
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 20,
+              child: Text(
+                '$rank',
+                style: AppTypo.hint(t, color: t.foregroundSubtle),
+              ),
+            ),
+            const SizedBox(width: AppSpace.sm),
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    row.symbol,
+                    style: AppTypo.rowLabel(t),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: AppSpace.xxs),
+                  // The bar itself: a thin track with a proportional fill,
+                  // same visual language as ProgressRule but per-row-scaled
+                  // rather than 0..1 against a fixed total.
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppRadius.chip / 2),
+                    child: SizedBox(
+                      height: 5,
+                      child: Stack(
+                        children: [
+                          Container(color: track),
+                          FractionallySizedBox(
+                            widthFactor: drawnFraction,
+                            child: Container(color: fill),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: AppSpace.sm),
+            ShrinkTrailing(
+              child: Figure.static(
+                '${row.surge.toStringAsFixed(1)}×',
+                fontSize: AppTextScale.rowLabel,
+                fontWeight: FontWeight.w600,
+                color: t.textPrimary,
+                textAlign: TextAlign.right,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

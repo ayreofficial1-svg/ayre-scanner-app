@@ -47,6 +47,13 @@ enum DataSurface {
   courses,
   insightNotes,
   account,
+  // Spec: full Nifty-500 breadth (Home) + volatility / momentum /
+  // volume-surge (Insights). Each is its own surface so, e.g., a failed
+  // volume-surge fetch never takes the volatility histogram down with it.
+  fullBreadth,
+  volatility,
+  momentum,
+  volumeSurge,
 }
 
 /// Debug-only fault injection.

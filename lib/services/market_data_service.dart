@@ -82,6 +82,20 @@ abstract interface class MarketDataService {
   Future<DataResult<List<Signal>>> getSignals();
   Future<DataResult<List<Course>>> getCourses();
   Future<DataResult<List<InsightNote>>> getInsightNotes();
+
+  /// Full Nifty-500 breadth (`GET /api/breadth/full`) — Home's donut source.
+  /// Refreshes on its own fixed hourly schedule server-side, independent of
+  /// [getSentiment]'s ~140-stock live-tick count.
+  Future<DataResult<FullBreadth>> getFullBreadth();
+
+  /// ATR% distribution across the tracked universe, for Insights.
+  Future<DataResult<VolatilityHistogram>> getVolatility();
+
+  /// Bullish/bearish MACD tilt across the tracked universe, for Insights.
+  Future<DataResult<MomentumTilt>> getMomentum();
+
+  /// Top stocks by today's-volume ÷ 20-day-average, descending, for Insights.
+  Future<DataResult<VolumeSurgeBoard>> getVolumeSurge({int limit = 15});
 }
 
 /// Reads every surface from the Ayre backend.
@@ -137,6 +151,15 @@ class RemoteMarketDataService implements MarketDataService {
   static const _mostActive = '/api/market/most-active';
   static String _constituents(IndexId i) =>
       '/api/market/${i.apiKey}/constituents';
+
+  /// Cache-only reads — the backend never touches Fyers on these requests
+  /// (see main.py's docstrings for `/api/breadth/full` and the three
+  /// `/api/insights/*` routes). Safe to poll at the same cadence as anything
+  /// else on these screens; there's no per-request cost on the other end.
+  static const _breadthFull = '/api/breadth/full';
+  static const _insightsVolatility = '/api/insights/volatility';
+  static const _insightsMomentum = '/api/insights/momentum';
+  static const _insightsVolumeSurge = '/api/insights/volume-surge';
 
   /// Constituent lists are the source for movers, breadth and equity lookups.
   /// Cached only very briefly — just long enough to de-duplicate the several
@@ -398,6 +421,77 @@ class RemoteMarketDataService implements MarketDataService {
       rootKeys: const ['insights', 'notes', 'data'],
       parse: InsightNote.tryParse,
     );
+  }
+
+  @override
+  Future<DataResult<FullBreadth>> getFullBreadth() {
+    return _run(DataSurface.fullBreadth, () async {
+      final decoded = jsonDecode(await _get(_breadthFull));
+      if (decoded is! Map<String, dynamic>) throw const DataFailure.malformed();
+      final parsed = FullBreadth.tryParse(decoded);
+      if (parsed == null) return const DataResult<FullBreadth>.empty();
+      return DataResult.ready(
+        parsed,
+        stale:
+            parsed.asOf != null &&
+            _isStale(parsed.asOf!, DataSurface.fullBreadth),
+      );
+    }, onEmpty: () => const DataResult<FullBreadth>.empty());
+  }
+
+  @override
+  Future<DataResult<VolatilityHistogram>> getVolatility() {
+    return _run(DataSurface.volatility, () async {
+      final decoded = jsonDecode(await _get(_insightsVolatility));
+      if (decoded is! Map<String, dynamic>) throw const DataFailure.malformed();
+      final parsed = VolatilityHistogram.tryParse(decoded);
+      if (parsed == null || parsed.total == 0) {
+        return const DataResult<VolatilityHistogram>.empty();
+      }
+      return DataResult.ready(
+        parsed,
+        stale:
+            parsed.asOf != null &&
+            _isStale(parsed.asOf!, DataSurface.volatility),
+      );
+    }, onEmpty: () => const DataResult<VolatilityHistogram>.empty());
+  }
+
+  @override
+  Future<DataResult<MomentumTilt>> getMomentum() {
+    return _run(DataSurface.momentum, () async {
+      final decoded = jsonDecode(await _get(_insightsMomentum));
+      if (decoded is! Map<String, dynamic>) throw const DataFailure.malformed();
+      final parsed = MomentumTilt.tryParse(decoded);
+      if (parsed == null || parsed.total == 0) {
+        return const DataResult<MomentumTilt>.empty();
+      }
+      return DataResult.ready(
+        parsed,
+        stale:
+            parsed.asOf != null && _isStale(parsed.asOf!, DataSurface.momentum),
+      );
+    }, onEmpty: () => const DataResult<MomentumTilt>.empty());
+  }
+
+  @override
+  Future<DataResult<VolumeSurgeBoard>> getVolumeSurge({int limit = 15}) {
+    return _run(DataSurface.volumeSurge, () async {
+      final decoded = jsonDecode(
+        await _get('$_insightsVolumeSurge?limit=$limit'),
+      );
+      if (decoded is! Map<String, dynamic>) throw const DataFailure.malformed();
+      final parsed = VolumeSurgeBoard.tryParse(decoded);
+      if (parsed == null || parsed.rows.isEmpty) {
+        return const DataResult<VolumeSurgeBoard>.empty();
+      }
+      return DataResult.ready(
+        parsed,
+        stale:
+            parsed.asOf != null &&
+            _isStale(parsed.asOf!, DataSurface.volumeSurge),
+      );
+    }, onEmpty: () => const DataResult<VolumeSurgeBoard>.empty());
   }
 
   // ── Plumbing ─────────────────────────────────────────────────────────────

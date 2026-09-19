@@ -202,4 +202,54 @@ class FakeMarketData implements MarketDataService {
       ),
     ]);
   }
+
+  @override
+  Future<DataResult<FullBreadth>> getFullBreadth() async {
+    return _wrap(
+      DataSurface.fullBreadth,
+      () => FullBreadth(
+        advances: 268,
+        declines: 194,
+        unchanged: 38,
+        avgChangePct: 0.34,
+        coverage: 500,
+        asOf: _at,
+      ),
+    );
+  }
+
+  @override
+  Future<DataResult<VolatilityHistogram>> getVolatility() async {
+    return _wrap(
+      DataSurface.volatility,
+      () => VolatilityHistogram(
+        buckets: const {'0-1%': 210, '1-2%': 165, '2-3%': 84, '3%+': 41},
+        asOf: _at,
+      ),
+    );
+  }
+
+  @override
+  Future<DataResult<MomentumTilt>> getMomentum() async {
+    return _wrap(
+      DataSurface.momentum,
+      () => MomentumTilt(bullish: 286, bearish: 214, asOf: _at),
+    );
+  }
+
+  @override
+  Future<DataResult<VolumeSurgeBoard>> getVolumeSurge({int limit = 15}) async {
+    return _wrap(
+      DataSurface.volumeSurge,
+      () => VolumeSurgeBoard(
+        rows: [
+          const VolumeSurgeRow(symbol: 'ADANIENT', surge: 3.8, close: 3140.75),
+          const VolumeSurgeRow(symbol: 'BAJFINANCE', surge: 2.6, close: 7218.9),
+          const VolumeSurgeRow(symbol: 'RELIANCE', surge: 1.9, close: 2984.55),
+          const VolumeSurgeRow(symbol: 'HDFCBANK', surge: 1.4, close: 1712.3),
+        ].take(limit).toList(),
+        asOf: _at,
+      ),
+    );
+  }
 }

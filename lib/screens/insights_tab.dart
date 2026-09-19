@@ -33,6 +33,14 @@ class _InsightsTabState extends State<InsightsTab> {
   DataResult<List<Quote>>? _losers;
   DataResult<List<Quote>>? _mostActive;
   DataResult<List<InsightNote>>? _notes;
+  // Cache-only on the backend (see market_data_service.dart's endpoint
+  // doc): these refresh at scan cadence (up to 7×/day), not on
+  // [_liveTimer]'s tick, so they're loaded once in [_load] and left alone
+  // by [_refreshLive] — polling them every 10s would just re-fetch the
+  // same cached numbers.
+  DataResult<VolatilityHistogram>? _volatility;
+  DataResult<MomentumTilt>? _momentum;
+  DataResult<VolumeSurgeBoard>? _volumeSurge;
   bool _loading = true;
   Timer? _liveTimer;
   bool _liveRefreshInFlight = false;
@@ -90,6 +98,9 @@ class _InsightsTabState extends State<InsightsTab> {
       widget.marketData.getTopLosers(),
       widget.marketData.getMostActive(),
       widget.marketData.getInsightNotes(),
+      widget.marketData.getVolatility(),
+      widget.marketData.getMomentum(),
+      widget.marketData.getVolumeSurge(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -98,6 +109,9 @@ class _InsightsTabState extends State<InsightsTab> {
       _losers = results[2] as DataResult<List<Quote>>;
       _mostActive = results[3] as DataResult<List<Quote>>;
       _notes = results[4] as DataResult<List<InsightNote>>;
+      _volatility = results[5] as DataResult<VolatilityHistogram>;
+      _momentum = results[6] as DataResult<MomentumTilt>;
+      _volumeSurge = results[7] as DataResult<VolumeSurgeBoard>;
       _loading = false;
     });
     if (!initial) HapticFeedback.mediumImpact();
@@ -109,6 +123,24 @@ class _InsightsTabState extends State<InsightsTab> {
     setState(() => _sentiment = result);
   }
 
+  Future<void> _reloadVolatility() async {
+    final result = await widget.marketData.getVolatility();
+    if (!mounted) return;
+    setState(() => _volatility = result);
+  }
+
+  Future<void> _reloadMomentum() async {
+    final result = await widget.marketData.getMomentum();
+    if (!mounted) return;
+    setState(() => _momentum = result);
+  }
+
+  Future<void> _reloadVolumeSurge() async {
+    final result = await widget.marketData.getVolumeSurge();
+    if (!mounted) return;
+    setState(() => _volumeSurge = result);
+  }
+
   void _openEquity(Quote quote) {
     HapticFeedback.selectionClick();
     Navigator.of(context).push(
@@ -117,6 +149,22 @@ class _InsightsTabState extends State<InsightsTab> {
           symbol: quote.symbol,
           marketData: widget.marketData,
           seed: quote,
+        ),
+      ),
+    );
+  }
+
+  /// Same destination as [_openEquity], for rows that don't carry a full
+  /// [Quote] — the volume-surge leaderboard's rows are symbol + surge +
+  /// close only, so the detail screen fetches its own header data rather
+  /// than being seeded with one.
+  void _openEquityBySymbol(String symbol) {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EquityDetailScreen(
+          symbol: symbol,
+          marketData: widget.marketData,
         ),
       ),
     );
@@ -232,6 +280,30 @@ class _InsightsTabState extends State<InsightsTab> {
               byVolume: true,
               emptyMessage: 'No traded volume reported for this session yet.',
               failedMessage: "Most Active didn't load.",
+            ),
+
+            // ── Section 5: volatility ────────────────────────────────────────
+            // Refreshes at scan cadence, not the 10s live tick — see the
+            // field doc on _volatility.
+            const SizedBox(height: AppSpace.sectionGap),
+            _VolatilitySection(
+              result: _loading ? null : _volatility,
+              onRetry: _reloadVolatility,
+            ),
+
+            // ── Section 6: momentum tilt ─────────────────────────────────────
+            const SizedBox(height: AppSpace.sectionGap),
+            _MomentumSection(
+              result: _loading ? null : _momentum,
+              onRetry: _reloadMomentum,
+            ),
+
+            // ── Section 7: volume-surge leaderboard ──────────────────────────
+            const SizedBox(height: AppSpace.sectionGap),
+            _VolumeSurgeSection(
+              result: _loading ? null : _volumeSurge,
+              onOpen: _openEquityBySymbol,
+              onRetry: _reloadVolumeSurge,
             ),
 
             // ── Desk notes: §13.3's featured-article card + article list ────
@@ -530,5 +602,179 @@ class _MoversSection extends StatelessWidget {
   List<Quote> get _rows {
     final rows = result!.value!;
     return rows.length <= maxRows ? rows : rows.sublist(0, maxRows);
+  }
+}
+
+// ─── Volatility / momentum / volume-surge ─────────────────────────────────
+//
+// Three byproducts of the same scan (backend spec §2), presented as their
+// own independently-failing sections — same "one section's failure doesn't
+// take the desk down" rule the rest of this screen already follows.
+
+class _VolatilitySection extends StatelessWidget {
+  const _VolatilitySection({required this.result, required this.onRetry});
+
+  final DataResult<VolatilityHistogram>? result;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionLabel(
+          label: 'Volatility',
+          trailing: result?.isReady == true
+              ? FreshnessStamp(
+                  asOf: result!.value!.asOf,
+                  stale: result!.stale,
+                )
+              : null,
+        ),
+        if (result == null)
+          const AyreCard(
+            child: SkeletonBlock(height: 96, radius: AppRadius.chip),
+          )
+        else if (result!.isFailed)
+          StatePanel.failed(
+            headline: "Volatility didn't load.",
+            message: 'The other sections on this page are unaffected.',
+            compact: true,
+            onRetry: onRetry,
+          )
+        else if (result!.isEmpty)
+          const StatePanel.empty(
+            headline: 'No volatility reading',
+            message: 'The desk has not published a reading for this session yet.',
+            compact: true,
+          )
+        else
+          AyreCard(
+            padding: const EdgeInsets.all(AppSpace.lg),
+            child: VolatilityBars(buckets: result!.value!.buckets),
+          ),
+      ],
+    );
+  }
+}
+
+class _MomentumSection extends StatelessWidget {
+  const _MomentumSection({required this.result, required this.onRetry});
+
+  final DataResult<MomentumTilt>? result;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionLabel(
+          label: 'Momentum',
+          trailing: result?.isReady == true
+              ? FreshnessStamp(
+                  asOf: result!.value!.asOf,
+                  stale: result!.stale,
+                )
+              : null,
+        ),
+        if (result == null)
+          const AyreCard(
+            padding: EdgeInsets.all(AppSpace.lg),
+            child: Center(
+              child: SkeletonBlock(width: 132, height: 132, radius: 66),
+            ),
+          )
+        else if (result!.isFailed)
+          StatePanel.failed(
+            headline: "Momentum didn't load.",
+            message: 'The other sections on this page are unaffected.',
+            compact: true,
+            onRetry: onRetry,
+          )
+        else if (result!.isEmpty)
+          const StatePanel.empty(
+            headline: 'No momentum reading',
+            message: 'The desk has not published a reading for this session yet.',
+            compact: true,
+          )
+        else
+          AyreCard(
+            padding: const EdgeInsets.all(AppSpace.lg),
+            child: Center(
+              child: BreadthDonut(
+                advances: result!.value!.bullish,
+                declines: result!.value!.bearish,
+                centerLabel: 'BULLISH',
+                primaryLabel: 'Bullish',
+                secondaryLabel: 'Bearish',
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _VolumeSurgeSection extends StatelessWidget {
+  const _VolumeSurgeSection({
+    required this.result,
+    required this.onOpen,
+    required this.onRetry,
+  });
+
+  final DataResult<VolumeSurgeBoard>? result;
+  final ValueChanged<String> onOpen;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SectionLabel(
+          label: 'Volume surge',
+          trailing: result?.isReady == true
+              ? FreshnessStamp(
+                  asOf: result!.value!.asOf,
+                  stale: result!.stale,
+                )
+              : null,
+        ),
+        if (result == null)
+          const AyreCard(
+            padding: EdgeInsets.symmetric(vertical: AppSpace.xs),
+            child: Column(
+              children: [
+                SkeletonTickerRow(),
+                SkeletonTickerRow(),
+                SkeletonTickerRow(),
+              ],
+            ),
+          )
+        else if (result!.isFailed)
+          StatePanel.failed(
+            headline: "Volume Surge didn't load.",
+            message: 'The other sections on this page are unaffected.',
+            compact: true,
+            onRetry: onRetry,
+          )
+        else if (result!.isEmpty)
+          const StatePanel.empty(
+            headline: 'No volume surge',
+            message: 'No stock is trading meaningfully above its 20-day '
+                'average volume right now.',
+            compact: true,
+          )
+        else
+          AyreCard(
+            padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
+            child: VolumeSurgeLeaderboard(
+              rows: result!.value!.rows,
+              onTap: (row) => onOpen(row.symbol),
+            ),
+          ),
+      ],
+    );
   }
 }

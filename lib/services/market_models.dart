@@ -179,6 +179,151 @@ class Sentiment {
   }
 }
 
+/// Full Nifty-500 market breadth (`GET /api/breadth/full`) — a separate,
+/// complete breadth reading from [Sentiment]'s ~140-stock live-tick count.
+/// Refreshes on its own fixed hourly schedule (backend spec §4), not
+/// tick-by-tick, which is why it carries its own [asOf] rather than reusing
+/// the live-refresh cadence the rest of Home polls on.
+class FullBreadth {
+  const FullBreadth({
+    required this.advances,
+    required this.declines,
+    required this.unchanged,
+    required this.avgChangePct,
+    required this.coverage,
+    this.asOf,
+  });
+
+  final int advances;
+  final int declines;
+  final int unchanged;
+  final num avgChangePct;
+
+  /// How many of the ~500 constituents this reading actually covers — shown
+  /// so a partial batch (a few symbols the poller's Fyers call missed) isn't
+  /// silently presented as full-universe breadth.
+  final int coverage;
+  final DateTime? asOf;
+
+  static FullBreadth? tryParse(Map<String, dynamic> json) {
+    final coverage = _num(json, const ['coverage'])?.round();
+    if (coverage == null || coverage <= 0) return null;
+    return FullBreadth(
+      advances: _num(json, const ['advances'])?.round() ?? 0,
+      declines: _num(json, const ['declines'])?.round() ?? 0,
+      unchanged: _num(json, const ['unchanged'])?.round() ?? 0,
+      avgChangePct: _num(json, const ['avg_change_pct']) ?? 0,
+      coverage: coverage,
+      asOf: _asOfStamp(json),
+    );
+  }
+}
+
+/// ATR% distribution across the tracked universe (`GET
+/// /api/insights/volatility`) — how spread-out today's daily ranges are,
+/// bucketed. Refreshes at scan cadence (up to 7×/day), like [MomentumTilt]
+/// and [VolumeSurgeBoard] below — all three are byproducts of the same scan.
+class VolatilityHistogram {
+  const VolatilityHistogram({required this.buckets, this.asOf});
+
+  /// Ordered bucket label → stock count, e.g. {"0-1%": 120, "1-2%": 90, ...}.
+  /// Insertion order is preserved from the backend response, which already
+  /// orders buckets low-to-high.
+  final Map<String, int> buckets;
+  final DateTime? asOf;
+
+  int get total => buckets.values.fold(0, (a, b) => a + b);
+
+  static VolatilityHistogram? tryParse(Map<String, dynamic> json) {
+    final raw = json['buckets'];
+    if (raw is! Map) return null;
+    final buckets = <String, int>{};
+    raw.forEach((key, value) {
+      final n = _num({'v': value}, const ['v']);
+      if (n != null) buckets[key.toString()] = n.round();
+    });
+    if (buckets.isEmpty) return null;
+    return VolatilityHistogram(buckets: buckets, asOf: _asOfStamp(json));
+  }
+}
+
+/// Bullish/bearish MACD tilt across the tracked universe (`GET
+/// /api/insights/momentum`).
+class MomentumTilt {
+  const MomentumTilt({
+    required this.bullish,
+    required this.bearish,
+    this.asOf,
+  });
+
+  final int bullish;
+  final int bearish;
+  final DateTime? asOf;
+
+  int get total => bullish + bearish;
+
+  static MomentumTilt? tryParse(Map<String, dynamic> json) {
+    final bullish = _num(json, const ['bullish'])?.round();
+    final bearish = _num(json, const ['bearish'])?.round();
+    if (bullish == null && bearish == null) return null;
+    return MomentumTilt(
+      bullish: bullish ?? 0,
+      bearish: bearish ?? 0,
+      asOf: _asOfStamp(json),
+    );
+  }
+}
+
+/// One row of the volume-surge leaderboard (`GET
+/// /api/insights/volume-surge`) — today's volume as a multiple of the
+/// 20-day average.
+class VolumeSurgeRow {
+  const VolumeSurgeRow({
+    required this.symbol,
+    required this.surge,
+    this.close,
+  });
+
+  final String symbol;
+
+  /// Multiple of the 20-day average volume — 2.4 means 2.4× normal volume.
+  final num surge;
+  final num? close;
+
+  static VolumeSurgeRow? tryParse(Map<String, dynamic> json) {
+    final symbol = _str(json, const ['symbol']);
+    final surge = _num(json, const ['volume_surge', 'surge']);
+    if (symbol == null || surge == null) return null;
+    return VolumeSurgeRow(
+      symbol: symbol,
+      surge: surge,
+      close: _num(json, const ['close']),
+    );
+  }
+}
+
+/// The volume-surge leaderboard as a whole: the ranked rows plus the batch's
+/// own `as_of` reading. Kept as one wrapper rather than folding `asOf` into
+/// each row — the list has a single timestamp, not a per-row one.
+class VolumeSurgeBoard {
+  const VolumeSurgeBoard({required this.rows, this.asOf});
+
+  final List<VolumeSurgeRow> rows;
+  final DateTime? asOf;
+
+  static VolumeSurgeBoard? tryParse(Map<String, dynamic> json) {
+    final raw = json['items'];
+    if (raw is! List) return null;
+    final rows = <VolumeSurgeRow>[];
+    for (final entry in raw) {
+      if (entry is! Map) continue;
+      final row = VolumeSurgeRow.tryParse(entry.cast<String, dynamic>());
+      if (row != null) rows.add(row);
+    }
+    return VolumeSurgeBoard(rows: rows, asOf: _asOfStamp(json));
+  }
+}
+
 /// A scanner setup on the Signals board.
 class Signal {
   const Signal({
@@ -310,6 +455,61 @@ class InsightNote {
       featured: json['featured'] == true || json['pinned'] == true,
     );
   }
+}
+
+/// Parses the scanner backend's "18 Sep 2026 11:45:12" IST wall-clock
+/// stamps — used by `/api/breadth/full`'s and the `/api/insights/*`
+/// endpoints' `as_of` fields — into a proper [DateTime].
+///
+/// Public (unlike the other parsing helpers below, which are private to this
+/// file) because `market_data_service.dart` needs it too, for
+/// [VolumeSurgeBoard]'s top-level `as_of` — the one case here where a
+/// timestamp sits beside a list rather than inside a model with its own
+/// `tryParse`. Returns null (never throws) for anything that isn't exactly
+/// this format; an ISO-8601 stamp should go through [DateTime.tryParse]
+/// instead, as every other model in this file already does.
+DateTime? parseIstStamp(String raw) {
+  final match = RegExp(
+    r'^(\d{1,2}) (\w{3}) (\d{4}) (\d{2}):(\d{2}):(\d{2})$',
+  ).firstMatch(raw.trim());
+  if (match == null) return null;
+  const months = {
+    'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+    'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12,
+  };
+  final month = months[match.group(2)];
+  final day = int.tryParse(match.group(1)!);
+  final year = int.tryParse(match.group(3)!);
+  final hour = int.tryParse(match.group(4)!);
+  final minute = int.tryParse(match.group(5)!);
+  final second = int.tryParse(match.group(6)!);
+  if (month == null ||
+      day == null ||
+      year == null ||
+      hour == null ||
+      minute == null ||
+      second == null) {
+    return null;
+  }
+  // The backend's stamp is IST wall-clock (UTC+5:30) with no offset suffix —
+  // build the matching UTC instant so `.toLocal()` downstream
+  // (`FreshnessStamp`) shows the correct clock time on any device.
+  return DateTime.utc(
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+  ).subtract(const Duration(hours: 5, minutes: 30));
+}
+
+/// `as_of` reader shared by [FullBreadth], [VolatilityHistogram],
+/// [MomentumTilt] and [VolumeSurgeBoard]'s `tryParse` methods.
+DateTime? _asOfStamp(Map<String, dynamic> json) {
+  final raw = json['as_of'];
+  if (raw is! String) return null;
+  return parseIstStamp(raw) ?? DateTime.tryParse(raw);
 }
 
 // ─── Shared parsing helpers ────────────────────────────────────────────────
