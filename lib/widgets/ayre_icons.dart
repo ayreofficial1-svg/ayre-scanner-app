@@ -54,6 +54,11 @@ enum AyreGlyph {
   instrument,
   equity,
 
+  /// A pedimented bank facade — roofline, three columns, base. New in
+  /// Phase 3: the Bank Nifty index card's glyph (v5 §2.1 / §2A index-card
+  /// table); no existing glyph reads as a bank.
+  bank,
+
   // Status
   disconnected,
   empty,
@@ -423,6 +428,20 @@ class _AyreIconPainter extends CustomPainter {
             ..lineTo(16.5, 9),
           s,
         );
+
+      case AyreGlyph.bank:
+        {
+          final roof = Path()
+            ..moveTo(3.5, 9.5)
+            ..lineTo(12, 4.5)
+            ..lineTo(20.5, 9.5)
+            ..close();
+          c.drawPath(roof, filled ? f : s);
+        }
+        for (final x in const [7.5, 12.0, 16.5]) {
+          c.drawLine(Offset(x, 12.5), Offset(x, 17), s);
+        }
+        c.drawLine(const Offset(4, 19.5), const Offset(20, 19.5), s);
 
       // ── Status ─────────────────────────────────────────────────────────────
       case AyreGlyph.disconnected:

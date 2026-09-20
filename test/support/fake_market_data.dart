@@ -200,6 +200,17 @@ class FakeMarketData implements MarketDataService {
         category: 'Breadth',
         featured: true,
       ),
+      const InsightNote(
+        title: 'Volume confirms the breakout in large-cap lenders',
+        body: 'Turnover ran well above its 20-day average as the sector '
+            'cleared its prior high.',
+        category: 'Volume',
+      ),
+      const InsightNote(
+        title: 'Rate-sensitives hold their ground',
+        body: 'Housing finance and autos absorbed the morning sell-off '
+            'without giving up their trend.',
+      ),
     ]);
   }
 

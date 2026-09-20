@@ -13,6 +13,8 @@ import '../widgets/ayre_charts.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_hills.dart';
 import '../widgets/ayre_icons.dart';
+import '../widgets/ayre_index_art.dart';
+import '../widgets/ayre_insight_carousel.dart';
 import '../widgets/ayre_logo.dart';
 import '../widgets/figure.dart';
 import '../widgets/pressable_scale.dart';
@@ -21,14 +23,15 @@ import '../widgets/state_views.dart';
 import '../widgets/ticker_trace.dart';
 import 'home_shell.dart' show initialsFor;
 import 'index_detail_screen.dart';
+import 'insight_note_screen.dart';
 import 'notifications_screen.dart';
 
 /// Home — the market gateway (Spec §13.1).
 ///
 /// v5 order: greeting header (with the decorative hill ornament behind it) →
-/// **Market Sentiment card** → index board → market-breadth donut → footer
-/// line. The screen's *information* is unchanged from v4 except that the
-/// composite sentiment reading, which used to be a gauge beside the breadth
+/// **Market Sentiment card** → index board → market-breadth donut →
+/// **Market Insight carousel** → footer line. The screen's *information* is
+/// unchanged from v4 except that the composite sentiment reading, which used to be a gauge beside the breadth
 /// donut, is now the top-of-page Market Sentiment card (a bucketed
 /// Bullish/Neutral/Bearish label with a one-line description). The gauge
 /// itself lives on Insights; the donut stays here, in its own card, because
@@ -72,6 +75,11 @@ class _HomeTabState extends State<HomeTab> {
   // volume-surge): polling a cache that only changes hourly would just
   // re-fetch the same numbers.
   DataResult<FullBreadth>? _fullBreadth;
+  // The Market Insight carousel's source: the same admin-curated desk notes
+  // (`/api/insights`) the Insights tab lists. Editorial content that changes
+  // a few times a day at most, so — like `_fullBreadth` — it loads in `_load`
+  // and is left out of `_refreshLive`'s 10s tick.
+  DataResult<List<InsightNote>>? _notes;
   String _accountName = '';
   bool _loading = true;
   Timer? _liveTimer;
@@ -124,6 +132,7 @@ class _HomeTabState extends State<HomeTab> {
     final board = await widget.marketData.getIndexBoard();
     final breadth = await widget.marketData.getSentiment(monthly: false);
     final fullBreadth = await widget.marketData.getFullBreadth();
+    final notes = await widget.marketData.getInsightNotes();
     if (!mounted) return;
 
     final name =
@@ -136,6 +145,7 @@ class _HomeTabState extends State<HomeTab> {
       _board = board;
       _breadth = breadth;
       _fullBreadth = fullBreadth;
+      _notes = notes;
       _loading = false;
     });
     widget.onAccountResolved?.call(name);
@@ -240,21 +250,44 @@ class _HomeTabState extends State<HomeTab> {
               breadthResult: _loading ? null : _fullBreadth,
               onRetry: _load,
             ),
+            // An empty desk omits the card *and* its gap, so Home doesn't end
+            // in a hole; loading and failed still show their own states.
+            if (_showsInsights) ...[
+              const SizedBox(height: AppSpace.sectionGap),
+              Entrance(
+                index: 4,
+                child: _InsightSection(
+                  result: _loading ? null : _notes,
+                  onReadMore: _openInsight,
+                  onRetry: _load,
+                ),
+              ),
+            ],
             const SizedBox(height: AppSpace.sectionGap),
-            const Entrance(index: 4, child: _FooterLine()),
+            const Entrance(index: 5, child: _FooterLine()),
           ],
         ),
       ),
     );
   }
 
+  /// False only when the desk answered with nothing to show.
+  bool get _showsInsights {
+    if (_loading) return true;
+    final notes = _notes;
+    if (notes == null || notes.isFailed) return true;
+    return notes.isReady && notes.value!.isNotEmpty;
+  }
+
+  void _openInsight(InsightNote note) {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => InsightNoteScreen(note: note)),
+    );
+  }
+
   void _openIndex(Quote quote) {
-    final index =
-        IndexId.fromId(quote.symbol) ??
-        IndexId.values.firstWhere(
-          (i) => i.label == quote.name,
-          orElse: () => IndexId.nifty50,
-        );
+    final index = _indexIdFor(quote) ?? IndexId.nifty50;
     HapticFeedback.selectionClick();
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -498,6 +531,18 @@ class _AccountControl extends StatelessWidget {
   }
 }
 
+/// Which of the three known indices a quote is, by symbol and then by label;
+/// null for anything else (a card then takes the neutral identity rather than
+/// borrowing another index's tint).
+IndexId? _indexIdFor(Quote quote) {
+  final bySymbol = IndexId.fromId(quote.symbol);
+  if (bySymbol != null) return bySymbol;
+  for (final candidate in IndexId.values) {
+    if (candidate.label == quote.name) return candidate;
+  }
+  return null;
+}
+
 // ─── Index board ───────────────────────────────────────────────────────────
 
 /// The three instruments. The whole card is the tap target into Index Detail.
@@ -588,6 +633,15 @@ class _IndexBoard extends StatelessWidget {
   }
 }
 
+/// One index card (v5 §2.1): a circular, radial-gradient icon tile + name +
+/// exchange, the LIVE chip opposite, the hero level, the change row, and the
+/// "VIEW CONSTITUENTS" link — on the index's own identity tint (§2A).
+///
+/// **No period tabs and no Open/High/Low row.** The backend supplies neither
+/// for an index (plan §3), so the reference's sparkline slot is an ornament
+/// ([AyreIndexFlourish]) behind the figures — and only while `trace` is empty.
+/// The moment a quote carries a real trace, the flourish is not built and the
+/// sparkline draws beneath the change row as before.
 class _IndexCard extends StatelessWidget {
   const _IndexCard({
     required this.quote,
@@ -606,21 +660,103 @@ class _IndexCard extends StatelessWidget {
     // §12.1: the trace inherits the colour of its subject. This is the one
     // decision that makes the sparkline informative rather than decorative.
     final tone = up ? t.positive : t.negative;
+    final identity = AyreIndexIdentity.of(context, _indexIdFor(quote));
+    final tint = identity.tint;
+    final hasTrace = quote.trace.length >= 2;
+
+    // The level and its change row. Wrapped in the flourish backdrop below
+    // when there is no trace; otherwise laid out bare.
+    final figures = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // The level counts up (§12.3/§15.2) rather than rolling its digits.
+        // `formatPrice` keeps Indian grouping while it counts, so the string
+        // doesn't change shape as it arrives.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: CountUpFigure(
+            value: quote.lastPrice.toDouble(),
+            // Counting a five-figure index level up from zero would be a
+            // slot machine, so it starts within sight of the target — the
+            // exact case `CountUpFigure`'s `from` exists for.
+            from: quote.lastPrice.toDouble() - quote.change.toDouble(),
+            format: (v) => formatPrice(v),
+            fontSize: AppTextScale.hero,
+            color: t.textPrimary,
+            semanticsLabel: '${quote.name} at ${formatPrice(quote.lastPrice)}',
+          ),
+        ),
+        const SizedBox(height: AppSpace.xs),
+        Row(
+          children: [
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  children: [
+                    DeltaFigure(
+                      change: quote.percentChange,
+                      fontSize: AppTextScale.rowLabel,
+                    ),
+                    const SizedBox(width: AppSpace.xs),
+                    Figure(
+                      formatDelta(quote.change, percent: false),
+                      fontSize: AppTextScale.hint,
+                      color: t.foregroundMuted,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpace.sm),
+            // The clock is a non-flex child, so it would otherwise be
+            // measured against unbounded width and push the row over in a
+            // narrow multi-column card at a large text scale. `muted`, not
+            // the usual `subtle`: on the identity tints `subtle` measures
+            // only ~2.6:1.
+            ShrinkTrailing(
+              child: Text(
+                formatClock(quote.asOf),
+                style: AppTypo.valueSmall(t, color: t.foregroundMuted),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
 
     return AyreCard(
       onTap: onTap,
+      color: tint.cardBackground,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              AyreIndexIconTile(glyph: identity.glyph, tint: tint),
+              const SizedBox(width: AppSpace.sm),
               Expanded(
                 flex: 3,
-                child: Text(
-                  quote.name,
-                  style: AppTypo.cardTitle(t),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      quote.name,
+                      style: AppTypo.cardTitle(t),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (identity.exchange != null)
+                      Text(
+                        identity.exchange!,
+                        style: AppTypo.hint(t, color: t.foregroundMuted),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
                 ),
               ),
               // A stale feed renders nothing in this slot — never a "Live"
@@ -641,61 +777,11 @@ class _IndexCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpace.inCardGap),
-          // The level counts up (§12.3/§15.2) rather than rolling its digits.
-          // `formatPrice` keeps Indian grouping while it counts, so the string
-          // doesn't change shape as it arrives.
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: CountUpFigure(
-              value: quote.lastPrice.toDouble(),
-              // Counting a five-figure index level up from zero would be a
-              // slot machine, so it starts within sight of the target — the
-              // exact case `CountUpFigure`'s `from` exists for.
-              from: quote.lastPrice.toDouble() - quote.change.toDouble(),
-              format: (v) => formatPrice(v),
-              fontSize: AppTextScale.hero,
-              color: t.textPrimary,
-              semanticsLabel:
-                  '${quote.name} at ${formatPrice(quote.lastPrice)}',
-            ),
-          ),
-          const SizedBox(height: AppSpace.xs),
-          Row(
-            children: [
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    children: [
-                      DeltaFigure(
-                        change: quote.percentChange,
-                        fontSize: AppTextScale.rowLabel,
-                      ),
-                      const SizedBox(width: AppSpace.xs),
-                      Figure(
-                        formatDelta(quote.change, percent: false),
-                        fontSize: AppTextScale.hint,
-                        color: t.foregroundMuted,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpace.sm),
-              // The clock is a non-flex child, so it would otherwise be
-              // measured against unbounded width and push the row over in a
-              // narrow multi-column card at a large text scale.
-              ShrinkTrailing(
-                child: Text(
-                  formatClock(quote.asOf),
-                  style: AppTypo.valueSmall(t),
-                ),
-              ),
-            ],
-          ),
-          if (quote.trace.length >= 2) ...[
+          if (hasTrace)
+            figures
+          else
+            AyreIndexFlourish(color: tint.trace, child: figures),
+          if (hasTrace) ...[
             const SizedBox(height: AppSpace.inCardGap),
             // Full card width rather than §12.2's fixed 96px sparkline box:
             // this is the card's own trend, not an inline marker beside a row.
@@ -727,7 +813,8 @@ class _IndexCard extends StatelessWidget {
   }
 }
 
-/// The skeleton mirrors the real card's shape, block for block (§14.4).
+/// The skeleton mirrors the real card's shape, block for block (§14.4):
+/// circular tile + two label lines, the level, the change row, the link.
 class _IndexCardSkeleton extends StatelessWidget {
   const _IndexCardSkeleton();
 
@@ -737,16 +824,66 @@ class _IndexCardSkeleton extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SkeletonBlock(width: 96, height: 15),
+          Row(
+            children: [
+              SkeletonBlock(width: 44, height: 44, radius: AppRadius.circle),
+              SizedBox(width: AppSpace.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SkeletonBlock(width: 96, height: 15),
+                    SizedBox(height: AppSpace.xxs),
+                    SkeletonBlock(width: 36, height: 11),
+                  ],
+                ),
+              ),
+            ],
+          ),
           SizedBox(height: AppSpace.inCardGap),
           SkeletonBlock(width: 170, height: 34, radius: AppRadius.inset),
           SizedBox(height: AppSpace.xs),
           SkeletonBlock(width: 140, height: 12),
           SizedBox(height: AppSpace.inCardGap),
-          SkeletonBlock(height: 36, radius: AppRadius.inset),
+          SkeletonBlock(width: 110, height: 11),
         ],
       ),
     );
+  }
+}
+
+// ─── Market Insight ────────────────────────────────────────────────────────
+
+/// The carousel's loading / failed / ready states. An empty desk never gets
+/// here — `HomeTab` omits the whole section instead.
+class _InsightSection extends StatelessWidget {
+  const _InsightSection({
+    required this.result,
+    required this.onReadMore,
+    required this.onRetry,
+  });
+
+  final DataResult<List<InsightNote>>? result;
+  final ValueChanged<InsightNote> onReadMore;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = result;
+    if (r == null) return const AyreInsightSkeleton();
+
+    if (r.isFailed) {
+      return StatePanel.failed(
+        headline: "Market insight didn't load",
+        message: 'The rest of the page is unaffected.',
+        compact: true,
+        onRetry: onRetry,
+      );
+    }
+
+    final notes = r.value;
+    if (notes == null || notes.isEmpty) return const SizedBox.shrink();
+    return AyreInsightCarousel(notes: notes, onReadMore: onReadMore);
   }
 }
 
