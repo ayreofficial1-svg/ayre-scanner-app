@@ -2,23 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// ─── "v4" — calm, editorial, premium ───────────────────────────────────────
+// ─── "v5" — forest-green, emerald, mint-paper ──────────────────────────────
 //
-// The base hue family is deliberately WARM: off-white paper and soft charcoal
-// surfaces, not the previous identity's cool graphite/ink. One accent —
-// clay/terracotta — shifts warmer and darker in light mode rather than
-// staying fixed across themes. Sage (positive), rose (negative) and gold
-// (neutral/attention) sit alongside it as a fixed four-colour semantic set;
-// there is no separate "info" role and no highlight-fill card pattern —
-// emphasis comes from an accent-tinted border on a card, never a solid tint
-// fill behind it.
+// v5 retires v4's warm clay/terracotta identity for a cool, deep
+// forest-green ink and a bright, saturated emerald accent. The light theme's
+// canvas is a pale, cool mint-white paper (never pure white/gray); the dark
+// theme's canvas is near-black with a green cast (never pure black/gray).
+// Positive (gain) and negative (loss) are genuine saturated green/red again
+// — not v4's muted sage/rose — reserved for actual gain/loss figures and
+// glyphs; neutral/attention stays a muted gold/amber, never a button fill,
+// never navigation, never brand.
 //
-// Two structural surfaces sit either side of `surface`, not three ascending
-// steps plus a separate "terminal readout" panel: `surfaceRaised` (a tile
-// lifted slightly off the card) and `surfaceSunken` (an inset track/fill
-// recessed into the card). Unlike the previous identity, v4 re-introduces
-// soft, two-layer shadows for elevation — flat/no-shadow was a rule of the
-// identity this replaces, not a rule of this one.
+// Two structural surfaces still sit either side of `surface`: `surfaceRaised`
+// (a tile lifted slightly off the card) and `surfaceSunken` (an inset
+// track/fill recessed into the card). The soft, two-layer shadows v4
+// introduced are kept — flat/no-shadow is not a v5 rule either.
 @immutable
 class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   const AppThemeTokens({
@@ -47,8 +45,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     required this.skeleton,
   });
 
-  /// App canvas: warm off-white paper in light, soft near-black charcoal in
-  /// dark.
+  /// App canvas: pale, cool mint-white paper in light; near-black with a
+  /// green cast in dark. Never pure white/gray (light) or pure black/gray
+  /// (dark).
   final Color background;
 
   /// The default card/panel fill, one step off [background].
@@ -63,37 +62,45 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   /// readout region). Sibling of [surfaceRaised] — see that field's note.
   final Color surfaceSunken;
 
-  /// The single brand/identity accent: clay/terracotta. No longer
-  /// theme-invariant — it shifts warmer and darker in light mode. Used for
-  /// the primary control, selected states, and featured-card accent edges.
+  /// The primary brand/identity accent: forest-green/emerald. Not
+  /// theme-invariant — brighter and more saturated in dark mode so it still
+  /// reads as the loudest color against a near-black field. Used for
+  /// "Bullish" text, up-arrows, the NIFTY trace, primary buttons, active nav
+  /// elements, and links.
   final Color accent;
 
-  /// A darkened accent variant for small type-weight use (links, selected
-  /// labels, small icons) where the raw [accent] value doesn't clear 4.5:1 as
-  /// text on its theme's surfaces. See the Phase 0 contrast pass in
-  /// `AYRE_REDESIGN_V4_PLAN.md` §7 item 5 — this is only populated where the
-  /// raw accent actually fails; where it already passes, this equals
-  /// [accent].
+  /// A darkened (light theme) / lightened (dark theme) accent variant for
+  /// small type-weight use (links, selected labels) where the raw [accent]
+  /// value doesn't clear 4.5:1 as text on its theme's surfaces — verified
+  /// numerically in the v5 Phase 0 contrast pass; only populated where the
+  /// raw accent actually differs from a passing value.
   final Color accentInk;
 
   /// Accent held back for large, low-emphasis fills.
   final Color accentSoft;
 
-  /// Text on an [accent] fill. The accent sits at a mid lightness in both
-  /// themes, so a dark ink — not inverted white — clears contrast; verified
-  /// numerically, not assumed.
+  /// Text/icon on an [accent] fill — white in light (accent is mid-dark
+  /// there), near-black ink in dark (accent is bright/mid-light there);
+  /// verified numerically per theme, not assumed to be the same choice in
+  /// both.
   final Color onAccent;
 
-  /// Positive/gain. Sage — muted, not a saturated market green.
+  /// Positive/gain. Same hue family as [accent] — a genuine saturated
+  /// market green, kept as its own field per the token contract (a screen
+  /// may want brand-accent and gain-color to diverge later), and no longer
+  /// v4's muted sage.
   final Color positive;
   final Color positiveSoft;
 
-  /// Negative/loss. Muted rose — never the previous identity's bright red.
+  /// Negative/loss. A clear, saturated red — distinct from any card's own
+  /// warm identity tint (e.g. the SENSEX card's coral, which is never a
+  /// loss signal), and no longer v4's muted rose.
   final Color negative;
   final Color negativeSoft;
 
-  /// Neutral/attention. Muted gold — the LIVE dot, delayed/stale chips,
-  /// offline notices. Never a button fill, never navigation, never brand.
+  /// Neutral/attention (e.g. a flat/unchanged badge). Muted gold/amber —
+  /// never a button fill, never navigation, never brand. (The LIVE
+  /// indicator itself moved to [positive] in v5 — see the LIVE-chip spec.)
   final Color neutral;
   final Color neutralSoft;
 
@@ -222,6 +229,108 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
 
 extension AppThemeContext on BuildContext {
   AppThemeTokens get tokens => Theme.of(this).extension<AppThemeTokens>()!;
+}
+
+// ─── Index-card identity tints ──────────────────────────────────────────────
+// Not `AppThemeTokens` fields (redesign plan §2A / Phase 0 step 6): each Home
+// index card — and anywhere else an index is represented as a card, e.g.
+// `index_detail_screen.dart`'s header — carries its own fixed light/dark
+// identity tint, independent of theme *semantics* and never a stand-in for
+// gain/loss color. This is the single shared lookup; consume it from both
+// `home_tab.dart` and `index_detail_screen.dart` rather than duplicating the
+// table.
+
+/// One index's identity tint pair for a single brightness. Purely
+/// decorative — never swap these in for [AppThemeTokens.positive] /
+/// [AppThemeTokens.negative].
+@immutable
+class AppIndexTint {
+  const AppIndexTint({
+    required this.cardBackground,
+    required this.iconGradientCenter,
+    required this.iconGradientEdge,
+    required this.trace,
+    required this.activePeriodTabFill,
+  });
+
+  /// Card background fill.
+  final Color cardBackground;
+
+  /// Icon-tile radial-gradient center stop (lighter). See
+  /// [AppRadius]'s "icon-tile shape override" note — this is the one icon
+  /// tile in the app that's circular rather than a rounded square.
+  final Color iconGradientCenter;
+
+  /// Icon-tile radial-gradient edge stop (darker).
+  final Color iconGradientEdge;
+
+  /// Sparkline trace / icon glyph color.
+  final Color trace;
+
+  /// Active period-tab (1D/1W/1M/1Y) pill fill, a deeper shade of the
+  /// card's own tint.
+  final Color activePeriodTabFill;
+}
+
+/// Which index a card represents, for [AppIndexTints] lookup. Extend with a
+/// new case here — and a matching entry in [AppIndexTints.light]/[dark] —
+/// if a fourth index is ever added; never reuse an existing index's tint.
+enum AppIndexId { nifty50, sensex, bankNifty }
+
+/// The fixed light/dark [AppIndexTint] pair for each [AppIndexId].
+abstract final class AppIndexTints {
+  static const Map<AppIndexId, AppIndexTint> light = {
+    AppIndexId.nifty50: AppIndexTint(
+      cardBackground: Color(0xFFE7F3E8),
+      iconGradientCenter: Color(0xFFDFF0E2),
+      iconGradientEdge: Color(0xFFB8DEC0),
+      trace: Color(0xFF2E9E5B),
+      activePeriodTabFill: Color(0xFFC9E4CE),
+    ),
+    AppIndexId.sensex: AppIndexTint(
+      cardBackground: Color(0xFFFBEAE4),
+      iconGradientCenter: Color(0xFFFAE2D8),
+      iconGradientEdge: Color(0xFFEEC3AF),
+      trace: Color(0xFFD97757),
+      activePeriodTabFill: Color(0xFFF3D2C3),
+    ),
+    AppIndexId.bankNifty: AppIndexTint(
+      cardBackground: Color(0xFFE6EEF7),
+      iconGradientCenter: Color(0xFFDCEAF6),
+      iconGradientEdge: Color(0xFFB9D3EB),
+      trace: Color(0xFF4A79B5),
+      activePeriodTabFill: Color(0xFFCBE0F3),
+    ),
+  };
+
+  static const Map<AppIndexId, AppIndexTint> dark = {
+    AppIndexId.nifty50: AppIndexTint(
+      cardBackground: Color(0xFF14251A),
+      iconGradientCenter: Color(0xFF25452F),
+      iconGradientEdge: Color(0xFF15291C),
+      trace: Color(0xFF4ED892),
+      activePeriodTabFill: Color(0xFF255436),
+    ),
+    AppIndexId.sensex: AppIndexTint(
+      cardBackground: Color(0xFF2A1B14),
+      iconGradientCenter: Color(0xFF4A2E1F),
+      iconGradientEdge: Color(0xFF2C1911),
+      trace: Color(0xFFE08A63),
+      activePeriodTabFill: Color(0xFF5A3624),
+    ),
+    AppIndexId.bankNifty: AppIndexTint(
+      cardBackground: Color(0xFF131E2A),
+      iconGradientCenter: Color(0xFF213D57),
+      iconGradientEdge: Color(0xFF122333),
+      trace: Color(0xFF6FA8E0),
+      activePeriodTabFill: Color(0xFF29476A),
+    ),
+  };
+
+  /// Look up [id]'s tint for the current [brightness]. Switches the same
+  /// way the rest of the app already themes conditionally.
+  static AppIndexTint of(AppIndexId id, Brightness brightness) =>
+      (brightness == Brightness.dark ? dark : light)[id]!;
 }
 
 // ─── Radii ─────────────────────────────────────────────────────────────────
@@ -618,74 +727,85 @@ abstract final class AppTypo {
 abstract final class AppTheme {
   static const Color transparent = Color(0x00000000);
 
-  // Dark — `#100F14` canvas, warm off-white text. Not a re-tint of the
-  // previous cool "Slate" dark theme; every surface, text and accent value
-  // below is authored fresh from the Spec.
+  // Dark — near-black-green canvas (`#0B120D`), soft off-white text with a
+  // faint green cast. Not a re-tint of v4's warm `#100F14` dark theme; every
+  // surface, text and accent value below is authored fresh from the v5 spec
+  // (redesign plan §2A).
   static const _dark = AppThemeTokens(
-    background: Color(0xFF100F14),
-    surface: Color(0xFF17161D),
-    surfaceRaised: Color(0xFF211F28),
-    surfaceSunken: Color(0xFF0B0A0F),
-    accent: Color(0xFFD26A4C),
-    // Raw accent already clears 4.5:1 as small text on both `background` and
-    // `surface` in dark mode (~5.3–5.9:1 numerically) — no separate ink
-    // variant needed here; see the light-theme value below for the case
-    // where one is.
-    accentInk: Color(0xFFD26A4C),
-    accentSoft: Color(0xFFE09A82),
-    // Deliberately dark: the accent sits at a mid lightness, so inverted
-    // white button text under-performs (~3.5:1) where a dark warm ink clears
-    // ~5.9:1.
-    onAccent: Color(0xFF1F0F08),
-    positive: Color(0xFF93B59A),
-    positiveSoft: Color(0xFFA9C7B0),
-    negative: Color(0xFFC97E72),
-    negativeSoft: Color(0xFFD7A299),
-    neutral: Color(0xFFD9C79A),
-    neutralSoft: Color(0x24D9C79A),
-    textPrimary: Color(0xFFF3ECE0),
-    foregroundMuted: Color(0xFF9495A3),
-    foregroundSubtle: Color(0xFF6A6B78),
-    textDisabled: Color(0x806A6B78),
-    hairline: Color(0x0FFFFFFF),
-    navHairline: Color(0x14FFFFFF),
-    shadowColor: Color(0xFF030305),
-    navBg: Color(0xFF13121A),
-    skeleton: Color(0xFF211F28),
+    background: Color(0xFF0B120D),
+    surface: Color(0xFF121A14),
+    surfaceRaised: Color(0xFF1B261E),
+    surfaceSunken: Color(0xFF080D09),
+    accent: Color(0xFF3FCB7A),
+    // Raw accent already clears 4.5:1 as small text on both `background`
+    // and `surface` in dark mode (~10.6:1 / ~9.9:1 numerically) — no
+    // contrast-driven ink swap needed; `accentInk` below is still a
+    // distinct, lighter value per the spec table for link/selected-label
+    // use, not a failure fix.
+    accentInk: Color(0xFF59D98C),
+    accentSoft: Color(0xFF1E3B29),
+    // Dark ink text: accent sits at a bright/mid-light lightness in dark
+    // mode, so an inverted near-black ink clears ~9.1:1 where white would
+    // under-perform.
+    onAccent: Color(0xFF06130A),
+    positive: Color(0xFF4ED892),
+    positiveSoft: Color(0xFF16301F),
+    negative: Color(0xFFF0685F),
+    negativeSoft: Color(0xFF3A1917),
+    neutral: Color(0xFFE0B563),
+    neutralSoft: Color(0x24E0B563),
+    textPrimary: Color(0xFFEDF5EE),
+    foregroundMuted: Color(0xFF9FB0A4),
+    foregroundSubtle: Color(0xFF67766C),
+    textDisabled: Color(0x8067766C),
+    hairline: Color(0x14CFE8D5),
+    navHairline: Color(0x1FCFE8D5),
+    shadowColor: Color(0xFF000000),
+    navBg: Color(0xFF101911),
+    skeleton: Color(0xFF1B261E),
   );
 
-  // Light — `#F6F0E6` warm paper canvas. Not a re-tint of the previous cool
-  // "Fogpaper" light theme; every surface, text and accent value below is
-  // authored fresh from the Spec.
+  // Light — pale, cool mint-white paper canvas (`#F1F7F1`), deep
+  // near-black forest-green ink text. Not a re-tint of v4's warm `#F6F0E6`
+  // light theme; every surface, text and accent value below is authored
+  // fresh from the v5 spec (redesign plan §2A).
   static const _light = AppThemeTokens(
-    background: Color(0xFFF6F0E6),
-    surface: Color(0xFFFEFCF7),
-    surfaceRaised: Color(0xFFF1EADD),
-    surfaceSunken: Color(0xFFECE3D4),
-    accent: Color(0xFFC75F43),
-    // Raw accent measures ~3.8:1 as small text on the light surfaces — fails
-    // AA. This is a darkened variant of the same hue (same ~13° hue / ~54%
-    // saturation, lightness pulled down) that clears ~6.7:1. Numerically
-    // derived for Phase 0; treat as provisional pending visual QA against
-    // the actual design tool value in Phase 1.
-    accentInk: Color(0xFF954329),
-    accentSoft: Color(0xFFD88A6E),
-    onAccent: Color(0xFF1F0F08),
-    positive: Color(0xFF5E8A66),
-    positiveSoft: Color(0xFF7FA885),
-    negative: Color(0xFFB05A4C),
-    negativeSoft: Color(0xFFC97E72),
-    neutral: Color(0xFF9A883E),
-    neutralSoft: Color(0x249A883E),
-    textPrimary: Color(0xFF1A1A22),
-    foregroundMuted: Color(0xFF5F606B),
-    foregroundSubtle: Color(0xFF8A8B95),
-    textDisabled: Color(0x808A8B95),
-    hairline: Color(0x0F1A1A22),
-    navHairline: Color(0x141A1A22),
-    shadowColor: Color(0xFFB39980),
-    navBg: Color(0xFFFEFCF7),
-    skeleton: Color(0xFFF1EADD),
+    background: Color(0xFFF1F7F1),
+    surface: Color(0xFFFFFFFF),
+    surfaceRaised: Color(0xFFE9F2E9),
+    surfaceSunken: Color(0xFFE1EDE1),
+    accent: Color(0xFF1F8A4B),
+    // Raw accent measures ~4.0:1 / ~4.4:1 as small text on
+    // `background`/`surface` in light mode — fails AA. `accentInk` is a
+    // darkened variant of the same hue that clears ~6.0:1 / ~6.6:1,
+    // verified numerically for Phase 0.
+    accentInk: Color(0xFF166B3A),
+    accentSoft: Color(0xFFCFE8D8),
+    // White text on `accent` measures ~4.38:1 — a hair under the 4.5:1 AA
+    // threshold for normal-size text. (Button labels render at 14px/700,
+    // below the ~18.66px-bold "large text" cutoff, so the 3:1 large-text
+    // allowance doesn't apply either.) White is already the maximum
+    // achievable luminance for this role, so no local change to `onAccent`
+    // can close the gap, and `accent` itself is canonical per the plan's
+    // guardrails — not to be substituted. Flagged here per Phase 0 step 3
+    // rather than silently changed; left as specified pending design
+    // review.
+    onAccent: Color(0xFFFFFFFF),
+    positive: Color(0xFF1F8A4B),
+    positiveSoft: Color(0xFFDCEEE0),
+    negative: Color(0xFFD64545),
+    negativeSoft: Color(0xFFF7DCDC),
+    neutral: Color(0xFFC98A2D),
+    neutralSoft: Color(0x24C98A2D),
+    textPrimary: Color(0xFF16211B),
+    foregroundMuted: Color(0xFF5B6B60),
+    foregroundSubtle: Color(0xFF8B968E),
+    textDisabled: Color(0x808B968E),
+    hairline: Color(0x141A2E22),
+    navHairline: Color(0x1F1A2E22),
+    shadowColor: Color(0xFFB9CBBB),
+    navBg: Color(0xFFFFFFFF),
+    skeleton: Color(0xFFE7EEE8),
   );
 
   static AppThemeTokens get lightTokens => _light;
