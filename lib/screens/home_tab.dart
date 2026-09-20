@@ -8,8 +8,10 @@ import '../services/market_data_service.dart';
 import '../services/market_models.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ayre_avatar.dart';
 import '../widgets/ayre_charts.dart';
 import '../widgets/ayre_components.dart';
+import '../widgets/ayre_hills.dart';
 import '../widgets/ayre_icons.dart';
 import '../widgets/ayre_logo.dart';
 import '../widgets/figure.dart';
@@ -23,25 +25,25 @@ import 'notifications_screen.dart';
 
 /// Home — the market gateway (Spec §13.1).
 ///
-/// Rebuilt in Phase 5 against §13.1's own list: greeting header with a theme
-/// toggle, the index strip, a breadth donut, a sentiment gauge, and a footer
-/// line. The screen's *information* is unchanged from v3 — the same board, the
-/// same breadth reading — but almost every component rendering it is new, and
-/// three v3 devices are gone for good:
+/// v5 order: greeting header (with the decorative hill ornament behind it) →
+/// **Market Sentiment card** → index board → market-breadth donut → footer
+/// line. The screen's *information* is unchanged from v4 except that the
+/// composite sentiment reading, which used to be a gauge beside the breadth
+/// donut, is now the top-of-page Market Sentiment card (a bucketed
+/// Bullish/Neutral/Bearish label with a one-line description). The gauge
+/// itself lives on Insights; the donut stays here, in its own card, because
+/// it is the only surface showing the full Nifty-500 advance/decline split.
+///
+/// Devices retired in earlier phases and still gone:
 ///
 /// * **The ink readout panel.** v3 sat each index's live figures on a dark
-///   "terminal feed" plate. v4 has no such concept (`inkPanel`/`onInkPanel`
-///   were retired in Phase 0); the figures sit on the card, and what marks
+///   "terminal feed" plate. The figures sit on the card, and what marks
 ///   them as live is the LIVE chip and the trace, not a plate behind them.
 /// * **The bespoke breadth ring.** `_BreadthRing`/`_RingPainter` were a
-///   private, one-screen donut written before there was a shared one. Phase 3
-///   built `BreadthDonut` to §12.2; this screen now uses it and the private
-///   pair is deleted rather than kept as a near-duplicate.
-/// * **The inlined direction rendering.** `_BreadthFigure` did its own
-///   caret-plus-tinted-count layout, which is exactly what §20.7 says must be
-///   one reused component. Advances/declines now read through the donut's own
-///   labelled legend, and `DirectionBadge` carries direction wherever a badge
-///   is what's wanted.
+///   private, one-screen donut written before there was a shared one. This
+///   screen uses `BreadthDonut`.
+/// * **The inlined direction rendering.** `DirectionBadge` carries direction
+///   wherever a badge is what's wanted.
 class HomeTab extends StatefulWidget {
   const HomeTab({
     super.key,
@@ -177,18 +179,41 @@ class _HomeTabState extends State<HomeTab> {
             120,
           ),
           children: [
-            SafeArea(
-              bottom: false,
-              child: Entrance(
-                child: _Header(
-                  name: displayName,
-                  onOpenProfile: widget.onOpenProfile,
+            // The hills are the header's backdrop, not part of its layout:
+            // positioned to the page's top-right corner (past the list
+            // padding, so they bleed to the viewport edge) and painted first.
+            // `Stack` sizes to the SafeArea child alone.
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Positioned(
+                  top: -AppSpace.pageTop,
+                  right: -AppSpace.pageHorizontal,
+                  child: AyreHills(),
                 ),
-              ),
+                SafeArea(
+                  bottom: false,
+                  child: Entrance(
+                    child: _Header(
+                      name: displayName,
+                      onOpenProfile: widget.onOpenProfile,
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: AppSpace.sectionGap),
             Entrance(
               index: 1,
+              child: _SentimentCard(
+                sentimentResult: _loading ? null : _breadth,
+                breadthResult: _loading ? null : _fullBreadth,
+                onRetry: _load,
+              ),
+            ),
+            const SizedBox(height: AppSpace.sectionGap),
+            Entrance(
+              index: 2,
               child: SectionLabel(
                 label: 'Index board',
                 trailing: _board?.isReady == true
@@ -208,16 +233,15 @@ class _HomeTabState extends State<HomeTab> {
             ),
             const SizedBox(height: AppSpace.sectionGap),
             Entrance(
-              index: 2,
+              index: 3,
               child: const SectionLabel(label: 'Market breadth'),
             ),
             _BreadthCard(
-              sentimentResult: _loading ? null : _breadth,
               breadthResult: _loading ? null : _fullBreadth,
               onRetry: _load,
             ),
             const SizedBox(height: AppSpace.sectionGap),
-            const Entrance(index: 3, child: _FooterLine()),
+            const Entrance(index: 4, child: _FooterLine()),
           ],
         ),
       ),
@@ -246,6 +270,15 @@ class _HomeTabState extends State<HomeTab> {
 
 // ─── Header ────────────────────────────────────────────────────────────────
 
+/// Time-of-day salutation from the device clock. Local time, three buckets —
+/// there's no server-side notion of the user's morning to defer to.
+String _greetingFor(DateTime now) {
+  final h = now.hour;
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
 class _Header extends StatelessWidget {
   const _Header({required this.name, required this.onOpenProfile});
 
@@ -256,6 +289,7 @@ class _Header extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final resolved = name.trim();
+    final greeting = _greetingFor(DateTime.now());
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -277,10 +311,44 @@ class _Header extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(height: AppSpace.xs),
+              // §2.1's hierarchy: a lighter, smaller salutation over the
+              // name, which is the boldest, largest text in the header. Both
+              // are existing scale steps (`featuredHeadline` / `page`) — no
+              // new type role. With no name yet, the salutation stands alone
+              // at title size rather than dangling a comma.
+              if (resolved.isEmpty)
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(greeting, style: AppTypo.pageTitle(t)),
+                )
+              else ...[
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '$greeting,',
+                    style: AppTypo.display(
+                      fontSize: AppTextScale.featuredHeadline,
+                      fontWeight: FontWeight.w500,
+                      color: t.textPrimary,
+                      height: 1.2,
+                      letterSpacing: -0.4,
+                    ),
+                  ),
+                ),
+                Text(
+                  resolved,
+                  style: AppTypo.pageTitle(t),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
               const SizedBox(height: AppSpace.xxs),
               Text(
-                resolved.isEmpty ? 'Hi there' : 'Hi, $resolved',
-                style: AppTypo.pageTitle(t),
+                'Discipline today. A better tomorrow.',
+                style: AppTypo.body(t),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -341,9 +409,11 @@ class _ThemeToggle extends StatelessWidget {
   }
 }
 
-/// Header controls: a rounded-square tile with a hairline edge (§7 — icon
-/// tiles are rounded squares, never circles), sized to the 44pt floor rather
-/// than the 40px this used to be.
+/// Header controls (v5 §2A, "Circular header icon buttons"): flat 44pt
+/// circles — `surface` (white) in light, `surfaceRaised` in dark — with a
+/// `textPrimary` glyph and, for the bell, a `negative` unread dot. A circle
+/// is the spec'd exception to the rounded-square icon-tile rule here;
+/// no gradient, no shadow.
 class _HeaderControl extends StatelessWidget {
   const _HeaderControl({
     required this.glyph,
@@ -360,41 +430,42 @@ class _HeaderControl extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final fill = dark ? t.surfaceRaised : t.surface;
     return Semantics(
       button: true,
       label: label,
       child: PressableScale(
         onTap: onTap,
-        borderRadius: AppRadius.iconTile,
+        borderRadius: AppRadius.circle,
         child: Container(
           height: 44,
           width: 44,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: t.surface,
-            borderRadius: BorderRadius.circular(AppRadius.iconTile),
+            color: fill,
+            shape: BoxShape.circle,
             border: Border.all(color: t.hairline),
           ),
           child: Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.center,
             children: [
-              AyreIcon(glyph, size: 18, color: t.foregroundMuted),
+              AyreIcon(glyph, size: 18, color: t.textPrimary),
               if (badge)
                 Positioned(
                   top: 2,
                   right: 2,
                   child: Container(
-                    height: 7,
-                    width: 7,
+                    height: 8,
+                    width: 8,
                     decoration: BoxDecoration(
-                      // v4 has no "info" accent (retired in Phase 0). An
-                      // unread marker is the brand asking for attention, not a
-                      // market signal, so it takes the accent — not `neutral`,
-                      // which is reserved for delayed/offline states.
-                      color: t.accent,
+                      // An unread marker is an alert: the true-red `negative`
+                      // token, ringed in the button's own fill so it reads as
+                      // a dot sitting on the circle.
+                      color: t.negative,
                       shape: BoxShape.circle,
-                      border: Border.all(color: t.surface, width: 1.5),
+                      border: Border.all(color: fill, width: 1.5),
                     ),
                   ),
                 ),
@@ -414,33 +485,14 @@ class _AccountControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
     return Semantics(
       button: true,
       label: 'Profile',
       child: PressableScale(
         onTap: onTap,
         borderRadius: AppRadius.circle,
-        child: Container(
-          height: 44,
-          width: 44,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: t.surfaceRaised,
-            // The one circle §7 allows alongside the toggle knob: this is an
-            // avatar, not an icon tile.
-            shape: BoxShape.circle,
-            border: Border.all(color: t.hairline),
-          ),
-          child: Text(
-            initialsFor(name),
-            style: AppTypo.ui(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: t.textPrimary,
-            ),
-          ),
-        ),
+        // The identity-accent chip (lavender/plum), never brand green.
+        child: AyreAvatar(initials: initialsFor(name)),
       ),
     );
   }
@@ -571,19 +623,21 @@ class _IndexCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: AppSpace.sm),
-              ShrinkTrailing(
-                child: stale
-                    ? const AyreChip(
-                        label: 'Delayed',
-                        tone: ChipTone.attention,
-                      )
-                    : const AyreChip(
-                        label: 'Live',
-                        tone: ChipTone.live,
-                        pulse: true,
-                      ),
-              ),
+              // A stale feed renders nothing in this slot — never a "Live"
+              // chip it hasn't earned, and never the word "Delayed" (§4).
+              // Omitted outright rather than a `SizedBox.shrink()` inside
+              // `ShrinkTrailing`: same result, without a zero-size
+              // `FittedBox` child or a dangling gap.
+              if (!stale) ...[
+                const SizedBox(width: AppSpace.sm),
+                const ShrinkTrailing(
+                  child: AyreChip(
+                    label: 'Live',
+                    tone: ChipTone.live,
+                    pulse: true,
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: AppSpace.inCardGap),
@@ -696,63 +750,287 @@ class _IndexCardSkeleton extends StatelessWidget {
   }
 }
 
-// ─── Breadth ───────────────────────────────────────────────────────────────
+// ─── Market Sentiment ──────────────────────────────────────────────────────
 
-/// Market breadth (§13.1): the full Nifty-500 advance/decline split as a
-/// donut, with the composite sentiment reading beside it as a gauge.
+/// The three buckets a 0–100 sentiment score is read into.
 ///
-/// The two charts answer different questions and §13.1 asks for both, so they
-/// sit side by side rather than one being demoted to a figure the way v3 did:
-/// the donut says *how many* went each way, the gauge says *how the desk reads
-/// it*. Stacked on a phone, paired once there's width for it.
+/// Breakpoints are **< 35 bearish · 35–64 neutral · ≥ 65 bullish** — the same
+/// cut points `Sentiment.band` (Caution / Neutral / Strong) and the Insights
+/// gauge's directional tone already use, so the same score never reads as two
+/// different moods on two tabs.
+enum _Mood { bullish, neutral, bearish }
+
+_Mood _moodFor(int score) => switch (score) {
+  < 35 => _Mood.bearish,
+  < 65 => _Mood.neutral,
+  _ => _Mood.bullish,
+};
+
+/// Component-specific colors for the Market Sentiment card (v5 §2A component
+/// table). Not `AppThemeTokens` fields — Phase 0 forbids adding any — so they
+/// live beside the one widget that consumes them. The bucket word/arrow
+/// deliberately do *not* appear here: those reuse `positive`/`neutral`/
+/// `negative` per the spec.
+abstract final class _SentimentCardColors {
+  static const List<Color> gradientLight = [
+    Color(0xFFDCEEDF),
+    Color(0xFFEAF5EC),
+  ];
+  static const List<Color> gradientDark = [
+    Color(0xFF14251A),
+    Color(0xFF0F1D15),
+  ];
+  static const Color labelLight = Color(0xFF4F6357);
+  static const Color labelDark = Color(0xFF9FB0A4);
+  static const Color descriptionLight = Color(0xFF64766B);
+  static const Color descriptionDark = Color(0xFF9FB0A4);
+}
+
+/// The top-of-page Market Sentiment card (§2.1): a small icon + label, the
+/// bucketed reading set large and bold with a directional glyph, and a
+/// one-line description.
 ///
-/// **Two independent sources, one card (backend spec §4).** The donut used to
-/// read `advances`/`declines` off the same `Sentiment` object the gauge
-/// reads — a live tick across only the ~140 stocks Home's own board and
-/// movers lists already touch. It now reads [FullBreadth]
-/// (`GET /api/breadth/full`), a separate hourly poll across the entire
-/// Nifty 500. The two can therefore be ready, empty or failed independently,
-/// and each slot degrades on its own rather than one section's failure
-/// blanking the whole card — same rule Insights already follows for its own
-/// multi-source sections.
-class _BreadthCard extends StatelessWidget {
-  const _BreadthCard({
+/// **Everything on it is real.** The bucket comes from the `/api/sentiment`
+/// 0–100 score. The description is, in order of preference: the feed's own
+/// `note` when there is one; else "X of Y stocks advancing" from the real
+/// advance/decline counts (the sentiment feed's own live-tick counts first,
+/// the full Nifty-500 breadth second); else a generic line that states no
+/// numbers. It never implies data the API didn't return.
+///
+/// Neutral carries no glyph, matching `DirectionBadge`'s convention for a
+/// flat reading: the word itself is the non-color channel.
+class _SentimentCard extends StatelessWidget {
+  const _SentimentCard({
     required this.sentimentResult,
     required this.breadthResult,
     required this.onRetry,
   });
 
   final DataResult<Sentiment>? sentimentResult;
+
+  /// Only consulted for the description fallback — never for the bucket.
+  final DataResult<FullBreadth>? breadthResult;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final result = sentimentResult;
+    if (result == null) return const _SentimentSkeleton();
+
+    if (result.isFailed) {
+      return StatePanel.failed(
+        headline: "Sentiment didn't load",
+        message: 'The index levels below are unaffected.',
+        compact: true,
+        onRetry: onRetry,
+      );
+    }
+
+    final sentiment = result.value;
+    if (sentiment == null) {
+      return const StatePanel.empty(
+        headline: 'No sentiment reading yet',
+        message: 'The overall market mood appears once the session is under way.',
+        compact: true,
+      );
+    }
+
+    final t = context.tokens;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final (String word, Color tone, AyreGlyph? glyph) = switch (_moodFor(
+      sentiment.score,
+    )) {
+      _Mood.bullish => ('Bullish', t.positive, AyreGlyph.trendUp),
+      _Mood.neutral => ('Neutral', t.neutral, null),
+      _Mood.bearish => ('Bearish', t.negative, AyreGlyph.trendDown),
+    };
+    final description = _describe(sentiment, breadthResult?.value);
+    final labelColor = dark
+        ? _SentimentCardColors.labelDark
+        : _SentimentCardColors.labelLight;
+    final descriptionColor = dark
+        ? _SentimentCardColors.descriptionDark
+        : _SentimentCardColors.descriptionLight;
+
+    return AyreCard(
+      // The gradient has to reach the card's edge, so the padding moves
+      // inside it; `AyreCard` still supplies the radius clip, hairline and
+      // shadow.
+      padding: EdgeInsets.zero,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: dark
+                ? _SentimentCardColors.gradientDark
+                : _SentimentCardColors.gradientLight,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpace.lg),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Semantics(
+                container: true,
+                excludeSemantics: true,
+                label:
+                    'Market sentiment: $word, score ${sentiment.score} out '
+                    'of 100. $description',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        AyreIcon(
+                          AyreGlyph.instrument,
+                          size: 16,
+                          color: labelColor,
+                        ),
+                        const SizedBox(width: AppSpace.xs),
+                        Expanded(
+                          child: Text(
+                            'Market Sentiment',
+                            style: AppTypo.ui(
+                              fontSize: AppTextScale.body,
+                              fontWeight: FontWeight.w600,
+                              color: labelColor,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpace.sm),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              word,
+                              style: AppTypo.pageTitle(t, color: tone),
+                            ),
+                          ),
+                        ),
+                        if (glyph != null) ...[
+                          const SizedBox(width: AppSpace.xs),
+                          AyreIcon(
+                            glyph,
+                            size: 26,
+                            color: tone,
+                            strokeWidth: 2.4,
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: AppSpace.xs),
+                    Text(
+                      description,
+                      style: AppTypo.body(t, color: descriptionColor),
+                    ),
+                  ],
+                ),
+              ),
+              if (result.stale) ...[
+                const SizedBox(height: AppSpace.inCardGap),
+                const StaleNotice(),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// The one-line reading under the bucket. See the class doc for the
+  /// fallback order; nothing here is invented.
+  static String _describe(Sentiment sentiment, FullBreadth? fullBreadth) {
+    final note = sentiment.note?.trim();
+    if (note != null && note.isNotEmpty) return note;
+
+    final adv = sentiment.advances;
+    final dec = sentiment.declines;
+    if (adv != null && dec != null) {
+      final total = adv + dec + (sentiment.unchanged ?? 0);
+      if (total > 0) return _advancing(adv, total);
+    }
+
+    if (fullBreadth != null) {
+      final total =
+          fullBreadth.advances + fullBreadth.declines + fullBreadth.unchanged;
+      if (total > 0) return _advancing(fullBreadth.advances, total);
+    }
+
+    return 'Overall market mood, from the latest sentiment reading.';
+  }
+
+  static String _advancing(int advances, int total) =>
+      '${formatPrice(advances, decimals: 0)} of '
+      '${formatPrice(total, decimals: 0)} stocks advancing';
+}
+
+/// Mirrors the real card's blocks — label, bucket word, description — so the
+/// loaded card doesn't reflow the page (§14.4).
+class _SentimentSkeleton extends StatelessWidget {
+  const _SentimentSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const AyreCard(
+      padding: EdgeInsets.all(AppSpace.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SkeletonBlock(width: 120, height: 12),
+          SizedBox(height: AppSpace.sm),
+          SkeletonBlock(width: 150, height: 30, radius: AppRadius.inset),
+          SizedBox(height: AppSpace.xs),
+          SkeletonBlock(height: 12),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Breadth ───────────────────────────────────────────────────────────────
+
+/// Market breadth (§13.1): the full Nifty-500 advance/decline split as a
+/// donut, in its own card.
+///
+/// The composite sentiment reading that used to sit beside it as a gauge is
+/// now the Market Sentiment card at the top of the page, so this card has a
+/// single source — [FullBreadth] (`GET /api/breadth/full`, a separate hourly
+/// poll across the entire Nifty 500) — and a single ready/empty/failed state
+/// of its own. Sentiment failing no longer blanks it, and vice versa.
+class _BreadthCard extends StatelessWidget {
+  const _BreadthCard({required this.breadthResult, required this.onRetry});
+
   final DataResult<FullBreadth>? breadthResult;
   final Future<void> Function() onRetry;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final result = breadthResult;
+    if (result == null) return const _BreadthSkeleton();
 
-    // Both surfaces load together in `_load`, so they're null together too —
-    // one skeleton for the whole card while either is still in flight.
-    if (sentimentResult == null && breadthResult == null) {
-      return const _BreadthSkeleton();
+    if (result.isFailed) {
+      return StatePanel.failed(
+        headline: "Market breadth didn't load",
+        message: 'The index levels above are unaffected.',
+        compact: true,
+        onRetry: onRetry,
+      );
     }
 
-    final sentimentFailed = sentimentResult?.isFailed ?? false;
-    final sentimentEmpty = sentimentResult?.isEmpty ?? false;
-    final breadthFailed = breadthResult?.isFailed ?? false;
-    final breadthEmpty = breadthResult?.isEmpty ?? false;
-
-    // Neither side has anything to show — this is the whole-card failure/
-    // empty case the original single-source card handled.
-    if ((sentimentFailed || sentimentEmpty) &&
-        (breadthFailed || breadthEmpty)) {
-      if (sentimentFailed || breadthFailed) {
-        return StatePanel.failed(
-          headline: "Market breadth didn't load",
-          message: 'The index levels above are unaffected.',
-          compact: true,
-          onRetry: onRetry,
-        );
-      }
+    final breadth = result.value;
+    if (breadth == null) {
       return const StatePanel.empty(
         headline: 'No breadth reading yet',
         message: 'Advances and declines appear once the session is under way.',
@@ -760,152 +1038,31 @@ class _BreadthCard extends StatelessWidget {
       );
     }
 
-    final sentiment = sentimentResult?.value;
-    final fullBreadth = breadthResult?.value;
-
-    // With no counts there is nothing to lead with, so say that plainly
-    // rather than rendering zeroes as if they were real — the gauge would
-    // otherwise show a confident-looking score with no breadth behind it.
-    if (sentiment != null &&
-        sentiment.advances == null &&
-        sentiment.declines == null &&
-        fullBreadth == null) {
-      return StatePanel.empty(
-        headline: 'Breadth counts unavailable',
-        message:
-            'The feed returned a sentiment reading but no advance or '
-            'decline counts. Score: ${sentiment.score}.',
-        compact: true,
-      );
-    }
-
-    final donutSlot = fullBreadth != null
-        ? BreadthDonut(
-            advances: fullBreadth.advances,
-            declines: fullBreadth.declines,
-            unchanged: fullBreadth.unchanged,
-          )
-        : _BreadthSlotNotice(
-            failed: breadthFailed,
-            label: breadthFailed ? "Breadth didn't load" : 'No breadth yet',
-          );
-
-    final gaugeSlot = sentiment != null
-        ? SentimentGauge(
-            score: sentiment.score,
-            band: _band(sentiment.score),
-            // §12.1 over §12.2 here, deliberately: a sentiment reading's
-            // subject is direction, and tinting a bearish gauge with the
-            // brand accent would make the one chart on this screen that has
-            // an opinion the one chart that doesn't show it. Open decision
-            // #12 — this is the call this screen makes; revisit if the Spec
-            // says otherwise.
-            tone: switch (sentiment.score) {
-              < 35 => t.negative,
-              < 65 => t.neutral,
-              _ => t.positive,
-            },
-          )
-        : _BreadthSlotNotice(
-            failed: sentimentFailed,
-            label: sentimentFailed ? "Sentiment didn't load" : 'No sentiment yet',
-          );
-
     return AyreCard(
       padding: const EdgeInsets.all(AppSpace.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              // Paired only where both charts fit at their fixed widths
-              // (132 + 176 + gap) without either being squeezed. Below that
-              // they stack — a donut compressed to 90px stops being readable
-              // long before it stops fitting.
-              final paired = constraints.maxWidth >= 132 + 176 + AppSpace.lg;
-              if (!paired) {
-                return Column(
-                  children: [
-                    Center(child: donutSlot),
-                    const SizedBox(height: AppSpace.lg),
-                    const HairlineDivider(),
-                    const SizedBox(height: AppSpace.lg),
-                    Center(child: gaugeSlot),
-                  ],
-                );
-              }
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(child: Center(child: donutSlot)),
-                  const SizedBox(width: AppSpace.lg),
-                  Expanded(child: Center(child: gaugeSlot)),
-                ],
-              );
-            },
-          ),
-          if (fullBreadth != null) ...[
-            const SizedBox(height: AppSpace.inCardGap),
-            Center(
-              child: Text(
-                'Full Nifty 500 · ${fullBreadth.coverage} stocks tracked',
-                style: AppTypo.hint(t, color: t.foregroundMuted),
-              ),
+          Center(
+            child: BreadthDonut(
+              advances: breadth.advances,
+              declines: breadth.declines,
+              unchanged: breadth.unchanged,
             ),
-          ],
-          if (sentiment?.note != null && sentiment!.note!.isNotEmpty) ...[
-            const SizedBox(height: AppSpace.lg),
-            const HairlineDivider(),
-            const SizedBox(height: AppSpace.inCardGap),
-            Text(sentiment.note!, style: AppTypo.body(t)),
-          ],
-          if ((sentimentResult?.stale ?? false) ||
-              (breadthResult?.stale ?? false)) ...[
+          ),
+          const SizedBox(height: AppSpace.inCardGap),
+          Center(
+            child: Text(
+              'Full Nifty 500 · ${breadth.coverage} stocks tracked',
+              textAlign: TextAlign.center,
+              style: AppTypo.hint(t, color: t.foregroundMuted),
+            ),
+          ),
+          if (result.stale) ...[
             const SizedBox(height: AppSpace.inCardGap),
             const StaleNotice(),
           ],
         ],
-      ),
-    );
-  }
-
-  /// The band the score falls in. Named here rather than taken from the feed
-  /// because `Sentiment` carries no band field — v3's `BreadthMeter` was
-  /// handed one by `insights_tab.dart`, which derived it the same way.
-  static String _band(int score) => switch (score) {
-    < 20 => 'Bearish',
-    < 40 => 'Cautious',
-    < 60 => 'Neutral',
-    < 80 => 'Constructive',
-    _ => 'Bullish',
-  };
-}
-
-/// Fills one half of [_BreadthCard] when that half's own source failed or
-/// came back empty while the other half still has something to show — the
-/// card stays up and legible rather than the whole thing dropping to a
-/// single [StatePanel].
-class _BreadthSlotNotice extends StatelessWidget {
-  const _BreadthSlotNotice({required this.failed, required this.label});
-
-  final bool failed;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return SizedBox(
-      width: 132,
-      height: 132,
-      child: Center(
-        child: Text(
-          label,
-          textAlign: TextAlign.center,
-          style: AppTypo.hint(
-            t,
-            color: failed ? t.negative : t.foregroundSubtle,
-          ),
-        ),
       ),
     );
   }
@@ -925,8 +1082,6 @@ class _BreadthSkeleton extends StatelessWidget {
           SkeletonBlock(width: 132, height: 132, radius: AppRadius.circle),
           SizedBox(height: AppSpace.md),
           SkeletonBlock(width: 190, height: 12),
-          SizedBox(height: AppSpace.lg),
-          SkeletonBlock(width: 176, height: 88, radius: AppRadius.inset),
         ],
       ),
     );
