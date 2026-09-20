@@ -885,10 +885,25 @@ class SettingRow extends StatelessWidget {
 /// A grouped card of rows with hairlines between them — Profile and Settings
 /// share this so their lists are visually identical.
 class RowGroup extends StatelessWidget {
-  const RowGroup({super.key, required this.children, this.color});
+  const RowGroup({
+    super.key,
+    required this.children,
+    this.color,
+    this.indent = defaultIndent,
+  });
+
+  /// Where the hairlines start: the row padding, an 18px leading icon and the
+  /// gap after it — the Profile/Settings row grammar.
+  static const double defaultIndent = AppSpace.md + 18 + AppSpace.md;
 
   final List<Widget> children;
   final Color? color;
+
+  /// Left inset of the hairlines between rows. Lists whose rows lead with
+  /// something other than an 18px icon (the Insights movers' instrument tile)
+  /// pass their own leading width so the dividers start at the text, not
+  /// under the tile.
+  final double indent;
 
   @override
   Widget build(BuildContext context) {
@@ -898,8 +913,7 @@ class RowGroup extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < children.length; i++) ...[
-            if (i > 0)
-              const HairlineDivider(indent: AppSpace.md + 18 + AppSpace.md),
+            if (i > 0) HairlineDivider(indent: indent),
             children[i],
           ],
         ],
@@ -1117,11 +1131,14 @@ class _SkeletonBlockState extends State<SkeletonBlock>
   }
 }
 
-/// A skeleton in the exact shape of a [TickerRow].
+/// A skeleton in the exact shape of a [TickerRow]. [tile] adds the leading
+/// instrument-tile block for lists whose rows lead with an
+/// `AyreInstrumentTile`, so the loaded list doesn't shift sideways.
 class SkeletonTickerRow extends StatelessWidget {
-  const SkeletonTickerRow({super.key, this.dense = false});
+  const SkeletonTickerRow({super.key, this.dense = false, this.tile = false});
 
   final bool dense;
+  final bool tile;
 
   @override
   Widget build(BuildContext context) {
@@ -1132,6 +1149,10 @@ class SkeletonTickerRow extends StatelessWidget {
       ),
       child: Row(
         children: [
+          if (tile) ...const [
+            SkeletonBlock(width: 40, height: 40, radius: AppRadius.iconTile),
+            SizedBox(width: AppSpace.md),
+          ],
           const Expanded(
             flex: 5,
             child: Column(

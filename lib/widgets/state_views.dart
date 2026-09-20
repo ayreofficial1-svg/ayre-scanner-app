@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'ayre_components.dart';
 import 'ayre_icons.dart';
+import 'pressable_scale.dart';
 
 /// What a data section is currently showing. Every data-driven surface in the
 /// app resolves to exactly one of these, and each section resolves its own —
@@ -292,6 +293,124 @@ class StatePanel extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// The calm, whole-section state (redesign plan §2.3): no card chrome, just a
+/// small glyph, a bold one-line message, a muted one-line explanation and a
+/// small circular refresh control, all centered on the page.
+///
+/// [StatePanel] is a card with a labelled button — right for a section inside
+/// a dense feed, and it stays that. This is the quieter composition for a
+/// screen whose *whole* body is empty or failed (Learn's library), where a
+/// boxed error block reads as louder than the situation deserves.
+///
+/// The same rules carry over: the glyph is the preset's (so empty and failed
+/// stay distinguishable without reading), it is ink-toned and never red, and
+/// the control's accessible name is the preset's §14.5 verb ("Try again"),
+/// because the visible control is icon-only.
+class CalmStatePanel extends StatelessWidget {
+  const CalmStatePanel({
+    super.key,
+    required this.headline,
+    required this.message,
+    this.preset = StatePreset.empty,
+    this.onRetry,
+  });
+
+  /// Succeeded, nothing to show.
+  const CalmStatePanel.empty({
+    super.key,
+    required this.headline,
+    required this.message,
+    this.onRetry,
+  }) : preset = StatePreset.empty;
+
+  /// The request failed.
+  const CalmStatePanel.failed({
+    super.key,
+    required this.headline,
+    required this.message,
+    this.onRetry,
+  }) : preset = StatePreset.failed;
+
+  final String headline;
+  final String message;
+  final StatePreset preset;
+
+  /// Shown as the circular refresh control when non-null.
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final tone = preset.isFault ? t.foregroundMuted : t.foregroundSubtle;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.lg,
+        vertical: AppSpace.xxl,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(15),
+            decoration: BoxDecoration(
+              color: t.surfaceRaised,
+              borderRadius: BorderRadius.circular(AppRadius.iconTile),
+            ),
+            child: AyreIcon(preset.glyph, size: 24, color: tone),
+          ),
+          const SizedBox(height: AppSpace.lg),
+          Text(
+            headline,
+            textAlign: TextAlign.center,
+            style: AppTypo.cardTitle(t),
+          ),
+          const SizedBox(height: AppSpace.xs),
+          Text(message, textAlign: TextAlign.center, style: AppTypo.body(t)),
+          if (onRetry != null) ...[
+            const SizedBox(height: AppSpace.lg),
+            _RefreshDot(label: preset.action.label, onTap: onRetry!),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// The small circular refresh control behind [CalmStatePanel]. 44pt — the HIG
+/// floor the rest of the app's controls already hold to.
+class _RefreshDot extends StatelessWidget {
+  const _RefreshDot({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Semantics(
+      button: true,
+      label: label,
+      child: PressableScale(
+        onTap: onTap,
+        borderRadius: AppRadius.circle,
+        child: Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: t.surface,
+            shape: BoxShape.circle,
+            border: Border.all(color: t.hairline),
+          ),
+          child: AyreIcon(AyreGlyph.refresh, size: 18, color: t.textPrimary),
+        ),
       ),
     );
   }

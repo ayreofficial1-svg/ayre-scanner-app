@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import '../widgets/ayre_charts.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
+import '../widgets/ayre_stat_tile.dart';
 import '../widgets/figure.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/responsive.dart';
@@ -22,6 +23,16 @@ import 'lesson_screen.dart';
 /// v3 listed every course identically and left the user to find where they
 /// were. The continue card fixes that — the thing you were last doing gets the
 /// ring and the top of the page, everything else is a list beneath it.
+///
+/// v5 (redesign plan Phase 5): eyebrow / title / subhead header, two stat tiles
+/// (the shared [AyreStatTile]), a subject filter row, the calm centered empty
+/// and failed states ([CalmStatePanel]), and a static footer info card.
+///
+/// **The filter pills are the feed's real subjects, not a fixed set.** The
+/// reference image's All / Basics / Technical / Fundamental / Psychology are
+/// example labels; the backend's `category` is free text (and null on most
+/// articles), so the row is built from whatever categories the loaded courses
+/// actually carry, and hidden while there is nothing to choose between.
 class LearnTab extends StatefulWidget {
   const LearnTab({super.key, required this.marketData});
 
@@ -35,6 +46,9 @@ class _LearnTabState extends State<LearnTab> {
   DataResult<List<Course>>? _result;
   bool _loading = true;
 
+  /// The selected subject filter; null means "All".
+  String? _category;
+
   @override
   void initState() {
     super.initState();
@@ -47,8 +61,26 @@ class _LearnTabState extends State<LearnTab> {
     setState(() {
       _result = result;
       _loading = false;
+      // A refresh can drop a subject entirely; a filter left pointing at it
+      // would show an empty library with no way to see why.
+      final subjects =
+          result.value?.map((c) => c.category).toSet() ?? const <String>{};
+      if (_category != null && !subjects.contains(_category)) _category = null;
     });
     if (!initial) HapticFeedback.mediumImpact();
+  }
+
+  /// Distinct subjects in first-seen order.
+  List<String> get _subjects {
+    final courses = _result?.value;
+    if (courses == null) return const [];
+    return courses.map((c) => c.category).toSet().toList();
+  }
+
+  void _selectSubject(String? subject) {
+    if (subject == _category) return;
+    HapticFeedback.selectionClick();
+    setState(() => _category = subject);
   }
 
   /// The course to continue: the one furthest along that isn't finished. A
@@ -71,9 +103,17 @@ class _LearnTabState extends State<LearnTab> {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final courses = _result?.value ?? const <Course>[];
-    final subjects = courses.map((c) => c.category).toSet().length;
+    final subjects = _subjects;
     final columns = AppBreakpoints.columns(context);
     final resume = _inProgress;
+    // Counts read "—" until the library has actually answered: a "0 Courses"
+    // tile during the first load, or after a failure, would state something
+    // the app doesn't know.
+    final countsKnown = !_loading && _result != null && !_result!.isFailed;
+    final showLibrary = !_loading && _result!.isReady && courses.isNotEmpty;
+    final visible = _category == null
+        ? courses
+        : courses.where((c) => c.category == _category).toList();
 
     return RefreshIndicator(
       color: t.accentInk,
@@ -99,30 +139,48 @@ class _LearnTabState extends State<LearnTab> {
                     Text('TRADING LIBRARY', style: AppTypo.label(t)),
                     const SizedBox(height: AppSpace.xxs),
                     Text('My courses', style: AppTypo.pageTitle(t)),
-                    const SizedBox(height: AppSpace.sm),
-                    Row(
-                      children: [
-                        LabelledFigure(
-                          label: 'Subjects',
-                          value: '$subjects',
-                          fontSize: AppTextScale.cardTitle,
-                        ),
-                        const SizedBox(width: AppSpace.xxl),
-                        LabelledFigure(
-                          label: 'Courses',
-                          value: '${courses.length}',
-                          fontSize: AppTextScale.cardTitle,
-                        ),
-                      ],
+                    const SizedBox(height: AppSpace.xxs),
+                    Text(
+                      'Build your edge, one lesson at a time.',
+                      style: AppTypo.body(t),
                     ),
                   ],
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpace.sectionGap),
+            Entrance(
+              index: 1,
+              child: Align(
+                alignment: Alignment.centerLeft,
+                // Two tiles across a tablet-width column would be mostly
+                // empty card; they stay a compact pair.
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: AyreStatTile(
+                          value: countsKnown ? '${subjects.length}' : '—',
+                          label: 'Subjects',
+                        ),
+                      ),
+                      const SizedBox(width: AppSpace.cardGap),
+                      Expanded(
+                        child: AyreStatTile(
+                          value: countsKnown ? '${courses.length}' : '—',
+                          label: 'Courses',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
             if (resume != null) ...[
               const SizedBox(height: AppSpace.sectionGap),
               Entrance(
-                index: 1,
+                index: 2,
                 child: _ContinueCard(
                   course: resume,
                   onTap: () => _open(resume),
@@ -130,16 +188,30 @@ class _LearnTabState extends State<LearnTab> {
               ),
             ],
             const SizedBox(height: AppSpace.sectionGap),
-            if (!_loading && _result!.isReady && courses.isNotEmpty)
-              const Entrance(index: 2, child: SectionLabel(label: 'Library')),
-            _list(columns),
+            if (showLibrary)
+              const Entrance(index: 3, child: SectionLabel(label: 'Library')),
+            // Nothing to choose between with a single subject, so no filter.
+            if (showLibrary && subjects.length > 1) ...[
+              Entrance(
+                index: 3,
+                child: _SubjectFilter(
+                  subjects: subjects,
+                  selected: _category,
+                  onSelected: _selectSubject,
+                ),
+              ),
+              const SizedBox(height: AppSpace.sm),
+            ],
+            _list(columns, visible),
+            const SizedBox(height: AppSpace.sectionGap),
+            const Entrance(index: 4, child: _LearnFooter()),
           ],
         ),
       ),
     );
   }
 
-  Widget _list(int columns) {
+  Widget _list(int columns, List<Course> courses) {
     if (_loading) {
       return const AyreCard(
         padding: EdgeInsets.symmetric(vertical: AppSpace.xs),
@@ -154,7 +226,7 @@ class _LearnTabState extends State<LearnTab> {
     }
 
     if (_result!.isFailed) {
-      return StatePanel.failed(
+      return CalmStatePanel.failed(
         headline: "Your library didn't load",
         message: 'Progress you have already made is kept.',
         onRetry: _load,
@@ -162,13 +234,12 @@ class _LearnTabState extends State<LearnTab> {
     }
 
     if (_result!.isEmpty) {
-      return const StatePanel.empty(
+      return CalmStatePanel.empty(
         headline: 'No lessons yet',
         message: 'New material appears here as the library grows.',
+        onRetry: _load,
       );
     }
-
-    final courses = _result!.value!;
 
     if (columns == 1) {
       return Entrance(
@@ -212,6 +283,103 @@ class _LearnTabState extends State<LearnTab> {
     Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => LessonScreen(course: course)));
+  }
+}
+
+// ─── Subject filter ────────────────────────────────────────────────────────
+
+/// The horizontal pill row (§2.3): "All", then one pill per subject in the
+/// loaded library. The active pill is the solid-accent [AyreFilterChip] the
+/// app already uses for Signals' filters — same component, same 44pt target,
+/// same not-colour-only selected state.
+class _SubjectFilter extends StatelessWidget {
+  const _SubjectFilter({
+    required this.subjects,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<String> subjects;
+
+  /// The selected subject, or null for "All".
+  final String? selected;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      // Not clipped: pills scroll out through the page's side padding to the
+      // screen edge instead of being cut off a page-margin short of it.
+      clipBehavior: Clip.none,
+      child: Row(
+        children: [
+          AyreFilterChip(
+            label: 'All',
+            selected: selected == null,
+            onTap: () => onSelected(null),
+          ),
+          for (final subject in subjects) ...[
+            const SizedBox(width: AppSpace.xs),
+            AyreFilterChip(
+              label: subject,
+              selected: subject == selected,
+              onTap: () => onSelected(subject),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Footer ────────────────────────────────────────────────────────────────
+
+/// The static information card at the foot of the page (§2.3): icon tile,
+/// heading, one short paragraph, in the same card language as everywhere else.
+///
+/// Copy is a placeholder for design review — an educational-use note, since the
+/// screen is trading education. It states no data and makes no product claim
+/// beyond that.
+class _LearnFooter extends StatelessWidget {
+  const _LearnFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return AyreCard(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: t.surfaceRaised,
+              borderRadius: BorderRadius.circular(AppRadius.iconTile),
+            ),
+            child: AyreIcon(AyreGlyph.about, size: 20, color: t.foregroundMuted),
+          ),
+          const SizedBox(width: AppSpace.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('For learning, not advice', style: AppTypo.rowLabel(t)),
+                const SizedBox(height: AppSpace.xxs),
+                Text(
+                  'Lessons explain how markets and trading work. They are '
+                  'educational material and are not investment advice.',
+                  style: AppTypo.body(t),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
