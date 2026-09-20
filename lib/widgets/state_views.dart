@@ -22,7 +22,7 @@ enum DataPhase {
 
 /// The four action verbs of Spec §14.5, which are **not** interchangeable.
 ///
-/// Before v4 the app had one `retryLabel` string that each call site filled in
+/// The app used to have one `retryLabel` string that each call site filled in
 /// by hand, which is exactly how a codebase ends up offering "Retry" for an
 /// expired session and "Try again" for a dropped connection on adjacent
 /// screens. Making the verb an enum means the choice is made once per *kind of
@@ -52,9 +52,9 @@ enum StateAction {
 /// How a state panel reads: which glyph, which tone, and which verb its action
 /// carries. One row per state in the Spec's §14.1 table.
 ///
-/// Failure is never rose-toned. Red means "the market went down", never "the
-/// app broke" — a rule the previous identity already held and v4 keeps
-/// verbatim, now enforced here rather than per call site.
+/// Failure is never red-toned. Red means "the market went down", never "the
+/// app broke" — a rule the app has always held, now enforced here rather than
+/// per call site.
 enum StatePreset {
   /// Succeeded, nothing to show. Calm and complete — not a degraded state.
   empty,
@@ -234,10 +234,9 @@ class StatePanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final fault = preset.isFault;
-    // Ink-toned, not rose. The soft plate behind the glyph is a plain raised
-    // fill: v4 retired the previous identity's tinted highlight fills
-    // (`fillMint` and siblings), so weight comes from the glyph's own tone,
-    // not from a coloured plate behind it.
+    // Ink-toned, not red. The soft plate behind the glyph is a plain raised
+    // fill — weight comes from the glyph's own tone, not from a coloured
+    // plate behind it.
     final tone = fault ? t.foregroundMuted : t.foregroundSubtle;
 
     return AyreCard(

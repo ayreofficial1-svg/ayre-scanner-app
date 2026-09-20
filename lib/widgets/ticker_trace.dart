@@ -14,7 +14,7 @@ import '../theme/app_theme.dart';
 ///
 /// Two rules from §12.1 are enforced here rather than left to call sites:
 ///
-/// * **No gridlines.** The previous identity's `showGrid` flag is gone, not
+/// * **No gridlines.** The old `showGrid` flag is gone, not
 ///   deprecated — a small chart with gridlines reads as a terminal readout,
 ///   which is the identity this replaces. `chartGrid` was retired as a token
 ///   in Phase 0 for the same reason.
@@ -88,8 +88,8 @@ class TickerTrace extends StatefulWidget {
   final double height;
   final double strokeWidth;
 
-  /// A vertical gradient beneath the line, from the line's own colour at low
-  /// alpha down to fully transparent.
+  /// A vertical gradient beneath the line, from the line's own colour (30%
+  /// alpha in light, 35% in dark) down to fully transparent.
   final bool fill;
 
   /// A dot on the latest sample — "you are here". Round, in the line's colour,
@@ -117,8 +117,8 @@ class _TickerTraceState extends State<TickerTrace>
     _from = widget.points;
     _to = widget.points;
     // Retuned in Phase 3 onto the Spec's own chart-draw timing (§15.2,
-    // 1.1–1.4s) — the previous 620ms was the old identity's "feed ticking in"
-    // pace and reads hurried against v4's motion. `AppMotion.traceDraw` was
+    // 1.1–1.4s) — the earlier 620ms was a "feed ticking in" pace that reads
+    // hurried against this app's calmer motion. `AppMotion.traceDraw` was
     // retired with this change rather than left as a second chart duration.
     _draw = AnimationController(vsync: this, duration: AppMotion.chartDraw);
     _morph = AnimationController(vsync: this, duration: AppMotion.slow)
@@ -174,6 +174,11 @@ class _TickerTraceState extends State<TickerTrace>
               points: _interpolated,
               color: widget.color ?? t.foregroundMuted,
               haloColor: t.surface,
+              // §2A "Sparkline area fill": the trace color at 30% alpha
+              // fading to 0% (light), 35% -> 0% (dark — slightly higher so the
+              // wash still reads against the darker card).
+              fillAlpha:
+                  Theme.of(context).brightness == Brightness.dark ? 0.35 : 0.30,
               strokeWidth: widget.strokeWidth,
               fill: widget.fill,
               endDot: widget.endDot,
@@ -193,6 +198,7 @@ class _TracePainter extends CustomPainter {
     required this.points,
     required this.color,
     required this.haloColor,
+    required this.fillAlpha,
     required this.strokeWidth,
     required this.fill,
     required this.endDot,
@@ -202,6 +208,10 @@ class _TracePainter extends CustomPainter {
   final List<double> points;
   final Color color;
   final Color haloColor;
+
+  /// Starting (top) alpha of the area fill's vertical gradient; it always
+  /// fades to fully transparent at the bottom.
+  final double fillAlpha;
   final double strokeWidth;
   final bool fill;
   final bool endDot;
@@ -247,7 +257,7 @@ class _TracePainter extends CustomPainter {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              color.withValues(alpha: 0.22),
+              color.withValues(alpha: fillAlpha),
               color.withValues(alpha: 0.0),
             ],
           ).createShader(Rect.fromLTWH(0, 0, size.width, size.height)),
@@ -260,10 +270,10 @@ class _TracePainter extends CustomPainter {
         ..color = color
         ..style = PaintingStyle.stroke
         ..strokeWidth = strokeWidth
-        // Round, not the previous identity's butt/miter. A mitred join on a
-        // sharp reversal throws a spike well past the stroke width, which is
-        // the "terminal" read v4 is moving away from — and §7's rounded
-        // geometry applies to drawn strokes, not just box corners.
+        // Round, not butt/miter. A mitred join on a sharp reversal throws a
+        // spike well past the stroke width, which reads as a "terminal"
+        // readout — and §7's rounded geometry applies to drawn strokes, not
+        // just box corners.
         ..strokeCap = StrokeCap.round
         ..strokeJoin = StrokeJoin.round,
     );
@@ -287,6 +297,7 @@ class _TracePainter extends CustomPainter {
     return old.drawn != drawn ||
         old.color != color ||
         old.haloColor != haloColor ||
+        old.fillAlpha != fillAlpha ||
         old.strokeWidth != strokeWidth ||
         old.fill != fill ||
         old.endDot != endDot ||

@@ -14,7 +14,7 @@ import 'package:flutter/material.dart';
 /// the one state rule used everywhere an icon has a selected condition).
 ///
 /// **v4 redraw vs. reuse (plan §7 open decision #1):** the three nav glyphs
-/// that read as distinctly "terminal" against the calm/editorial v4 identity
+/// that read as distinctly "terminal" against the calm/editorial identity
 /// — [AyreGlyph.home] (was a literal terminal-window frame), [AyreGlyph.signals]
 /// (was blocky ascending bars) and [AyreGlyph.insights] (was a literal breadth-
 /// meter scale, i.e. themed screen content leaking into the icon) — were

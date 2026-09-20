@@ -9,9 +9,9 @@ import 'pressable_scale.dart';
 import 'responsive.dart';
 import 'spring.dart';
 
-/// The app's card material: warm surface fill, 18px radius, 1px hairline, and
-/// a soft two-layer shadow (§8 of the Spec — v4 re-introduces shadows; the
-/// identity this replaces had none). Never nested — a card inside a card is
+/// The app's card material: `surface` fill, 18px radius, 1px hairline, and a
+/// soft two-layer shadow (§8 of the Spec — shadows are part of the identity,
+/// flat/no-shadow is not a rule). Never nested — a card inside a card is
 /// always a hairline-divided row group ([RowGroup]) or a sunken/raised tonal
 /// fill ([InkPanel]) instead.
 class AyreCard extends StatelessWidget {
@@ -37,7 +37,7 @@ class AyreCard extends StatelessWidget {
   /// An accent-tinted border (§8.4) marking a featured card — emphasis comes
   /// from the tinted edge itself, never a solid tint fill behind the card.
   /// Renders as a 1.5px full-perimeter accent-toned border, not a leading-edge
-  /// bar (that was the previous identity's device; v4 has no equivalent).
+  /// bar.
   final bool accentEdge;
   final Color? accentColor;
 
@@ -85,7 +85,7 @@ class AyreCard extends StatelessWidget {
 /// recessed into the surface ([raised] false, the default: a track, an inset
 /// readout region) or lifted slightly off it ([raised] true: a nested tonal
 /// block, an icon tile backing). This is a repurposing of the previous
-/// "terminal readout panel" concept, not a rename-only pass — v4 has no
+/// "terminal readout panel" concept, not a rename-only pass — there are no
 /// "live feed" semantics for this component, just a plain sub-surface fill at
 /// the Spec's 12px inset radius. The class name is kept as `InkPanel` (rather
 /// than introducing e.g. `AyreInset`) so the existing call sites in
@@ -179,7 +179,7 @@ class SectionLabel extends StatelessWidget {
 /// or stamp on the end of a header row will happily report a width larger than
 /// the row and push the row into overflow. Giving it a flex slot bounds it, and
 /// the [FittedBox] scales it down rather than clipping — which matters at large
-/// accessibility text scales, where "DELAYED" is wider than it looks.
+/// accessibility text scales, where a caps chip label is wider than it looks.
 class ShrinkTrailing extends StatelessWidget {
   const ShrinkTrailing({super.key, required this.child, this.flex = 2});
 
@@ -222,10 +222,10 @@ class HairlineDivider extends StatelessWidget {
 enum AyreButtonKind { primary, outline, danger }
 
 /// A fully-rounded pill (Spec §11.1 — buttons are pills, not rounded rects, in
-/// v4). Primary is a solid accent fill with dark ink text: the accent sits at
-/// a mid lightness in both themes, so inverted white text under-performs
-/// against the darker ink (see the Phase 0 contrast note on
-/// [AppThemeTokens.onAccent]).
+/// v5). Primary is a solid accent fill: white text in light (`onAccent`), near-
+/// black ink in dark. The light pairing measures ~4.38:1, just under AA for
+/// normal-size text — see the Phase 0 contrast note on
+/// [AppThemeTokens.onAccent].
 class AyreButton extends StatelessWidget {
   const AyreButton({
     super.key,
@@ -278,7 +278,7 @@ class AyreButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(AppRadius.button),
-            // An accent fill against warm paper/charcoal is a mid-lightness
+            // An accent fill against mint paper/near-black is a mid-lightness
             // fill in both themes, so a hairline still carries the
             // component's edge definition rather than relying on the fill
             // alone to read as a distinct shape.
@@ -366,7 +366,7 @@ class AyreSwitch extends StatelessWidget {
             height: _h,
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              color: value ? t.accent : t.surfaceRaised,
+              color: value ? t.accent : t.surfaceSunken,
               borderRadius: BorderRadius.circular(AppRadius.chip),
               border: Border.all(
                 color: value ? t.accent.withValues(alpha: 0.9) : t.hairline,
@@ -383,7 +383,11 @@ class AyreSwitch extends StatelessWidget {
                   width: _knob,
                   height: _knob,
                   decoration: BoxDecoration(
-                    color: value ? t.onAccent : t.foregroundSubtle,
+                    // Off-knob is `foregroundMuted`, not `foregroundSubtle`:
+                    // on the spec'd `surfaceSunken` off-track the subtle tone
+                    // measures 2.54:1 in light (under the 3:1 non-text floor);
+                    // muted measures 4.68:1 light / 8.6:1 dark.
+                    color: value ? t.onAccent : t.foregroundMuted,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -520,7 +524,7 @@ class _Segment<T> extends StatelessWidget {
 
 // ─── Status chips ──────────────────────────────────────────────────────────
 
-/// `info` is retired in v4 (plan §3.3 / §7 open decision — the Spec's fixed
+/// `info` is retired (plan §3.3 / §7 open decision — the Spec's fixed
 /// accent set is accent/positive/negative/neutral only, with no separate
 /// "info" role). The one real call site using it
 /// (`profile_tab.dart`'s tier badge — a non-market identity tag) is
@@ -528,9 +532,10 @@ class _Segment<T> extends StatelessWidget {
 /// metadata, not a brand or market-direction signal.
 enum ChipTone { neutral, live, attention, brand }
 
-/// Small, flat, caps chip for states like LIVE, DELAYED, CLOSED, NEW. Neutral
-/// (muted gold) carries attention/LIVE; the brand accent carries non-market
-/// identity tags only (tiers, badges) — never a market-direction signal.
+/// Small, flat, caps chip for states like LIVE, CLOSED, NEW. LIVE is
+/// [AppThemeTokens.positive] on `positiveSoft`; neutral/attention (muted gold)
+/// carries warnings; the brand accent carries non-market identity tags only
+/// (tiers, badges) — never a market-direction signal.
 class AyreChip extends StatelessWidget {
   const AyreChip({
     super.key,
@@ -552,7 +557,9 @@ class AyreChip extends StatelessWidget {
     final t = context.tokens;
     final (Color fg, Color bg) = switch (tone) {
       ChipTone.neutral => (t.foregroundSubtle, t.surfaceRaised),
-      ChipTone.live => (t.neutral, t.neutralSoft),
+      // LIVE is a market-liveness signal: `positive` on `positiveSoft` in
+      // both themes, regardless of any per-card identity tint around it.
+      ChipTone.live => (t.positive, t.positiveSoft),
       ChipTone.attention => (t.neutral, t.neutralSoft),
       ChipTone.brand => (t.accentInk, t.accent.withValues(alpha: 0.16)),
     };
@@ -1320,7 +1327,7 @@ class DirectionBadge extends StatelessWidget {
 /// than a flag on an existing one. The three do genuinely different jobs and
 /// conflating them produces nonsense:
 ///
-/// * [AyreChip] reports a **state** the user cannot change — LIVE, DELAYED, a
+/// * [AyreChip] reports a **state** the user cannot change — LIVE, CLOSED, a
 ///   tier. A "selected" LIVE chip means nothing.
 /// * [TagPill] labels a **piece of content** — an article's category. It never
 ///   pulses, animates, or responds to touch.
@@ -1407,7 +1414,7 @@ class AyreFilterChip extends StatelessWidget {
 
 /// A small, neutral, non-market informational tag — the category label on an
 /// Insights note, a topic marker. Distinct from [AyreChip]: chips carry a
-/// state (LIVE, DELAYED, a tier), tags label a piece of content and never
+/// state (LIVE, CLOSED, a tier), tags label a piece of content and never
 /// pulse, animate, or carry a glyph. Extracted in Phase 1 per plan §6 as a
 /// **new** shared component: `insights_tab.dart`'s `note.category` label was
 /// previously rendered as a bare uppercase [Text] with no pill/fill at all,

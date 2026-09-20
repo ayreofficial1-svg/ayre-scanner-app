@@ -110,16 +110,16 @@ class _DrawOnState extends State<_DrawOn> with SingleTickerProviderStateMixin {
 
 // ─── BreadthDonut ──────────────────────────────────────────────────────────
 
-/// Market breadth as a three-segment donut (Spec §12.2): advances in sage,
-/// declines in rose, unchanged in the subtle foreground tone, with the advance
-/// share counting up in the middle.
+/// Market breadth as a three-segment donut (Spec §12.2): advances in
+/// [AppThemeTokens.positive], declines in [AppThemeTokens.negative], unchanged
+/// in the subtle foreground tone, with the advance share counting up in the
+/// middle.
 ///
-/// This replaces `BreadthMeter`, the previous identity's linear filled bar
-/// against a labelled 0–100 scale. That component's own doc comment argued a
-/// bar was *deliberately* not a dial; v4 reverses that on both counts — a
-/// donut here, and a genuine gauge for sentiment ([SentimentGauge]). The old
-/// file was deleted rather than retuned, following the Phase 2 precedent with
-/// `curved_nav_bar.dart`.
+/// This replaced `BreadthMeter`, an earlier linear filled bar against a
+/// labelled 0–100 scale. That component was deliberately a bar rather than a
+/// dial; the redesign reversed that on both counts — a donut here, and a
+/// genuine gauge for sentiment ([SentimentGauge]). The old file was deleted
+/// rather than retuned.
 ///
 /// Segments are never smaller than they are: a slice too thin to draw with
 /// round caps and a 2px gap is dropped from the ring entirely rather than
@@ -535,18 +535,24 @@ class _RingPainter extends CustomPainter {
 
 // ─── SentimentGauge ────────────────────────────────────────────────────────
 
+/// The end-cap dot's radius: exactly half the stroke's thickness, so the dot
+/// is flush with the arc's own width — clearly heavier than the hollow marker
+/// it replaces, but adding no overhang beyond what the stroke already draws,
+/// so the gauge's layout box and anything that clips to it are unaffected.
+double _gaugeMarkerRadius(double thickness) => thickness / 2;
+
 /// The sentiment reading as a 180° gauge (Spec §12.2): 176px wide, 11px thick,
-/// a track with the accent filled to `score/100` of the arc, and a marker dot
-/// at the reading — surface-filled, accent-stroked, so it reads as a position
-/// on the arc rather than another segment of it.
+/// a `surfaceSunken` track with a flat (non-gradient) fill to `score/100` of
+/// the arc, and a solid end-cap dot at the reading — same colour as the fill
+/// and as wide as the stroke itself, so it reads as the arc's terminus.
 ///
-/// This reverses the previous identity explicitly. `BreadthMeter`'s doc comment
-/// stated a gauge motif "belonged to the previous identity and is retired";
-/// the Spec brings it back by name, and the plan (§6) treats that as a
-/// deliberate reversal rather than an oversight to be argued with.
+/// The band is named in a small pill beneath the arc (`accentInk` text on an
+/// `accentSoft` fill by default). The score is spelled out inside the arc, so
+/// the reading survives with the arc, its colour, or both removed.
 ///
-/// The score is spelled out beneath the arc and the band is named, so the
-/// reading survives with the arc, its colour, or both removed.
+/// When a caller passes a directional [tone] (a bearish reading tinted
+/// [AppThemeTokens.negative], say) the fill, end-cap and pill all follow it —
+/// the gauge never shows a red arc under a green "STRONG" label.
 class SentimentGauge extends StatelessWidget {
   const SentimentGauge({
     super.key,
@@ -576,6 +582,14 @@ class SentimentGauge extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final fill = tone ?? t.accent;
+    // Default: the spec's `accentInk` on `accentSoft`. A directional tone
+    // gets a soft wash of itself instead so the pill never contradicts the
+    // arc above it.
+    final directional = tone;
+    final pillFg = directional ?? t.accentInk;
+    final pillBg = directional == null
+        ? t.accentSoft
+        : directional.withValues(alpha: 0.14);
     final clamped = (score / 100).clamp(0.0, 1.0);
     // A 180° arc of radius r occupies r + half a stroke vertically.
     final radius = (width - thickness) / 2;
@@ -598,7 +612,6 @@ class SentimentGauge extends StatelessWidget {
                     value: clamped * progress,
                     fill: fill,
                     track: t.surfaceSunken,
-                    markerFill: t.surface,
                     thickness: thickness,
                   ),
                   // The reading sits inside the arc's own opening rather than
@@ -644,11 +657,18 @@ class SentimentGauge extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpace.xs),
-            Text(
-              band.toUpperCase(),
-              style: AppTypo.label(t, color: fill),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: pillBg,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+              ),
+              child: Text(
+                band.toUpperCase(),
+                style: AppTypo.label(t, color: pillFg),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),
@@ -662,17 +682,12 @@ class _GaugePainter extends CustomPainter {
     required this.value,
     required this.fill,
     required this.track,
-    required this.markerFill,
     required this.thickness,
   });
 
   final double value;
   final Color fill;
   final Color track;
-
-  /// The marker is filled with the surface it sits on and stroked in the fill
-  /// colour, so it reads as a position marker rather than a blob of arc.
-  final Color markerFill;
   final double thickness;
 
   @override
@@ -714,16 +729,8 @@ class _GaugePainter extends CustomPainter {
       center.dx + radius * math.cos(angle),
       center.dy + radius * math.sin(angle),
     );
-    final markerRadius = thickness * 0.34;
-    canvas.drawCircle(at, markerRadius, Paint()..color = markerFill);
-    canvas.drawCircle(
-      at,
-      markerRadius,
-      Paint()
-        ..color = fill
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
+    // A solid end-cap in the fill's own colour.
+    canvas.drawCircle(at, _gaugeMarkerRadius(thickness), Paint()..color = fill);
   }
 
   @override
@@ -731,7 +738,6 @@ class _GaugePainter extends CustomPainter {
     return old.value != value ||
         old.fill != fill ||
         old.track != track ||
-        old.markerFill != markerFill ||
         old.thickness != thickness;
   }
 }

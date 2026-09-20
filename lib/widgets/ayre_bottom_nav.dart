@@ -7,9 +7,9 @@ import '../theme/app_theme.dart';
 import 'ayre_icons.dart';
 import 'spring.dart';
 
-/// A navigation destination. Unlike v3's icon-only bar, the label is now
-/// rendered on screen — it is still the accessibility name too, so nothing
-/// changes for screen-reader users.
+/// A navigation destination. The label is rendered on screen (icon + label on
+/// every item) and is also the accessibility name, so nothing changes for
+/// screen-reader users.
 class NavDestination {
   const NavDestination({required this.label, required this.glyph});
 
@@ -29,30 +29,31 @@ const List<NavDestination> kNavDestinations = [
 /// semantics wiring.
 Key navDestinationKey(String label) => ValueKey('nav-destination-$label');
 
-/// The always-visible bottom navigation — v4's flat glass pill, replacing
-/// v3's raised, protruding, icon-only [CurvedNavBar] outright (Spec §9).
+/// The always-visible bottom navigation — v5's floating glass pill.
 ///
-/// Every particular of the old bar is reversed here: no protrusion (the bar
-/// is a flat plane, full width, flush to the bottom edge — nothing rises
-/// above its top edge), icon **and** label on every item at all times, and
-/// the active item is never enlarged — only a tonal pill slides in behind it
-/// and its glyph switches from line to filled.
+/// The bar is a fully rounded pill that floats above the bottom edge with a
+/// margin on every side (never flush to the screen edges), carrying a soft
+/// [AppThemeTokens.shadowColor] shadow beneath it. Every destination shows an
+/// icon **and** a label at all times; the active destination is never
+/// enlarged — a solid pill (deep ink in light, brand emerald in dark) slides in
+/// behind it and its glyph switches from line to filled.
 ///
 /// **Glass effect:** [BackdropFilter] blurs whatever scrolls beneath the bar
 /// (Flutter's direct equivalent of CSS `backdrop-filter: blur()`), composed
 /// with a saturation boost so the blurred content doesn't wash out — CSS's
 /// `saturate(150%)` has no built-in Flutter filter, so it is reproduced here
 /// as the literal RGB saturation matrix (`ColorFilter.matrix`, composed
-/// after the blur via `ImageFilter.compose`) rather than approximated or
-/// dropped, resolving plan §7 open decision #2. [AppThemeTokens.navBg] at
-/// ~66% alpha sits on top of the filtered content for the tint.
+/// after the blur via `ImageFilter.compose`). [AppThemeTokens.navBg] sits on
+/// top of the filtered content for the tint, at ~90% alpha in light and ~85%
+/// in dark (the dark canvas needs slightly more see-through to still read as
+/// glass rather than a solid slab).
 ///
 /// **Motion:** the pill's position is driven by [SpringValue] on
-/// [AppSpring.navPill] (Phase 1's numerically-verified spring, ζ≈0.87,
-/// settle≈0.21s, ~0.4% overshoot — "glides smoothly, no bounce"), re-
-/// targeting mid-flight from wherever it currently sits rather than
-/// restarting, so a fast second tap doesn't cause a visible snap-back.
-/// Reduced motion is honored by [SpringValue] itself.
+/// [AppSpring.navPill] (numerically verified: ζ≈0.87, settle≈0.21s, ~0.4%
+/// overshoot — "glides smoothly, no bounce"), re-targeting mid-flight from
+/// wherever it currently sits rather than restarting, so a fast second tap
+/// doesn't cause a visible snap-back. Reduced motion is honored by
+/// [SpringValue] itself.
 class AyreBottomNav extends StatelessWidget {
   const AyreBottomNav({
     super.key,
@@ -69,36 +70,81 @@ class AyreBottomNav extends StatelessWidget {
   /// once padding is added.
   static const double barHeight = 64;
 
+  /// Gap between the floating pill and the screen's left/right/bottom edges.
+  static const double edgeMargin = 12;
+
+  /// Total vertical space the nav occupies (pill + its bottom margin), for
+  /// screens that need to pad their scroll content clear of it. The safe-area
+  /// inset is added separately by the caller, as before.
+  static const double occupiedHeight = barHeight + edgeMargin;
+
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final radius = BorderRadius.circular(AppRadius.pill);
 
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.compose(
-          outer: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-          // saturate(150%) — the standard CSS saturation matrix at s = 1.5,
-          // applied after the blur so the effect reads like the Spec's
-          // "frosted, slightly vivid" glass rather than a flat gray smear.
-          inner: const ColorFilter.matrix(<double>[
-            1.3935, -0.3575, -0.036, 0, 0,
-            -0.1065, 1.1425, -0.036, 0, 0,
-            -0.1065, -0.3575, 1.464, 0, 0,
-            0, 0, 0, 1, 0,
-          ]),
+    // The outer padding is what makes the bar float: transparent margin on
+    // the left, right and bottom, with the safe-area inset added beneath it.
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        edgeMargin,
+        0,
+        edgeMargin,
+        edgeMargin + bottomInset,
+      ),
+      child: DecoratedBox(
+        // The shadow lives on a DecoratedBox *outside* the ClipRRect: a clip
+        // would otherwise cut it off at the pill's own edge. `shadowColor` is
+        // a muted sage-gray in light and pure black in dark (per the token's
+        // docs).
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          boxShadow: [
+            BoxShadow(
+              color: t.shadowColor.withValues(alpha: isDark ? 0.45 : 0.30),
+              blurRadius: 24,
+              offset: const Offset(0, 8),
+            ),
+            BoxShadow(
+              color: t.shadowColor.withValues(alpha: isDark ? 0.30 : 0.16),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        child: Container(
-          decoration: BoxDecoration(
-            color: t.navBg.withValues(alpha: 0.66),
-            border: Border(top: BorderSide(color: t.navHairline)),
-          ),
-          padding: EdgeInsets.only(bottom: bottomInset),
-          child: SizedBox(
-            height: barHeight,
-            child: _NavPillLayer(
-              selectedIndex: selectedIndex,
-              onSelected: onSelected,
+        child: ClipRRect(
+          borderRadius: radius,
+          child: BackdropFilter(
+            filter: ImageFilter.compose(
+              outer: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+              // saturate(150%) — the standard CSS saturation matrix at
+              // s = 1.5, applied after the blur so the effect reads like
+              // "frosted, slightly vivid" glass rather than a flat gray smear.
+              inner: const ColorFilter.matrix(<double>[
+                1.3935, -0.3575, -0.036, 0, 0,
+                -0.1065, 1.1425, -0.036, 0, 0,
+                -0.1065, -0.3575, 1.464, 0, 0,
+                0, 0, 0, 1, 0,
+              ]),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: t.navBg.withValues(alpha: isDark ? 0.85 : 0.90),
+                borderRadius: radius,
+                // A full-perimeter hairline, not a top-edge-only rule: a
+                // floating pill has no "top edge" to underline, it needs its
+                // whole silhouette defined against the page behind it.
+                border: Border.all(color: t.navHairline),
+              ),
+              child: SizedBox(
+                height: barHeight,
+                child: _NavPillLayer(
+                  selectedIndex: selectedIndex,
+                  onSelected: onSelected,
+                ),
+              ),
             ),
           ),
         ),
@@ -107,7 +153,29 @@ class AyreBottomNav extends StatelessWidget {
   }
 }
 
-/// The sliding tonal pill and the row of items, layered together so the pill
+/// Active-pill fill (§2A "Bottom nav" rows): the deep ink `textPrimary` in
+/// light, the brand `accent` in dark. Resolved here from the ambient
+/// brightness rather than as a new [AppThemeTokens] field — the token set is
+/// fixed (Phase 0), and this pairing is specific to this one component.
+Color _activePillColor(AppThemeTokens t, BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark ? t.accent : t.textPrimary;
+
+/// Active tab icon + label: white on the light theme's ink pill, `onAccent`
+/// on the dark theme's emerald pill.
+Color _activeContentColor(AppThemeTokens t, BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+    ? t.onAccent
+    : const Color(0xFFFFFFFF);
+
+/// Inactive tab icon + label. Light uses the spec's own muted gray
+/// (`#8B948E`, a touch lighter than `foregroundSubtle` so inactive items
+/// recede against the white bar); dark reuses `foregroundMuted`.
+Color _inactiveContentColor(AppThemeTokens t, BuildContext context) =>
+    Theme.of(context).brightness == Brightness.dark
+    ? t.foregroundMuted
+    : const Color(0xFF8B948E);
+
+/// The sliding solid pill and the row of items, layered together so the pill
 /// paints once beneath the (non-animating) item row.
 class _NavPillLayer extends StatelessWidget {
   const _NavPillLayer({required this.selectedIndex, required this.onSelected});
@@ -151,12 +219,12 @@ class _NavPillLayer extends StatelessWidget {
                             ),
                             child: DecoratedBox(
                               decoration: BoxDecoration(
-                                // The Spec's "flat tonal pill" — never a
-                                // solid fill, always a light wash on the
-                                // accent, per the same 12–16% wash
-                                // convention used for every other soft
-                                // semantic tint in this theme.
-                                color: t.accent.withValues(alpha: 0.14),
+                                // A solid pill, never a wash: the deep
+                                // forest-green ink (= `textPrimary`) in
+                                // light, the brand emerald (`accent`) in
+                                // dark — the one place the nav carries the
+                                // brand at full strength.
+                                color: _activePillColor(t, context),
                                 borderRadius: BorderRadius.circular(
                                   AppRadius.pill,
                                 ),
@@ -212,7 +280,9 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final color = selected ? t.accentInk : t.foregroundSubtle;
+    final color = selected
+        ? _activeContentColor(t, context)
+        : _inactiveContentColor(t, context);
 
     return Semantics(
       button: true,
