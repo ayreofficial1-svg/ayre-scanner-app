@@ -21,7 +21,7 @@ void main() {
       category: 'Breadth',
       featured: true,
     ),
-    InsightNote(title: 'Third note, no body'),
+    InsightNote(title: 'Third note, no body', body: ''),
   ];
 
   Widget host(Widget child, {ThemeData? theme}) => MaterialApp(

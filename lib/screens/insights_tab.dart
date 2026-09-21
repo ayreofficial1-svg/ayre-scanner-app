@@ -896,9 +896,8 @@ class _MoversTrailing extends StatelessWidget {
 /// screen: the feed's whole list is already in hand (at most ten rows), so a
 /// route would only re-render it.
 ///
-/// The vertical padding is tap area, not decoration. It stops short of the
-/// 44pt floor to avoid opening a tall gap above each section label; Phase 7's
-/// whole-app target pass owns closing that.
+/// The vertical padding is tap area, not decoration: 15pt above and below a
+/// ~16pt line clears the 44pt target floor.
 class _SeeAllLink extends StatelessWidget {
   const _SeeAllLink({required this.expanded, required this.onTap});
 
@@ -914,7 +913,7 @@ class _SeeAllLink extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 2),
           child: Text(
             expanded ? 'Show less' : 'See all',
             style: AppTypo.ui(

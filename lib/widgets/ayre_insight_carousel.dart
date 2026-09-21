@@ -137,7 +137,7 @@ class _AyreInsightCarouselState extends State<AyreInsightCarousel> {
                                   alignment: Alignment.centerLeft,
                                   children: [
                                     ...previousChildren,
-                                    if (currentChild != null) currentChild,
+                                    ?currentChild,
                                   ],
                                 ),
                             child: Text(

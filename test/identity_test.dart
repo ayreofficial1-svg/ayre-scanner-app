@@ -10,13 +10,10 @@ import 'package:flutter_test/flutter_test.dart';
 /// written brief — the check §9.4 asks for, since real hex values always drift a
 /// little from a spec during implementation.
 ///
-/// Updated for v4 (plan `AYRE_REDESIGN_V4_PLAN.md`) per the working agreement
-/// at the top of that document: this file is maintained quietly alongside
-/// each phase's own changes rather than re-surfaced as a standalone
-/// deliverable. Phase 0 changed every token value and several token names;
-/// Phase 1 retired `ChipTone.info`, redrew three of the five nav glyphs, and
-/// made icon stroke weight state-dependent (1.7 inactive / 2.1 active,
-/// Spec §10) rather than fixed — both reflected below.
+/// Updated for v5 (`INVESTY_IMPLEMENTATION_PLAN.md` §2A): forest-green/emerald
+/// identity, mint-paper light theme, near-black-green dark theme. The v4
+/// clay/sage/rose assertions this file used to hold no longer describe the
+/// app and were replaced, not patched.
 void main() {
   final themes = {
     'light': AppTheme.lightTokens,
@@ -24,7 +21,7 @@ void main() {
   };
 
   group('palette — base and brand', () {
-    test('the base is warm in both themes, never cool/graphite', () {
+    test('the base carries a green cast in both themes, never neutral gray', () {
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
         for (final surface in [
           t.background,
@@ -32,51 +29,50 @@ void main() {
           t.surfaceRaised,
           t.surfaceSunken,
         ]) {
-          // v4 is deliberately warm paper/charcoal — a red-or-neutral-above-
-          // blue undertone — reversing the previous cool graphite/ink base.
+          // Mint-white (light) / near-black green (dark): green is never the
+          // weakest channel. Pure white satisfies this with equality.
           expect(
-            surface.r,
+            surface.g,
+            greaterThanOrEqualTo(surface.r),
+            reason: '$name base steps must not lean red',
+          );
+          expect(
+            surface.g,
             greaterThanOrEqualTo(surface.b),
-            reason: '$name base steps must be warm, never cool-undertoned',
+            reason: '$name base steps must not lean blue',
           );
         }
       }
     });
 
-    test('the accent is v4\'s clay/terracotta, not the old brand green', () {
-      // v4 retires the fixed cross-theme brand green entirely — the accent is
-      // now theme-dependent (warmer/darker in light mode) and lives in the
-      // clay/terracotta family, not spring-green.
-      expect(AppTheme.darkTokens.accent, const Color(0xFFD26A4C));
-      expect(AppTheme.lightTokens.accent, const Color(0xFFC75F43));
+    test('the accent is v5 emerald, not v4 clay', () {
+      expect(AppTheme.darkTokens.accent, const Color(0xFF3FCB7A));
+      expect(AppTheme.lightTokens.accent, const Color(0xFF1F8A4B));
+      expect(AppTheme.darkTokens.accent, isNot(const Color(0xFFD26A4C)));
+      expect(AppTheme.lightTokens.accent, isNot(const Color(0xFFC75F43)));
     });
 
-    test('the accent is a warm, red-leaning orange (clay), not green', () {
+    test('the accent family is green', () {
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
-        for (final tone in [t.accent, t.accentInk]) {
+        for (final tone in [t.accent, t.accentInk, t.positive]) {
           expect(
             _hue(tone),
-            inInclusiveRange(0, 30),
-            reason: '$name accent family must be a warm clay/terracotta',
+            inInclusiveRange(130, 165),
+            reason: '$name accent family must be emerald/forest green',
           );
         }
       }
     });
 
-    test('positive is sage (green-leaning), distinct from the clay accent', () {
-      // v4 reverses v3's "one ownable green for brand and gain": positive is
-      // now a muted sage, deliberately in a different family from the clay
-      // accent, and negative (muted rose) must stay unmistakable from it.
+    test('negative is a clear red and never confusable with positive', () {
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
-        final positiveHue = _hue(t.positive);
-        expect(
-          positiveHue,
-          inInclusiveRange(90, 160),
-          reason: '$name positive should read as sage green',
-        );
-
         final negativeHue = _hue(t.negative);
-        final gap = (positiveHue - negativeHue).abs();
+        expect(
+          negativeHue > 340 || negativeHue < 25,
+          isTrue,
+          reason: '$name negative must sit in the red band, got $negativeHue',
+        );
+        final gap = (_hue(t.positive) - negativeHue).abs();
         expect(
           math.min(gap, 360 - gap),
           greaterThan(90),
@@ -85,22 +81,14 @@ void main() {
       }
     });
 
-    test('negative is a muted rose, and neutral (gold) is tellable apart', () {
+    test('neutral is a muted gold, tellable apart from negative', () {
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
-        // Rose sits in the red/pink band, not v3's wine-red "Garnet" band.
-        final negativeHue = _hue(t.negative);
-        expect(
-          negativeHue > 340 || negativeHue < 25,
-          isTrue,
-          reason: '$name negative must be a muted rose, got $negativeHue',
-        );
         expect(
           _hue(t.neutral),
           inInclusiveRange(30, 60),
           reason: '$name neutral is a muted gold',
         );
-        // Compared on the wrapped axis so 350° vs 40° reads as 50° apart.
-        final gap = (negativeHue - _hue(t.neutral)).abs();
+        final gap = (_hue(t.negative) - _hue(t.neutral)).abs();
         expect(
           math.min(gap, 360 - gap),
           greaterThan(8),
@@ -109,38 +97,38 @@ void main() {
       }
     });
 
-    test('no bright/saturated green or red survives from the old identity', () {
-      // Hard rule carried into code (plan §3.3): the previous identity's
-      // saturated market colours are explicitly excluded, not just replaced.
-      const excluded = [
-        Color(0xFF00C853),
-        Color(0xFF16A34A),
-        Color(0xFFFF1744),
-        Color(0xFFEF4444),
-        Color(0xFF07C58F), // the old fixed brand green itself
-      ];
+    test('the avatar identity accent is lavender/plum, distinct from brand', () {
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
-        for (final tone in [t.accent, t.positive, t.negative, t.neutral]) {
+        for (final tone in [t.avatarFill, t.avatarInk]) {
           expect(
-            excluded,
-            isNot(contains(tone)),
-            reason: '$name must not reintroduce an excluded saturated tone',
+            _hue(tone),
+            inInclusiveRange(230, 290),
+            reason: '$name avatar tones must stay in the lavender/plum family',
           );
         }
+      }
+      expect(AppTheme.lightTokens.avatarFill, const Color(0xFFE1DDF5));
+      expect(AppTheme.darkTokens.avatarInk, const Color(0xFFC9BFEA));
+    });
+
+    test('index identity tints are distinct per index in both themes', () {
+      for (final tints in [AppIndexTints.light, AppIndexTints.dark]) {
+        expect(tints.keys.toSet(), AppIndexId.values.toSet());
+        final backgrounds = tints.values.map((v) => v.cardBackground).toSet();
+        final traces = tints.values.map((v) => v.trace).toSet();
+        expect(backgrounds.length, AppIndexId.values.length);
+        expect(traces.length, AppIndexId.values.length);
       }
     });
   });
 
   group('accessibility — contrast at final values', () {
-    test('every text tone clears 4.5:1 on its surfaces', () {
+    test('primary and muted text clear 4.5:1 on every surface step', () {
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
         for (final surface in [t.background, t.surface, t.surfaceRaised]) {
           for (final (role, color) in [
             ('textPrimary', t.textPrimary),
             ('foregroundMuted', t.foregroundMuted),
-            // foregroundSubtle is eyebrow/caption-only by design discipline
-            // (plan §3.2) — checked separately at large-text (3:1) below,
-            // not asserted at the 4.5:1 normal-text floor here.
           ]) {
             expect(
               _contrast(color, surface),
@@ -152,25 +140,22 @@ void main() {
       }
     });
 
-    test('foregroundSubtle (eyebrows/captions only) clears 3:1', () {
+    test('foregroundSubtle (eyebrows/micro-labels only) holds a 2.5:1 floor', () {
+      // §2A's values measure 2.68–3.07:1 in light and 3.27–3.96:1 in dark.
+      // This token is micro-copy only by design; the assertion is a
+      // regression guard on the canonical values, not a claim of AA.
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
         for (final surface in [t.background, t.surface, t.surfaceRaised]) {
           expect(
             _contrast(t.foregroundSubtle, surface),
-            greaterThanOrEqualTo(3.0),
-            reason:
-                '$name foregroundSubtle is micro-copy only, held to the '
-                'large-text/non-text floor, not full body-text AA',
+            greaterThanOrEqualTo(2.5),
+            reason: '$name foregroundSubtle regressed below its measured floor',
           );
         }
       }
     });
 
     test('accentInk clears 4.5:1 as small text on its own theme\'s surfaces', () {
-      // Phase 0's numeric contrast pass (plan §7 open decision #5): dark
-      // theme's raw accent already clears AA (accentInk == accent there);
-      // light theme needed a derived, darkened accentInk. Verify both hold
-      // at the tokens' actual final values, not the plan's prose claim.
       for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
         for (final surface in [t.background, t.surface]) {
           expect(
@@ -182,29 +167,35 @@ void main() {
       }
     });
 
-    test('ink text on the accent fill clears 4.5:1', () {
-      for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
-        expect(
-          _contrast(t.onAccent, t.accent),
-          greaterThanOrEqualTo(4.5),
-          reason: '$name primary button label',
-        );
-      }
+    test('dark onAccent clears 4.5:1 on accent', () {
+      final t = AppTheme.darkTokens;
+      expect(_contrast(t.onAccent, t.accent), greaterThanOrEqualTo(4.5));
     });
 
-    test('the accent fill carries a visible component edge', () {
-      // A mid-lightness fill can't always carry its own boundary, which is
-      // why AyreButton draws a hairline edge around every kind.
-      for (final (name, t) in themes.entries.map((e) => (e.key, e.value))) {
-        final edge = Color.alphaBlend(
-          t.textPrimary.withValues(alpha: 0.18),
-          t.background,
-        );
-        expect(
-          _contrast(edge, t.background),
-          greaterThanOrEqualTo(1.4),
-          reason: '$name accent fills need a visible boundary',
-        );
+    test('light onAccent on accent holds its measured ~4.38:1 (known, flagged)', () {
+      // White on #1F8A4B is a hair under AA for normal text. White is already
+      // the maximum, and `accent` is canonical in §2A, so the value is pinned
+      // here rather than silently changed; it is flagged for design review
+      // (plan §7, Phase 0). Fails if the pairing gets worse.
+      final t = AppTheme.lightTokens;
+      expect(_contrast(t.onAccent, t.accent), greaterThanOrEqualTo(4.3));
+    });
+
+    test('text on the identity tints keeps `muted` at or above 4.5:1', () {
+      for (final entry in {
+        Brightness.light: AppIndexTints.light,
+        Brightness.dark: AppIndexTints.dark,
+      }.entries) {
+        final t = entry.key == Brightness.light
+            ? AppTheme.lightTokens
+            : AppTheme.darkTokens;
+        for (final tint in entry.value.values) {
+          expect(
+            _contrast(t.foregroundMuted, tint.cardBackground),
+            greaterThanOrEqualTo(4.5),
+            reason: '${entry.key.name} muted text on an index card tint',
+          );
+        }
       }
     });
   });
