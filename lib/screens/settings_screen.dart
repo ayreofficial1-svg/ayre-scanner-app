@@ -8,6 +8,7 @@ import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
 import '../widgets/figure.dart';
+import '../widgets/pressable_scale.dart';
 import 'support_screen.dart';
 
 /// Settings — grouped by what the user is actually trying to change, with the
@@ -77,8 +78,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Text('THEME', style: AppTypo.label(t)),
                     const SizedBox(height: AppSpace.sm),
                     // Light and Dark only. The System option is gone, and stored
-                    // "system" values are migrated on load.
-                    AyreSegmented<ThemeMode>(
+                    // "system" values are migrated on load. Big tappable tiles
+                    // (redesign plan §2.4 / Phase 6 step 4), not the thin
+                    // segmented bar — the underlying selection logic is
+                    // untouched.
+                    _AppearanceTiles(
                       value: theme.themeMode == ThemeMode.system
                           ? ThemeMode.dark
                           : theme.themeMode,
@@ -86,18 +90,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         HapticFeedback.selectionClick();
                         theme.setThemeMode(mode);
                       },
-                      segments: const [
-                        AyreSegment(
-                          value: ThemeMode.light,
-                          label: 'Light',
-                          glyph: AyreGlyph.empty,
-                        ),
-                        AyreSegment(
-                          value: ThemeMode.dark,
-                          label: 'Dark',
-                          glyph: AyreGlyph.live,
-                        ),
-                      ],
                     ),
                     const SizedBox(height: AppSpace.md),
                     Text(
@@ -253,15 +245,11 @@ class _TextSizeCard extends StatelessWidget {
           // moment of choosing.
           _Preview(scale: value.scale),
           const SizedBox(height: AppSpace.md),
-          AyreSegmented<AppTextSize>(
-            compact: true,
-            value: value,
-            onChanged: onChanged,
-            segments: [
-              for (final size in AppTextSize.values)
-                AyreSegment(value: size, label: size.label),
-            ],
-          ),
+          // Three-up "big tappable tile" selector (redesign plan §2.4 /
+          // Phase 6 step 4): each tile shows "Aa" at its own scale plus a
+          // checkmark on the selected tile, replacing the thinner segmented
+          // bar. `onChanged` wiring is unchanged.
+          _TextSizeTiles(value: value, onChanged: onChanged),
           const SizedBox(height: AppSpace.sm),
           Text(
             'Applies across the app straight away, on top of your device’s own '
@@ -320,6 +308,203 @@ class _Preview extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Appearance & text-size tile selectors ─────────────────────────────────
+// Phase 6 step 4: both selectors render as a row of big tappable tiles
+// (glyph/sample + label + checkmark on the selected tile) rather than
+// `AyreSegmented`'s thinner bar. `AyreSegmented` itself is left untouched —
+// it's shared with the Insights time-window toggle, which keeps the bar
+// style. These two widgets are local to this screen.
+
+class _AppearanceTiles extends StatelessWidget {
+  const _AppearanceTiles({required this.value, required this.onChanged});
+
+  final ThemeMode value;
+  final ValueChanged<ThemeMode> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _BigTile(
+            selected: value == ThemeMode.light,
+            label: 'Light',
+            onTap: () => onChanged(ThemeMode.light),
+            child: _TileGlyph(
+              glyph: AyreGlyph.sun,
+              selected: value == ThemeMode.light,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpace.sm),
+        Expanded(
+          child: _BigTile(
+            selected: value == ThemeMode.dark,
+            label: 'Dark',
+            onTap: () => onChanged(ThemeMode.dark),
+            child: _TileGlyph(
+              glyph: AyreGlyph.moon,
+              selected: value == ThemeMode.dark,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TextSizeTiles extends StatelessWidget {
+  const _TextSizeTiles({required this.value, required this.onChanged});
+
+  final AppTextSize value;
+  final ValueChanged<AppTextSize> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (final size in AppTextSize.values) ...[
+          if (size != AppTextSize.values.first)
+            const SizedBox(width: AppSpace.sm),
+          Expanded(
+            child: _BigTile(
+              selected: value == size,
+              label: size.label,
+              onTap: () => onChanged(size),
+              child: _TileAa(scale: size.scale, selected: value == size),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// One tile shared by both selectors: a sample/glyph, a label, and a
+/// checkmark badge in the corner when selected. Fill/content colors follow
+/// §2A's "Theme/text-size selector tiles" component-table row exactly:
+/// selected tiles fill `accent` with `onAccent` content; unselected tiles
+/// stay on `surfaceRaised` with `foregroundMuted` content.
+class _BigTile extends StatelessWidget {
+  const _BigTile({
+    required this.selected,
+    required this.label,
+    required this.onTap,
+    required this.child,
+  });
+
+  final bool selected;
+  final String label;
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final fg = selected ? t.onAccent : t.foregroundMuted;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      child: PressableScale(
+        onTap: onTap,
+        borderRadius: AppRadius.control,
+        child: AnimatedContainer(
+          duration: AppMotion.buttonPress,
+          curve: AppMotion.ease,
+          padding: const EdgeInsets.symmetric(
+            vertical: AppSpace.md,
+            horizontal: AppSpace.sm,
+          ),
+          decoration: BoxDecoration(
+            color: selected ? t.accent : t.surfaceRaised,
+            borderRadius: BorderRadius.circular(AppRadius.control),
+            border: Border.all(
+              color: selected ? t.accent : t.hairline,
+            ),
+          ),
+          child: Stack(
+            children: [
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  child,
+                  const SizedBox(height: AppSpace.xs),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      label,
+                      style: AppTypo.ui(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: fg,
+                      ),
+                      maxLines: 1,
+                    ),
+                  ),
+                ],
+              ),
+              if (selected)
+                Positioned(
+                  top: 0,
+                  right: 0,
+                  child: AyreIcon(AyreGlyph.check, size: 14, color: fg),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Theme tile's sample — the sun/moon glyph, sized up from the row-icon
+/// default since this is the tile's whole visual identity, not a leading
+/// icon beside text.
+class _TileGlyph extends StatelessWidget {
+  const _TileGlyph({required this.glyph, required this.selected});
+
+  final AyreGlyph glyph;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return AyreIcon(
+      glyph,
+      size: 22,
+      color: selected ? t.onAccent : t.foregroundMuted,
+      filled: selected,
+    );
+  }
+}
+
+/// Text-size tile's sample — "Aa" rendered at the size's own scale so the
+/// tile previews the choice, same idea as `_Preview` above but compact
+/// enough to sit inside a tile.
+class _TileAa extends StatelessWidget {
+  const _TileAa({required this.scale, required this.selected});
+
+  final double scale;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return MediaQuery.withNoTextScaling(
+      child: Text(
+        'Aa',
+        style: AppTypo.display(
+          fontSize: 18 * scale,
+          fontWeight: FontWeight.w700,
+          color: selected ? t.onAccent : t.foregroundMuted,
         ),
       ),
     );

@@ -43,6 +43,8 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     required this.shadowColor,
     required this.navBg,
     required this.skeleton,
+    required this.avatarFill,
+    required this.avatarInk,
   });
 
   /// App canvas: pale, cool mint-white paper in light; near-black with a
@@ -142,6 +144,15 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   /// base fill, not the highlight.
   final Color skeleton;
 
+  /// Avatar / identity-chip fill (Phase 6, §2A "Avatar / identity chip" row)
+  /// — a deliberate lavender/plum secondary accent, distinct from brand
+  /// green. Used only for personal/identity chips (the Profile initials
+  /// circle), never for market data.
+  final Color avatarFill;
+
+  /// Initials text on [avatarFill].
+  final Color avatarInk;
+
   @override
   AppThemeTokens copyWith({
     Color? background,
@@ -167,6 +178,8 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     Color? shadowColor,
     Color? navBg,
     Color? skeleton,
+    Color? avatarFill,
+    Color? avatarInk,
   }) {
     return AppThemeTokens(
       background: background ?? this.background,
@@ -192,6 +205,8 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       shadowColor: shadowColor ?? this.shadowColor,
       navBg: navBg ?? this.navBg,
       skeleton: skeleton ?? this.skeleton,
+      avatarFill: avatarFill ?? this.avatarFill,
+      avatarInk: avatarInk ?? this.avatarInk,
     );
   }
 
@@ -223,6 +238,8 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       shadowColor: c(shadowColor, other.shadowColor),
       navBg: c(navBg, other.navBg),
       skeleton: c(skeleton, other.skeleton),
+      avatarFill: c(avatarFill, other.avatarFill),
+      avatarInk: c(avatarInk, other.avatarInk),
     );
   }
 }
@@ -763,6 +780,10 @@ abstract final class AppTheme {
     shadowColor: Color(0xFF000000),
     navBg: Color(0xFF101911),
     skeleton: Color(0xFF1B261E),
+    // Phase 6 — deliberate lavender/plum secondary accent for the Profile
+    // avatar/identity chip only; never brand green, never market data.
+    avatarFill: Color(0xFF241F38),
+    avatarInk: Color(0xFFC9BFEA),
   );
 
   // Light — pale, cool mint-white paper canvas (`#F1F7F1`), deep
@@ -806,6 +827,10 @@ abstract final class AppTheme {
     shadowColor: Color(0xFFB9CBBB),
     navBg: Color(0xFFFFFFFF),
     skeleton: Color(0xFFE7EEE8),
+    // Phase 6 — deliberate lavender/plum secondary accent for the Profile
+    // avatar/identity chip only; never brand green, never market data.
+    avatarFill: Color(0xFFE1DDF5),
+    avatarInk: Color(0xFF4B3F73),
   );
 
   static AppThemeTokens get lightTokens => _light;

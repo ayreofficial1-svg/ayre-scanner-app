@@ -5,7 +5,9 @@ import '../services/api_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
+import '../widgets/ayre_hills.dart';
 import '../widgets/ayre_icons.dart';
+import '../widgets/ayre_stat_tile.dart';
 import '../widgets/figure.dart';
 import 'edit_profile_screen.dart';
 import 'home_shell.dart' show initialsFor;
@@ -106,11 +108,29 @@ class _ProfileTabState extends State<ProfileTab> {
           120,
         ),
         children: [
-          SafeArea(
-            bottom: false,
-            child: Entrance(
-              child: _IdentityBlock(name: _name, handle: _handle, tier: _tier),
-            ),
+          // Same "soft layered shape" header device as Home (§2A, Phase 6
+          // step 1) — bled to the top-right corner behind the identity
+          // block, not part of its layout.
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Positioned(
+                top: -AppSpace.pageTop,
+                right: -AppSpace.pageHorizontal,
+                child: AyreHills(),
+              ),
+              SafeArea(
+                bottom: false,
+                child: Entrance(
+                  child: _IdentityBlock(
+                    name: _name,
+                    handle: _handle,
+                    tier: _tier,
+                    onEdit: _editProfile,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: AppSpace.sectionGap),
           const Entrance(index: 1, child: _StatsRow()),
@@ -244,95 +264,129 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 }
 
+/// Profile header (redesign plan §2.4 / Phase 6 step 1): circular
+/// avatar/initials in the identity-accent lavender/plum tone (never brand
+/// green — §2A's "Avatar / identity chip" row is a deliberate secondary
+/// accent reserved for personal identity, distinct from market data), name,
+/// handle, a small pill tag top-right of the header, a muted tagline, and an
+/// "Edit Profile" pill button.
 class _IdentityBlock extends StatelessWidget {
   const _IdentityBlock({
     required this.name,
     required this.handle,
     required this.tier,
+    required this.onEdit,
   });
 
   final String name;
   final String? handle;
   final String? tier;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     // A flat header block, not a bordered card.
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          height: 56,
-          width: 56,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: t.accent,
-            // §7 reserves circles for avatars and the toggle knob. This is an
-            // avatar — it was a rounded square in v3 because that identity had
-            // no such rule. Home's header control matches.
-            shape: BoxShape.circle,
-            border: Border.all(color: t.hairline),
-          ),
-          child: Text(
-            initialsFor(name),
-            style: AppTypo.ui(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: t.onAccent,
-            ),
-          ),
-        ),
-        const SizedBox(width: AppSpace.md),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                name,
-                style: AppTypo.display(
-                  fontSize: AppTextScale.featuredHeadline,
-                  fontWeight: FontWeight.w700,
-                  color: t.textPrimary,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              height: 56,
+              width: 56,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: t.avatarFill,
+                // §7 reserves circles for avatars and the toggle knob. This
+                // is an avatar — it was a rounded square in v3 because that
+                // identity had no such rule. Home's header control matches.
+                shape: BoxShape.circle,
+                border: Border.all(color: t.hairline),
               ),
-              const SizedBox(height: AppSpace.xxs),
-              Row(
+              child: Text(
+                initialsFor(name),
+                style: AppTypo.ui(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: t.avatarInk,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpace.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (handle != null && handle!.isNotEmpty)
-                    Flexible(
-                      child: Text(
-                        '@$handle',
-                        style: AppTypo.caption(t),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                  Text(
+                    name,
+                    style: AppTypo.display(
+                      fontSize: AppTextScale.featuredHeadline,
+                      fontWeight: FontWeight.w700,
+                      color: t.textPrimary,
                     ),
-                  if (tier != null && tier!.isNotEmpty) ...[
-                    if (handle != null && handle!.isNotEmpty)
-                      const SizedBox(width: AppSpace.sm),
-                    // `ChipTone.info` was retired in Phase 1 (plan §3.3/§7 —
-                    // v4 has no separate "info" accent role); a tier badge is
-                    // non-market identity metadata, which maps onto
-                    // `ChipTone.neutral` rather than `brand` (brand is
-                    // reserved for accent-toned tags, and a tier isn't a
-                    // market-direction or promotional signal). This is a
-                    // one-line fix to keep the screen compiling, not a
-                    // Phase 5 rebuild of `profile_tab.dart` itself.
-                    AyreChip(label: tier!, tone: ChipTone.neutral),
-                  ],
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: AppSpace.xxs),
+                  if (handle != null && handle!.isNotEmpty)
+                    Text(
+                      '@$handle',
+                      style: AppTypo.caption(t),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                 ],
               ),
-            ],
-          ),
+            ),
+            // Top-right pill tag (§2A "Profile mood/streak tag pill" /
+            // Component table: text `accentInk` on `accentSoft`). The app
+            // has no streak/mood endpoint, so this reuses the real `tier`
+            // the session already returns rather than inventing figures —
+            // same non-market identity metadata as before, restyled onto
+            // the header's corner instead of a same-line chip.
+            if (tier != null && tier!.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpace.sm,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: t.accentSoft,
+                  borderRadius: BorderRadius.circular(AppRadius.chip),
+                ),
+                child: Text(
+                  tier!.toUpperCase(),
+                  style: AppTypo.label(t, color: t.accentInk),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: AppSpace.sm),
+        // Muted tagline — placeholder copy in the same spirit as Learn's
+        // subhead (Phase 5), flagged for design review rather than pulled
+        // from any backend field (there isn't one).
+        Text(
+          'Discipline today. A better tomorrow.',
+          style: AppTypo.caption(t),
+        ),
+        const SizedBox(height: AppSpace.md),
+        AyreButton(
+          label: 'Edit Profile',
+          glyph: AyreGlyph.edit,
+          kind: AyreButtonKind.outline,
+          expand: false,
+          onPressed: onEdit,
         ),
       ],
     );
   }
 }
 
-/// §13.5's stats row.
+/// §13.5's stats row, rebuilt (Phase 6 step 2) onto the shared
+/// [AyreStatTile] from Phase 5 instead of a bespoke card — "one component
+/// for two screens", per that component's own doc comment.
 ///
 /// Built only from figures the app genuinely holds locally — alerts logged on
 /// this device, and whether the notification log has anything unread. There is
@@ -350,25 +404,24 @@ class _StatsRow extends StatelessWidget {
       builder: (context, _) {
         final entries = NotificationLog.instance.entries;
         final unread = NotificationLog.instance.hasUnread;
-        return AyreCard(
-          child: Row(
-            children: [
-              Expanded(
-                child: LabelledFigure(
-                  label: 'Alerts logged',
-                  value: '${entries.length}',
-                  fontSize: AppTextScale.cardTitle,
-                ),
+        return Row(
+          children: [
+            Expanded(
+              child: AyreStatTile(
+                glyph: AyreGlyph.bell,
+                value: '${entries.length}',
+                label: 'Alerts logged',
               ),
-              Expanded(
-                child: LabelledFigure(
-                  label: 'Unread',
-                  value: unread ? 'Yes' : 'No',
-                  fontSize: AppTextScale.cardTitle,
-                ),
+            ),
+            const SizedBox(width: AppSpace.sm),
+            Expanded(
+              child: AyreStatTile(
+                glyph: AyreGlyph.alerts,
+                value: unread ? 'Yes' : 'No',
+                label: 'Unread insights',
               ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
