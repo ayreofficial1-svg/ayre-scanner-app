@@ -499,7 +499,7 @@ class OfflineBanner extends StatelessWidget {
 class StaleNotice extends StatelessWidget {
   const StaleNotice({
     super.key,
-    this.message = 'Data may be delayed during high volume',
+    this.message = 'Showing the last values received',
     this.onRefresh,
   });
 
@@ -560,26 +560,25 @@ class StaleNotice extends StatelessWidget {
   }
 }
 
-/// A freshness stamp. The clock is a figure, so it takes the numeric face.
+/// A freshness stamp — "AS OF hh:mm". The clock is a figure, so it takes the
+/// numeric face.
+///
+/// It always draws the clock, fresh or stale. A stale feed is signalled by
+/// [StaleNotice] and by the LIVE chip being omitted — never by the word
+/// "Delayed" on the stamp (v5 plan §4).
 class FreshnessStamp extends StatelessWidget {
   const FreshnessStamp({super.key, required this.asOf, this.stale = false});
 
   final DateTime? asOf;
+
+  /// Retained only so existing call sites keep compiling. It no longer
+  /// changes what is drawn.
   final bool stale;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     if (asOf == null) return const SizedBox.shrink();
-    // The stale variant needs the same shrink treatment as the stamp below —
-    // "DELAYED" is wider than it looks once the text scale is turned up.
-    if (stale) {
-      return const FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerRight,
-        child: AyreChip(label: 'Delayed', tone: ChipTone.attention),
-      );
-    }
     // Shrinks instead of overflowing: this sits in a narrow trailing slot, and
     // at a large text scale the stamp is wider than the slot allows.
     return FittedBox(

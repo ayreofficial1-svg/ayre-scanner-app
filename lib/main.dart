@@ -10,6 +10,18 @@ import 'theme/app_theme.dart';
 import 'widgets/ayre_components.dart';
 import 'widgets/state_views.dart';
 
+/// The single switch for the client-side sign-in gate.
+///
+/// `false` (current): startup skips `ApiService.loadSavedCookie()` /
+/// `getSession()` and goes straight to `HomeShell`. Set to `true` to restore
+/// the login gate; nothing else needs to change — `LoginScreen`,
+/// `ApiService.login/logout/getSession` and `SessionExpiredScreen` are all
+/// still wired.
+///
+/// This flag only controls the app. The backend enforces sign-in on its own
+/// (`_require_authentication`, an `@app.before_request` hook in the scanner's
+/// `main.py`), so while that hook is active, unauthenticated `/api/*` calls
+/// still return 401 and the app routes to `SessionExpiredScreen`.
 const bool kEnableAuthStartupGate = false;
 
 void main() {

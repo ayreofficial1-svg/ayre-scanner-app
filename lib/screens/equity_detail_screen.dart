@@ -197,19 +197,19 @@ class _EquityHeader extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: AppSpace.sm),
-                ShrinkTrailing(
-                  child: stale
-                      ? const AyreChip(
-                          label: 'Delayed',
-                          tone: ChipTone.attention,
-                        )
-                      : const AyreChip(
-                          label: 'Live',
-                          tone: ChipTone.live,
-                          pulse: true,
-                        ),
-                ),
+                // A stale feed renders nothing in this slot — never a "Live"
+                // chip it hasn't earned, and never the word "Delayed" (v5
+                // plan §4). The StaleNotice below carries the explanation.
+                if (!stale) ...[
+                  const SizedBox(width: AppSpace.sm),
+                  const ShrinkTrailing(
+                    child: AyreChip(
+                      label: 'Live',
+                      tone: ChipTone.live,
+                      pulse: true,
+                    ),
+                  ),
+                ],
               ],
             ),
             const SizedBox(height: AppSpace.sm),
@@ -247,7 +247,7 @@ class _EquityHeader extends StatelessWidget {
                   if (quote.trace.length >= 2) ...[
                     const SizedBox(height: AppSpace.md),
                     // §12.1: a chart inherits the colour of its subject —
-                    // no fixed neutral chart-line token in v4.
+                    // no fixed neutral chart-line token in v5.
                     TickerTrace(
                       points: normaliseTrace(quote.trace),
                       height: 64,

@@ -226,7 +226,7 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('a stale section keeps its values and flags the delay', (
+    testWidgets('a stale section keeps its values and never says Delayed', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -234,7 +234,11 @@ void main() {
       );
       await settle(tester);
 
-      expect(find.text('DELAYED'), findsWidgets);
+      // v5 plan §4: no "Delayed" chip anywhere, and no "Live" chip on a feed
+      // that hasn't earned it. The freshness stamp always shows its clock.
+      expect(find.text('DELAYED'), findsNothing);
+      expect(find.text('LIVE'), findsNothing);
+      expect(find.text('AS OF'), findsWidgets);
       // Degraded-but-shown: the level is still on screen.
       expect(find.text('24,518.40'), findsWidgets);
       expect(tester.takeException(), isNull);
