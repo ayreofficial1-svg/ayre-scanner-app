@@ -213,7 +213,7 @@ class BreadthDonut extends StatelessWidget {
                         CountUpFigure(
                           value: share,
                           format: (v) => '${v.round()}%',
-                          fontSize: 26,
+                          fontSize: AppTextScale.page,
                           fontWeight: FontWeight.w600,
                           color: t.textPrimary,
                           semanticsLabel:
@@ -634,7 +634,7 @@ class SentimentGauge extends StatelessWidget {
                             CountUpFigure(
                               value: score.toDouble(),
                               format: (v) => '${v.round()}',
-                              fontSize: 36,
+                              fontSize: AppTextScale.hero,
                               fontWeight: FontWeight.w600,
                               color: t.textPrimary,
                             ),

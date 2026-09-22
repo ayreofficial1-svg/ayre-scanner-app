@@ -206,22 +206,37 @@ class _AyreIconPainter extends CustomPainter {
         // icon than a "signal". Replaced with a soft radiating-arcs mark
         // (a dot with two concentric open arcs) matching lucide's `Radio`
         // silhouette — reads as "broadcast/pulse" rather than "chart".
+        //
+        // The v4 redraw anchored the dot *and* every arc at (7, 17) — one
+        // corner of the 24pt grid — rather than the (12, 12) centre every
+        // other nav glyph is drawn against. That put the glyph's whole
+        // visual weight in the bottom-left of its box, which is what read
+        // as the bottom nav being "off centre" on the Signals tab. Redrawn
+        // here as lucide's `Radio` actually is: a centred dot with two
+        // mirrored pairs of arcs bowing out along the bottom-left/top-right
+        // diagonal, so the mark's weight sits on (12, 12) like its
+        // neighbours.
         {
-          c.drawCircle(const Offset(7, 17), 1.8, f);
-          c.drawArc(
-            Rect.fromCircle(center: const Offset(7, 17), radius: 6.2),
-            math.pi * 1.05,
-            math.pi * 0.9,
-            false,
-            s,
-          );
-          c.drawArc(
-            Rect.fromCircle(center: const Offset(7, 17), radius: 10.4),
-            math.pi * 1.12,
-            math.pi * 0.76,
-            false,
-            s,
-          );
+          const center = Offset(12, 12);
+          c.drawCircle(center, 1.8, f);
+          const sweep = math.pi * 0.62;
+          const start = math.pi * 1.25 - sweep / 2;
+          for (final radius in [5.2, 9.2]) {
+            c.drawArc(
+              Rect.fromCircle(center: center, radius: radius),
+              start,
+              sweep,
+              false,
+              s,
+            );
+            c.drawArc(
+              Rect.fromCircle(center: center, radius: radius),
+              start + math.pi,
+              sweep,
+              false,
+              s,
+            );
+          }
         }
       case AyreGlyph.insights:
         // v4 redraw (plan §7 open decision #1): the v3 path was a literal

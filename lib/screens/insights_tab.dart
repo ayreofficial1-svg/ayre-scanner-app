@@ -29,9 +29,15 @@ import 'equity_detail_screen.dart';
 /// there is deliberately **no per-row sparkline**, because the backend supplies
 /// no series for movers (§3).
 class InsightsTab extends StatefulWidget {
-  const InsightsTab({super.key, required this.marketData});
+  const InsightsTab({super.key, required this.marketData, this.active = true});
 
   final MarketDataService marketData;
+
+  /// Whether this tab is the one currently showing in the shell's
+  /// [IndexedStack]. See [HomeTab.active] for why this exists: it stops
+  /// [_refreshLive] from fetching and rebuilding this screen's four
+  /// sections every 10s while another tab is on screen.
+  final bool active;
 
   @override
   State<InsightsTab> createState() => _InsightsTabState();
@@ -71,12 +77,20 @@ class _InsightsTabState extends State<InsightsTab> {
   }
 
   @override
+  void didUpdateWidget(InsightsTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.active && widget.active) _refreshLive();
+  }
+
+  @override
   void dispose() {
     _liveTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _refreshLive() async {
+    // Off-screen tabs skip the tick entirely — see [InsightsTab.active].
+    if (!widget.active) return;
     // See HomeTab._refreshLive: skips a tick rather than let it stack behind
     // a still-running one.
     if (!mounted || _liveRefreshInFlight) return;

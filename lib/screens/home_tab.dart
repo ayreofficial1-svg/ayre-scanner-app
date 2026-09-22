@@ -53,11 +53,23 @@ class HomeTab extends StatefulWidget {
     required this.marketData,
     this.onAccountResolved,
     this.onOpenProfile,
+    this.active = true,
   });
 
   final MarketDataService marketData;
   final ValueChanged<String>? onAccountResolved;
   final VoidCallback? onOpenProfile;
+
+  /// Whether this tab is the one currently showing in the shell's
+  /// [IndexedStack]. The tab stays mounted (and its state preserved) while
+  /// on another tab, but there is no reason to keep fetching and rebuilding
+  /// its live data every 10s while it isn't on screen — that's main-thread
+  /// work (network completion, JSON decode, setState, a full chart/carousel
+  /// rebuild) spent on a screen nobody can see. [_liveTimer] keeps ticking
+  /// on its normal cadence regardless, but [_refreshLive] no-ops while
+  /// inactive and a becoming-active transition triggers one immediate catch-
+  /// up refresh instead.
+  final bool active;
 
   @override
   State<HomeTab> createState() => _HomeTabState();
@@ -100,12 +112,22 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   @override
+  void didUpdateWidget(HomeTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.active && widget.active) _refreshLive();
+  }
+
+  @override
   void dispose() {
     _liveTimer?.cancel();
     super.dispose();
   }
 
   Future<void> _refreshLive() async {
+    // Off-screen tabs (the shell keeps every tab mounted in an
+    // IndexedStack) skip the tick entirely rather than fetch and rebuild
+    // for a screen nobody can see — see [HomeTab.active].
+    if (!widget.active) return;
     // A tick that fires while the previous one is still awaiting its
     // response would otherwise pile a second request on top of the first —
     // harmless individually, but across every live-refreshing screen it's
