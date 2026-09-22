@@ -64,9 +64,9 @@ class _HomeShellState extends State<HomeShell> {
           onOpenProfile: () => _select(4),
           active: _index == 0,
         ),
-        SignalsTab(marketData: widget.marketData),
+        SignalsTab(marketData: widget.marketData, active: _index == 1),
         InsightsTab(marketData: widget.marketData, active: _index == 2),
-        LearnTab(marketData: widget.marketData),
+        LearnTab(marketData: widget.marketData, active: _index == 3),
         ProfileTab(accountName: name),
       ],
     );

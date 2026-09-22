@@ -24,9 +24,19 @@ import 'equity_detail_screen.dart';
 /// rows inside one card, so the screen reads as "here's the one, here are the
 /// others" rather than as a wall.
 class SignalsTab extends StatefulWidget {
-  const SignalsTab({super.key, required this.marketData});
+  const SignalsTab({super.key, required this.marketData, this.active = true});
 
   final MarketDataService marketData;
+
+  /// Whether this is the tab currently showing in the shell's
+  /// [IndexedStack]. The shell mounts all five tabs immediately (that's
+  /// what lets a tab keep its scroll position/state when you switch away
+  /// and back), so without this every tab's first load fires the instant
+  /// you land on the shell — five tabs' worth of HTTP calls landing and
+  /// getting JSON-decoded/rebuilt on the UI thread in the same short
+  /// window right after login. Deferring the load until the tab is first
+  /// actually selected spreads that burst out instead.
+  final bool active;
 
   @override
   State<SignalsTab> createState() => _SignalsTabState();
@@ -60,7 +70,15 @@ class _SignalsTabState extends State<SignalsTab> {
   @override
   void initState() {
     super.initState();
-    _load(initial: true);
+    if (widget.active) _load(initial: true);
+  }
+
+  @override
+  void didUpdateWidget(SignalsTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.active && widget.active && _result == null) {
+      _load(initial: true);
+    }
   }
 
   Future<void> _load({bool initial = false}) async {

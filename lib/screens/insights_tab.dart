@@ -64,7 +64,7 @@ class _InsightsTabState extends State<InsightsTab> {
   @override
   void initState() {
     super.initState();
-    _load(initial: true);
+    if (widget.active) _load(initial: true);
     // Sentiment/gainers/losers/most-active only — not _notes, which is
     // editorially authored content that doesn't change tick to tick.
     // Safe to poll this often: the backend serves the market-data pieces
@@ -79,7 +79,12 @@ class _InsightsTabState extends State<InsightsTab> {
   @override
   void didUpdateWidget(InsightsTab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!oldWidget.active && widget.active) _refreshLive();
+    if (!oldWidget.active && widget.active) {
+      // First time this tab has ever been selected: it never ran its
+      // initial load (see initState), so a plain live-refresh would leave
+      // _notes/_volatility/_momentum/_volumeSurge stuck null forever.
+      _sentiment == null ? _load(initial: true) : _refreshLive();
+    }
   }
 
   @override

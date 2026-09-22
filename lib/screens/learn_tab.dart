@@ -34,9 +34,14 @@ import 'lesson_screen.dart';
 /// articles), so the row is built from whatever categories the loaded courses
 /// actually carry, and hidden while there is nothing to choose between.
 class LearnTab extends StatefulWidget {
-  const LearnTab({super.key, required this.marketData});
+  const LearnTab({super.key, required this.marketData, this.active = true});
 
   final MarketDataService marketData;
+
+  /// See [SignalsTab.active] — defers this tab's first load until it's
+  /// actually selected, instead of firing on shell mount alongside every
+  /// other tab.
+  final bool active;
 
   @override
   State<LearnTab> createState() => _LearnTabState();
@@ -52,7 +57,15 @@ class _LearnTabState extends State<LearnTab> {
   @override
   void initState() {
     super.initState();
-    _load(initial: true);
+    if (widget.active) _load(initial: true);
+  }
+
+  @override
+  void didUpdateWidget(LearnTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.active && widget.active && _result == null) {
+      _load(initial: true);
+    }
   }
 
   Future<void> _load({bool initial = false}) async {
