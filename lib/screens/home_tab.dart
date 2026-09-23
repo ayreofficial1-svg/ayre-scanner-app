@@ -436,10 +436,13 @@ class _Header extends StatelessWidget {
 
 /// The Home theme toggle (§13.1).
 ///
-/// Writes to the same `setThemeMode` the Settings segmented control does, so
-/// the two can never disagree — this is the re-verification Phase 0 asked for
-/// and it holds: there is one setter, on `AppThemeController`, and both call
-/// it. No System option exists to fall through to (§13.6/§20.11).
+/// Writes to the same `setThemeMode` the Settings tiles do, so the two can
+/// never disagree — there is one setter, on `AppThemeController`, and both
+/// call it. Phase 1A restored `System` as a Settings option; this toggle
+/// still only moves between explicit Light/Dark, matching a single-button
+/// toggle's "shows the mode you're about to move to" convention — tapping
+/// it while on `System` pins the theme to the opposite of whatever `System`
+/// is currently resolving to, same as picking a tile in Settings would.
 ///
 /// Icon-only, so unlike the nav it genuinely needs a semantic label — and the
 /// label states what tapping *does*, not what mode you're in, since "Dark" as

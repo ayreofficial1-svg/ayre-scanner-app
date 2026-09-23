@@ -77,15 +77,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   children: [
                     Text('THEME', style: AppTypo.label(t)),
                     const SizedBox(height: AppSpace.sm),
-                    // Light and Dark only. The System option is gone, and stored
-                    // "system" values are migrated on load. Big tappable tiles
-                    // (redesign plan §2.4 / Phase 6 step 4), not the thin
-                    // segmented bar — the underlying selection logic is
-                    // untouched.
+                    // Phase 1A (HIG alignment): System restored as a third
+                    // tile alongside Light/Dark. Big tappable tiles (redesign
+                    // plan §2.4 / Phase 6 step 4), not the thin segmented bar
+                    // — the underlying selection logic is untouched, just
+                    // widened to a third value.
                     _AppearanceTiles(
-                      value: theme.themeMode == ThemeMode.system
-                          ? ThemeMode.dark
-                          : theme.themeMode,
+                      value: theme.themeMode,
                       onChanged: (mode) {
                         HapticFeedback.selectionClick();
                         theme.setThemeMode(mode);
@@ -351,6 +349,21 @@ class _AppearanceTiles extends StatelessWidget {
             child: _TileGlyph(
               glyph: AyreGlyph.moon,
               selected: value == ThemeMode.dark,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpace.sm),
+        Expanded(
+          child: _BigTile(
+            selected: value == ThemeMode.system,
+            label: 'System',
+            onTap: () => onChanged(ThemeMode.system),
+            // Reuses the half-filled contrast disc already drawn for the
+            // Profile "Appearance" row glyph — a sun/moon composite is
+            // exactly what "follows the device" should look like here.
+            child: _TileGlyph(
+              glyph: AyreGlyph.appearance,
+              selected: value == ThemeMode.system,
             ),
           ),
         ),

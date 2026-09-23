@@ -270,7 +270,12 @@ class AyreButton extends StatelessWidget {
         borderRadius: AppRadius.button,
         child: Container(
           width: expand ? double.infinity : null,
-          constraints: const BoxConstraints(minHeight: 46),
+          // Phase 1D (HIG alignment): was a hardcoded 46 — below the app's
+          // own AppSpace.minTarget (48) that every other tappable row
+          // already enforces (_RefreshDot, OfflineBanner's dismiss target,
+          // StaleNotice's refresh link). Still above Apple's 44pt floor
+          // either way; raised for internal consistency, not compliance.
+          constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpace.lg,
             vertical: AppSpace.md,

@@ -795,22 +795,25 @@ abstract final class AppTheme {
     surface: Color(0xFFFFFFFF),
     surfaceRaised: Color(0xFFE9F2E9),
     surfaceSunken: Color(0xFFE1EDE1),
-    accent: Color(0xFF1F8A4B),
+    // Phase 1B (HIG alignment): deepened from #1F8A4B by ~2% lightness
+    // (same hue/saturation) after design sign-off, specifically to clear
+    // the onAccent contrast floor below — was ~4.38:1 with white text,
+    // now ~4.55:1. Numerically verified.
+    accent: Color(0xFF1E8749),
     // Raw accent measures ~4.0:1 / ~4.4:1 as small text on
     // `background`/`surface` in light mode — fails AA. `accentInk` is a
     // darkened variant of the same hue that clears ~6.0:1 / ~6.6:1,
-    // verified numerically for Phase 0.
+    // verified numerically for Phase 0. (Still holds after the Phase 1B
+    // `accent` deepening — `accentInk` sits well past `accent` already.)
     accentInk: Color(0xFF166B3A),
     accentSoft: Color(0xFFCFE8D8),
-    // White text on `accent` measures ~4.38:1 — a hair under the 4.5:1 AA
-    // threshold for normal-size text. (Button labels render at 14px/700,
-    // below the ~18.66px-bold "large text" cutoff, so the 3:1 large-text
-    // allowance doesn't apply either.) White is already the maximum
-    // achievable luminance for this role, so no local change to `onAccent`
-    // can close the gap, and `accent` itself is canonical per the plan's
-    // guardrails — not to be substituted. Flagged here per Phase 0 step 3
-    // rather than silently changed; left as specified pending design
-    // review.
+    // Phase 1B (HIG alignment): white text on `accent` now measures
+    // ~4.55:1, clearing the 4.5:1 AA floor for normal-size text (button
+    // labels render at 14px/700, below the large-text cutoff, so the 3:1
+    // allowance never applied here). Resolved by deepening `accent` above
+    // rather than changing `onAccent` — white remained the max-luminance,
+    // correct choice for this role. See decisions log at the bottom of
+    // the HIG alignment plan for the sign-off record.
     onAccent: Color(0xFFFFFFFF),
     positive: Color(0xFF1F8A4B),
     positiveSoft: Color(0xFFDCEEE0),

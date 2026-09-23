@@ -42,7 +42,10 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
 
   final _navigatorKey = GlobalKey<NavigatorState>();
 
-  // Light or dark only — never system. `system` is migrated away on first load.
+  // Phase 1A (HIG alignment): `system` is a valid, selectable third option
+  // again (Settings' Appearance tiles). Default for a fresh install stays
+  // `dark`, unchanged, so existing users see no silent shift — `system` is
+  // only ever reached by an explicit user choice now.
   ThemeMode _themeMode = ThemeMode.dark;
   bool _splashComplete = false;
   bool _sessionExpired = false;
@@ -83,32 +86,23 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
     final value = prefs.getString(_themeModeKey);
     if (!mounted) return;
 
-    // Existing users stored on "system" are migrated to whichever explicit mode
-    // the device is currently showing, so the app looks the same to them on the
-    // upgrade — rather than silently flipping or resolving to a mode that no
-    // longer exists in the picker.
-    if (value == null || value == ThemeMode.system.name) {
-      final brightness = View.of(context).platformDispatcher.platformBrightness;
-      final resolved = brightness == Brightness.light
-          ? ThemeMode.light
-          : ThemeMode.dark;
-      setState(() => _themeMode = resolved);
-      await prefs.setString(_themeModeKey, resolved.name);
-      return;
-    }
+    // No stored preference yet: keep the app's existing default (`dark`)
+    // rather than defaulting a fresh install to `system` — 1A widens the
+    // picker, it doesn't change what a new user sees first.
+    if (value == null) return;
 
+    // Phase 1A: `system` is restored as a real, persisted choice — no more
+    // migrating it away to a resolved light/dark value on load. A value
+    // stored by an older build that no longer matches a known mode name
+    // falls back to `dark`, same as before.
     setState(() {
-      _themeMode = value == ThemeMode.light.name
-          ? ThemeMode.light
-          : ThemeMode.dark;
+      _themeMode = switch (value) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        'system' => ThemeMode.system,
+        _ => ThemeMode.dark,
+      };
     });
-  }
-
-  Future<void> setThemeModeGuarded(ThemeMode mode) {
-    // Defensive: nothing in the UI can pass `system` any more, but this makes
-    // that guarantee explicit rather than incidental.
-    assert(mode != ThemeMode.system, 'System theme mode was removed');
-    return setThemeMode(mode == ThemeMode.system ? ThemeMode.dark : mode);
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {

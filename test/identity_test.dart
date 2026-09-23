@@ -47,7 +47,9 @@ void main() {
 
     test('the accent is v5 emerald, not v4 clay', () {
       expect(AppTheme.darkTokens.accent, const Color(0xFF3FCB7A));
-      expect(AppTheme.lightTokens.accent, const Color(0xFF1F8A4B));
+      // Phase 1B (HIG alignment): deepened ~2% lightness from #1F8A4B to
+      // clear the onAccent contrast floor below — see that test.
+      expect(AppTheme.lightTokens.accent, const Color(0xFF1E8749));
       expect(AppTheme.darkTokens.accent, isNot(const Color(0xFFD26A4C)));
       expect(AppTheme.lightTokens.accent, isNot(const Color(0xFFC75F43)));
     });
@@ -172,13 +174,12 @@ void main() {
       expect(_contrast(t.onAccent, t.accent), greaterThanOrEqualTo(4.5));
     });
 
-    test('light onAccent on accent holds its measured ~4.38:1 (known, flagged)', () {
-      // White on #1F8A4B is a hair under AA for normal text. White is already
-      // the maximum, and `accent` is canonical in §2A, so the value is pinned
-      // here rather than silently changed; it is flagged for design review
-      // (plan §7, Phase 0). Fails if the pairing gets worse.
+    test('light onAccent clears 4.5:1 on accent', () {
+      // Phase 1B (HIG alignment): accent was deepened ~2% lightness
+      // specifically to close this gap — was ~4.38:1 (below AA), now
+      // ~4.55:1. Fails if the pairing regresses below the AA floor.
       final t = AppTheme.lightTokens;
-      expect(_contrast(t.onAccent, t.accent), greaterThanOrEqualTo(4.3));
+      expect(_contrast(t.onAccent, t.accent), greaterThanOrEqualTo(4.5));
     });
 
     test('text on the identity tints keeps `muted` at or above 4.5:1', () {
