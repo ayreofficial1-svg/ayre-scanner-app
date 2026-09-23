@@ -174,7 +174,7 @@ class _InsightsTabState extends State<InsightsTab> {
   void _openEquity(Quote quote) {
     HapticFeedback.selectionClick();
     Navigator.of(context).push(
-      MaterialPageRoute(
+      terminalRoute(
         builder: (_) => EquityDetailScreen(
           symbol: quote.symbol,
           marketData: widget.marketData,
@@ -191,7 +191,7 @@ class _InsightsTabState extends State<InsightsTab> {
   void _openEquityBySymbol(String symbol) {
     HapticFeedback.selectionClick();
     Navigator.of(context).push(
-      MaterialPageRoute(
+      terminalRoute(
         builder: (_) => EquityDetailScreen(
           symbol: symbol,
           marketData: widget.marketData,

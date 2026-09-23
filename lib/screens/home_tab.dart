@@ -304,7 +304,7 @@ class _HomeTabState extends State<HomeTab> {
   void _openInsight(InsightNote note) {
     HapticFeedback.selectionClick();
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => InsightNoteScreen(note: note)),
+      terminalRoute(builder: (_) => InsightNoteScreen(note: note)),
     );
   }
 
@@ -312,7 +312,7 @@ class _HomeTabState extends State<HomeTab> {
     final index = _indexIdFor(quote) ?? IndexId.nifty50;
     HapticFeedback.selectionClick();
     Navigator.of(context).push(
-      MaterialPageRoute(
+      terminalRoute(
         builder: (_) => IndexDetailScreen(
           index: index,
           marketData: widget.marketData,
@@ -422,7 +422,7 @@ class _Header extends StatelessWidget {
             onTap: () {
               HapticFeedback.selectionClick();
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                terminalRoute(builder: (_) => const NotificationsScreen()),
               );
             },
           ),

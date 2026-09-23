@@ -243,7 +243,7 @@ class SessionExpiredScreen extends StatelessWidget {
                   onRetry: () {
                     onSignIn();
                     Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      terminalRoute(builder: (_) => const LoginScreen()),
                       (route) => false,
                     );
                   },

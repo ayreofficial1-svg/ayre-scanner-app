@@ -1,4 +1,5 @@
 import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -796,22 +797,27 @@ abstract final class AppTheme {
     surface: Color(0xFFFFFFFF),
     surfaceRaised: Color(0xFFE9F2E9),
     surfaceSunken: Color(0xFFE1EDE1),
-    accent: Color(0xFF1F8A4B),
+    accent: Color(0xFF1E8749),
     // Raw accent measures ~4.0:1 / ~4.4:1 as small text on
     // `background`/`surface` in light mode — fails AA. `accentInk` is a
     // darkened variant of the same hue that clears ~6.0:1 / ~6.6:1,
     // verified numerically for Phase 0.
     accentInk: Color(0xFF166B3A),
     accentSoft: Color(0xFFCFE8D8),
-    // White text on `accent` measures ~4.38:1 — a hair under the 4.5:1 AA
-    // threshold for normal-size text. (Button labels render at 14px/700,
-    // below the ~18.66px-bold "large text" cutoff, so the 3:1 large-text
-    // allowance doesn't apply either.) White is already the maximum
-    // achievable luminance for this role, so no local change to `onAccent`
-    // can close the gap, and `accent` itself is canonical per the plan's
-    // guardrails — not to be substituted. Flagged here per Phase 0 step 3
-    // rather than silently changed; left as specified pending design
-    // review.
+    // Phase 1B (HIG alignment): white on the original `#1F8A4B` measured
+    // ~4.38:1 — a hair under the 4.5:1 AA threshold for normal-size text.
+    // (Button labels render at 14px/700, below the ~18.66px-bold
+    // "large text" cutoff, so the 3:1 large-text allowance doesn't apply
+    // either.) White is already the maximum achievable luminance for this
+    // role, so the fix had to come from `accent` itself: deepened ~2%
+    // lightness, same hue/saturation (hue still 144.6°, inside the
+    // identity test's 130-165° green band) from `#1F8A4B` to `#1E8749`.
+    // `onAccent`-on-`accent` now measures ~4.55:1, clearing the floor —
+    // see `test/identity_test.dart`'s `light onAccent clears 4.5:1`,
+    // which already asserted this and would fail against the old value.
+    // `positive` (separate token, still `#1F8A4B`) is intentionally
+    // unchanged — no white-on-fill usage is flagged against it, out of
+    // this item's scope.
     onAccent: Color(0xFFFFFFFF),
     positive: Color(0xFF1F8A4B),
     positiveSoft: Color(0xFFDCEEE0),

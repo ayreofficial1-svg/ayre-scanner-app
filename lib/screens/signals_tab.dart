@@ -113,7 +113,7 @@ class _SignalsTabState extends State<SignalsTab> {
   void _openEquity(Signal signal) {
     HapticFeedback.selectionClick();
     Navigator.of(context).push(
-      MaterialPageRoute(
+      terminalRoute(
         builder: (_) => EquityDetailScreen(
           symbol: signal.symbol,
           marketData: widget.marketData,

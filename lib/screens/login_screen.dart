@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
@@ -29,6 +30,11 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    // Phase 6C: every other primary confirming action in the app (Edit
+    // Profile's save, Support's copy) hits haptic on submit; Login's submit
+    // was the one gap. Medium weight to match Edit Profile's save, not the
+    // heavy weight reserved for destructive/session actions.
+    HapticFeedback.mediumImpact();
     FocusScope.of(context).unfocus();
     setState(() {
       _loading = true;
@@ -46,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (success) {
       await Navigator.of(
         context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => HomeShell()));
+      ).pushReplacement(terminalRoute(builder: (_) => HomeShell()));
     } else {
       setState(() => _error = 'Invalid username or password');
     }

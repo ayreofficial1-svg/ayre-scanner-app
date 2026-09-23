@@ -258,7 +258,7 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
   void _openEquity(Quote row) {
     HapticFeedback.selectionClick();
     Navigator.of(context).push(
-      MaterialPageRoute(
+      terminalRoute(
         builder: (_) => EquityDetailScreen(
           symbol: row.symbol,
           marketData: widget.marketData,

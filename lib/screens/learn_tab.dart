@@ -295,7 +295,7 @@ class _LearnTabState extends State<LearnTab> {
     HapticFeedback.selectionClick();
     Navigator.of(
       context,
-    ).push(MaterialPageRoute(builder: (_) => LessonScreen(course: course)));
+    ).push(terminalRoute(builder: (_) => LessonScreen(course: course)));
   }
 }
 

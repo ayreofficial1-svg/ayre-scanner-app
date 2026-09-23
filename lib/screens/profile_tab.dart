@@ -64,7 +64,7 @@ class _ProfileTabState extends State<ProfileTab> {
   Future<void> _editProfile() async {
     HapticFeedback.selectionClick();
     final updated = await Navigator.of(context).push<String>(
-      MaterialPageRoute(
+      terminalRoute(
         builder: (_) => EditProfileScreen(displayName: _name, handle: _handle),
       ),
     );
@@ -90,7 +90,7 @@ class _ProfileTabState extends State<ProfileTab> {
     await ApiService.logout();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      terminalRoute(builder: (_) => const LoginScreen()),
       (route) => false,
     );
   }
@@ -174,7 +174,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   onTap: () {
                     HapticFeedback.selectionClick();
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                      terminalRoute(builder: (_) => const SettingsScreen()),
                     );
                   },
                 ),
@@ -185,7 +185,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   onTap: () {
                     HapticFeedback.selectionClick();
                     Navigator.of(context).push(
-                      MaterialPageRoute(
+                      terminalRoute(
                         builder: (_) => const NotificationsScreen(),
                       ),
                     );
@@ -209,7 +209,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   onTap: () {
                     HapticFeedback.selectionClick();
                     Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SupportScreen()),
+                      terminalRoute(builder: (_) => const SupportScreen()),
                     );
                   },
                 ),

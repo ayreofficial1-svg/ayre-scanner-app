@@ -194,7 +194,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () {
                       HapticFeedback.selectionClick();
                       Navigator.of(context).push(
-                        MaterialPageRoute(
+                        terminalRoute(
                           builder: (_) => const SupportScreen(),
                         ),
                       );
