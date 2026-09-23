@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// The personal-identity chip (v5 §2A, "Avatar / identity chip"): a circle of
+/// The personal-identity chip (v5 §2A, "Avatar / identity chip"): a circle of ff
 /// initials in a lavender/plum tone.
 ///
 /// **A deliberate secondary accent, distinct from brand green.** It exists
