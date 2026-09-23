@@ -5,6 +5,7 @@ import 'screens/home_shell.dart';
 import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/api_service.dart';
+import 'services/reachability.dart';
 import 'services/settings_store.dart';
 import 'theme/app_theme.dart';
 import 'widgets/ayre_components.dart';
@@ -44,8 +45,6 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
   // Light or dark only — never system. `system` is migrated away on first load.
   ThemeMode _themeMode = ThemeMode.dark;
   bool _splashComplete = false;
-  bool _offline = false;
-  bool _offlineDismissed = false;
   bool _sessionExpired = false;
 
   @override
@@ -58,14 +57,10 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
       if (!mounted || _sessionExpired) return;
       setState(() => _sessionExpired = true);
     };
-    ApiService.onReachabilityChanged = (reachable) {
-      if (!mounted) return;
-      setState(() {
-        _offline = !reachable;
-        // A fresh disconnection earns a fresh banner.
-        if (!reachable) _offlineDismissed = false;
-      });
-    };
+    // Scoped to its own ChangeNotifier rather than this widget's setState —
+    // see ReachabilityStore's doc for why a root-level setState here was a
+    // problem.
+    ApiService.onReachabilityChanged = ReachabilityStore.instance.setReachable;
   }
 
   @override
@@ -164,11 +159,20 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
                 data: media.copyWith(textScaler: TextScaler.linear(effective)),
                 child: Column(
                   children: [
-                    if (_offline && !_offlineDismissed)
-                      OfflineBanner(
-                        onDismiss: () =>
-                            setState(() => _offlineDismissed = true),
-                      ),
+                    // Scoped listener: only this banner rebuilds when
+                    // reachability changes, not the whole app tree.
+                    ListenableBuilder(
+                      listenable: ReachabilityStore.instance,
+                      builder: (context, _) {
+                        final store = ReachabilityStore.instance;
+                        if (!store.offline || store.dismissed) {
+                          return const SizedBox.shrink();
+                        }
+                        return OfflineBanner(
+                          onDismiss: ReachabilityStore.instance.dismiss,
+                        );
+                      },
+                    ),
                     Expanded(child: child ?? const SizedBox.shrink()),
                   ],
                 ),

@@ -55,19 +55,44 @@ class _HomeShellState extends State<HomeShell> {
   Widget _build(BuildContext context, String name) {
     final t = context.tokens;
 
+    // Every visible live quote carries its own repeating AnimationController
+    // (LivePulseDot's breathing dot). IndexedStack keeps all five tabs
+    // mounted for the life of the app, and none of those controllers stop
+    // ticking on their own just because their tab is out of view — so the
+    // number of animations silently running in the background only grows
+    // the longer a session goes on and the more screens get visited.
+    // TickerMode mutes every ticker in a subtree without touching the
+    // widgets that own them, so wrapping each inactive tab in one is enough
+    // to stop its animations from consuming frame callbacks while hidden;
+    // they resume automatically the moment that tab becomes active again.
+    Widget tickered(int index, Widget child) =>
+        TickerMode(enabled: index == _index, child: child);
+
     final tabs = IndexedStack(
       index: _index,
       children: [
-        HomeTab(
-          marketData: widget.marketData,
-          onAccountResolved: _onAccountResolved,
-          onOpenProfile: () => _select(4),
-          active: _index == 0,
+        tickered(
+          0,
+          HomeTab(
+            marketData: widget.marketData,
+            onAccountResolved: _onAccountResolved,
+            onOpenProfile: () => _select(4),
+            active: _index == 0,
+          ),
         ),
-        SignalsTab(marketData: widget.marketData, active: _index == 1),
-        InsightsTab(marketData: widget.marketData, active: _index == 2),
-        LearnTab(marketData: widget.marketData, active: _index == 3),
-        ProfileTab(accountName: name),
+        tickered(
+          1,
+          SignalsTab(marketData: widget.marketData, active: _index == 1),
+        ),
+        tickered(
+          2,
+          InsightsTab(marketData: widget.marketData, active: _index == 2),
+        ),
+        tickered(
+          3,
+          LearnTab(marketData: widget.marketData, active: _index == 3),
+        ),
+        tickered(4, ProfileTab(accountName: name)),
       ],
     );
 
