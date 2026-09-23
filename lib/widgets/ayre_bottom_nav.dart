@@ -316,7 +316,9 @@ class AyreNavRail extends StatelessWidget {
 /// One [AyreNavRail] destination: icon above label, stacked, at least
 /// [AppSpace.minTarget] tall — the same touch-target floor every other
 /// interactive row in the app enforces. The selected item takes the same
-/// pill treatment as the bottom nav's active item, just laid out vertically.
+/// pill treatment as the bottom nav's active item, just laid out vertically,
+/// and the same [_NavTransition] emphasis motion as [_NavItem] so the rail
+/// and the floating bar read as one animation language.
 class _RailItem extends StatelessWidget {
   const _RailItem({
     super.key,
@@ -332,9 +334,8 @@ class _RailItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final color = selected
-        ? _activeContentColor(t, context)
-        : _inactiveContentColor(t, context);
+    final activeColor = _activeContentColor(t, context);
+    final inactiveColor = _inactiveContentColor(t, context);
     final pill = _activePillColor(t, context);
 
     return Semantics(
@@ -343,8 +344,7 @@ class _RailItem extends StatelessWidget {
       label: destination.label,
       child: Tooltip(
         message: destination.label,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
+        child: _NavPressScale(
           onTap: onTap,
           child: Container(
             constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
@@ -353,28 +353,41 @@ class _RailItem extends StatelessWidget {
               vertical: AppSpace.xxs,
             ),
             padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
-            decoration: BoxDecoration(
-              color: selected ? pill : Colors.transparent,
-              borderRadius: BorderRadius.circular(AppRadius.card),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AyreIcon(
-                  destination.glyph,
-                  size: 22,
-                  filled: selected,
-                  color: color,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  destination.label,
-                  style: AppTypo.navLabel(t, color: color),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+            child: _NavTransition(
+              selected: selected,
+              builder: (context, p, bump, color) {
+                return DecoratedBox(
+                  decoration: BoxDecoration(
+                    // The pill itself fades in/out with `p` too, rather than
+                    // snapping — the rail's one departure from the bottom
+                    // bar's *sliding* pill, since a vertical rail has no
+                    // shared track for it to glide along.
+                    color: Color.lerp(Colors.transparent, pill, p),
+                    borderRadius: BorderRadius.circular(AppRadius.card),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _NavIconMorph(
+                        glyph: destination.glyph,
+                        p: p,
+                        bump: bump,
+                        color: color,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        destination.label,
+                        style: AppTypo.navLabel(t, color: color),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                );
+              },
+              activeColor: activeColor,
+              inactiveColor: inactiveColor,
             ),
           ),
         ),
@@ -383,9 +396,13 @@ class _RailItem extends StatelessWidget {
   }
 }
 
-/// One destination's icon, label and tap target. Never enlarges or shifts on
-/// selection — only the icon's fill state and both elements' color change,
-/// per the Spec's "never enlarge the item" rule for this control.
+/// One destination's icon, label and tap target. The item's own box never
+/// enlarges or shifts on selection — that stays the fixed backdrop the
+/// sliding pill in [_NavPillLayer] moves against — but the icon and label
+/// *within* it now carry [_NavTransition]'s emphasis motion: a brief pop and
+/// lift as the glyph crosses from outline to filled, mirrored on the way
+/// back down when another tab takes over. See [_NavTransition] for the
+/// motion's shape and rationale.
 class _NavItem extends StatelessWidget {
   const _NavItem({
     super.key,
@@ -401,9 +418,8 @@ class _NavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final color = selected
-        ? _activeContentColor(t, context)
-        : _inactiveContentColor(t, context);
+    final activeColor = _activeContentColor(t, context);
+    final inactiveColor = _inactiveContentColor(t, context);
 
     return Semantics(
       button: true,
@@ -412,29 +428,190 @@ class _NavItem extends StatelessWidget {
       child: Tooltip(
         message: destination.label,
         preferBelow: false,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
+        child: _NavPressScale(
           onTap: onTap,
           child: SizedBox(
             height: AyreBottomNav.barHeight,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AyreIcon(
-                  destination.glyph,
-                  size: 22,
-                  filled: selected,
-                  color: color,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  destination.label,
-                  style: AppTypo.navLabel(t, color: color),
-                ),
-              ],
+            child: _NavTransition(
+              selected: selected,
+              activeColor: activeColor,
+              inactiveColor: inactiveColor,
+              builder: (context, p, bump, color) {
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _NavIconMorph(
+                      glyph: destination.glyph,
+                      p: p,
+                      bump: bump,
+                      color: color,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      destination.label,
+                      style: AppTypo.navLabel(t, color: color),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Drives one nav item's selection emphasis on [AppSpring.navPill] — the
+/// same spring [_NavPillLayer] slides the background pill on, so an icon's
+/// pop and the pill's glide arrive together rather than reading as two
+/// unrelated animations.
+///
+/// [builder] receives:
+///  - `p`: selection progress, clamped to 0–1 (0 = fully inactive, 1 = fully
+///    active). Drives color and the icon's line↔fill crossfade.
+///  - `bump`: a parabola of `p` (`4·p·(1-p)`) that is *zero at both rest
+///    states* and peaks mid-transition. This is what gives the icon a
+///    transient pop/lift exactly while it is changing state, in either
+///    direction, without ever leaving it visually enlarged at rest — keeping
+///    faith with the "never enlarge the item" rule while still giving the
+///    change itself some weight, per the reference's "how it becomes active
+///    ... and how it returns to normal" brief.
+///  - `color`: inactive→active color already interpolated by `p`, so callers
+///    never lerp it themselves.
+class _NavTransition extends StatelessWidget {
+  const _NavTransition({
+    required this.selected,
+    required this.activeColor,
+    required this.inactiveColor,
+    required this.builder,
+  });
+
+  final bool selected;
+  final Color activeColor;
+  final Color inactiveColor;
+  final Widget Function(
+    BuildContext context,
+    double p,
+    double bump,
+    Color color,
+  )
+  builder;
+
+  @override
+  Widget build(BuildContext context) {
+    return SpringValue(
+      value: selected ? 1.0 : 0.0,
+      spring: AppSpring.navPill,
+      builder: (context, raw, _) {
+        final p = raw.clamp(0.0, 1.0);
+        final bump = 4 * p * (1 - p);
+        final color = Color.lerp(inactiveColor, activeColor, p)!;
+        return builder(context, p, bump, color);
+      },
+    );
+  }
+}
+
+/// The glyph itself: crossfades outline→filled as `p` runs 0→1 (a soft
+/// weight change rather than a hard swap) and rides [bump] into a small pop
+/// (scale) and lift (translateY), both zero at rest. Two stacked [AyreIcon]s
+/// rather than one continuously-morphing painter — [AyreIcon]'s glyphs are
+/// hand-drawn per state, not parameterized by fill fraction, so a dissolve
+/// between the two fixed drawings is the low-risk way to get a soft
+/// transition out of the existing icon set.
+class _NavIconMorph extends StatelessWidget {
+  const _NavIconMorph({
+    required this.glyph,
+    required this.p,
+    required this.bump,
+    required this.color,
+  });
+
+  final AyreGlyph glyph;
+  final double p;
+  final double bump;
+  final Color color;
+
+  /// Fixed at the one size every nav item actually uses — [AyreBottomNav]
+  /// and [AyreNavRail] both call this without overriding it, so a
+  /// configurable `size` parameter was dead weight the analyzer flagged
+  /// (`unused_element_parameter`). Reintroduce it as a constructor field if
+  /// a second call site ever needs a different size.
+  static const double _size = 22;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.translate(
+      offset: Offset(0, -bump * 1.6),
+      child: Transform.scale(
+        scale: 1 + bump * 0.12,
+        child: SizedBox(
+          width: _size,
+          height: _size,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Opacity(
+                opacity: 1 - p,
+                child: AyreIcon(glyph, size: _size, filled: false, color: color),
+              ),
+              Opacity(
+                opacity: p,
+                child: AyreIcon(glyph, size: _size, filled: true, color: color),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Wraps a nav tap target with a small press-down scale — the tactile cue
+/// that the row itself responds to touch, independent of (and a beat ahead
+/// of) the selection change [_NavTransition] plays once the tap commits.
+/// Snaps instead of animating under reduced motion, matching [SpringValue]'s
+/// own reduced-motion behavior elsewhere in this file.
+///
+/// Deliberately not the shared `PressableScale` (widgets/pressable_scale.dart):
+/// that one clips to a rounded card and shows an ink splash, which reads fine
+/// on a standalone card but would visibly bleed across neighboring items
+/// inside the nav's single shared glass pill, which has no per-item clip
+/// boundary of its own. This is scale-only, no splash, so it stays this
+/// component's private helper rather than a variant bolted onto the shared
+/// one.
+class _NavPressScale extends StatefulWidget {
+  const _NavPressScale({required this.onTap, required this.child});
+
+  final VoidCallback onTap;
+  final Widget child;
+
+  @override
+  State<_NavPressScale> createState() => _NavPressScaleState();
+}
+
+class _NavPressScaleState extends State<_NavPressScale> {
+  bool _pressed = false;
+
+  void _setPressed(bool value) {
+    if (_pressed != value) setState(() => _pressed = value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      onTapDown: (_) => _setPressed(true),
+      onTapCancel: () => _setPressed(false),
+      onTapUp: (_) => _setPressed(false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.92 : 1.0,
+        duration: reduceMotion ? Duration.zero : AppMotion.buttonPress,
+        curve: AppMotion.ease,
+        child: widget.child,
       ),
     );
   }

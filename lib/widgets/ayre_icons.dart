@@ -172,124 +172,53 @@ class _AyreIconPainter extends CustomPainter {
     switch (glyph) {
       // ── Navigation ─────────────────────────────────────────────────────────
       case AyreGlyph.home:
-        // v4 redraw (plan §7 open decision #1): the v3 path drew a literal
-        // terminal window (framed panel + header rule + prompt-cursor tick)
-        // — the single most "terminal" glyph in the old set, and the one
-        // most visible since it's the first nav item. Replaced with a plain
-        // roofline pictogram (a peaked roof over a simple house body, no
-        // door/window detail) to match lucide's `House` silhouette and the
-        // calm/rounded reading the rest of the set already has.
-        //
-        // v6 fix: the filled (selected) state used to draw the *outline*
-        // roof (wide eaves, apex at y=4) unconditionally, then layer a
-        // *separately shaped* solid body underneath it (narrower, no eaves,
-        // apex at y=5.5). The two roofs didn't share a single point, so the
-        // outline roof's tips poked out past the solid fill — the "cut"
-        // look. Fixed by reusing the exact same roof/wall coordinates for
-        // both states: two solid fills (a roof triangle, a wall rectangle)
-        // when selected, the same shapes stroked when not, so choosing the
-        // tab never changes the silhouette — only line vs. solid.
+        // v8 rework: dropped the eaved roofline for a plain five-point house
+        // — apex, two roof/wall shoulders, two base corners — closer to the
+        // reference bar's plain, blocky house than the overhanging roof this
+        // used to be. Fewer corners, one closed path, stroked with a miter
+        // join so outline and fill trace exactly the same silhouette.
         {
-          const roofApex = Offset(12, 4);
-          const roofLeft = Offset(3.5, 11.5);
-          const roofRight = Offset(20.5, 11.5);
-          const wallLeft = 6.0;
-          const wallRight = 18.0;
-          const wallTop = 10.5;
-          const wallBottom = 19.5;
+          final house = Path()
+            ..moveTo(12, 4) // apex
+            ..lineTo(19, 10.5) // right shoulder — roof meets wall
+            ..lineTo(19, 20) // base, right
+            ..lineTo(5, 20) // base, left
+            ..lineTo(5, 10.5) // left shoulder
+            ..close();
           if (filled) {
-            final roofFill = Path()
-              ..moveTo(roofLeft.dx, roofLeft.dy)
-              ..lineTo(roofApex.dx, roofApex.dy)
-              ..lineTo(roofRight.dx, roofRight.dy)
-              ..close();
-            c.drawPath(roofFill, f);
-            c.drawRect(
-              const Rect.fromLTRB(wallLeft, wallTop, wallRight, wallBottom),
-              f,
-            );
+            c.drawPath(house, f);
           } else {
-            final roofLine = Path()
-              ..moveTo(roofLeft.dx, roofLeft.dy)
-              ..lineTo(roofApex.dx, roofApex.dy)
-              ..lineTo(roofRight.dx, roofRight.dy);
-            c.drawPath(roofLine, s);
-            c.drawLine(
-              const Offset(wallLeft, wallTop),
-              const Offset(wallLeft, wallBottom),
-              s,
-            );
-            c.drawLine(
-              const Offset(wallRight, wallTop),
-              const Offset(wallRight, wallBottom),
-              s,
-            );
-            c.drawLine(
-              const Offset(wallLeft, wallBottom),
-              const Offset(wallRight, wallBottom),
-              s,
-            );
+            c.drawPath(house, _miterStroke(s));
           }
         }
       case AyreGlyph.signals:
-        // v4 redraw (plan §7 open decision #1): the v3 path was ascending
-        // bar-chart bars — sharp, blocky, and closer to a generic analytics
-        // icon than a "signal". Replaced with a soft radiating-arcs mark
-        // (a dot with two concentric open arcs) matching lucide's `Radio`
-        // silhouette — reads as "broadcast/pulse" rather than "chart".
-        //
-        // The v4 redraw anchored the dot *and* every arc at (7, 17) — one
-        // corner of the 24pt grid — rather than the (12, 12) centre every
-        // other nav glyph is drawn against. That put the glyph's whole
-        // visual weight in the bottom-left of its box, which is what read
-        // as the bottom nav being "off centre" on the Signals tab.
-        //
-        // v6 fix: the v5 redraw centred the mark correctly but swept each
-        // arc pair across ~280° of the circle (only ~68° of open gap), so
-        // at 22pt with the selected 2.1 stroke the two concentric near-rings
-        // merge into a smeared pinwheel blob rather than reading as
-        // "signal". Redrawn as lucide's `Radio` actually is — two short
-        // arcs radiating left and right of the centred dot, 90° wide with
-        // generous open gaps top and bottom, so it stays crisp at nav size
-        // in both the line and filled (thicker-stroke) states.
+        // v8 rework: replaced the radio/pulse arcs with a plain bolt. The
+        // arcs were open strokes with no honest "filled" state of their own
+        // (selecting the tab could only thicken them, never really light
+        // up) — a closed silhouette carries the same weight every other nav
+        // glyph does when active, and reads as a bolder, simpler mark, in
+        // keeping with the reference bar's plain pictograms.
         {
-          const center = Offset(12, 12);
-          c.drawCircle(center, 1.8, f);
-          const sweep = math.pi * 0.5;
-          for (final radius in [5.4, 9.0]) {
-            c.drawArc(
-              Rect.fromCircle(center: center, radius: radius),
-              -sweep / 2,
-              sweep,
-              false,
-              s,
-            );
-            c.drawArc(
-              Rect.fromCircle(center: center, radius: radius),
-              math.pi - sweep / 2,
-              sweep,
-              false,
-              s,
-            );
+          final bolt = Path()
+            ..moveTo(13.5, 3)
+            ..lineTo(7, 13)
+            ..lineTo(11.3, 13)
+            ..lineTo(10, 21)
+            ..lineTo(17.5, 10.3)
+            ..lineTo(12.6, 10.3)
+            ..close();
+          if (filled) {
+            c.drawPath(bolt, f);
+          } else {
+            c.drawPath(bolt, _miterStroke(s));
           }
         }
       case AyreGlyph.insights:
-        // v4 redraw (plan §7 open decision #1): the v3 path was a literal
-        // breadth-meter scale-with-marker — themed content (what the
-        // Insights tab's data viz shows) leaking into the icon, rather than
-        // a neutral pictogram for the destination. Replaced with a simple
-        // four-point sparkle/spark mark, matching lucide's `Sparkles`
-        // silhouette used for "insights/highlights" wayfinding.
-        //
-        // v6 fix: each of the sparkle's four points is a cusp (the curve
-        // reverses direction 180° at the tip). The default round
-        // strokeJoin rounds a cusp off into a small blunt nub, so the
-        // line-at-rest glyph read as a soft pinwheel while the filled
-        // (selected) glyph — which fills the same path instead of
-        // stroking it — kept its sharp points. Selecting the tab looked
-        // like the icon itself changed shape. Fixed by stroking with a
-        // miter join, which keeps the point sharp in the unfilled state
-        // too, so only line-vs-solid changes on selection.
+        // v8 rework: dropped the small companion spark that used to sit
+        // bottom-right of the main one — a single, larger four-point
+        // sparkle reads cleaner at nav size and keeps this set to the
+        // reference bar's one-shape-per-icon simplicity. Cusps stay stroked
+        // with a miter join so the points stay sharp outline or filled.
         {
           Path sparkPath(Offset center, double r) => Path()
             ..moveTo(center.dx, center.dy - r)
@@ -298,84 +227,70 @@ class _AyreIconPainter extends CustomPainter {
             ..quadraticBezierTo(center.dx, center.dy, center.dx - r, center.dy)
             ..quadraticBezierTo(center.dx, center.dy, center.dx, center.dy - r)
             ..close();
-
-          final big = sparkPath(const Offset(12, 11), 6.5);
-          final small = sparkPath(const Offset(18.5, 18.5), 2.6);
+          final star = sparkPath(const Offset(12, 12), 8.5);
           if (filled) {
-            c.drawPath(big, f);
-            c.drawPath(small, f);
+            c.drawPath(star, f);
           } else {
-            final sharpStroke = Paint()
-              ..color = color
+            c.drawPath(star, _miterStroke(s));
+          }
+        }
+      case AyreGlyph.learn:
+        // v8 rework: replaced the ruled document (a rect plus three content
+        // lines) with a plain folded-corner page — the universal "document"
+        // mark, one dog-eared rectangle rather than a rect-plus-lines
+        // composite. Bolder and simpler, and it removes the one glyph most
+        // exposed to a stray misalignment between stroked lines and their
+        // punched-through filled counterparts.
+        {
+          final page = Path()
+            ..moveTo(6, 3)
+            ..lineTo(15, 3)
+            ..lineTo(19, 7)
+            ..lineTo(19, 21)
+            ..lineTo(6, 21)
+            ..close();
+          final crease = Path()
+            ..moveTo(15, 3)
+            ..lineTo(15, 7)
+            ..lineTo(19, 7);
+          if (filled) {
+            c.saveLayer(page.getBounds().inflate(4), Paint());
+            c.drawPath(page, f);
+            final punch = Paint()
               ..style = PaintingStyle.stroke
               ..strokeWidth = strokeWidth
               ..strokeCap = StrokeCap.round
               ..strokeJoin = StrokeJoin.miter
-              ..strokeMiterLimit = 4;
-            c.drawPath(big, sharpStroke);
-            c.drawPath(small, sharpStroke);
+              ..blendMode = BlendMode.clear;
+            c.drawPath(crease, punch);
+            c.restore();
+          } else {
+            final line = _miterStroke(s);
+            c.drawPath(page, line);
+            c.drawPath(crease, line);
           }
         }
-      case AyreGlyph.learn:
-        // Stacked rules under a header — a document, not an open book.
-        //
-        // The filled (selected) state used to just fill the rect and skip
-        // the three rules entirely — with no line detail left, it read as a
-        // blank white card rather than a document. Fixed by keeping the
-        // rules in the filled state too, punched through the solid fill
-        // with BlendMode.clear so the pill color shows through as crisp
-        // gaps, the same "solid silhouette with cut-through detail" a
-        // filled file/description icon uses elsewhere.
-        if (filled) {
-          final rect = RRect.fromRectAndRadius(
-            const Rect.fromLTWH(5, 3, 14, 18),
-            const Radius.circular(2),
-          );
-          c.saveLayer(rect.outerRect.inflate(4), Paint());
-          c.drawRRect(rect, f);
-          final punch = Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = strokeWidth
-            ..strokeCap = StrokeCap.round
-            ..blendMode = BlendMode.clear;
-          c.drawLine(const Offset(8.5, 8), const Offset(15.5, 8), punch);
-          c.drawLine(const Offset(8.5, 12), const Offset(15.5, 12), punch);
-          c.drawLine(const Offset(8.5, 16), const Offset(13, 16), punch);
-          c.restore();
-        } else {
-          _rect(c, s, f, 5, 3, 14, 18, r: 2);
-          c.drawLine(const Offset(8.5, 8), const Offset(15.5, 8), s);
-          c.drawLine(const Offset(8.5, 12), const Offset(15.5, 12), s);
-          c.drawLine(const Offset(8.5, 16), const Offset(13, 16), s);
-        }
       case AyreGlyph.profile:
-        // v6 fix: the filled (selected) state used to draw the shoulders as
-        // an `arcToPoint` D-shape between two points 0.5pt lower than the
-        // unfilled cubic-curve shoulders — a differently-proportioned
-        // silhouette, not the same mark solidified. That's what read as
-        // "off-centre"/"cut" when the tab was selected. Fixed by reusing
-        // the exact same shoulder curve for both states and, when filled,
-        // simply closing it off at the bottom of the icon's own grid to
-        // make a solid silhouette instead of substituting a new shape.
+        // v8 rework: bumped the head and shoulder proportions up (bigger
+        // head, wider shoulders) for a bolder mark closer to the reference
+        // bar's person icon. Keeps v7's fix of sharing one path's footprint
+        // between outline and filled — the outline strokes it open (no
+        // floor edge), the filled state is the same path with one closing
+        // edge added — so selecting the tab still never changes its extent.
         {
-          const headCenter = Offset(12, 9);
-          const headRadius = 3.6;
+          const headCenter = Offset(12, 8.6);
+          const headRadius = 3.9;
+          final shoulders = Path()
+            ..moveTo(4.8, 24)
+            ..lineTo(4.8, 19.8)
+            ..cubicTo(6, 15.6, 8.8, 14.4, 12, 14.4)
+            ..cubicTo(15.2, 14.4, 18, 15.6, 19.2, 19.8)
+            ..lineTo(19.2, 24);
           if (filled) {
             c.drawCircle(headCenter, headRadius, f);
-            final shoulders = Path()
-              ..moveTo(5.5, 20)
-              ..cubicTo(6.5, 16, 9, 15, 12, 15)
-              ..cubicTo(15, 15, 17.5, 16, 18.5, 20)
-              ..lineTo(18.5, 24)
-              ..lineTo(5.5, 24)
-              ..close();
-            c.drawPath(shoulders, f);
+            c.drawPath(Path.from(shoulders)..close(), f);
           } else {
             c.drawCircle(headCenter, headRadius, s);
-            final shoulders = Path()
-              ..moveTo(5.5, 20)
-              ..cubicTo(6.5, 16, 9, 15, 12, 15)
-              ..cubicTo(15, 15, 17.5, 16, 18.5, 20);
             c.drawPath(shoulders, s);
           }
         }
@@ -704,6 +619,21 @@ class _AyreIconPainter extends CustomPainter {
       c.drawRRect(rect, s);
     }
   }
+
+  /// A copy of the given stroke paint with a miter join instead of this
+  /// file's default round join. Used for the handful of glyphs (the house's
+  /// eave/floor corners, the sparkle's cusps) whose outline is one closed
+  /// path shared with its filled twin: a round join would visibly bulge or
+  /// soften those corners relative to the filled version's sharp ones, which
+  /// is exactly the "shape changes on selection" artifact single-path
+  /// sharing is meant to eliminate.
+  Paint _miterStroke(Paint base) => Paint()
+    ..color = base.color
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = base.strokeWidth
+    ..strokeCap = base.strokeCap
+    ..strokeJoin = StrokeJoin.miter
+    ..strokeMiterLimit = 4;
 
   void _chevron(Canvas c, Paint s, double x, int direction) {
     c.drawPath(
