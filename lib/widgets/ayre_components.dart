@@ -806,7 +806,28 @@ class TickerRow extends StatelessWidget {
     );
 
     if (onTap == null) return row;
-    return PressableScale(onTap: onTap, borderRadius: 0, child: row);
+
+    // Phase 5: grouped row announcement instead of fragmented sub-labels —
+    // symbol/name/price/direction/delta read as one unit, matching the
+    // _NavItem/_ReadMoreButton pattern (Semantics + excludeSemantics on the
+    // visual subtree).
+    final buf = StringBuffer(symbol);
+    if (name != null && name!.isNotEmpty) buf.write(', $name');
+    if (price != null) buf.write(', ${formatPrice(price)}');
+    if (changePercent != null) {
+      final up = changePercent! >= 0;
+      buf.write(
+        ', ${up ? 'up' : 'down'} '
+        '${changePercent!.abs().toStringAsFixed(2)} percent',
+      );
+    }
+
+    return Semantics(
+      button: true,
+      label: buf.toString(),
+      excludeSemantics: true,
+      child: PressableScale(onTap: onTap, borderRadius: 0, child: row),
+    );
   }
 }
 
@@ -883,7 +904,21 @@ class SettingRow extends StatelessWidget {
     );
 
     if (onTap == null || !enabled) return row;
-    return PressableScale(onTap: onTap, borderRadius: 0, child: row);
+
+    // Phase 5: destructive rows (Sign out) need their weight in the
+    // announcement, not just "Sign out" indistinguishable from a normal
+    // nav row — subtitle folds in for context, same grouping pattern as
+    // TickerRow/_NavItem.
+    final buf = StringBuffer(title);
+    if (subtitle != null && subtitle!.isNotEmpty) buf.write(', $subtitle');
+    if (danger) buf.write(', destructive action');
+
+    return Semantics(
+      button: true,
+      label: buf.toString(),
+      excludeSemantics: true,
+      child: PressableScale(onTap: onTap, borderRadius: 0, child: row),
+    );
   }
 }
 

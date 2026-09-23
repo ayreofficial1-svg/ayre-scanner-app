@@ -414,7 +414,12 @@ class _ContinueCard extends StatelessWidget {
     final t = context.tokens;
     final progress = course.progress ?? 0;
 
-    return AyreCard(
+    return Semantics(
+      button: true,
+      label: 'Continue, ${course.title}, '
+          '${course.lessonsDone} of ${course.lessonsTotal} lessons',
+      excludeSemantics: true,
+      child: AyreCard(
       onTap: onTap,
       accentEdge: true,
       padding: const EdgeInsets.all(AppSpace.lg),
@@ -452,6 +457,7 @@ class _ContinueCard extends StatelessWidget {
           AyreIcon(AyreGlyph.forward, size: 16, color: t.accentInk),
         ],
       ),
+      ),
     );
   }
 }
@@ -470,7 +476,20 @@ class _CourseRow extends StatelessWidget {
     final progress = course.progress;
     final complete = progress != null && progress >= 1;
 
-    return PressableScaleRow(
+    // Phase 5: grouped announcement (title, category, completion, progress).
+    final buf = StringBuffer(course.title);
+    buf.write(', ${course.category}');
+    if (complete) {
+      buf.write(', complete');
+    } else if (progress != null) {
+      buf.write(', ${course.lessonsDone} of ${course.lessonsTotal} lessons');
+    }
+
+    return Semantics(
+      button: true,
+      label: buf.toString(),
+      excludeSemantics: true,
+      child: PressableScaleRow(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.all(AppSpace.md),
@@ -560,6 +579,7 @@ class _CourseRow extends StatelessWidget {
             ],
           ],
         ),
+      ),
       ),
     );
   }

@@ -830,7 +830,12 @@ class _VolatilityBar extends StatelessWidget {
         ? math.max(4.0, barMaxHeight * drawnFraction)
         : 0.0;
 
-    return Column(
+    // Phase 5: one spoken summary per bar instead of two disconnected
+    // fragments (a bare count, a bare bucket label).
+    return Semantics(
+      label: '$count stocks, $label change',
+      excludeSemantics: true,
+      child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Figure.static(
@@ -877,6 +882,7 @@ class _VolatilityBar extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
       ],
+      ),
     );
   }
 }
@@ -956,7 +962,17 @@ class _VolumeSurgeRowTile extends StatelessWidget {
     final t = context.tokens;
     final drawnFraction = (fraction * progress).clamp(0.0, 1.0);
 
-    return InkWell(
+    // Phase 5: grouped announcement (rank, symbol, surge multiple) —
+    // same reasoning as TickerRow/_CompactSignalRow.
+    final label =
+        'Rank $rank, ${row.symbol}, ${row.surge.toStringAsFixed(1)} times '
+        'average volume';
+
+    return Semantics(
+      button: onTap != null,
+      label: label,
+      excludeSemantics: true,
+      child: InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(
@@ -1019,6 +1035,7 @@ class _VolumeSurgeRowTile extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

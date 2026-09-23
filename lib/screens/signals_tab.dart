@@ -367,7 +367,12 @@ class _FeaturedSignal extends StatelessWidget {
     final t = context.tokens;
     final tone = signal.bullish ? t.positive : t.negative;
 
-    return AyreCard(
+    // Phase 5: content-dense card — mark tappable without collapsing the
+    // rationale/levels detail children carry (unlike TickerRow's terse
+    // grouped-label treatment).
+    return Semantics(
+      button: true,
+      child: AyreCard(
       onTap: onTap,
       accentEdge: true,
       padding: const EdgeInsets.all(AppSpace.lg),
@@ -495,6 +500,7 @@ class _FeaturedSignal extends StatelessWidget {
           ],
         ],
       ),
+      ),
     );
   }
 }
@@ -516,13 +522,35 @@ class _CompactSignalRow extends StatelessWidget {
     final t = context.tokens;
     final tone = signal.bullish ? t.positive : t.negative;
 
-    return PressableScaleRow(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpace.md,
-          vertical: AppSpace.hairlineRowPadding,
-        ),
+    // Phase 5: grouped announcement (symbol, direction, price, change) —
+    // same pattern as TickerRow.
+    final buf = StringBuffer(signal.symbol);
+    if (signal.name != null && signal.name!.isNotEmpty) {
+      buf.write(', ${signal.name}');
+    }
+    buf.write(', ${signal.bullish ? 'bullish' : 'bearish'}');
+    if (signal.lastPrice != null) {
+      buf.write(', ${formatPrice(signal.lastPrice)}');
+    }
+    if (signal.percentChange != null) {
+      final up = signal.percentChange! >= 0;
+      buf.write(
+        ', ${up ? 'up' : 'down'} '
+        '${signal.percentChange!.abs().toStringAsFixed(2)} percent',
+      );
+    }
+
+    return Semantics(
+      button: true,
+      label: buf.toString(),
+      excludeSemantics: true,
+      child: PressableScaleRow(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpace.md,
+            vertical: AppSpace.hairlineRowPadding,
+          ),
         child: Row(
           children: [
             AyreIcon(
@@ -580,6 +608,7 @@ class _CompactSignalRow extends StatelessWidget {
               ),
             ),
           ],
+        ),
         ),
       ),
     );

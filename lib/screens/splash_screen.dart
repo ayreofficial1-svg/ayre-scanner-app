@@ -48,26 +48,31 @@ class _AyreSplashScreenState extends State<AyreSplashScreen>
 
     return Scaffold(
       backgroundColor: t.background,
-      body: Center(
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            if (reduceMotion) return child!;
-            // A short rise and fade in, then a fade out as the app takes over.
-            final enter = AppMotion.ease.transform(
-              (_controller.value / 0.45).clamp(0.0, 1.0),
-            );
-            final exit =
-                1 - ((_controller.value - 0.88) / 0.12).clamp(0.0, 1.0);
-            return Opacity(
-              opacity: enter * exit,
-              child: Transform.translate(
-                offset: Offset(0, 10 * (1 - enter)),
-                child: child,
-              ),
-            );
-          },
-          child: const _SplashMark(),
+      // Phase 5: purely presentational and time-boxed — auto-dismisses via
+      // onFinished, so VoiceOver/TalkBack shouldn't announce it as content
+      // or a loading state that outlives its ~1s actual visible duration.
+      body: ExcludeSemantics(
+        child: Center(
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              if (reduceMotion) return child!;
+              // A short rise and fade in, then a fade out as the app takes over.
+              final enter = AppMotion.ease.transform(
+                (_controller.value / 0.45).clamp(0.0, 1.0),
+              );
+              final exit =
+                  1 - ((_controller.value - 0.88) / 0.12).clamp(0.0, 1.0);
+              return Opacity(
+                opacity: enter * exit,
+                child: Transform.translate(
+                  offset: Offset(0, 10 * (1 - enter)),
+                  child: child,
+                ),
+              );
+            },
+            child: const _SplashMark(),
+          ),
         ),
       ),
     );
