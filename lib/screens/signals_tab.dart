@@ -9,6 +9,7 @@ import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
 import '../widgets/figure.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/responsive.dart';
 import '../widgets/state_views.dart';
 import 'equity_detail_screen.dart';
 
@@ -125,6 +126,7 @@ class _SignalsTabState extends State<SignalsTab> {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final all = _result?.value ?? const <Signal>[];
+    final columns = AppBreakpoints.columns(context);
 
     return RefreshIndicator(
       color: t.accentInk,
@@ -132,6 +134,10 @@ class _SignalsTabState extends State<SignalsTab> {
       onRefresh: _load,
       edgeOffset: 72,
       child: ContentWidth(
+        // Single column keeps the app's default 620pt reading measure;
+        // once the board goes multi-column (Phase 2A) it needs the wider
+        // frame `learn_tab.dart` already uses for the same reason.
+        maxWidth: columns > 1 ? 960 : null,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
             AppSpace.pageHorizontal,
@@ -172,14 +178,14 @@ class _SignalsTabState extends State<SignalsTab> {
               },
             )),
             const SizedBox(height: AppSpace.sectionGap),
-            ..._board(),
+            ..._board(columns),
           ],
         ),
       ),
     );
   }
 
-  List<Widget> _board() {
+  List<Widget> _board(int columns) {
     if (_loading) return const [_SignalsSkeleton()];
 
     if (_result!.isFailed) {
@@ -242,29 +248,67 @@ class _SignalsTabState extends State<SignalsTab> {
       if (rest.isNotEmpty) ...[
         const SizedBox(height: AppSpace.sectionGap),
         const Entrance(index: 3, child: SectionLabel(label: 'Also on watch')),
-        Entrance(
-          index: 4,
-          // `RowGroup` *is* the card — it wraps its rows in one `AyreCard`
-          // with hairline dividers between them (§8.3). Wrapping it in
-          // another card would nest cards, which §19 forbids outright; a
-          // stack of sibling cards for what is one list was the structural
-          // mistake v3 made here.
-          child: RowGroup(
-            children: [
-              for (final signal in rest)
-                _CompactSignalRow(
-                  signal: signal,
-                  onTap: () => _openEquity(signal),
-                ),
-            ],
-          ),
-        ),
+        Entrance(index: 4, child: _AlsoOnWatch(columns: columns, signals: rest, onTap: _openEquity)),
       ],
       if (_result!.stale) ...[
         const SizedBox(height: AppSpace.md),
         const StaleNotice(),
       ],
     ];
+  }
+}
+
+/// The "also on watch" list, single-column below [AppBreakpoints.twoColumn]
+/// (the hairline-divided `RowGroup` §13.2 specifies) and a card grid at or
+/// above it (Phase 2A) — the same column-count pattern `learn_tab.dart`
+/// already applies to its course list, replicated rather than reinvented.
+class _AlsoOnWatch extends StatelessWidget {
+  const _AlsoOnWatch({
+    required this.columns,
+    required this.signals,
+    required this.onTap,
+  });
+
+  final int columns;
+  final List<Signal> signals;
+  final ValueChanged<Signal> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (columns == 1) {
+      // `RowGroup` *is* the card — it wraps its rows in one `AyreCard` with
+      // hairline dividers between them (§8.3). Wrapping it in another card
+      // would nest cards, which §19 forbids outright.
+      return RowGroup(
+        children: [
+          for (final signal in signals)
+            _CompactSignalRow(signal: signal, onTap: () => onTap(signal)),
+        ],
+      );
+    }
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: EdgeInsets.zero,
+      itemCount: signals.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: columns,
+        mainAxisSpacing: AppSpace.cardGap,
+        crossAxisSpacing: AppSpace.cardGap,
+        // Ratio-driven, not a fixed extent, so a large accessibility text
+        // scale grows the tile instead of overflowing it — same reasoning
+        // as `learn_tab.dart`'s course grid.
+        childAspectRatio: 3.6,
+      ),
+      itemBuilder: (context, index) => AyreCard(
+        padding: EdgeInsets.zero,
+        child: _CompactSignalRow(
+          signal: signals[index],
+          onTap: () => onTap(signals[index]),
+        ),
+      ),
+    );
   }
 }
 

@@ -262,6 +262,127 @@ class _NavPillLayer extends StatelessWidget {
   }
 }
 
+/// Large-screen (≥[AppBreakpoints.twoColumn]) counterpart to [AyreBottomNav]
+/// (Phase 2B). Same [kNavDestinations]/[NavDestination]/[navDestinationKey]
+/// data, same [AppThemeTokens] palette, so a tablet/desktop window reads as
+/// the same product rather than falling back to stock Material
+/// `NavigationRail` colors. `HomeShell` swaps this in for the floating pill
+/// above the pivot width; nothing about tab state (`IndexedStack`,
+/// `TickerMode`) changes — only the nav chrome.
+class AyreNavRail extends StatelessWidget {
+  const AyreNavRail({
+    super.key,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  static const double width = 88;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+
+    return Container(
+      width: width,
+      decoration: BoxDecoration(
+        color: t.surface,
+        border: Border(right: BorderSide(color: t.hairline)),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            const SizedBox(height: AppSpace.lg),
+            for (var i = 0; i < kNavDestinations.length; i++)
+              _RailItem(
+                key: navDestinationKey(kNavDestinations[i].label),
+                destination: kNavDestinations[i],
+                selected: i == selectedIndex,
+                onTap: () {
+                  if (i == selectedIndex) return;
+                  HapticFeedback.selectionClick();
+                  onSelected(i);
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One [AyreNavRail] destination: icon above label, stacked, at least
+/// [AppSpace.minTarget] tall — the same touch-target floor every other
+/// interactive row in the app enforces. The selected item takes the same
+/// pill treatment as the bottom nav's active item, just laid out vertically.
+class _RailItem extends StatelessWidget {
+  const _RailItem({
+    super.key,
+    required this.destination,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final NavDestination destination;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final color = selected
+        ? _activeContentColor(t, context)
+        : _inactiveContentColor(t, context);
+    final pill = _activePillColor(t, context);
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: destination.label,
+      child: Tooltip(
+        message: destination.label,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Container(
+            constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
+            margin: const EdgeInsets.symmetric(
+              horizontal: AppSpace.sm,
+              vertical: AppSpace.xxs,
+            ),
+            padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
+            decoration: BoxDecoration(
+              color: selected ? pill : Colors.transparent,
+              borderRadius: BorderRadius.circular(AppRadius.card),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                AyreIcon(
+                  destination.glyph,
+                  size: 22,
+                  filled: selected,
+                  color: color,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  destination.label,
+                  style: AppTypo.navLabel(t, color: color),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// One destination's icon, label and tap target. Never enlarges or shifts on
 /// selection — only the icon's fill state and both elements' color change,
 /// per the Spec's "never enlarge the item" rule for this control.

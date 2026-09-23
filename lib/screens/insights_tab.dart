@@ -10,6 +10,7 @@ import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
 import '../widgets/ayre_instrument_tile.dart';
 import '../widgets/figure.dart';
+import '../widgets/responsive.dart';
 import '../widgets/state_views.dart';
 import 'equity_detail_screen.dart';
 
@@ -235,6 +236,7 @@ class _InsightsTabState extends State<InsightsTab> {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final columns = AppBreakpoints.columns(context);
 
     return RefreshIndicator(
       color: t.accentInk,
@@ -242,6 +244,10 @@ class _InsightsTabState extends State<InsightsTab> {
       onRefresh: _load,
       edgeOffset: 72,
       child: ContentWidth(
+        // Widened the same way `learn_tab.dart`/`signals_tab.dart` widen
+        // once their lists go multi-column (Phase 2A) — the default 620pt
+        // reading measure otherwise starves a 2-/3-column movers grid.
+        maxWidth: columns > 1 ? 960 : null,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(
             AppSpace.pageHorizontal,
@@ -288,6 +294,7 @@ class _InsightsTabState extends State<InsightsTab> {
               label: 'Top gainers',
               result: _loading ? null : _gainers,
               onOpen: _openEquity,
+              columns: columns,
               emptyMessage:
                   'No advancing equities reported for this session yet.',
               failedMessage: "Top Gainers didn't load.",
@@ -297,6 +304,7 @@ class _InsightsTabState extends State<InsightsTab> {
               label: 'Top losers',
               result: _loading ? null : _losers,
               onOpen: _openEquity,
+              columns: columns,
               emptyMessage:
                   'No declining equities reported for this session yet.',
               failedMessage: "Top Losers didn't load.",
@@ -307,6 +315,7 @@ class _InsightsTabState extends State<InsightsTab> {
               result: _loading ? null : _mostActive,
               onOpen: _openEquity,
               byVolume: true,
+              columns: columns,
               emptyMessage: 'No traded volume reported for this session yet.',
               failedMessage: "Most Active didn't load.",
             ),
@@ -738,6 +747,7 @@ class _MoversSection extends StatefulWidget {
     required this.onOpen,
     required this.emptyMessage,
     required this.failedMessage,
+    required this.columns,
     this.byVolume = false,
   });
 
@@ -747,6 +757,11 @@ class _MoversSection extends StatefulWidget {
   final String emptyMessage;
   final String failedMessage;
   final bool byVolume;
+
+  /// [AppBreakpoints.columns] of the page, threaded down from
+  /// `InsightsTab.build` so this list can switch from the single hairline-
+  /// divided `RowGroup` to a card grid at wider viewports (Phase 2A).
+  final int columns;
 
   /// Movers lists show a fixed few rows until "See all" is tapped. The backend
   /// returns at most ten per list, so expanding is bounded.
@@ -833,33 +848,54 @@ class _MoversSectionState extends State<_MoversSection> {
                 : AppMotion.pageTransition,
             curve: AppMotion.ease,
             alignment: Alignment.topCenter,
-            child: RowGroup(
-              // Hairlines start at the text, not under the tile.
-              indent:
-                  AppSpace.md + AyreInstrumentTile.defaultSize + AppSpace.md,
-              children: [
-                // §2.2's row grammar: monogram tile, symbol over company
-                // name, price over change. The old rank numeral is gone — the
-                // list is already in rank order and the tile is the leading
-                // element now. No sparkline: the feed carries no series for
-                // movers (§3).
-                for (final quote in _rows)
-                  TickerRow(
-                    leading: AyreInstrumentTile(symbol: quote.symbol),
-                    symbol: quote.symbol,
-                    name: quote.name == quote.symbol ? null : quote.name,
-                    price: quote.lastPrice,
-                    changePercent: quote.percentChange,
-                    changeAbsolute: widget.byVolume ? null : quote.change,
-                    volume: widget.byVolume ? quote.volume : null,
-                    onTap: () => widget.onOpen(quote),
+            child: widget.columns == 1
+                ? RowGroup(
+                    // Hairlines start at the text, not under the tile.
+                    indent: AppSpace.md +
+                        AyreInstrumentTile.defaultSize +
+                        AppSpace.md,
+                    children: [
+                      for (final quote in _rows) _row(quote),
+                    ],
+                  )
+                // Phase 2A: the same column-count grid `learn_tab.dart` uses
+                // for its course list, so this rank-ordered list reads left-
+                // to-right, top-to-bottom rather than losing its order.
+                : GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
+                    itemCount: _rows.length,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: widget.columns,
+                      mainAxisSpacing: AppSpace.cardGap,
+                      crossAxisSpacing: AppSpace.cardGap,
+                      childAspectRatio: 3.6,
+                    ),
+                    itemBuilder: (context, index) => AyreCard(
+                      padding: EdgeInsets.zero,
+                      child: _row(_rows[index]),
+                    ),
                   ),
-              ],
-            ),
           ),
       ],
     );
   }
+
+  // §2.2's row grammar: monogram tile, symbol over company name, price over
+  // change. The old rank numeral is gone — the list is already in rank order
+  // and the tile is the leading element now. No sparkline: the feed carries
+  // no series for movers (§3).
+  Widget _row(Quote quote) => TickerRow(
+        leading: AyreInstrumentTile(symbol: quote.symbol),
+        symbol: quote.symbol,
+        name: quote.name == quote.symbol ? null : quote.name,
+        price: quote.lastPrice,
+        changePercent: quote.percentChange,
+        changeAbsolute: widget.byVolume ? null : quote.change,
+        volume: widget.byVolume ? quote.volume : null,
+        onTap: () => widget.onOpen(quote),
+      );
 }
 
 /// A movers list's trailing header slot: the freshness stamp, and — when the

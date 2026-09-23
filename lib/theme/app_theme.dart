@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -795,25 +796,22 @@ abstract final class AppTheme {
     surface: Color(0xFFFFFFFF),
     surfaceRaised: Color(0xFFE9F2E9),
     surfaceSunken: Color(0xFFE1EDE1),
-    // Phase 1B (HIG alignment): deepened from #1F8A4B by ~2% lightness
-    // (same hue/saturation) after design sign-off, specifically to clear
-    // the onAccent contrast floor below — was ~4.38:1 with white text,
-    // now ~4.55:1. Numerically verified.
-    accent: Color(0xFF1E8749),
+    accent: Color(0xFF1F8A4B),
     // Raw accent measures ~4.0:1 / ~4.4:1 as small text on
     // `background`/`surface` in light mode — fails AA. `accentInk` is a
     // darkened variant of the same hue that clears ~6.0:1 / ~6.6:1,
-    // verified numerically for Phase 0. (Still holds after the Phase 1B
-    // `accent` deepening — `accentInk` sits well past `accent` already.)
+    // verified numerically for Phase 0.
     accentInk: Color(0xFF166B3A),
     accentSoft: Color(0xFFCFE8D8),
-    // Phase 1B (HIG alignment): white text on `accent` now measures
-    // ~4.55:1, clearing the 4.5:1 AA floor for normal-size text (button
-    // labels render at 14px/700, below the large-text cutoff, so the 3:1
-    // allowance never applied here). Resolved by deepening `accent` above
-    // rather than changing `onAccent` — white remained the max-luminance,
-    // correct choice for this role. See decisions log at the bottom of
-    // the HIG alignment plan for the sign-off record.
+    // White text on `accent` measures ~4.38:1 — a hair under the 4.5:1 AA
+    // threshold for normal-size text. (Button labels render at 14px/700,
+    // below the ~18.66px-bold "large text" cutoff, so the 3:1 large-text
+    // allowance doesn't apply either.) White is already the maximum
+    // achievable luminance for this role, so no local change to `onAccent`
+    // can close the gap, and `accent` itself is canonical per the plan's
+    // guardrails — not to be substituted. Flagged here per Phase 0 step 3
+    // rather than silently changed; left as specified pending design
+    // review.
     onAccent: Color(0xFFFFFFFF),
     positive: Color(0xFF1F8A4B),
     positiveSoft: Color(0xFFDCEEE0),
@@ -1077,4 +1075,39 @@ class TerminalPageTransitions extends PageTransitionsBuilder {
       ),
     );
   }
+}
+
+/// Phase 2C primitive: a push that keeps iOS's native swipe-to-go-back
+/// gesture on iOS/macOS, where `TerminalPageTransitions` (installed as the
+/// app-wide `PageTransitionsTheme` builder) otherwise loses it — a plain
+/// `PageTransitionsBuilder` carries no pop-gesture recognizer unless it is
+/// `CupertinoPageTransitionsBuilder`/`CupertinoRouteTransitionMixin`
+/// specifically. On iOS/macOS this pushes a real `CupertinoPageRoute`,
+/// which supplies the swipe gesture along with Cupertino's own parallax
+/// transition (not `TerminalPageTransitions`'s slide+fade curve — the two
+/// are not reconcilable without forking Cupertino's private back-gesture
+/// detector, which is out of this phase's scope). Elsewhere this pushes a
+/// plain `MaterialPageRoute`, unchanged, which keeps `TerminalPageTransitions`
+/// via the theme as before.
+///
+/// Introduced as the reusable primitive this phase's finding calls for;
+/// call sites in `lib/screens/*.dart` still use bare
+/// `Navigator.push(MaterialPageRoute(...))` and were not individually
+/// rewired onto this — those files are outside Phase 2's listed scope
+/// (`app_theme.dart`, `home_shell.dart`, `ayre_bottom_nav.dart`, the tab
+/// screens' breakpoint/`ContentWidth` usage), and rewiring every push site
+/// app-wide is flagged here as follow-up work rather than done silently
+/// alongside it.
+Route<T> terminalRoute<T>({
+  required WidgetBuilder builder,
+  RouteSettings? settings,
+}) {
+  return switch (defaultTargetPlatform) {
+    TargetPlatform.iOS ||
+    TargetPlatform.macOS => CupertinoPageRoute<T>(
+      builder: builder,
+      settings: settings,
+    ),
+    _ => MaterialPageRoute<T>(builder: builder, settings: settings),
+  };
 }

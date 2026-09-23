@@ -4,6 +4,7 @@ import '../services/market_data_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_bottom_nav.dart';
+import '../widgets/responsive.dart';
 import 'home_tab.dart';
 import 'insights_tab.dart';
 import 'learn_tab.dart';
@@ -96,15 +97,30 @@ class _HomeShellState extends State<HomeShell> {
       ],
     );
 
+    // Phase 2B: below the pivot, the floating pill — the app's signature nav
+    // element — is untouched. At/above it, a fixed side rail replaces the
+    // bottom bar rather than floating over content that now has the width to
+    // spare. Only the nav chrome swaps; IndexedStack/TickerMode above is
+    // unchanged either way.
+    final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.twoColumn;
+
     return Scaffold(
       backgroundColor: t.background,
-      extendBody: true,
-      body: _TabFade(index: _index, child: tabs),
-      // Always visible: no scroll listener, no idle timer, no collapsed state.
-      bottomNavigationBar: AyreBottomNav(
-        selectedIndex: _index,
-        onSelected: _select,
-      ),
+      extendBody: !wide,
+      body: wide
+          ? Row(
+              children: [
+                AyreNavRail(selectedIndex: _index, onSelected: _select),
+                Expanded(child: _TabFade(index: _index, child: tabs)),
+              ],
+            )
+          : _TabFade(index: _index, child: tabs),
+      // Always visible: no scroll listener, no idle timer, no collapsed
+      // state. Only shown below the rail pivot — the rail is its own
+      // permanent chrome and the two must never both be on screen.
+      bottomNavigationBar: wide
+          ? null
+          : AyreBottomNav(selectedIndex: _index, onSelected: _select),
     );
   }
 }
