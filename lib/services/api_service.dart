@@ -192,7 +192,7 @@ class ApiService {
               'token': token,
               'platform': platform,
               'signals': signals,
-              if (appVersion != null) 'app_version': appVersion,
+              'app_version': ?appVersion,
             }),
           )
           .timeout(_timeout);

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
@@ -236,7 +238,7 @@ class PushService extends ChangeNotifier {
     final messenger = messengerKey.currentState;
     if (messenger == null) return;
     final context = navigatorKey.currentContext;
-    final tokens = context == null ? null : context.tokens;
+    final tokens = context?.tokens;
 
     messenger
       ..hideCurrentSnackBar()
