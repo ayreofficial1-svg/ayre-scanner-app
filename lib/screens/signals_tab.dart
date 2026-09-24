@@ -16,8 +16,10 @@ import 'equity_detail_screen.dart';
 
 /// Signals — the signal board (Spec §13.2).
 ///
-/// Rebuilt in Phase 5 to §13.2's four parts: filter chips, a featured signal
-/// card, a compact signal list, and the bar strength meter.
+/// One view of every stock the backend has pushed: a featured signal card, a
+/// compact signal list, and the bar strength meter. There are deliberately no
+/// filters — no All / Bullish / Bearish switch — so what the backend pushes is
+/// exactly what is shown.
 ///
 /// v3 rendered every signal as an identical mid-weight card, which meant the
 /// board had no shape — twelve equally loud things and no way in. §13.2's
@@ -44,30 +46,9 @@ class SignalsTab extends StatefulWidget {
   State<SignalsTab> createState() => _SignalsTabState();
 }
 
-/// The board's filters. Bias, not sector or timeframe — bias is the one axis
-/// every signal is guaranteed to carry (`Signal.bullish` is non-nullable),
-/// so a filter on it can never produce a silently-empty board because the
-/// feed omitted a field.
-enum _Filter {
-  all('All'),
-  bullish('Bullish'),
-  bearish('Bearish');
-
-  const _Filter(this.label);
-
-  final String label;
-
-  bool matches(Signal s) => switch (this) {
-    _Filter.all => true,
-    _Filter.bullish => s.bullish,
-    _Filter.bearish => !s.bullish,
-  };
-}
-
 class _SignalsTabState extends State<SignalsTab> {
   DataResult<List<Signal>>? _result;
   bool _loading = true;
-  _Filter _filter = _Filter.all;
 
   @override
   void initState() {
@@ -144,7 +125,6 @@ class _SignalsTabState extends State<SignalsTab> {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final all = _result?.value ?? const <Signal>[];
     final columns = AppBreakpoints.columns(context);
 
     return RefreshIndicator(
@@ -181,18 +161,6 @@ class _SignalsTabState extends State<SignalsTab> {
                 ),
               ),
             ),
-            const SizedBox(height: AppSpace.md),
-            // Chips render even while loading, greyed by their own zero
-            // counts — a filter row that appears only after data lands makes
-            // the header jump, which is the reflow skeletons exist to avoid.
-            Entrance(index: 1, child: _FilterRow(
-              selected: _filter,
-              signals: all,
-              onSelect: (f) {
-                HapticFeedback.selectionClick();
-                setState(() => _filter = f);
-              },
-            )),
             const SizedBox(height: AppSpace.sectionGap),
             ..._board(columns),
           ],
@@ -223,26 +191,10 @@ class _SignalsTabState extends State<SignalsTab> {
       ];
     }
 
-    final matching = _result!.value!.where(_filter.matches).toList();
-
-    // A filtered-to-nothing board is not an empty feed and must not read like
-    // one: the data arrived, the query is too narrow, and the action is the
-    // user's. That distinction is exactly what Phase 4 added `noResults` for.
-    if (matching.isEmpty) {
-      return [
-        StatePanel.noResults(
-          headline: 'No ${_filter.label.toLowerCase()} setups in this sweep',
-          message: 'The scanner found setups, just none on this side.',
-          retryLabel: 'Show all',
-          onRetry: () => setState(() => _filter = _Filter.all),
-        ),
-      ];
-    }
-
     // The featured slot goes to the highest conviction, and ties break toward
     // the largest move — otherwise the "featured" pick would silently be
     // whichever the feed happened to list first.
-    final ranked = [...matching]
+    final ranked = [..._result!.value!]
       ..sort((a, b) {
         final byStrength = (b.strength ?? 0).compareTo(a.strength ?? 0);
         if (byStrength != 0) return byStrength;
@@ -255,7 +207,7 @@ class _SignalsTabState extends State<SignalsTab> {
 
     return [
       Entrance(
-        index: 2,
+        index: 1,
         child: _FeaturedSignal(
           signal: featured,
           onTap: () => _openEquity(featured),
@@ -263,8 +215,8 @@ class _SignalsTabState extends State<SignalsTab> {
       ),
       if (rest.isNotEmpty) ...[
         const SizedBox(height: AppSpace.sectionGap),
-        const Entrance(index: 3, child: SectionLabel(label: 'Also on watch')),
-        Entrance(index: 4, child: _AlsoOnWatch(columns: columns, signals: rest, onTap: _openEquity)),
+        const Entrance(index: 2, child: SectionLabel(label: 'Also on watch')),
+        Entrance(index: 3, child: _AlsoOnWatch(columns: columns, signals: rest, onTap: _openEquity)),
       ],
     ];
   }
@@ -319,46 +271,6 @@ class _AlsoOnWatch extends StatelessWidget {
           signal: signals[index],
           onTap: () => onTap(signals[index]),
         ),
-      ),
-    );
-  }
-}
-
-// ─── Filters ───────────────────────────────────────────────────────────────
-
-class _FilterRow extends StatelessWidget {
-  const _FilterRow({
-    required this.selected,
-    required this.signals,
-    required this.onSelect,
-  });
-
-  final _Filter selected;
-  final List<Signal> signals;
-  final ValueChanged<_Filter> onSelect;
-
-  @override
-  Widget build(BuildContext context) {
-    // Scrolls rather than wraps: at a large text scale three chips plus their
-    // counts exceed a 320pt width, and a wrapped filter row changes the
-    // header's height as the text scale changes.
-    return SizedBox(
-      height: 44,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        clipBehavior: Clip.none,
-        children: [
-          for (final filter in _Filter.values) ...[
-            if (filter != _Filter.values.first)
-              const SizedBox(width: AppSpace.xs),
-            AyreFilterChip(
-              label: filter.label,
-              selected: filter == selected,
-              count: signals.where(filter.matches).length,
-              onTap: () => onSelect(filter),
-            ),
-          ],
-        ],
       ),
     );
   }

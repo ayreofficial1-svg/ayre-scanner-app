@@ -184,6 +184,11 @@ class RemoteMarketDataService implements MarketDataService {
   static const _cacheTtl = Duration(seconds: 3);
   final Map<IndexId, (DateTime, List<Quote>)> _constituentCache = {};
 
+  /// Whether each index's last constituents response was the backend's saved
+  /// closing reading (`market_closed: true`), so a closed market's values are
+  /// not flagged "live" during the minutes right after the bell.
+  final Map<IndexId, bool> _constituentsClosed = {};
+
   /// In-flight request per index, so concurrent callers within the same
   /// refresh tick share one HTTP round trip instead of each firing their
   /// own. Without this, one `_refreshLive()` tick on Insights alone starts
@@ -223,7 +228,11 @@ class RemoteMarketDataService implements MarketDataService {
       if (rows.isEmpty) return const DataResult<List<Quote>>.empty();
       return DataResult.ready(
         rows,
-        stale: _isStale(asOf, DataSurface.indexBoard),
+        stale: _isStale(
+          asOf,
+          DataSurface.indexBoard,
+          closed: decoded['market_closed'] == true,
+        ),
       );
     }, onEmpty: () => const DataResult<List<Quote>>.empty());
   }
@@ -274,7 +283,11 @@ class RemoteMarketDataService implements MarketDataService {
       if (rows.isEmpty) return const DataResult<List<Quote>>.empty();
       return DataResult.ready(
         rows,
-        stale: _isStale(_newest(rows), DataSurface.indexConstituents),
+        stale: _isStale(
+          _newest(rows),
+          DataSurface.indexConstituents,
+          closed: _constituentsClosed[index] ?? false,
+        ),
       );
     }, onEmpty: () => const DataResult<List<Quote>>.empty());
   }
@@ -293,7 +306,11 @@ class RemoteMarketDataService implements MarketDataService {
         if (match.isNotEmpty) {
           return DataResult.ready(
             match.first,
-            stale: _isStale(match.first.asOf, DataSurface.equityDetail),
+            stale: _isStale(
+              match.first.asOf,
+              DataSurface.equityDetail,
+              closed: _constituentsClosed[index] ?? false,
+            ),
           );
         }
       }
@@ -361,7 +378,11 @@ class RemoteMarketDataService implements MarketDataService {
       if (eligible.isEmpty) return const DataResult<List<Quote>>.empty();
       return DataResult.ready(
         eligible.take(10).toList(),
-        stale: _isStale(asOf, surface),
+        stale: _isStale(
+          asOf,
+          surface,
+          closed: decoded['market_closed'] == true,
+        ),
       );
     }, onEmpty: () => const DataResult<List<Quote>>.empty());
   }
@@ -544,6 +565,7 @@ class RemoteMarketDataService implements MarketDataService {
       if (quote != null) rows.add(quote);
     }
     _constituentCache[index] = (DateTime.now(), rows);
+    _constituentsClosed[index] = decoded['market_closed'] == true;
     return rows;
   }
 
@@ -627,8 +649,14 @@ class RemoteMarketDataService implements MarketDataService {
     throw failure;
   }
 
-  bool _isStale(DateTime asOf, DataSurface surface) {
+  /// [closed] is the backend's `market_closed` flag: the reading is the saved
+  /// closing value, which is by definition no longer live, so it is flagged as
+  /// such straight away rather than only once it is older than [cadence].
+  /// The values themselves are still shown — see the closing snapshot in the
+  /// backend's main.py.
+  bool _isStale(DateTime asOf, DataSurface surface, {bool closed = false}) {
     if (FaultInjector.instance.forcesStale(surface)) return true;
+    if (closed) return true;
     return DateTime.now().difference(asOf) > cadence;
   }
 

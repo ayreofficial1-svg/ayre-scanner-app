@@ -159,7 +159,7 @@ void main() {
   });
 
   group('per-surface independence', () {
-    testWidgets('a failed movers list leaves the sentiment reading alone', (
+    testWidgets('a failed movers list leaves the other sections alone', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -181,8 +181,7 @@ void main() {
       await tester.tap(find.byKey(navDestinationKey('Insights')));
       await settle(tester);
 
-      // The sentiment reading is at the top of the desk and unaffected.
-      expect(find.text('71'), findsOneWidget);
+      // The failed list says so on its own, at the top of the desk.
       expect(find.textContaining("Top Gainers didn't load"), findsOneWidget);
 
       // The desk is a long feed, so the lower sections are built as they scroll

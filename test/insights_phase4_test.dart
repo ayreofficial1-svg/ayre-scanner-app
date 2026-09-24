@@ -3,14 +3,15 @@ import 'package:ayre_scanner/services/market_data_service.dart';
 import 'package:ayre_scanner/services/market_models.dart';
 import 'package:ayre_scanner/theme/app_theme.dart';
 import 'package:ayre_scanner/widgets/ayre_charts.dart';
+import 'package:ayre_scanner/widgets/ayre_components.dart';
 import 'package:ayre_scanner/widgets/ayre_instrument_tile.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/fake_market_data.dart';
 
-/// Phase 4: the Insights tab — sentiment card pairing, movers row grammar and
-/// the "See all" control.
+/// Phase 4: the Insights tab — movers row grammar, the "See all" control, and
+/// the section-heading "i" explanations.
 void main() {
   final at = DateTime(2026, 9, 18, 15, 31);
 
@@ -56,52 +57,41 @@ void main() {
     });
   });
 
-  group('sentiment card', () {
-    testWidgets('pairs the gauge with the desk note and a breadth line', (
+  group('sections', () {
+    testWidgets('the Market Sentiment section is gone', (tester) async {
+      useSize(tester, const Size(390, 844));
+      await tester.pumpWidget(host(FakeMarketData()));
+      await settle(tester);
+
+      expect(find.byType(SentimentGauge), findsNothing);
+      expect(find.text('MARKET SENTIMENT'), findsNothing);
+      expect(find.text('How the market feels'), findsNothing);
+      // The desk now opens straight on the first movers list.
+      expect(find.text('TOP GAINERS'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('a heading\'s "i" icon opens a plain explanation', (
       tester,
     ) async {
       useSize(tester, const Size(390, 844));
       await tester.pumpWidget(host(FakeMarketData()));
       await settle(tester);
 
-      final gauge = tester.widget<SentimentGauge>(find.byType(SentimentGauge));
-      // Side by side: the narrower paired gauge, not the stacked 176.
-      expect(gauge.width, 148);
-      // Bullish reading → no directional tone, i.e. the spec'd brand accent.
-      expect(gauge.tone, isNull);
+      // Top gainers is the first section, so its icon is the first one.
+      expect(find.byType(SectionInfoButton), findsWidgets);
+      await tester.tap(find.byType(SectionInfoButton).first);
+      await settle(tester);
 
       expect(
-        find.text(
-          'Breadth is constructive with leadership narrowing into '
-          'large-cap financials.',
-        ),
+        find.textContaining('gone up the most today'),
         findsOneWidget,
       );
-      expect(find.text('1,284 of 2,122 stocks advancing'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-    });
 
-    testWidgets('stacks at large text sizes', (tester) async {
-      useSize(tester, const Size(390, 844));
-      await tester.pumpWidget(host(FakeMarketData(), scale: 2.0));
+      await tester.tap(find.text('Got it'));
       await settle(tester);
-
-      final gauge = tester.widget<SentimentGauge>(find.byType(SentimentGauge));
-      expect(gauge.width, 176);
-      expect(find.text('1,284 of 2,122 stocks advancing'), findsOneWidget);
+      expect(find.textContaining('gone up the most today'), findsNothing);
       expect(tester.takeException(), isNull);
-    });
-
-    testWidgets('a bearish reading keeps its red tone and says "declining"', (
-      tester,
-    ) async {
-      useSize(tester, const Size(390, 844));
-      await tester.pumpWidget(host(_BearishSentiment(at)));
-      await settle(tester);
-
-      final gauge = tester.widget<SentimentGauge>(find.byType(SentimentGauge));
-      expect(gauge.tone, AppTheme.darkTokens.negative);
-      expect(find.text('900 of 1,300 stocks declining'), findsOneWidget);
     });
   });
 
@@ -211,25 +201,5 @@ class _ManyGainers extends FakeMarketData {
           asOf: _at,
         ),
     ]);
-  }
-}
-
-/// A weak market: 300 advancing against 900 declining.
-class _BearishSentiment extends FakeMarketData {
-  _BearishSentiment(this._at);
-
-  final DateTime _at;
-
-  @override
-  Future<DataResult<Sentiment>> getSentiment({required bool monthly}) async {
-    return DataResult.ready(
-      Sentiment(
-        score: 20,
-        asOf: _at,
-        advances: 300,
-        declines: 900,
-        unchanged: 100,
-      ),
-    );
   }
 }

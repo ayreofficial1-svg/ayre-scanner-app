@@ -348,9 +348,7 @@ void main() {
   // width, theme and text scale. What they can't catch is behaviour that only
   // appears after an interaction, which is where §13's new structures live.
   group('tab screens', () {
-    testWidgets('Signals filters the board, and says so when it empties', (
-      tester,
-    ) async {
+    testWidgets('Signals is a single board with no filters', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -370,28 +368,11 @@ void main() {
         await tester.pump(const Duration(milliseconds: 16));
       }
 
-      // §13.2's filter chips are present before any interaction.
-      expect(find.byType(AyreFilterChip), findsNWidgets(3));
+      // Everything the backend pushes is shown as-is: no All / Bullish /
+      // Bearish chips, and so no filtered-to-nothing state to recover from.
+      expect(find.byType(AyreFilterChip), findsNothing);
+      expect(find.text('Show all'), findsNothing);
       expect(tester.takeException(), isNull);
-
-      // Filtering to a side with nothing in it must read as "your query is
-      // narrow", never as "the feed is empty" — the distinction Phase 4 added
-      // `StatePreset.noResults` for. Whichever side empties first, the panel
-      // that appears is the no-results one and it offers a way back.
-      for (final label in ['Bullish', 'Bearish']) {
-        await tester.tap(find.text(label));
-        for (var i = 0; i < 30; i++) {
-          await tester.pump(const Duration(milliseconds: 16));
-        }
-        expect(tester.takeException(), isNull);
-        if (find.text('Show all').evaluate().isNotEmpty) {
-          await tester.tap(find.text('Show all'));
-          for (var i = 0; i < 30; i++) {
-            await tester.pump(const Duration(milliseconds: 16));
-          }
-          expect(tester.takeException(), isNull);
-        }
-      }
     });
 
     testWidgets('Home theme toggle drives the same setter Settings does', (

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
 import 'ayre_icons.dart';
@@ -131,23 +132,36 @@ class InkPanel extends StatelessWidget {
 ///
 /// [subtitle] is an optional one-line description shown directly under the
 /// heading. Left null, the header looks exactly as it always has.
+///
+/// [info] is an optional plain-language explanation of what the section shows.
+/// When given, a small, quiet "i" icon sits right after the heading text and
+/// opens the explanation in a sheet when tapped. Left null, no icon is drawn.
 class SectionLabel extends StatelessWidget {
   const SectionLabel({
     super.key,
     required this.label,
     this.trailing,
     this.subtitle,
+    this.info,
     this.padding = const EdgeInsets.only(bottom: AppSpace.sm),
   });
 
   final String label;
   final Widget? trailing;
   final String? subtitle;
+  final String? info;
   final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+
+    final heading = Text(
+      label.toUpperCase(),
+      style: AppTypo.label(t, fontSize: 11),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
 
     // The heading and (when present) its description share one left column,
     // so a tall trailing control such as a "See all" link sits beside the pair
@@ -156,12 +170,20 @@ class SectionLabel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          label.toUpperCase(),
-          style: AppTypo.label(t, fontSize: 11),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
+        if (info == null)
+          heading
+        else
+          // The "i" icon rides on the heading's right-hand side. It lives with
+          // the heading rather than in the trailing slot so it can never crowd
+          // a "See all" link that sits at the far edge of the row.
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Flexible(child: heading),
+              SectionInfoButton(title: label, message: info!),
+            ],
+          ),
         if (subtitle != null) ...[
           const SizedBox(height: AppSpace.xxs),
           Text(
@@ -191,6 +213,137 @@ class SectionLabel extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// The small "i in a circle" beside a section heading.
+///
+/// Deliberately quiet: a 13pt outline in the subtle foreground tone, no fill,
+/// no shadow. Its tap area is only a little larger than the glyph (24×20) and
+/// sits right against the heading text, well away from any row or "See all"
+/// control, so it is unlikely to be hit by accident. Tapping it opens a bottom
+/// sheet with [message] — a short, everyday-language explanation of what the
+/// section shows.
+class SectionInfoButton extends StatelessWidget {
+  const SectionInfoButton({
+    super.key,
+    required this.title,
+    required this.message,
+  });
+
+  /// The section's name, used as the sheet's heading and the screen-reader
+  /// label.
+  final String title;
+
+  /// The explanation shown in the sheet.
+  final String message;
+
+  static const double _glyphSize = 13;
+
+  void _open(BuildContext context) {
+    HapticFeedback.selectionClick();
+    showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      builder: (_) => _SectionInfoSheet(title: title, message: message),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Semantics(
+      button: true,
+      label: 'About $title',
+      excludeSemantics: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _open(context),
+        child: SizedBox(
+          width: 24,
+          height: 20,
+          child: Center(
+            child: CustomPaint(
+              size: const Size.square(_glyphSize),
+              painter: _InfoGlyphPainter(
+                color: t.foregroundSubtle.withValues(alpha: 0.75),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Paints the "i" glyph: a thin circle with a dot above a short stem.
+class _InfoGlyphPainter extends CustomPainter {
+  const _InfoGlyphPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1
+      ..strokeCap = StrokeCap.round;
+    final fill = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    final centre = Offset(size.width / 2, size.height / 2);
+    canvas.drawCircle(centre, size.width / 2 - 0.6, stroke);
+    canvas.drawCircle(Offset(centre.dx, size.height * 0.31), 0.9, fill);
+    canvas.drawLine(
+      Offset(centre.dx, size.height * 0.46),
+      Offset(centre.dx, size.height * 0.72),
+      stroke,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_InfoGlyphPainter oldDelegate) =>
+      oldDelegate.color != color;
+}
+
+/// The sheet opened by [SectionInfoButton]: a heading, the explanation, and a
+/// single "Got it" button. Scrolls if a large text size makes it taller than
+/// the sheet allows.
+class _SectionInfoSheet extends StatelessWidget {
+  const _SectionInfoSheet({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpace.lg,
+          AppSpace.xl,
+          AppSpace.lg,
+          AppSpace.xl,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(title, style: AppTypo.sectionTitle(t)),
+            const SizedBox(height: AppSpace.sm),
+            Text(message, style: AppTypo.body(t)),
+            const SizedBox(height: AppSpace.xl),
+            AyreButton(
+              label: 'Got it',
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
       ),
     );
   }

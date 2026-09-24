@@ -10,7 +10,6 @@ import '../services/market_models.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_avatar.dart';
-import '../widgets/ayre_charts.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_hills.dart';
 import '../widgets/ayre_icons.dart';
@@ -29,23 +28,19 @@ import 'notifications_screen.dart';
 
 /// Home — the market gateway (Spec §13.1).
 ///
-/// v5 order: greeting header (with the decorative hill ornament behind it) →
-/// **Market Sentiment card** → index board → market-breadth donut →
-/// **Market Insight carousel** → footer line. The screen's *information* is
-/// unchanged from v4 except that the composite sentiment reading, which used to be a gauge beside the breadth
-/// donut, is now the top-of-page Market Sentiment card (a bucketed
-/// Bullish/Neutral/Bearish label with a one-line description). The gauge
-/// itself lives on Insights; the donut stays here, in its own card, because
-/// it is the only surface showing the full Nifty-500 advance/decline split.
+/// Order: greeting header (with the decorative hill ornament behind it) →
+/// **Market Sentiment card** → index board → **Market Insight carousel** →
+/// footer line.
+///
+/// The "Market breadth" donut card that used to sit between the index board
+/// and the insight carousel has been removed; nothing replaces it, and the
+/// remaining sections simply keep the standard section gap between them.
 ///
 /// Devices retired in earlier phases and still gone:
 ///
 /// * **The ink readout panel.** v3 sat each index's live figures on a dark
 ///   "terminal feed" plate. The figures sit on the card, and what marks
 ///   them as live is the LIVE chip and the trace, not a plate behind them.
-/// * **The bespoke breadth ring.** `_BreadthRing`/`_RingPainter` were a
-///   private, one-screen donut written before there was a shared one. This
-///   screen uses `BreadthDonut`.
 /// * **The inlined direction rendering.** `DirectionBadge` carries direction
 ///   wherever a badge is what's wanted.
 class HomeTab extends StatefulWidget {
@@ -79,8 +74,10 @@ class HomeTab extends StatefulWidget {
 class _HomeTabState extends State<HomeTab> {
   DataResult<List<Quote>>? _board;
   DataResult<Sentiment>? _breadth;
-  // The donut's source (spec §4): the full Nifty-500 count from
-  // `/api/breadth/full`, not `_breadth`'s ~140-stock live-tick count.
+  // The full Nifty-500 advance/decline count from `/api/breadth/full`. It no
+  // longer has a card of its own on Home; the Market Sentiment card reads it
+  // as the fallback for its one-line description ("X of Y stocks advancing")
+  // when the sentiment feed carries no note or counts of its own.
   // Refreshes on its own fixed hourly schedule server-side — cache-only on
   // every request — so it's loaded in `_load` alongside everything else but
   // deliberately left out of `_refreshLive`'s 10s tick, the same way
@@ -261,21 +258,12 @@ class _HomeTabState extends State<HomeTab> {
               onOpen: _openIndex,
               onRetry: _load,
             ),
-            const SizedBox(height: AppSpace.sectionGap),
-            Entrance(
-              index: 3,
-              child: const SectionLabel(label: 'Market breadth'),
-            ),
-            _BreadthCard(
-              breadthResult: _loading ? null : _fullBreadth,
-              onRetry: _load,
-            ),
             // An empty desk omits the card *and* its gap, so Home doesn't end
             // in a hole; loading and failed still show their own states.
             if (_showsInsights) ...[
               const SizedBox(height: AppSpace.sectionGap),
               Entrance(
-                index: 4,
+                index: 3,
                 child: _InsightSection(
                   result: _loading ? null : _notes,
                   onReadMore: _openInsight,
@@ -284,7 +272,7 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ],
             const SizedBox(height: AppSpace.sectionGap),
-            const Entrance(index: 5, child: _FooterLine()),
+            const Entrance(index: 4, child: _FooterLine()),
           ],
         ),
       ),
@@ -1135,96 +1123,6 @@ class _SentimentSkeleton extends StatelessWidget {
           SkeletonBlock(width: 150, height: 30, radius: AppRadius.inset),
           SizedBox(height: AppSpace.xs),
           SkeletonBlock(height: 12),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Breadth ───────────────────────────────────────────────────────────────
-
-/// Market breadth (§13.1): the full Nifty-500 advance/decline split as a
-/// donut, in its own card.
-///
-/// The composite sentiment reading that used to sit beside it as a gauge is
-/// now the Market Sentiment card at the top of the page, so this card has a
-/// single source — [FullBreadth] (`GET /api/breadth/full`, a separate hourly
-/// poll across the entire Nifty 500) — and a single ready/empty/failed state
-/// of its own. Sentiment failing no longer blanks it, and vice versa.
-class _BreadthCard extends StatelessWidget {
-  const _BreadthCard({required this.breadthResult, required this.onRetry});
-
-  final DataResult<FullBreadth>? breadthResult;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final result = breadthResult;
-    if (result == null) return const _BreadthSkeleton();
-
-    if (result.isFailed) {
-      return StatePanel.failed(
-        headline: "Market breadth didn't load",
-        message: 'The index levels above are unaffected.',
-        compact: true,
-        onRetry: onRetry,
-      );
-    }
-
-    final breadth = result.value;
-    if (breadth == null) {
-      return const StatePanel.empty(
-        headline: 'No breadth reading yet',
-        message: 'Advances and declines appear once the session is under way.',
-        compact: true,
-      );
-    }
-
-    return AyreCard(
-      padding: const EdgeInsets.all(AppSpace.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Center(
-            child: BreadthDonut(
-              advances: breadth.advances,
-              declines: breadth.declines,
-              unchanged: breadth.unchanged,
-              // Home shows the plain picture only: no "ADVANCING" caption
-              // inside the ring and no counts beside the legend labels.
-              centerLabel: null,
-              showLegendCounts: false,
-            ),
-          ),
-          const SizedBox(height: AppSpace.inCardGap),
-          Center(
-            child: Text(
-              'How stocks moved today',
-              textAlign: TextAlign.center,
-              style: AppTypo.hint(t, color: t.foregroundMuted),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BreadthSkeleton extends StatelessWidget {
-  const _BreadthSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return const AyreCard(
-      padding: EdgeInsets.all(AppSpace.lg),
-      child: Column(
-        children: [
-          // Circular, because what it stands in for is: a skeleton that
-          // doesn't share the real layout's shape just moves the reflow later.
-          SkeletonBlock(width: 132, height: 132, radius: AppRadius.circle),
-          SizedBox(height: AppSpace.md),
-          SkeletonBlock(width: 190, height: 12),
         ],
       ),
     );
