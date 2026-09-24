@@ -1,9 +1,52 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SECRETS & PRIVATE CONFIG — never commit these
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Firebase / push notifications (per-project config downloaded from the
+# Firebase console). Not a password, but tied to your project — keep it out of
+# public repos. The build still works without it; push is simply off.
+google-services.json
+**/google-services.json
+GoogleService-Info.plist
+**/GoogleService-Info.plist
+firebase_app_id_file.json
+**/firebase_app_id_file.json
+lib/firebase_options.dart
+
+# A Firebase/Google Cloud *service-account key* is a real secret (it can send
+# notifications as you). It belongs on the backend host only, never in this repo.
+*service-account*.json
+*firebase-adminsdk*.json
+
+# Environment / credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.p8
+*.p12
+*.key
+
+# Android signing (also covered by android/.gitignore — repeated on purpose)
+key.properties
+**/key.properties
+*.jks
+*.keystore
+local.properties
+
+# Session cookies saved by curl tests
+cookies.txt
+*.cookies
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Miscellaneous
+# ─────────────────────────────────────────────────────────────────────────────
 *.class
 *.log
 *.pyc
 *.swp
 .DS_Store
+Thumbs.db
 .atom/
 .build/
 .buildlog/
@@ -12,7 +55,7 @@
 .swiftpm/
 migrate_working_dir/
 
-# IntelliJ related
+# IntelliJ / Android Studio
 *.iml
 *.ipr
 *.iws
@@ -23,23 +66,36 @@ migrate_working_dir/
 # is commented out by default.
 #.vscode/
 
-# Flutter/Dart/Pub related
+# ─────────────────────────────────────────────────────────────────────────────
+# Flutter / Dart / Pub
+# (pubspec.lock is deliberately NOT ignored — for an app it should be committed)
+# ─────────────────────────────────────────────────────────────────────────────
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
 /build/
 /coverage/
 
-# Symbolication related
+# Symbolication / obfuscation
 app.*.symbols
-
-# Obfuscation related
 app.*.map.json
 
-# Android Studio will place build artifacts here
+# Android Studio build artifacts
 /android/app/debug
 /android/app/profile
 /android/app/release
+/android/.gradle/
+/android/captures/
+/android/gradlew
+/android/gradlew.bat
+
+# iOS / macOS generated
+**/Pods/
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/macos/Flutter/ephemeral/
+**/xcuserdata/
