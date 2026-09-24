@@ -169,12 +169,10 @@ class _LearnTabState extends State<LearnTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('TRADING LIBRARY', style: AppTypo.label(t)),
-                    const SizedBox(height: AppSpace.xxs),
-                    Text('My courses', style: AppTypo.pageTitle(t)),
+                    Text('Learning Hub', style: AppTypo.pageTitle(t)),
                     const SizedBox(height: AppSpace.xxs),
                     Text(
-                      'Build your edge, one lesson at a time.',
+                      'Understand the stock market better.',
                       style: AppTypo.body(t),
                     ),
                   ],

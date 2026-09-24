@@ -305,7 +305,7 @@ class _InsightsTabState extends State<InsightsTab> {
                     Text('Insights', style: AppTypo.pageTitle(t)),
                     const SizedBox(height: AppSpace.xxs),
                     Text(
-                      "Breadth, sentiment, and the day's movers, in one feed.",
+                      'Market data, in a snapshot.',
                       style: AppTypo.body(t),
                     ),
                   ],
@@ -962,27 +962,15 @@ class _MoversTrailing extends StatelessWidget {
   final bool expanded;
   final VoidCallback onToggle;
 
-  static const double _maxStampedTextScale = 1.3;
-
   @override
   Widget build(BuildContext context) {
-    final textScale = MediaQuery.textScalerOf(context).scale(100) / 100;
-    final showStamp = !showToggle || textScale <= _maxStampedTextScale;
-
+    // The freshness stamp ("As of ...") is intentionally not shown on this
+    // tab — see the Insights heading description.
+    if (!showToggle) return const SizedBox.shrink();
     return FittedBox(
       fit: BoxFit.scaleDown,
       alignment: Alignment.centerRight,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          if (showStamp) FreshnessStamp(asOf: asOf, stale: stale),
-          if (showToggle) ...[
-            if (showStamp) const SizedBox(width: AppSpace.sm),
-            _SeeAllLink(expanded: expanded, onTap: onToggle),
-          ],
-        ],
-      ),
+      child: _SeeAllLink(expanded: expanded, onTap: onToggle),
     );
   }
 }
@@ -1041,15 +1029,7 @@ class _VolatilitySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionLabel(
-          label: 'Volatility',
-          trailing: result?.isReady == true
-              ? FreshnessStamp(
-                  asOf: result!.value!.asOf,
-                  stale: result!.stale,
-                )
-              : null,
-        ),
+        const SectionLabel(label: 'Volatility'),
         if (result == null)
           const AyreCard(
             child: SkeletonBlock(height: 96, radius: AppRadius.chip),
@@ -1088,15 +1068,7 @@ class _MomentumSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionLabel(
-          label: 'Momentum',
-          trailing: result?.isReady == true
-              ? FreshnessStamp(
-                  asOf: result!.value!.asOf,
-                  stale: result!.stale,
-                )
-              : null,
-        ),
+        const SectionLabel(label: 'Momentum'),
         if (result == null)
           const AyreCard(
             padding: EdgeInsets.all(AppSpace.lg),
@@ -1151,15 +1123,7 @@ class _VolumeSurgeSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SectionLabel(
-          label: 'Volume surge',
-          trailing: result?.isReady == true
-              ? FreshnessStamp(
-                  asOf: result!.value!.asOf,
-                  stale: result!.stale,
-                )
-              : null,
-        ),
+        const SectionLabel(label: 'Volume surge'),
         if (result == null)
           const AyreCard(
             padding: EdgeInsets.symmetric(vertical: AppSpace.xs),

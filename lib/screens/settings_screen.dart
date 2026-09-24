@@ -91,8 +91,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     const SizedBox(height: AppSpace.md),
                     Text(
-                      'Light and dark are designed separately — each is tuned '
-                      'against its own background rather than inverted.',
+                      'Each theme is tuned separately.',
                       style: AppTypo.caption(t),
                     ),
                   ],
@@ -115,18 +114,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _SwitchRow(
                     glyph: AyreGlyph.bell,
                     title: 'In-app alerts',
-                    subtitle:
-                        'Keep a list of what changed while you were away, '
-                        'reachable from the bell on Home.',
+                    subtitle: 'See what changed while away.',
                     value: settings.inAppAlerts,
                     onChanged: settings.setInAppAlerts,
                   ),
                   _SwitchRow(
                     glyph: AyreGlyph.alerts,
                     title: 'New signal alerts',
-                    subtitle:
-                        'Record an entry when the scanner returns a pick '
-                        'you have not seen before.',
+                    subtitle: 'Alerts for new scanner picks.',
                     value: settings.newSignalAlerts,
                     enabled: settings.inAppAlerts,
                     onChanged: settings.setNewSignalAlerts,
@@ -134,9 +129,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _SwitchRow(
                     glyph: AyreGlyph.delayed,
                     title: 'Delayed-data warnings',
-                    subtitle:
-                        'Record an entry when market data falls behind its '
-                        'normal update interval.',
+                    subtitle: 'Warns when data is delayed.',
                     value: settings.staleDataWarnings,
                     enabled: settings.inAppAlerts,
                     onChanged: settings.setStaleDataWarnings,
@@ -153,7 +146,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     glyph: AyreGlyph.account,
                     title: 'Signed in as',
                     subtitle: _loadingSession
-                        ? "Checking this device's session"
+                        ? 'Checking your session.'
                         : 'The identity the scanner uses',
                     trailing: _loadingSession
                         ? const SkeletonBlock(width: 72, height: 11)
@@ -170,8 +163,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     glyph: AyreGlyph.lock,
                     title: 'Session',
                     subtitle: _session == null
-                        ? 'No active session on this device'
-                        : 'Signed in on this device only',
+                        ? 'No active session found.'
+                        : 'Active on this device.',
                     trailing: AyreChip(
                       label: _session == null ? 'Inactive' : 'Active',
                       tone: _session == null
@@ -203,7 +196,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   SettingRow(
                     glyph: AyreGlyph.about,
                     title: 'Version',
-                    subtitle: 'Include this when you report a problem',
+                    subtitle: 'Include this when reporting issues.',
                     trailing: Figure.static(
                       '$kAppVersion ($kAppBuild)',
                       fontSize: AppTextScale.hint,
@@ -250,8 +243,7 @@ class _TextSizeCard extends StatelessWidget {
           _TextSizeTiles(value: value, onChanged: onChanged),
           const SizedBox(height: AppSpace.sm),
           Text(
-            'Applies across the app straight away, on top of your device’s own '
-            'text-size setting.',
+            'Changes text size everywhere instantly.',
             style: AppTypo.caption(t),
           ),
         ],

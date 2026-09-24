@@ -517,40 +517,41 @@ class _AyreIconPainter extends CustomPainter {
           f,
         );
       case AyreGlyph.moon:
-        // A crescent as one closed path: the outer disc's arc, returned along
-        // a second, offset arc. Drawn rather than punched out with a
-        // difference operation so it paints identically stroked or filled.
+        // A standard crescent moon: a disc with a smaller, offset disc
+        // subtracted from it — the conventional "dark mode" glyph. This
+        // replaces the old two-arc lens shape, which read as a leaf/almond
+        // rather than a crescent. Sized to match the sun glyph's footprint
+        // (its rays reach the same ~8.6 radius) so the pair looks like one
+        // consistent family.
         {
-          final crescent = Path()
-            ..moveTo(19.2, 14.6)
-            ..arcToPoint(
-              const Offset(9.4, 4.8),
-              radius: const Radius.circular(8.2),
-              clockwise: false,
-            )
-            ..arcToPoint(
-              const Offset(19.2, 14.6),
-              radius: const Radius.circular(10.4),
-              clockwise: false,
-            )
-            ..close();
+          final outer = Path()
+            ..addOval(Rect.fromCircle(center: const Offset(12, 12), radius: 7.6));
+          final bite = Path()
+            ..addOval(
+              Rect.fromCircle(center: const Offset(15.4, 8.6), radius: 6.6),
+            );
+          final crescent = Path.combine(PathOperation.difference, outer, bite);
           c.drawPath(crescent, filled ? f : s);
         }
       case AyreGlyph.sun:
+        // A plain, standard sun mark — solid core plus eight short rays
+        // touching its edge — the conventional "light mode" glyph, drawn to
+        // read unambiguously as a sun (not a leaf/flower) at nav/button size.
         if (filled) {
-          c.drawCircle(const Offset(12, 12), 4.6, f);
+          c.drawCircle(const Offset(12, 12), 4.2, f);
         } else {
-          c.drawCircle(const Offset(12, 12), 4.6, s);
+          c.drawCircle(const Offset(12, 12), 4.2, s);
         }
-        // Eight rays on the 45° diagonals and the cardinals, drawn from a
-        // common inset so they read as one ring rather than eight lines.
+        // Eight rays on the cardinals and diagonals, started right at the
+        // core's edge so each ray reads as connected to the sun rather than
+        // as a separate petal-like mark floating beside it.
         for (var i = 0; i < 8; i++) {
           final angle = i * 3.14159265 / 4;
           final dx = math.cos(angle);
           final dy = math.sin(angle);
           c.drawLine(
-            Offset(12 + dx * 7.4, 12 + dy * 7.4),
-            Offset(12 + dx * 9.6, 12 + dy * 9.6),
+            Offset(12 + dx * 5.6, 12 + dy * 5.6),
+            Offset(12 + dx * 8.6, 12 + dy * 8.6),
             s,
           );
         }

@@ -171,13 +171,10 @@ class _SignalsTabState extends State<SignalsTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('LIVE SCANNER', style: AppTypo.label(t)),
-                    const SizedBox(height: AppSpace.xxs),
                     Text('Signal board', style: AppTypo.pageTitle(t)),
                     const SizedBox(height: AppSpace.xxs),
                     Text(
-                      'Curated setups with live movement and compact '
-                      'rationale.',
+                      'Stocks flagged as potential opportunities.',
                       style: AppTypo.body(t),
                     ),
                   ],

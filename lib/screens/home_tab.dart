@@ -265,19 +265,9 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ),
             const SizedBox(height: AppSpace.sectionGap),
-            Entrance(
+            const Entrance(
               index: 2,
-              child: SectionLabel(
-                label: 'Index board',
-                trailing: _board?.isReady == true
-                    ? FreshnessStamp(
-                        asOf: _board!.value!
-                            .map((q) => q.asOf)
-                            .reduce((a, b) => a.isAfter(b) ? a : b),
-                        stale: _board!.stale,
-                      )
-                    : null,
-              ),
+              child: SectionLabel(label: 'Index board'),
             ),
             _IndexBoard(
               result: _loading ? null : _board,
@@ -399,35 +389,33 @@ class _Header extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: Text(greeting, style: AppTypo.pageTitle(t)),
                 )
-              else ...[
+              else
+                // Greeting and name are wrapped together in one FittedBox
+                // (rather than two separately-scaled ones) so they share a
+                // single baseline and scale as one unit — the fix for the
+                // pair drifting out of alignment with each other and with
+                // the icon controls beside them.
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    '$greeting,',
-                    style: AppTypo.display(
-                      fontSize: AppTextScale.featuredHeadline,
-                      fontWeight: FontWeight.w500,
-                      color: t.textPrimary,
-                      height: 1.2,
-                      letterSpacing: -0.4,
-                    ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        '$greeting, ',
+                        style: AppTypo.display(
+                          fontSize: AppTextScale.featuredHeadline,
+                          fontWeight: FontWeight.w500,
+                          color: t.textPrimary,
+                          height: 1.2,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      Text(resolved, style: AppTypo.pageTitle(t)),
+                    ],
                   ),
                 ),
-                Text(
-                  resolved,
-                  style: AppTypo.pageTitle(t),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-              const SizedBox(height: AppSpace.xxs),
-              Text(
-                'Discipline today. A better tomorrow.',
-                style: AppTypo.body(t),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
             ],
           ),
         ),
@@ -734,41 +722,23 @@ class _IndexCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: AppSpace.xs),
-        Row(
-          children: [
-            Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Row(
-                  children: [
-                    DeltaFigure(
-                      change: quote.percentChange,
-                      fontSize: AppTextScale.rowLabel,
-                    ),
-                    const SizedBox(width: AppSpace.xs),
-                    Figure(
-                      formatDelta(quote.change, percent: false),
-                      fontSize: AppTextScale.hint,
-                      color: t.foregroundMuted,
-                    ),
-                  ],
-                ),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Row(
+            children: [
+              DeltaFigure(
+                change: quote.percentChange,
+                fontSize: AppTextScale.rowLabel,
               ),
-            ),
-            const SizedBox(width: AppSpace.sm),
-            // The clock is a non-flex child, so it would otherwise be
-            // measured against unbounded width and push the row over in a
-            // narrow multi-column card at a large text scale. `muted`, not
-            // the usual `subtle`: on the identity tints `subtle` measures
-            // only ~2.6:1.
-            ShrinkTrailing(
-              child: Text(
-                formatClock(quote.asOf),
-                style: AppTypo.valueSmall(t, color: t.foregroundMuted),
+              const SizedBox(width: AppSpace.xs),
+              Figure(
+                formatDelta(quote.change, percent: false),
+                fontSize: AppTextScale.hint,
+                color: t.foregroundMuted,
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
@@ -1284,8 +1254,7 @@ class _FooterLine extends StatelessWidget {
         const HairlineDivider(),
         const SizedBox(height: AppSpace.md),
         Text(
-          'Levels are indicative and may be delayed. '
-          'Nothing here is investment advice.',
+          'For informational purposes only, not investment advice.',
           textAlign: TextAlign.center,
           style: AppTypo.hint(t),
         ),

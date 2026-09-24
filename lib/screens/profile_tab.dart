@@ -337,6 +337,13 @@ class _IdentityBlock extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                  const SizedBox(height: AppSpace.xxs),
+                  Text(
+                    'Manage your account and settings.',
+                    style: AppTypo.body(t),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ),
@@ -362,14 +369,6 @@ class _IdentityBlock extends StatelessWidget {
                 ),
               ),
           ],
-        ),
-        const SizedBox(height: AppSpace.sm),
-        // Muted tagline — placeholder copy in the same spirit as Learn's
-        // subhead (Phase 5), flagged for design review rather than pulled
-        // from any backend field (there isn't one).
-        Text(
-          'Discipline today. A better tomorrow.',
-          style: AppTypo.caption(t),
         ),
         const SizedBox(height: AppSpace.md),
         AyreButton(
