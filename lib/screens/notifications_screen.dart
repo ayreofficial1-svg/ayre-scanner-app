@@ -50,7 +50,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   StatePanel.empty(
                     headline: 'Nothing recorded yet',
                     message: SettingsStore.instance.inAppAlerts
-                        ? 'New scanner picks appear here as they happen.'
+                        ? 'New scanner picks and messages from Ayre appear here as they happen.'
                         : 'In-app alerts are switched off in Settings, so '
                               'nothing is being recorded.',
                     pullToRefreshHint: false,
@@ -88,6 +88,7 @@ class _NoticeCard extends StatelessWidget {
     final t = context.tokens;
     final (glyph, tone) = switch (notice.kind) {
       NoticeKind.signal => (AyreGlyph.alerts, t.accentInk),
+      NoticeKind.general => (AyreGlyph.bell, t.accentInk),
     };
 
     return AyreCard(

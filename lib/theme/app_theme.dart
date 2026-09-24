@@ -482,6 +482,13 @@ abstract final class AppTextScale {
   /// Page title. Spec range 26–28.
   static const double page = 28;
 
+  /// Home's time-of-day salutation ("Good morning"). Deliberately larger than
+  /// [page]: it is the first thing on the app's first screen.
+  static const double greeting = 34;
+
+  /// The user's name, on its own line under the greeting.
+  static const double greetingName = 24;
+
   /// Hero metric. Spec range 34–44; this is the base — [heroXL] takes the top
   /// of the range for the single largest reading on a screen.
   static const double hero = 40;
@@ -774,8 +781,13 @@ abstract final class AppTheme {
     neutral: Color(0xFFE0B563),
     neutralSoft: Color(0x24E0B563),
     textPrimary: Color(0xFFEDF5EE),
-    foregroundMuted: Color(0xFF9FB0A4),
-    foregroundSubtle: Color(0xFF67766C),
+    // Brightened so section eyebrows ("TOP GAINERS"), their descriptions and
+    // all other secondary text read clearly on the near-black canvas. The
+    // three-step ladder is kept: textPrimary (#EDF5EE) > muted > subtle.
+    foregroundMuted: Color(0xFFD0DCD3),
+    foregroundSubtle: Color(0xFFB4C3B9),
+    // Disabled stays deliberately dim — it must not be lifted with the two
+    // tokens above, or a disabled control would read as enabled.
     textDisabled: Color(0x8067766C),
     hairline: Color(0x14CFE8D5),
     navHairline: Color(0x1FCFE8D5),
@@ -826,8 +838,11 @@ abstract final class AppTheme {
     neutral: Color(0xFFC98A2D),
     neutralSoft: Color(0x24C98A2D),
     textPrimary: Color(0xFF16211B),
-    foregroundMuted: Color(0xFF5B6B60),
-    foregroundSubtle: Color(0xFF8B968E),
+    // "Brighter" has no meaning on paper, so the light theme gets the
+    // equivalent: more contrast against the pale canvas (muted ~7:1, subtle
+    // ~4.5:1) with the same three-step ladder.
+    foregroundMuted: Color(0xFF465549),
+    foregroundSubtle: Color(0xFF66746A),
     textDisabled: Color(0x808B968E),
     hairline: Color(0x141A2E22),
     navHairline: Color(0x1F1A2E22),

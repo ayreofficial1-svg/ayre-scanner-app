@@ -344,16 +344,21 @@ class _Header extends StatelessWidget {
     final resolved = name.trim();
     final greeting = _greetingFor(DateTime.now());
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    // Two stacked bands. The wordmark and the three circular controls share
+    // the top band, so the salutation below gets the page's full width: at
+    // its larger size "Good afternoon" would otherwise be squeezed into the
+    // ~160px left over beside the controls and scaled straight back down.
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
               // The only in-app brand placement: a small wordmark, sized to
               // sit beneath the live content rather than compete with it.
-              FittedBox(
+              child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
                 child: Row(
@@ -364,67 +369,69 @@ class _Header extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: AppSpace.xs),
-              // §2.1's hierarchy: a lighter, smaller salutation over the
-              // name, which is the boldest, largest text in the header. Both
-              // are existing scale steps (`featuredHeadline` / `page`) — no
-              // new type role. With no name yet, the salutation stands alone
-              // at title size rather than dangling a comma.
-              if (resolved.isEmpty)
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(greeting, style: AppTypo.pageTitle(t)),
-                )
-              else
-                // Greeting and name are wrapped together in one FittedBox
-                // (rather than two separately-scaled ones) so they share a
-                // single baseline and scale as one unit — the fix for the
-                // pair drifting out of alignment with each other and with
-                // the icon controls beside them.
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        '$greeting, ',
-                        style: AppTypo.display(
-                          fontSize: AppTextScale.featuredHeadline,
-                          fontWeight: FontWeight.w500,
-                          color: t.textPrimary,
-                          height: 1.2,
-                          letterSpacing: -0.4,
-                        ),
-                      ),
-                      Text(resolved, style: AppTypo.pageTitle(t)),
-                    ],
-                  ),
-                ),
-            ],
+            ),
+            const SizedBox(width: AppSpace.sm),
+            const _ThemeToggle(),
+            const SizedBox(width: AppSpace.xs),
+            ListenableBuilder(
+              listenable: NotificationLog.instance,
+              builder: (context, _) => _HeaderControl(
+                glyph: AyreGlyph.bell,
+                label: 'Alerts',
+                badge: NotificationLog.instance.hasUnread,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  Navigator.of(context).push(
+                    terminalRoute(builder: (_) => const NotificationsScreen()),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: AppSpace.xs),
+            _AccountControl(name: resolved, onTap: onOpenProfile),
+          ],
+        ),
+        const SizedBox(height: AppSpace.md),
+        // The salutation is the header's largest text; the name sits on its
+        // own line directly beneath it, a step down and heavier-set so the
+        // pair still reads as one greeting. Each is wrapped in its own
+        // scale-down FittedBox so a long name or a large text-size setting
+        // shrinks the line rather than overflowing it.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            greeting,
+            maxLines: 1,
+            style: AppTypo.display(
+              fontSize: AppTextScale.greeting,
+              fontWeight: FontWeight.w700,
+              color: t.textPrimary,
+              height: 1.1,
+              letterSpacing: -1.0,
+            ),
           ),
         ),
-        const SizedBox(width: AppSpace.sm),
-        const _ThemeToggle(),
-        const SizedBox(width: AppSpace.xs),
-        ListenableBuilder(
-          listenable: NotificationLog.instance,
-          builder: (context, _) => _HeaderControl(
-            glyph: AyreGlyph.bell,
-            label: 'Alerts',
-            badge: NotificationLog.instance.hasUnread,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              Navigator.of(context).push(
-                terminalRoute(builder: (_) => const NotificationsScreen()),
-              );
-            },
+        // With no name yet the salutation stands alone — no empty line, no
+        // dangling gap under it.
+        if (resolved.isNotEmpty) ...[
+          const SizedBox(height: AppSpace.xxs),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              resolved,
+              maxLines: 1,
+              style: AppTypo.display(
+                fontSize: AppTextScale.greetingName,
+                fontWeight: FontWeight.w600,
+                color: t.textPrimary,
+                height: 1.2,
+                letterSpacing: -0.5,
+              ),
+            ),
           ),
-        ),
-        const SizedBox(width: AppSpace.xs),
-        _AccountControl(name: resolved, onTap: onOpenProfile),
+        ],
       ],
     );
   }
@@ -920,10 +927,10 @@ abstract final class _SentimentCardColors {
     Color(0xFF14251A),
     Color(0xFF0F1D15),
   ];
-  static const Color labelLight = Color(0xFF4F6357);
-  static const Color labelDark = Color(0xFF9FB0A4);
-  static const Color descriptionLight = Color(0xFF64766B);
-  static const Color descriptionDark = Color(0xFF9FB0A4);
+  static const Color labelLight = Color(0xFF3D5045);
+  static const Color labelDark = Color(0xFFD0DCD3);
+  static const Color descriptionLight = Color(0xFF4C5E52);
+  static const Color descriptionDark = Color(0xFFD0DCD3);
 }
 
 /// The top-of-page Market Sentiment card (§2.1): a small icon + label, the

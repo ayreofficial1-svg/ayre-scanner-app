@@ -7,9 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///
 /// Every value here changes something the app actually does, and every Settings
 /// row is backed by one of them. Toggles for capability the app doesn't have
-/// yet (push delivery, price alerts on a watchlist, a weekly digest) are
-/// deliberately absent rather than shipped inert — a switch that flips and
-/// changes nothing is worse than a shorter Settings screen.
+/// yet (price alerts on a watchlist, a weekly digest) are deliberately absent
+/// rather than shipped inert — a switch that flips and changes nothing is worse
+/// than a shorter Settings screen.
 class SettingsStore extends ChangeNotifier {
   SettingsStore._();
 
@@ -17,11 +17,13 @@ class SettingsStore extends ChangeNotifier {
 
   static const _kInAppAlerts = 'alerts_in_app';
   static const _kNewSignals = 'alerts_new_signals';
+  static const _kPush = 'alerts_push';
   static const _kDisplayName = 'profile_display_name';
   static const _kTextSize = 'appearance_text_size';
 
   bool _inAppAlerts = true;
   bool _newSignalAlerts = true;
+  bool _pushEnabled = true;
   String? _displayNameOverride;
   AppTextSize _textSize = AppTextSize.standard;
 
@@ -37,13 +39,19 @@ class SettingsStore extends ChangeNotifier {
   /// The master gate on the in-app alerts list.
   bool get inAppAlerts => _inAppAlerts;
 
-  /// Records an entry when the scanner returns a pick you haven't seen.
+  /// Records an entry when the scanner returns a pick you haven't seen. Also
+  /// decides whether new-pick push notifications are sent to this device.
   bool get newSignalAlerts => _newSignalAlerts;
+
+  /// Whether this device is registered for push notifications at all. Turning
+  /// it off unregisters the device with the backend (see `PushService`).
+  bool get pushEnabled => _pushEnabled;
 
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     _inAppAlerts = prefs.getBool(_kInAppAlerts) ?? true;
     _newSignalAlerts = prefs.getBool(_kNewSignals) ?? true;
+    _pushEnabled = prefs.getBool(_kPush) ?? true;
     _displayNameOverride = prefs.getString(_kDisplayName);
     final storedSize = prefs.getString(_kTextSize);
     _textSize = AppTextSize.values.firstWhere(
@@ -83,6 +91,9 @@ class SettingsStore extends ChangeNotifier {
   Future<void> setNewSignalAlerts(bool value) =>
       _set(_kNewSignals, value, () => _newSignalAlerts = value);
 
+  Future<void> setPushEnabled(bool value) =>
+      _set(_kPush, value, () => _pushEnabled = value);
+
   Future<void> _set(String key, bool value, VoidCallback apply) async {
     apply();
     notifyListeners();
@@ -107,7 +118,9 @@ enum AppTextSize {
   final double scale;
 }
 
-enum NoticeKind { signal }
+/// [signal] is a new scanner pick; [general] is a custom message the team sent
+/// to everyone's phone.
+enum NoticeKind { signal, general }
 
 /// One entry in the alerts list.
 class Notice {
@@ -197,6 +210,7 @@ class NotificationLog extends ChangeNotifier {
     if (!settings.inAppAlerts) return false;
     return switch (kind) {
       NoticeKind.signal => settings.newSignalAlerts,
+      NoticeKind.general => true,
     };
   }
 
@@ -250,5 +264,22 @@ class SeenSignalsStore {
 
     await prefs.setStringList(_key, {...known, ...symbols}.toList());
     return baseline ? const [] : fresh;
+  }
+
+  /// Records [symbols] as seen without reporting them as new — used when a push
+  /// for a pick has already produced its alert, so Signals doesn't add a second
+  /// one when it next loads.
+  ///
+  /// Does nothing until the baseline exists: writing a symbol into an empty set
+  /// would make the *next* [diffAndRecord] mistake the whole existing board for
+  /// new picks.
+  static Future<void> markSeen(Iterable<String> symbols) async {
+    final prefs = await SharedPreferences.getInstance();
+    final known = prefs.getStringList(_key)?.toSet() ?? <String>{};
+    if (known.isEmpty) return;
+    await prefs.setStringList(
+      _key,
+      {...known, ...symbols.where((s) => s.isNotEmpty)}.toList(),
+    );
   }
 }

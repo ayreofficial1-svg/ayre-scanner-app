@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Accent tint for the push notification icon (matches the brand emerald). -->
+    <color name="ayre_notification_accent">#1E8749</color>
+</resources>

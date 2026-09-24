@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -6,6 +8,7 @@ import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/api_service.dart';
 import 'services/app_lifecycle.dart';
+import 'services/push_service.dart';
 import 'services/reachability.dart';
 import 'services/settings_store.dart';
 import 'theme/app_theme.dart';
@@ -41,8 +44,6 @@ class AyreScannerApp extends StatefulWidget {
 
 class _AyreScannerAppState extends State<AyreScannerApp> {
   static const _themeModeKey = 'theme_mode';
-
-  final _navigatorKey = GlobalKey<NavigatorState>();
 
   // Phase 1A (HIG alignment): `system` is a valid, selectable third option
   // again (Settings' Appearance tiles). Default for a fresh install stays
@@ -81,6 +82,10 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
       SettingsStore.instance.load(),
       NotificationLog.instance.load(),
     ]);
+    // After settings are loaded (push reads them) and deliberately not awaited
+    // into the UI path: the permission prompt and token fetch must never hold
+    // up first paint. Failures are contained inside PushService.
+    unawaited(PushService.instance.init());
   }
 
   Future<void> _loadThemeMode() async {
@@ -126,7 +131,10 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
       child: MaterialApp(
         title: 'Ayre Scanner',
         debugShowCheckedModeBanner: false,
-        navigatorKey: _navigatorKey,
+        // Owned by PushService so a notification tap can return to the tab
+        // shell, and a foreground push can show its banner.
+        navigatorKey: PushService.instance.navigatorKey,
+        scaffoldMessengerKey: PushService.instance.messengerKey,
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: _themeMode,

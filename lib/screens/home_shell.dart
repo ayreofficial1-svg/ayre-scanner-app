@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/market_data_service.dart';
+import '../services/push_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_bottom_nav.dart';
@@ -31,6 +32,29 @@ class HomeShell extends StatefulWidget {
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
   String _accountName = '';
+
+  @override
+  void initState() {
+    super.initState();
+    final push = PushService.instance;
+    // A notification tapped while the app was closed lands here on first
+    // build; one tapped while it's running arrives through the notifier.
+    if (push.consumePendingOpenSignals()) _index = 1;
+    push.openSignalsRequests.addListener(_onOpenSignalsRequested);
+  }
+
+  @override
+  void dispose() {
+    PushService.instance.openSignalsRequests.removeListener(
+      _onOpenSignalsRequested,
+    );
+    super.dispose();
+  }
+
+  void _onOpenSignalsRequested() {
+    if (!mounted) return;
+    if (PushService.instance.consumePendingOpenSignals()) _select(1);
+  }
 
   void _select(int index) {
     if (index == _index) return;

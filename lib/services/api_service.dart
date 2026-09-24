@@ -174,6 +174,60 @@ class ApiService {
     }
   }
 
+  /// Registers this device's push token with the backend, along with which
+  /// kinds of push it wants. Safe to call repeatedly — the backend treats the
+  /// token as the identity and updates it in place. Returns true on success.
+  static Future<bool> registerDevice({
+    required String token,
+    required String platform,
+    required bool signals,
+    String? appVersion,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/api/devices/register'),
+            headers: _headers(),
+            body: jsonEncode({
+              'token': token,
+              'platform': platform,
+              'signals': signals,
+              if (appVersion != null) 'app_version': appVersion,
+            }),
+          )
+          .timeout(_timeout);
+      if (response.statusCode == 200) {
+        notifyReachable(true);
+        return true;
+      }
+      return false;
+    } catch (_) {
+      notifyReachable(false);
+      return false;
+    }
+  }
+
+  /// Removes this device's push token from the backend (push switched off).
+  static Future<bool> unregisterDevice(String token) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/api/devices/unregister'),
+            headers: _headers(),
+            body: jsonEncode({'token': token}),
+          )
+          .timeout(_timeout);
+      if (response.statusCode == 200) {
+        notifyReachable(true);
+        return true;
+      }
+      return false;
+    } catch (_) {
+      notifyReachable(false);
+      return false;
+    }
+  }
+
   /// Fetches the current placeholder market-sentiment value (0-100 scale)
   /// for the Insights tab gauge.
   static Future<Map<String, dynamic>?> getSentiment() async {

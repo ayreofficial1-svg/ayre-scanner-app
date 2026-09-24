@@ -556,13 +556,13 @@ class _InsightPalette {
     glowStart: Color(0x402E9E5B),
     glowEnd: Color(0x002E9E5B),
     bars: Color(0xFF2E9E5B),
-    eyebrow: Color(0xFF9FD9AE),
+    eyebrow: Color(0xFFB4EBC6),
     headline: Color(0xFFFFFFFF),
-    description: Color(0xFFC7D4CB),
+    description: Color(0xFFDCE7E0),
     pill: Color(0xFF24382C),
     pillText: Color(0xFFFFFFFF),
     arrowFill: Color(0x1FFFFFFF),
-    pager: Color(0xFFB9C7BD),
+    pager: Color(0xFFCBD8CF),
   );
 
   static const _InsightPalette dark = _InsightPalette(
@@ -571,12 +571,12 @@ class _InsightPalette {
     glowStart: Color(0x554ED892),
     glowEnd: Color(0x004ED892),
     bars: Color(0xFF4ED892),
-    eyebrow: Color(0xFF6FCB93),
+    eyebrow: Color(0xFF8FE0AE),
     headline: Color(0xFFF5FFF8),
-    description: Color(0xFFAEC2B3),
+    description: Color(0xFFD3E0D7),
     pill: Color(0xFF1E3B29),
     pillText: Color(0xFFEDF5EE),
     arrowFill: Color(0x1FFFFFFF),
-    pager: Color(0xFF8FA396),
+    pager: Color(0xFFB3C4B8),
   );
 }

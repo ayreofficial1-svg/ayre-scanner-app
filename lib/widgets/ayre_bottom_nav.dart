@@ -167,13 +167,13 @@ Color _activeContentColor(AppThemeTokens t, BuildContext context) =>
     ? t.onAccent
     : const Color(0xFFFFFFFF);
 
-/// Inactive tab icon + label. Light uses the spec's own muted gray
-/// (`#8B948E`, a touch lighter than `foregroundSubtle` so inactive items
-/// recede against the white bar); dark reuses `foregroundMuted`.
+/// Inactive tab icon + label. Light uses a muted gray (`#77837B`, a touch
+/// lighter than `foregroundSubtle` so inactive items still recede against the
+/// white bar while staying legible); dark reuses `foregroundMuted`.
 Color _inactiveContentColor(AppThemeTokens t, BuildContext context) =>
     Theme.of(context).brightness == Brightness.dark
     ? t.foregroundMuted
-    : const Color(0xFF8B948E);
+    : const Color(0xFF77837B);
 
 /// The sliding solid pill and the row of items, layered together so the pill
 /// paints once beneath the (non-animating) item row.

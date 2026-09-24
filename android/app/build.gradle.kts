@@ -4,6 +4,14 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Firebase Cloud Messaging: the Google Services plugin turns google-services.json
+// into the app's Firebase configuration. It is applied only when that file is
+// present, so a checkout without it (CI, a new contributor) still builds — push
+// is simply off, and PushService skips itself at runtime.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.example.ayre_scanner"
     compileSdk = flutter.compileSdkVersion

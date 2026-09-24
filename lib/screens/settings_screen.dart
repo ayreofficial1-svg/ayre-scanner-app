@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../main.dart';
 import '../services/api_service.dart';
+import '../services/push_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
@@ -109,24 +110,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // ── Alerts ─────────────────────────────────────────────────────
               const SizedBox(height: AppSpace.lg),
               const SectionLabel(label: 'Alerts'),
-              RowGroup(
-                children: [
-                  _SwitchRow(
-                    glyph: AyreGlyph.bell,
-                    title: 'In-app alerts',
-                    subtitle: 'See what changed while away.',
-                    value: settings.inAppAlerts,
-                    onChanged: settings.setInAppAlerts,
-                  ),
-                  _SwitchRow(
-                    glyph: AyreGlyph.alerts,
-                    title: 'New signal alerts',
-                    subtitle: 'Alerts for new scanner picks.',
-                    value: settings.newSignalAlerts,
-                    enabled: settings.inAppAlerts,
-                    onChanged: settings.setNewSignalAlerts,
-                  ),
-                ],
+              ListenableBuilder(
+                // Push availability and permission can change after this
+                // screen opens (the OS prompt resolves asynchronously).
+                listenable: PushService.instance,
+                builder: (context, _) {
+                  final push = PushService.instance;
+                  return RowGroup(
+                    children: [
+                      _SwitchRow(
+                        glyph: AyreGlyph.bell,
+                        title: 'In-app alerts',
+                        subtitle: 'See what changed while away.',
+                        value: settings.inAppAlerts,
+                        onChanged: settings.setInAppAlerts,
+                      ),
+                      // Only offered on builds that can actually receive push
+                      // (Android/iOS with Firebase configured) — a switch that
+                      // changes nothing is worse than no switch.
+                      if (push.available)
+                        _SwitchRow(
+                          glyph: AyreGlyph.bell,
+                          title: 'Push notifications',
+                          subtitle: push.permissionDenied && settings.pushEnabled
+                              ? 'Blocked in system settings — allow notifications '
+                                    'for Ayre there.'
+                              : 'Get alerts on your phone, even when the app is '
+                                    'closed.',
+                          value: settings.pushEnabled,
+                          onChanged: settings.setPushEnabled,
+                        ),
+                      _SwitchRow(
+                        glyph: AyreGlyph.alerts,
+                        title: 'New signal alerts',
+                        subtitle: 'Alerts for new scanner picks.',
+                        value: settings.newSignalAlerts,
+                        // Governs both the in-app list and push, so it stays
+                        // usable while either of them is on.
+                        enabled:
+                            settings.inAppAlerts ||
+                            (push.available && settings.pushEnabled),
+                        onChanged: settings.setNewSignalAlerts,
+                      ),
+                    ],
+                  );
+                },
               ),
 
               // ── Account & session ──────────────────────────────────────────
