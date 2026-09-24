@@ -241,6 +241,8 @@ void main() {
       expect(find.text('AS OF'), findsWidgets);
       // Degraded-but-shown: the level is still on screen.
       expect(find.text('24,518.40'), findsWidgets);
+      // The old "last values" warning line is gone everywhere.
+      expect(find.text('Showing the last values received'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   });

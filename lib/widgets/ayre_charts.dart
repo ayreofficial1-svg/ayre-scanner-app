@@ -137,6 +137,7 @@ class BreadthDonut extends StatelessWidget {
     this.primaryLabel = 'Up',
     this.secondaryLabel = 'Down',
     this.neutralLabel = 'Flat',
+    this.showLegendCounts = true,
   });
 
   final int advances;
@@ -148,7 +149,10 @@ class BreadthDonut extends StatelessWidget {
   /// unaffected; Insights' momentum-tilt reading (bullish/bearish rather
   /// than advancing/declining stocks) is the one other reading this shape
   /// fits, and overrides these four instead of duplicating the whole widget.
-  final String centerLabel;
+  ///
+  /// [centerLabel] may be null to leave the caption out of the ring's centre,
+  /// showing the percentage on its own.
+  final String? centerLabel;
   final String primaryLabel;
   final String secondaryLabel;
   final String neutralLabel;
@@ -164,6 +168,10 @@ class BreadthDonut extends StatelessWidget {
   /// arc is which (§19), so this is on by default and should only be turned
   /// off where the caller supplies its own labelled breakdown.
   final bool showLegend;
+
+  /// Whether each legend key shows its count next to the label. When false the
+  /// legend is just the coloured dot and the name.
+  final bool showLegendCounts;
 
   int get _total => advances + declines + unchanged;
 
@@ -218,13 +226,15 @@ class BreadthDonut extends StatelessWidget {
                           color: t.textPrimary,
                           semanticsLabel:
                               '${share.round()} percent '
-                              '${centerLabel.toLowerCase()}, $advances '
-                              '${primaryLabel.toLowerCase()}, $declines '
-                              '${secondaryLabel.toLowerCase()}, $unchanged '
-                              '${neutralLabel.toLowerCase()}',
+                              '${(centerLabel ?? primaryLabel).toLowerCase()}, '
+                              '$advances ${primaryLabel.toLowerCase()}, '
+                              '$declines ${secondaryLabel.toLowerCase()}, '
+                              '$unchanged ${neutralLabel.toLowerCase()}',
                         ),
-                        const SizedBox(height: 2),
-                        Text(centerLabel, style: AppTypo.label(t)),
+                        if (centerLabel != null) ...[
+                          const SizedBox(height: 2),
+                          Text(centerLabel!, style: AppTypo.label(t)),
+                        ],
                       ],
                     ),
                   ),
@@ -241,20 +251,20 @@ class BreadthDonut extends StatelessWidget {
               _LegendKey(
                 color: t.positive,
                 label: primaryLabel,
-                value: advances,
+                value: showLegendCounts ? advances : null,
               ),
               const SizedBox(width: AppSpace.md),
               _LegendKey(
                 color: t.negative,
                 label: secondaryLabel,
-                value: declines,
+                value: showLegendCounts ? declines : null,
               ),
               if (unchanged > 0) ...[
                 const SizedBox(width: AppSpace.md),
                 _LegendKey(
                   color: t.foregroundSubtle,
                   label: neutralLabel,
-                  value: unchanged,
+                  value: showLegendCounts ? unchanged : null,
                 ),
               ],
             ],
@@ -271,12 +281,14 @@ class _LegendKey extends StatelessWidget {
   const _LegendKey({
     required this.color,
     required this.label,
-    required this.value,
+    this.value,
   });
 
   final Color color;
   final String label;
-  final int value;
+
+  /// Null hides the count, leaving only the dot and the name.
+  final int? value;
 
   @override
   Widget build(BuildContext context) {
@@ -291,13 +303,15 @@ class _LegendKey extends StatelessWidget {
         ),
         const SizedBox(width: AppSpace.xxs + 2),
         Text(label, style: AppTypo.hint(t, color: t.foregroundMuted)),
-        const SizedBox(width: AppSpace.xxs),
-        Figure.static(
-          '$value',
-          fontSize: AppTextScale.hint,
-          fontWeight: FontWeight.w600,
-          color: t.textPrimary,
-        ),
+        if (value != null) ...[
+          const SizedBox(width: AppSpace.xxs),
+          Figure.static(
+            '$value',
+            fontSize: AppTextScale.hint,
+            fontWeight: FontWeight.w600,
+            color: t.textPrimary,
+          ),
+        ],
       ],
     );
   }

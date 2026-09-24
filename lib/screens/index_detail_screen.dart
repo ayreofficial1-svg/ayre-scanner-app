@@ -344,7 +344,7 @@ class _IndexHeader extends StatelessWidget {
                 ),
                 // A stale feed renders nothing in this slot — never a "Live"
                 // chip it hasn't earned, and never the word "Delayed" (v5
-                // plan §4). The StaleNotice below carries the explanation.
+                // plan §4).
                 if (!stale) ...[
                   const SizedBox(width: AppSpace.sm),
                   const ShrinkTrailing(
@@ -397,10 +397,6 @@ class _IndexHeader extends StatelessWidget {
                 color: quote.isUp ? t.positive : t.negative,
                 fill: true,
               ),
-            ],
-            if (stale) ...[
-              const SizedBox(height: AppSpace.sm),
-              const StaleNotice(),
             ],
             if (quote.dayLow != null ||
                 quote.dayHigh != null ||

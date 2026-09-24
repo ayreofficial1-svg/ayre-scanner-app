@@ -366,49 +366,20 @@ class _SubjectFilter extends StatelessWidget {
 
 // ─── Footer ────────────────────────────────────────────────────────────────
 
-/// The static information card at the foot of the page (§2.3): icon tile,
-/// heading, one short paragraph, in the same card language as everywhere else.
-///
-/// Copy is a placeholder for design review — an educational-use note, since the
-/// screen is trading education. It states no data and makes no product claim
-/// beyond that.
+/// The short line at the foot of the page: one plain sentence saying what
+/// this tab is. Not a warning card, and not a course platform — just
+/// reading material about the stock market.
 class _LearnFooter extends StatelessWidget {
   const _LearnFooter();
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return AyreCard(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: t.surfaceRaised,
-              borderRadius: BorderRadius.circular(AppRadius.iconTile),
-            ),
-            child: AyreIcon(AyreGlyph.about, size: 20, color: t.foregroundMuted),
-          ),
-          const SizedBox(width: AppSpace.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('For learning, not advice', style: AppTypo.rowLabel(t)),
-                const SizedBox(height: AppSpace.xxs),
-                Text(
-                  'Lessons explain how markets and trading work. They are '
-                  'educational material and are not investment advice.',
-                  style: AppTypo.body(t),
-                ),
-              ],
-            ),
-          ),
-        ],
+    return Center(
+      child: Text(
+        'Learn how the market works.',
+        textAlign: TextAlign.center,
+        style: AppTypo.hint(t, color: t.foregroundMuted),
       ),
     );
   }

@@ -321,7 +321,10 @@ class _InsightsTabState extends State<InsightsTab> {
             // when /api/sentiment genuinely supports a window.
             const Entrance(
               index: 1,
-              child: SectionLabel(label: 'Market sentiment'),
+              child: SectionLabel(
+                label: 'Market sentiment',
+                subtitle: 'How the market feels',
+              ),
             ),
             _SentimentSection(
               result: _loading ? null : _sentiment,
@@ -332,6 +335,7 @@ class _InsightsTabState extends State<InsightsTab> {
             const SizedBox(height: AppSpace.sectionGap),
             _MoversSection(
               label: 'Top gainers',
+              subtitle: 'Stocks rising the most',
               result: _loading ? null : _gainers,
               onOpen: _openEquity,
               columns: columns,
@@ -342,6 +346,7 @@ class _InsightsTabState extends State<InsightsTab> {
             const SizedBox(height: AppSpace.sectionGap),
             _MoversSection(
               label: 'Top losers',
+              subtitle: 'Stocks falling the most',
               result: _loading ? null : _losers,
               onOpen: _openEquity,
               columns: columns,
@@ -352,6 +357,7 @@ class _InsightsTabState extends State<InsightsTab> {
             const SizedBox(height: AppSpace.sectionGap),
             _MoversSection(
               label: 'Most active',
+              subtitle: 'Stocks traded the most',
               result: _loading ? null : _mostActive,
               onOpen: _openEquity,
               byVolume: true,
@@ -395,7 +401,10 @@ class _InsightsTabState extends State<InsightsTab> {
             // screen's own. Flagged in the plan.
             if (!_loading && _notes?.isReady == true) ...[
               const SizedBox(height: AppSpace.sectionGap),
-              const SectionLabel(label: 'Desk notes'),
+              const SectionLabel(
+                label: 'Desk notes',
+                subtitle: 'Short notes from us',
+              ),
               ..._deskNotes(),
             ],
           ],
@@ -487,10 +496,6 @@ class _SentimentSection extends StatelessWidget {
                 unchanged: sentiment.unchanged ?? 0,
               ),
             ),
-          ],
-          if (result!.stale) ...[
-            const SizedBox(height: AppSpace.inCardGap),
-            const StaleNotice(),
           ],
         ],
       ),
@@ -788,10 +793,14 @@ class _MoversSection extends StatefulWidget {
     required this.emptyMessage,
     required this.failedMessage,
     required this.columns,
+    required this.subtitle,
     this.byVolume = false,
   });
 
   final String label;
+
+  /// The short description shown directly under the heading.
+  final String subtitle;
   final DataResult<List<Quote>>? result;
   final ValueChanged<Quote> onOpen;
   final String emptyMessage;
@@ -841,8 +850,11 @@ class _MoversSectionState extends State<_MoversSection> {
       children: [
         SectionLabel(
           label: widget.label,
+          subtitle: widget.subtitle,
           // The "See all" link carries its own vertical tap padding, which
-          // already supplies most of the gap under the label.
+          // already supplies most of the gap under the label. The
+          // description sits with the heading, so the link's height only
+          // adds room around the pair.
           padding: EdgeInsets.only(
             bottom: showToggle ? AppSpace.xxs : AppSpace.sm,
           ),
@@ -1029,7 +1041,10 @@ class _VolatilitySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionLabel(label: 'Volatility'),
+        const SectionLabel(
+          label: 'Volatility',
+          subtitle: 'How much prices swing',
+        ),
         if (result == null)
           const AyreCard(
             child: SkeletonBlock(height: 96, radius: AppRadius.chip),
@@ -1068,7 +1083,10 @@ class _MomentumSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionLabel(label: 'Momentum'),
+        const SectionLabel(
+          label: 'Momentum',
+          subtitle: 'Which way stocks lean',
+        ),
         if (result == null)
           const AyreCard(
             padding: EdgeInsets.all(AppSpace.lg),
@@ -1123,7 +1141,10 @@ class _VolumeSurgeSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SectionLabel(label: 'Volume surge'),
+        const SectionLabel(
+          label: 'Volume surge',
+          subtitle: 'Stocks with sudden activity',
+        ),
         if (result == null)
           const AyreCard(
             padding: EdgeInsets.symmetric(vertical: AppSpace.xs),

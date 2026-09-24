@@ -126,14 +126,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     enabled: settings.inAppAlerts,
                     onChanged: settings.setNewSignalAlerts,
                   ),
-                  _SwitchRow(
-                    glyph: AyreGlyph.delayed,
-                    title: 'Delayed-data warnings',
-                    subtitle: 'Warns when data is delayed.',
-                    value: settings.staleDataWarnings,
-                    enabled: settings.inAppAlerts,
-                    onChanged: settings.setStaleDataWarnings,
-                  ),
                 ],
               ),
 

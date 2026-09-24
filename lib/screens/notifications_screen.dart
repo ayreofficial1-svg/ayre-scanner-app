@@ -50,8 +50,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   StatePanel.empty(
                     headline: 'Nothing recorded yet',
                     message: SettingsStore.instance.inAppAlerts
-                        ? 'New scanner picks and delayed-data warnings appear '
-                              'here as they happen.'
+                        ? 'New scanner picks appear here as they happen.'
                         : 'In-app alerts are switched off in Settings, so '
                               'nothing is being recorded.',
                     pullToRefreshHint: false,
@@ -87,10 +86,7 @@ class _NoticeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    // Delayed data is time-sensitive attention, which is the muted-gold
-    // `neutral` tone's job — never a market-direction colour.
     final (glyph, tone) = switch (notice.kind) {
-      NoticeKind.staleData => (AyreGlyph.delayed, t.neutral),
       NoticeKind.signal => (AyreGlyph.alerts, t.accentInk),
     };
 

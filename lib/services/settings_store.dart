@@ -17,13 +17,11 @@ class SettingsStore extends ChangeNotifier {
 
   static const _kInAppAlerts = 'alerts_in_app';
   static const _kNewSignals = 'alerts_new_signals';
-  static const _kStaleData = 'alerts_stale_data';
   static const _kDisplayName = 'profile_display_name';
   static const _kTextSize = 'appearance_text_size';
 
   bool _inAppAlerts = true;
   bool _newSignalAlerts = true;
-  bool _staleDataWarnings = true;
   String? _displayNameOverride;
   AppTextSize _textSize = AppTextSize.standard;
 
@@ -42,14 +40,10 @@ class SettingsStore extends ChangeNotifier {
   /// Records an entry when the scanner returns a pick you haven't seen.
   bool get newSignalAlerts => _newSignalAlerts;
 
-  /// Records an entry when market data falls behind its normal update cadence.
-  bool get staleDataWarnings => _staleDataWarnings;
-
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     _inAppAlerts = prefs.getBool(_kInAppAlerts) ?? true;
     _newSignalAlerts = prefs.getBool(_kNewSignals) ?? true;
-    _staleDataWarnings = prefs.getBool(_kStaleData) ?? true;
     _displayNameOverride = prefs.getString(_kDisplayName);
     final storedSize = prefs.getString(_kTextSize);
     _textSize = AppTextSize.values.firstWhere(
@@ -89,9 +83,6 @@ class SettingsStore extends ChangeNotifier {
   Future<void> setNewSignalAlerts(bool value) =>
       _set(_kNewSignals, value, () => _newSignalAlerts = value);
 
-  Future<void> setStaleDataWarnings(bool value) =>
-      _set(_kStaleData, value, () => _staleDataWarnings = value);
-
   Future<void> _set(String key, bool value, VoidCallback apply) async {
     apply();
     notifyListeners();
@@ -116,7 +107,7 @@ enum AppTextSize {
   final double scale;
 }
 
-enum NoticeKind { signal, staleData }
+enum NoticeKind { signal }
 
 /// One entry in the alerts list.
 class Notice {
@@ -159,7 +150,7 @@ class Notice {
 /// The reverse-chronological list behind the header's notification bell.
 ///
 /// Entries come from things that genuinely happened while you were using the
-/// app — a scanner pick you hadn't seen, a data source falling behind — and
+/// app — a scanner pick you hadn't seen — and
 /// each class is gated by its matching switch in Settings, so turning one off
 /// visibly stops that kind of entry. Nothing here is seeded or sample data.
 class NotificationLog extends ChangeNotifier {
@@ -206,7 +197,6 @@ class NotificationLog extends ChangeNotifier {
     if (!settings.inAppAlerts) return false;
     return switch (kind) {
       NoticeKind.signal => settings.newSignalAlerts,
-      NoticeKind.staleData => settings.staleDataWarnings,
     };
   }
 

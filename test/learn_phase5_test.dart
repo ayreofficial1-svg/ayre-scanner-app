@@ -186,8 +186,9 @@ void main() {
           .widgetList<AyreStatTile>(find.byType(AyreStatTile))
           .map((t) => t.value);
       expect(values, ['0', '0']);
-      // The footer card is static and is there whatever the library holds.
-      expect(find.text('For learning, not advice'), findsOneWidget);
+      // The footer line is static and is there whatever the library holds.
+      expect(find.text('Learn how the market works.'), findsOneWidget);
+      expect(find.text('For learning, not advice'), findsNothing);
       expect(data.courseCalls, 1);
 
       await tester.tap(

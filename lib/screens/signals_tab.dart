@@ -266,10 +266,6 @@ class _SignalsTabState extends State<SignalsTab> {
         const Entrance(index: 3, child: SectionLabel(label: 'Also on watch')),
         Entrance(index: 4, child: _AlsoOnWatch(columns: columns, signals: rest, onTap: _openEquity)),
       ],
-      if (_result!.stale) ...[
-        const SizedBox(height: AppSpace.md),
-        const StaleNotice(),
-      ],
     ];
   }
 }

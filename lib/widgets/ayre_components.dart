@@ -128,35 +128,58 @@ class InkPanel extends StatelessWidget {
 
 /// A section header in the terminal-label convention, with room for a trailing
 /// control (a freshness stamp, a sort affordance).
+///
+/// [subtitle] is an optional one-line description shown directly under the
+/// heading. Left null, the header looks exactly as it always has.
 class SectionLabel extends StatelessWidget {
   const SectionLabel({
     super.key,
     required this.label,
     this.trailing,
+    this.subtitle,
     this.padding = const EdgeInsets.only(bottom: AppSpace.sm),
   });
 
   final String label;
   final Widget? trailing;
+  final String? subtitle;
   final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+
+    // The heading and (when present) its description share one left column,
+    // so a tall trailing control such as a "See all" link sits beside the pair
+    // instead of pushing the description away from its heading.
+    final titleBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label.toUpperCase(),
+          style: AppTypo.label(t, fontSize: 11),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(height: AppSpace.xxs),
+          Text(
+            subtitle!,
+            style: AppTypo.hint(t, color: t.foregroundMuted),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ],
+    );
+
     return Padding(
       padding: padding,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Expanded(
-            flex: 3,
-            child: Text(
-              label.toUpperCase(),
-              style: AppTypo.label(t, fontSize: 11),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
+          Expanded(flex: 3, child: titleBlock),
           if (trailing != null) ...[
             const SizedBox(width: AppSpace.sm),
             // Flex rather than a bare child: a non-flex Row child gets
@@ -272,8 +295,8 @@ class AyreButton extends StatelessWidget {
           width: expand ? double.infinity : null,
           // Phase 1D (HIG alignment): was a hardcoded 46 — below the app's
           // own AppSpace.minTarget (48) that every other tappable row
-          // already enforces (_RefreshDot, OfflineBanner's dismiss target,
-          // StaleNotice's refresh link). Still above Apple's 44pt floor
+          // already enforces (_RefreshDot, OfflineBanner's dismiss target).
+          // Still above Apple's 44pt floor
           // either way; raised for internal consistency, not compliance.
           constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
           padding: const EdgeInsets.symmetric(

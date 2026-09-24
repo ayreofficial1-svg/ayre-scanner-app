@@ -490,82 +490,12 @@ class OfflineBanner extends StatelessWidget {
   }
 }
 
-/// The stale-data marker (§14.3): a degraded-but-shown state, never a blocking
-/// error. Last-known values stay on screen and this explains why they might be
-/// behind.
-///
-/// Inline by construction — a [Row], not a card or a banner — so it cannot
-/// accidentally become a takeover.
-class StaleNotice extends StatelessWidget {
-  const StaleNotice({
-    super.key,
-    this.message = 'Showing the last values received',
-    this.onRefresh,
-  });
-
-  final String message;
-
-  /// Optional. Nothing has failed here, so the verb is [StateAction.refreshNow]
-  /// — never "Try again", which would imply the last attempt didn't work.
-  final VoidCallback? onRefresh;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Row(
-      children: [
-        AyreIcon(AyreGlyph.delayed, size: 13, color: t.neutral),
-        const SizedBox(width: AppSpace.xs),
-        Expanded(
-          child: Text(
-            message,
-            style: AppTypo.caption(t, color: t.foregroundMuted),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        if (onRefresh != null) ...[
-          const SizedBox(width: AppSpace.xs),
-          Semantics(
-            button: true,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: onRefresh,
-              // Phase 7: an inline caption-sized text link had a hit area of
-              // its own text bounds only (~16px tall) — under the 44pt
-              // floor. A minHeight box with the same left-aligned text
-              // keeps the caption's visual size but gives the row itself
-              // (and every StaleNotice call site, none of which pass
-              // onRefresh today, per the constructor default) enough
-              // height to meet the floor the moment one does.
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(
-                  minHeight: AppSpace.minTarget,
-                ),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    StateAction.refreshNow.label,
-                    style: AppTypo.caption(t, color: t.accentInk).copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
 /// A freshness stamp — "AS OF hh:mm". The clock is a figure, so it takes the
 /// numeric face.
 ///
 /// It always draws the clock, fresh or stale. A stale feed is signalled by
-/// [StaleNotice] and by the LIVE chip being omitted — never by the word
-/// "Delayed" on the stamp (v5 plan §4).
+/// the LIVE chip being omitted — never by the word "Delayed" on the stamp
+/// (v5 plan §4).
 class FreshnessStamp extends StatelessWidget {
   const FreshnessStamp({super.key, required this.asOf, this.stale = false});
 

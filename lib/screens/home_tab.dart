@@ -193,19 +193,6 @@ class _HomeTabState extends State<HomeTab> {
     });
     widget.onAccountResolved?.call(name);
 
-    if (board.stale) {
-      NotificationLog.instance.add(
-        Notice(
-          kind: NoticeKind.staleData,
-          title: 'Index feed is behind',
-          body:
-              'Levels are older than their usual update interval. '
-              'Last known values are still shown.',
-          at: DateTime.now(),
-        ),
-      );
-    }
-
     // A refresh that lands new data confirms itself; opening the app doesn't.
     if (!initial) HapticFeedback.mediumImpact();
   }
@@ -1090,10 +1077,6 @@ class _SentimentCard extends StatelessWidget {
                   ],
                 ),
               ),
-              if (result.stale) ...[
-                const SizedBox(height: AppSpace.inCardGap),
-                const StaleNotice(),
-              ],
             ],
           ),
         ),
@@ -1201,20 +1184,20 @@ class _BreadthCard extends StatelessWidget {
               advances: breadth.advances,
               declines: breadth.declines,
               unchanged: breadth.unchanged,
+              // Home shows the plain picture only: no "ADVANCING" caption
+              // inside the ring and no counts beside the legend labels.
+              centerLabel: null,
+              showLegendCounts: false,
             ),
           ),
           const SizedBox(height: AppSpace.inCardGap),
           Center(
             child: Text(
-              'Full Nifty 500 · ${breadth.coverage} stocks tracked',
+              'How stocks moved today',
               textAlign: TextAlign.center,
               style: AppTypo.hint(t, color: t.foregroundMuted),
             ),
           ),
-          if (result.stale) ...[
-            const SizedBox(height: AppSpace.inCardGap),
-            const StaleNotice(),
-          ],
         ],
       ),
     );
