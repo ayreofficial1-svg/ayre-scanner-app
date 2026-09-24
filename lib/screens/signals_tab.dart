@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
 import '../services/settings_store.dart';
@@ -72,6 +73,23 @@ class _SignalsTabState extends State<SignalsTab> {
   void initState() {
     super.initState();
     if (widget.active) _load(initial: true);
+    AppLifecycleService.instance.addListener(_onAppResumed);
+  }
+
+  /// Fired once, shortly after the app returns to the foreground. Reloads
+  /// silently if the app was away long enough for the board to be out of date.
+  void _onAppResumed() {
+    if (!mounted || !widget.active || _result == null) return;
+    if (AppLifecycleService.instance.lastAway < const Duration(seconds: 30)) {
+      return;
+    }
+    _load(initial: true);
+  }
+
+  @override
+  void dispose() {
+    AppLifecycleService.instance.removeListener(_onAppResumed);
+    super.dispose();
   }
 
   @override
@@ -85,8 +103,9 @@ class _SignalsTabState extends State<SignalsTab> {
   Future<void> _load({bool initial = false}) async {
     final result = await widget.marketData.getSignals();
     if (!mounted) return;
+    final shown = result.keepingLastGood(_result);
     setState(() {
-      _result = result;
+      _result = shown;
       _loading = false;
     });
     if (!initial) HapticFeedback.mediumImpact();

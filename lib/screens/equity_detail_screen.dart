@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 
+import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
 import '../theme/app_theme.dart';
@@ -48,14 +49,26 @@ class _EquityDetailScreenState extends State<EquityDetailScreen> {
     // Safe to poll this often: the backend serves this quote from Fyers'
     // single live WebSocket feed, so this never adds extra Fyers/NSE
     // requests no matter how frequently it ticks.
-    _liveTimer = Timer.periodic(
-      liveMarketRefreshInterval,
-      (_) => _load(silent: true),
-    );
+    _liveTimer = Timer.periodic(liveMarketRefreshInterval, (_) {
+      // Backgrounded or still settling after resume — see _onAppResumed.
+      if (!AppLifecycleService.instance.canFetch) return;
+      _load(silent: true);
+    });
+    AppLifecycleService.instance.addListener(_onAppResumed);
+  }
+
+  /// Fired once, shortly after the app returns to the foreground. Resets the
+  /// in-flight guard (a request cut off by backgrounding may never complete)
+  /// and refreshes silently.
+  void _onAppResumed() {
+    if (!mounted) return;
+    _liveRefreshInFlight = false;
+    _load(silent: true);
   }
 
   @override
   void dispose() {
+    AppLifecycleService.instance.removeListener(_onAppResumed);
     _liveTimer?.cancel();
     super.dispose();
   }
@@ -73,7 +86,7 @@ class _EquityDetailScreenState extends State<EquityDetailScreen> {
       final result = await widget.marketData.getEquity(widget.symbol);
       if (!mounted) return;
       setState(() {
-        _result = result;
+        _result = result.keepingLastGood(_result);
         _loading = false;
       });
     } finally {

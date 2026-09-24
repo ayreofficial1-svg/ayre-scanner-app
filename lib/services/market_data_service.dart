@@ -37,6 +37,18 @@ class DataResult<T> {
   bool get isReady => value != null;
   bool get isFailed => failure != null;
 
+  /// If this result is a failure and [previous] holds good data, keep the good
+  /// data instead. A transient failure (e.g. reconnecting after the app was
+  /// backgrounded) must not wipe what is already on screen; the failed state
+  /// only shows when there is nothing to show. Session failures always pass
+  /// through, since those change what the app does.
+  DataResult<T> keepingLastGood(DataResult<T>? previous) {
+    if (!isFailed) return this;
+    if (failure!.requiresReauth) return this;
+    if (previous == null || !previous.isReady) return this;
+    return previous;
+  }
+
   DataPhaseSnapshot get phase {
     if (isFailed) return DataPhaseSnapshot.failed;
     if (isEmpty) return DataPhaseSnapshot.empty;
@@ -559,31 +571,60 @@ class RemoteMarketDataService implements MarketDataService {
     return null;
   }
 
-  /// Every HTTP concern lives here: the session cookie, the timeout, and the
-  /// mapping from transport outcomes onto [DataFailure].
+  /// Retry policy for [_get]: up to [_maxAttempts] tries with these delays.
+  static const int _maxAttempts = 3;
+  static const List<Duration> _retryDelays = [
+    Duration(milliseconds: 700),
+    Duration(milliseconds: 1500),
+  ];
+
+  static bool _isTransientStatus(int code) =>
+      code == 502 || code == 503 || code == 504;
+
+  /// Every HTTP concern lives here: the session cookie, the timeout, retries,
+  /// and the mapping from transport outcomes onto [DataFailure].
+  ///
+  /// Transient failures (socket/DNS errors while the network comes back after
+  /// the app was backgrounded, gateway 502/503/504, one timeout) are retried
+  /// with a short backoff. The app is only reported offline once every attempt
+  /// has failed.
   Future<String> _get(String path) async {
-    try {
-      final response = await http
-          .get(Uri.parse('$baseUrl$path'), headers: ApiService.authHeaders())
-          .timeout(timeout);
-      if (response.statusCode == 401 || response.statusCode == 403) {
-        ApiService.notifySessionExpired();
-        throw const DataFailure.session();
+    DataFailure? lastFailure;
+    for (var attempt = 0; attempt < _maxAttempts; attempt++) {
+      if (attempt > 0) await Future<void>.delayed(_retryDelays[attempt - 1]);
+      try {
+        final response = await http
+            .get(Uri.parse('$baseUrl$path'), headers: ApiService.authHeaders())
+            .timeout(timeout);
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          ApiService.notifySessionExpired();
+          throw const DataFailure.session();
+        }
+        if (_isTransientStatus(response.statusCode)) {
+          lastFailure = DataFailure.api(statusCode: response.statusCode);
+          continue;
+        }
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          throw DataFailure.api(statusCode: response.statusCode);
+        }
+        ApiService.notifyReachable(true);
+        return response.body;
+      } on DataFailure {
+        rethrow;
+      } on TimeoutException {
+        lastFailure = const DataFailure.timeout();
+        // A timeout already cost `timeout` seconds; allow only one retry.
+        if (attempt >= 1) break;
+      } catch (_) {
+        // DNS failure, socket error, malformed URL — "we couldn't reach it".
+        lastFailure = const DataFailure.offline();
       }
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw DataFailure.api(statusCode: response.statusCode);
-      }
-      ApiService.notifyReachable(true);
-      return response.body;
-    } on DataFailure {
-      rethrow;
-    } on TimeoutException {
-      throw const DataFailure.timeout();
-    } catch (_) {
-      // DNS failure, socket error, malformed URL — all "we couldn't reach it".
-      ApiService.notifyReachable(false);
-      throw const DataFailure.offline();
     }
+    final failure = lastFailure ?? const DataFailure.offline();
+    if (failure.reason == DataFailureReason.offline) {
+      ApiService.notifyReachable(false);
+    }
+    throw failure;
   }
 
   bool _isStale(DateTime asOf, DataSurface surface) {

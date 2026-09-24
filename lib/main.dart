@@ -5,6 +5,7 @@ import 'screens/home_shell.dart';
 import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/api_service.dart';
+import 'services/app_lifecycle.dart';
 import 'services/reachability.dart';
 import 'services/settings_store.dart';
 import 'theme/app_theme.dart';
@@ -27,6 +28,7 @@ const bool kEnableAuthStartupGate = false;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  AppLifecycleService.instance.init();
   runApp(const AyreScannerApp());
 }
 

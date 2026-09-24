@@ -4,6 +4,7 @@ import 'dart:async';
 
 import '../main.dart' show AppThemeController;
 import '../services/api_service.dart';
+import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
 import '../services/settings_store.dart';
@@ -109,6 +110,21 @@ class _HomeTabState extends State<HomeTab> {
       liveMarketRefreshInterval,
       (_) => _refreshLive(),
     );
+    AppLifecycleService.instance.addListener(_onAppResumed);
+  }
+
+  /// Fired once, shortly after the app returns to the foreground (after the
+  /// network has had a moment to reconnect). A request that was in flight when
+  /// the app was backgrounded may never complete, so its guard is reset.
+  void _onAppResumed() {
+    if (!mounted || !widget.active) return;
+    _liveRefreshInFlight = false;
+    if (AppLifecycleService.instance.lastAway > const Duration(minutes: 5)) {
+      // Away long enough that the hourly/editorial surfaces are stale too.
+      _load(initial: true);
+    } else {
+      _refreshLive();
+    }
   }
 
   @override
@@ -119,6 +135,7 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   void dispose() {
+    AppLifecycleService.instance.removeListener(_onAppResumed);
     _liveTimer?.cancel();
     super.dispose();
   }
@@ -128,6 +145,9 @@ class _HomeTabState extends State<HomeTab> {
     // IndexedStack) skip the tick entirely rather than fetch and rebuild
     // for a screen nobody can see — see [HomeTab.active].
     if (!widget.active) return;
+    // Backgrounded, or still waiting for the network to settle after resume —
+    // the resume listener triggers the catch-up refresh.
+    if (!AppLifecycleService.instance.canFetch) return;
     // A tick that fires while the previous one is still awaiting its
     // response would otherwise pile a second request on top of the first —
     // harmless individually, but across every live-refreshing screen it's
@@ -140,9 +160,10 @@ class _HomeTabState extends State<HomeTab> {
       final board = await widget.marketData.getIndexBoard();
       final breadth = await widget.marketData.getSentiment(monthly: false);
       if (!mounted) return;
+      // A failed poll never replaces good data already on screen.
       setState(() {
-        _board = board;
-        _breadth = breadth;
+        _board = board.keepingLastGood(_board);
+        _breadth = breadth.keepingLastGood(_breadth);
       });
     } finally {
       _liveRefreshInFlight = false;
@@ -164,10 +185,10 @@ class _HomeTabState extends State<HomeTab> {
 
     setState(() {
       _accountName = name;
-      _board = board;
-      _breadth = breadth;
-      _fullBreadth = fullBreadth;
-      _notes = notes;
+      _board = board.keepingLastGood(_board);
+      _breadth = breadth.keepingLastGood(_breadth);
+      _fullBreadth = fullBreadth.keepingLastGood(_fullBreadth);
+      _notes = notes.keepingLastGood(_notes);
       _loading = false;
     });
     widget.onAccountResolved?.call(name);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 
+import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
 import '../theme/app_theme.dart';
@@ -75,6 +76,19 @@ class _InsightsTabState extends State<InsightsTab> {
       liveMarketRefreshInterval,
       (_) => _refreshLive(),
     );
+    AppLifecycleService.instance.addListener(_onAppResumed);
+  }
+
+  /// Fired once, shortly after the app returns to the foreground. Resets the
+  /// in-flight guard (a request cut off by backgrounding may never complete).
+  void _onAppResumed() {
+    if (!mounted || !widget.active) return;
+    _liveRefreshInFlight = false;
+    if (AppLifecycleService.instance.lastAway > const Duration(minutes: 5)) {
+      _load(initial: true);
+    } else {
+      _refreshLive();
+    }
   }
 
   @override
@@ -90,6 +104,7 @@ class _InsightsTabState extends State<InsightsTab> {
 
   @override
   void dispose() {
+    AppLifecycleService.instance.removeListener(_onAppResumed);
     _liveTimer?.cancel();
     super.dispose();
   }
@@ -97,6 +112,8 @@ class _InsightsTabState extends State<InsightsTab> {
   Future<void> _refreshLive() async {
     // Off-screen tabs skip the tick entirely — see [InsightsTab.active].
     if (!widget.active) return;
+    // Backgrounded or still settling after resume — see _onAppResumed.
+    if (!AppLifecycleService.instance.canFetch) return;
     // See HomeTab._refreshLive: skips a tick rather than let it stack behind
     // a still-running one.
     if (!mounted || _liveRefreshInFlight) return;
@@ -109,11 +126,20 @@ class _InsightsTabState extends State<InsightsTab> {
         widget.marketData.getMostActive(),
       ]);
       if (!mounted) return;
+      // A failed poll never replaces good data already on screen.
       setState(() {
-        _sentiment = results[0] as DataResult<Sentiment>;
-        _gainers = results[1] as DataResult<List<Quote>>;
-        _losers = results[2] as DataResult<List<Quote>>;
-        _mostActive = results[3] as DataResult<List<Quote>>;
+        _sentiment = (results[0] as DataResult<Sentiment>).keepingLastGood(
+          _sentiment,
+        );
+        _gainers = (results[1] as DataResult<List<Quote>>).keepingLastGood(
+          _gainers,
+        );
+        _losers = (results[2] as DataResult<List<Quote>>).keepingLastGood(
+          _losers,
+        );
+        _mostActive = (results[3] as DataResult<List<Quote>>).keepingLastGood(
+          _mostActive,
+        );
       });
     } finally {
       _liveRefreshInFlight = false;
@@ -134,14 +160,28 @@ class _InsightsTabState extends State<InsightsTab> {
     ]);
     if (!mounted) return;
     setState(() {
-      _sentiment = results[0] as DataResult<Sentiment>;
-      _gainers = results[1] as DataResult<List<Quote>>;
-      _losers = results[2] as DataResult<List<Quote>>;
-      _mostActive = results[3] as DataResult<List<Quote>>;
-      _notes = results[4] as DataResult<List<InsightNote>>;
-      _volatility = results[5] as DataResult<VolatilityHistogram>;
-      _momentum = results[6] as DataResult<MomentumTilt>;
-      _volumeSurge = results[7] as DataResult<VolumeSurgeBoard>;
+      _sentiment = (results[0] as DataResult<Sentiment>).keepingLastGood(
+        _sentiment,
+      );
+      _gainers = (results[1] as DataResult<List<Quote>>).keepingLastGood(
+        _gainers,
+      );
+      _losers = (results[2] as DataResult<List<Quote>>).keepingLastGood(
+        _losers,
+      );
+      _mostActive = (results[3] as DataResult<List<Quote>>).keepingLastGood(
+        _mostActive,
+      );
+      _notes = (results[4] as DataResult<List<InsightNote>>).keepingLastGood(
+        _notes,
+      );
+      _volatility = (results[5] as DataResult<VolatilityHistogram>)
+          .keepingLastGood(_volatility);
+      _momentum = (results[6] as DataResult<MomentumTilt>).keepingLastGood(
+        _momentum,
+      );
+      _volumeSurge = (results[7] as DataResult<VolumeSurgeBoard>)
+          .keepingLastGood(_volumeSurge);
       _loading = false;
     });
     if (!initial) HapticFeedback.mediumImpact();

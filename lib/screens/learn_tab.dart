@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
 import '../theme/app_theme.dart';
@@ -58,6 +59,24 @@ class _LearnTabState extends State<LearnTab> {
   void initState() {
     super.initState();
     if (widget.active) _load(initial: true);
+    AppLifecycleService.instance.addListener(_onAppResumed);
+  }
+
+  /// Fired once, shortly after the app returns to the foreground. Reloads
+  /// silently if the app was away long enough for the library to be out of
+  /// date.
+  void _onAppResumed() {
+    if (!mounted || !widget.active || _result == null) return;
+    if (AppLifecycleService.instance.lastAway < const Duration(seconds: 30)) {
+      return;
+    }
+    _load(initial: true);
+  }
+
+  @override
+  void dispose() {
+    AppLifecycleService.instance.removeListener(_onAppResumed);
+    super.dispose();
   }
 
   @override
@@ -69,8 +88,9 @@ class _LearnTabState extends State<LearnTab> {
   }
 
   Future<void> _load({bool initial = false}) async {
-    final result = await widget.marketData.getCourses();
+    final fetched = await widget.marketData.getCourses();
     if (!mounted) return;
+    final result = fetched.keepingLastGood(_result);
     setState(() {
       _result = result;
       _loading = false;

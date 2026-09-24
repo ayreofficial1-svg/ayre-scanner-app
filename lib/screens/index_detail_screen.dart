@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 
+import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
 import '../theme/app_theme.dart';
@@ -60,16 +61,31 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
     // Fyers' single live WebSocket feed, so this never adds extra
     // Fyers/NSE requests no matter how frequently it ticks.
     _liveTimer = Timer.periodic(liveMarketRefreshInterval, (_) {
+      // Backgrounded or still settling after resume — see _onAppResumed.
+      if (!AppLifecycleService.instance.canFetch) return;
       // Each guarded independently: quote and constituents are two separate
       // requests with independent latency, so one running long shouldn't
       // hold back the other from ticking again on schedule.
       if (!_liveQuoteInFlight) _loadQuote(silent: true);
       if (!_liveConstituentsInFlight) _loadConstituents(silent: true);
     });
+    AppLifecycleService.instance.addListener(_onAppResumed);
+  }
+
+  /// Fired once, shortly after the app returns to the foreground. Resets the
+  /// in-flight guards (a request cut off by backgrounding may never complete)
+  /// and refreshes silently.
+  void _onAppResumed() {
+    if (!mounted) return;
+    _liveQuoteInFlight = false;
+    _liveConstituentsInFlight = false;
+    _loadQuote(silent: true);
+    _loadConstituents(silent: true);
   }
 
   @override
   void dispose() {
+    AppLifecycleService.instance.removeListener(_onAppResumed);
     _liveTimer?.cancel();
     super.dispose();
   }
@@ -84,7 +100,7 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
       final result = await widget.marketData.getIndex(widget.index);
       if (!mounted) return;
       setState(() {
-        _quote = result;
+        _quote = result.keepingLastGood(_quote);
         _loadingQuote = false;
       });
     } finally {
@@ -102,7 +118,7 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
       final result = await widget.marketData.getConstituents(widget.index);
       if (!mounted) return;
       setState(() {
-        _constituents = result;
+        _constituents = result.keepingLastGood(_constituents);
         _loadingConstituents = false;
       });
     } finally {
