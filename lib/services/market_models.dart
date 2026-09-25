@@ -481,8 +481,16 @@ class WeeklyReportStock {
   static WeeklyReportStock? tryParse(Map<String, dynamic> json) {
     final symbol = _str(json, const ['symbol']);
     if (symbol == null) return null;
-    final outcome = _str(json, const ['outcome'])?.toLowerCase();
-    if (outcome != 'target' && outcome != 'stop_loss') return null;
+    // `_str(...)?.toLowerCase()` is `String?` — even after the guard below
+    // only lets 'target'/'stop_loss' through, Dart doesn't type-promote a
+    // nullable local from a value-equality check (only from a `== null`
+    // check), so passing it straight to `outcome` (a non-nullable `String`
+    // field) doesn't typecheck. Resolving to a definite literal here avoids
+    // that without a null-assertion (`!`), which the rest of this file's
+    // `tryParse` methods never use.
+    final rawOutcome = _str(json, const ['outcome'])?.toLowerCase();
+    if (rawOutcome != 'target' && rawOutcome != 'stop_loss') return null;
+    final String outcome = rawOutcome == 'target' ? 'target' : 'stop_loss';
     return WeeklyReportStock(
       symbol: symbol,
       profitPct: _num(json, const ['profit_pct', 'profitPct']) ?? 0,
