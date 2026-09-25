@@ -457,6 +457,94 @@ class InsightNote {
   }
 }
 
+/// One stock row inside a [WeeklyReport] — an admin-confirmed outcome for a
+/// past week, never computed by the app or the backend (see
+/// IMPLEMENTATION_SPEC_weekly_report_and_sentiment.md §A.4). [outcome] is
+/// exactly `"target"` or `"stop_loss"` — the same two spellings the backend
+/// validates on write, so a row that doesn't match either is dropped by
+/// [tryParse] rather than shown with a guessed meaning.
+class WeeklyReportStock {
+  const WeeklyReportStock({
+    required this.symbol,
+    required this.profitPct,
+    required this.outcome,
+  });
+
+  final String symbol;
+  final num profitPct;
+
+  /// `"target"` or `"stop_loss"` — see [targetHit].
+  final String outcome;
+
+  bool get targetHit => outcome == 'target';
+
+  static WeeklyReportStock? tryParse(Map<String, dynamic> json) {
+    final symbol = _str(json, const ['symbol']);
+    if (symbol == null) return null;
+    final outcome = _str(json, const ['outcome'])?.toLowerCase();
+    if (outcome != 'target' && outcome != 'stop_loss') return null;
+    return WeeklyReportStock(
+      symbol: symbol,
+      profitPct: _num(json, const ['profit_pct', 'profitPct']) ?? 0,
+      outcome: outcome,
+    );
+  }
+}
+
+/// One week's admin-entered performance record (`GET /api/weekly-report`),
+/// shown on the Signals tab directly below the Signal board. Purely
+/// historical and hand-entered by the admin on the website — there is no
+/// automatic target/stop-loss detection anywhere in this app or the backend
+/// (§A.4). [weekStart]/[weekEnd] arrive as plain ISO dates; the "6th
+/// September to 12th September" display format is computed client-side (see
+/// `signals_tab.dart`'s date-range formatter), not sent pre-formatted by the
+/// backend, so it can be redisplayed differently later without a data
+/// migration.
+class WeeklyReport {
+  const WeeklyReport({
+    required this.id,
+    required this.weekStart,
+    required this.weekEnd,
+    required this.stocks,
+  });
+
+  final String id;
+  final DateTime weekStart;
+  final DateTime weekEnd;
+
+  /// Never empty — [tryParse] drops a report with no valid rows, since an
+  /// empty report has nothing to show.
+  final List<WeeklyReportStock> stocks;
+
+  static WeeklyReport? tryParse(Map<String, dynamic> json) {
+    final id = _str(json, const ['id']);
+    final weekStart = _time(json, const ['week_start', 'weekStart']);
+    final weekEnd = _time(json, const ['week_end', 'weekEnd']);
+    if (id == null || weekStart == null || weekEnd == null) return null;
+
+    final rawStocks = json['stocks'];
+    final stocks = <WeeklyReportStock>[];
+    if (rawStocks is List) {
+      for (final entry in rawStocks) {
+        if (entry is Map) {
+          final parsed = WeeklyReportStock.tryParse(
+            entry.cast<String, dynamic>(),
+          );
+          if (parsed != null) stocks.add(parsed);
+        }
+      }
+    }
+    if (stocks.isEmpty) return null;
+
+    return WeeklyReport(
+      id: id,
+      weekStart: weekStart,
+      weekEnd: weekEnd,
+      stocks: stocks,
+    );
+  }
+}
+
 /// Parses the scanner backend's "18 Sep 2026 11:45:12" IST wall-clock
 /// stamps — used by `/api/breadth/full`'s and the `/api/insights/*`
 /// endpoints' `as_of` fields — into a proper [DateTime].

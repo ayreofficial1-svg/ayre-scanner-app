@@ -108,6 +108,10 @@ abstract interface class MarketDataService {
 
   /// Top stocks by today's-volume ÷ 20-day-average, descending, for Insights.
   Future<DataResult<VolumeSurgeBoard>> getVolumeSurge({int limit = 15});
+
+  /// Admin-entered weekly performance reports (`GET /api/weekly-report`),
+  /// newest week first — shown on the Signals tab below the board (Phase 5).
+  Future<DataResult<List<WeeklyReport>>> getWeeklyReports();
 }
 
 /// Reads every surface from the Ayre backend.
@@ -172,6 +176,10 @@ class RemoteMarketDataService implements MarketDataService {
   static const _insightsVolatility = '/api/insights/volatility';
   static const _insightsMomentum = '/api/insights/momentum';
   static const _insightsVolumeSurge = '/api/insights/volume-surge';
+
+  /// Admin-entered, read-only from this app's point of view — the website
+  /// writes it via POST/DELETE (Phase 4); the app only ever GETs it.
+  static const _weeklyReport = '/api/weekly-report';
 
   /// Constituent lists are the source for movers, breadth and equity lookups.
   /// Cached only very briefly — just long enough to de-duplicate the several
@@ -723,4 +731,14 @@ class RemoteMarketDataService implements MarketDataService {
 
   DateTime _newest(List<Quote> rows) =>
       rows.map((r) => r.asOf).reduce((a, b) => a.isAfter(b) ? a : b);
+
+  @override
+  Future<DataResult<List<WeeklyReport>>> getWeeklyReports() {
+    return _parsedList(
+      surface: DataSurface.weeklyReport,
+      path: _weeklyReport,
+      rootKeys: const ['reports', 'data'],
+      parse: WeeklyReport.tryParse,
+    );
+  }
 }

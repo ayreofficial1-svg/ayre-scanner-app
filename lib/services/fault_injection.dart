@@ -54,6 +54,10 @@ enum DataSurface {
   volatility,
   momentum,
   volumeSurge,
+  // Phase 5: admin-entered historical performance, shown on the Signals tab
+  // below the board (`GET /api/weekly-report`). Its own surface so a failed
+  // fetch never affects the Signal board it sits under.
+  weeklyReport,
 }
 
 /// Debug-only fault injection.

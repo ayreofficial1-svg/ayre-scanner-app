@@ -263,4 +263,32 @@ class FakeMarketData implements MarketDataService {
       ),
     );
   }
+
+  @override
+  Future<DataResult<List<WeeklyReport>>> getWeeklyReports() async {
+    return _wrap(DataSurface.weeklyReport, () => [
+      WeeklyReport(
+        id: 'wr1',
+        weekStart: DateTime(2026, 9, 6),
+        weekEnd: DateTime(2026, 9, 12),
+        stocks: const [
+          WeeklyReportStock(
+            symbol: 'RELIANCE',
+            profitPct: 4.2,
+            outcome: 'target',
+          ),
+          WeeklyReportStock(
+            symbol: 'BAJFINANCE',
+            profitPct: 2.6,
+            outcome: 'target',
+          ),
+          WeeklyReportStock(
+            symbol: 'HDFCLIFE',
+            profitPct: -1.8,
+            outcome: 'stop_loss',
+          ),
+        ],
+      ),
+    ]);
+  }
 }
