@@ -393,7 +393,15 @@ class RemoteMarketDataService implements MarketDataService {
       final decoded = jsonDecode(await _get(_sentiment));
       if (decoded is! Map<String, dynamic>) throw const DataFailure.malformed();
       final parsed = Sentiment.tryParse(decoded);
-      if (parsed == null) throw const DataFailure.malformed();
+      // A null score is a legitimate reading now, not malformed data: the
+      // backend's automatic breadth-derived sentiment (Phase 2) returns
+      // `sentiment: null` on a cold start (no breadth snapshot yet) or when
+      // coverage is too thin to trust, per `compute_sentiment`'s no-snapshot/
+      // low-coverage handling. Treating that as `DataFailure.malformed()`
+      // routed it into the error/retry branch instead of `_SentimentCard`'s
+      // existing "No sentiment reading yet" empty state, which is what this
+      // case is actually meant to show.
+      if (parsed == null) return const DataResult<Sentiment>.empty();
 
       // The endpoint carries no advance/decline counts, so they are counted
       // from real per-stock changes rather than shown as unavailable. If the
