@@ -117,7 +117,10 @@ class _HomeShellState extends State<HomeShell> {
           3,
           LearnTab(marketData: widget.marketData, active: _index == 3),
         ),
-        tickered(4, ProfileTab(accountName: name)),
+        tickered(
+          4,
+          ProfileTab(accountName: name, marketData: widget.marketData),
+        ),
       ],
     );
 

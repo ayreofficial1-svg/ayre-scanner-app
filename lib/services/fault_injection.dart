@@ -59,6 +59,11 @@ enum DataSurface {
   // the Signals tab in Phase 2; its own surface so a failed fetch never
   // affects the index board it sits under.
   weeklyReport,
+  // Phase 6: the SEBI Research Analyst registration number and disclaimer
+  // (`GET /api/compliance`), shown on the Research Analyst information
+  // screen. Its own surface so this can be exercised through fault
+  // injection independently of every other feed.
+  compliance,
 }
 
 /// Debug-only fault injection.

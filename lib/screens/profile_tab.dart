@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/api_service.dart';
+import '../services/market_data_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
@@ -10,11 +11,15 @@ import '../widgets/ayre_icons.dart';
 import '../widgets/ayre_stat_tile.dart';
 import '../widgets/figure.dart';
 import 'edit_profile_screen.dart';
+import 'faq_screen.dart';
 import 'home_shell.dart' show initialsFor;
 import 'login_screen.dart';
 import 'notifications_screen.dart';
+import 'privacy_policy_screen.dart';
+import 'research_analyst_screen.dart';
 import 'settings_screen.dart';
 import 'support_screen.dart' show SupportScreen, kAppVersion, kAppBuild;
+import 'terms_screen.dart';
 
 /// Profile — a flat header block plus list rows, using the same row grammar as
 /// Learn and Settings rather than a distinct card treatment.
@@ -22,9 +27,14 @@ import 'support_screen.dart' show SupportScreen, kAppVersion, kAppBuild;
 /// Sign out stays here (it's a session action, not a preference) and stays
 /// isolated in its own separated section.
 class ProfileTab extends StatefulWidget {
-  const ProfileTab({super.key, required this.accountName});
+  const ProfileTab({
+    super.key,
+    required this.accountName,
+    required this.marketData,
+  });
 
   final String accountName;
+  final MarketDataService marketData;
 
   @override
   State<ProfileTab> createState() => _ProfileTabState();
@@ -224,6 +234,65 @@ class _ProfileTabState extends State<ProfileTab> {
                 ),
                 // A "Saved / Watchlist" row belongs here once there is a
                 // watchlist feature to open. There isn't, so it isn't shown.
+              ],
+            ),
+          ),
+          const SizedBox(height: AppSpace.lg),
+          Entrance(index: 7, child: const SectionLabel(label: 'Legal')),
+          Entrance(
+            index: 7,
+            child: RowGroup(
+              children: [
+                SettingRow(
+                  glyph: AyreGlyph.about,
+                  title: 'Terms and Conditions',
+                  subtitle: 'The terms that govern using this app',
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(
+                      context,
+                    ).push(terminalRoute(builder: (_) => const TermsScreen()));
+                  },
+                ),
+                SettingRow(
+                  glyph: AyreGlyph.account,
+                  title: 'Research Analyst information',
+                  subtitle: 'Registration number and disclaimer',
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).push(
+                      terminalRoute(
+                        builder: (_) => ResearchAnalystScreen(
+                          marketData: widget.marketData,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                SettingRow(
+                  glyph: AyreGlyph.support,
+                  title: 'FAQ',
+                  subtitle: 'Answers to common questions',
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(
+                      context,
+                    ).push(terminalRoute(builder: (_) => const FaqScreen()));
+                  },
+                ),
+                SettingRow(
+                  glyph: AyreGlyph.lock,
+                  title: 'Privacy Policy',
+                  subtitle: 'How your information is handled',
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).push(
+                      terminalRoute(
+                        builder: (_) => const PrivacyPolicyScreen(),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),

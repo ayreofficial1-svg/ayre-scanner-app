@@ -291,4 +291,18 @@ class FakeMarketData implements MarketDataService {
       ),
     ]);
   }
+
+  @override
+  Future<DataResult<ComplianceInfo>> getComplianceInfo() async {
+    return _wrap(
+      DataSurface.compliance,
+      () => const ComplianceInfo(
+        registrationNumber: 'INH000XXXXXX',
+        disclaimer:
+            'This research report is published by a SEBI-registered '
+            'Research Analyst (Registration No: INH000XXXXXX). '
+            'Investments in securities market are subject to market risks.',
+      ),
+    );
+  }
 }

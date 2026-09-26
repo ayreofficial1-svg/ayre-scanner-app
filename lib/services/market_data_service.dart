@@ -112,6 +112,11 @@ abstract interface class MarketDataService {
   /// Admin-entered weekly performance reports (`GET /api/weekly-report`),
   /// newest week first — shown on the Signals tab below the board (Phase 5).
   Future<DataResult<List<WeeklyReport>>> getWeeklyReports();
+
+  /// The SEBI Research Analyst registration number and its disclaimer, for
+  /// the Research Analyst information screen. Cache-only on the backend —
+  /// see `main.py`'s `/api/compliance` docstring.
+  Future<DataResult<ComplianceInfo>> getComplianceInfo();
 }
 
 /// Reads every surface from the Ayre backend.
@@ -180,6 +185,10 @@ class RemoteMarketDataService implements MarketDataService {
   /// Admin-entered, read-only from this app's point of view — the website
   /// writes it via POST/DELETE (Phase 4); the app only ever GETs it.
   static const _weeklyReport = '/api/weekly-report';
+
+  /// Cache-only, same shape as `_breadthFull`/`_insightsVolatility` above —
+  /// two already-in-memory config strings, nothing computed per request.
+  static const _compliance = '/api/compliance';
 
   /// Constituent lists are the source for movers, breadth and equity lookups.
   /// Cached only very briefly — just long enough to de-duplicate the several
@@ -740,5 +749,16 @@ class RemoteMarketDataService implements MarketDataService {
       rootKeys: const ['reports', 'data'],
       parse: WeeklyReport.tryParse,
     );
+  }
+
+  @override
+  Future<DataResult<ComplianceInfo>> getComplianceInfo() {
+    return _run(DataSurface.compliance, () async {
+      final decoded = jsonDecode(await _get(_compliance));
+      if (decoded is! Map<String, dynamic>) throw const DataFailure.malformed();
+      final parsed = ComplianceInfo.tryParse(decoded);
+      if (parsed == null) return const DataResult<ComplianceInfo>.empty();
+      return DataResult.ready(parsed);
+    }, onEmpty: () => const DataResult<ComplianceInfo>.empty());
   }
 }

@@ -219,6 +219,34 @@ class FullBreadth {
   }
 }
 
+/// The SEBI Research Analyst registration number and its accompanying
+/// disclaimer (`GET /api/compliance`) — Phase 6. Both values live in the
+/// backend's `config/settings.py` and are shown as-is on the Research
+/// Analyst information screen; there is nothing to compute here, only two
+/// strings to carry.
+class ComplianceInfo {
+  const ComplianceInfo({
+    required this.registrationNumber,
+    required this.disclaimer,
+  });
+
+  final String registrationNumber;
+  final String disclaimer;
+
+  static ComplianceInfo? tryParse(Map<String, dynamic> json) {
+    final registrationNumber = _str(json, const [
+      'ra_registration_number',
+      'registration_number',
+    ]);
+    final disclaimer = _str(json, const ['disclaimer']);
+    if (registrationNumber == null || disclaimer == null) return null;
+    return ComplianceInfo(
+      registrationNumber: registrationNumber,
+      disclaimer: disclaimer,
+    );
+  }
+}
+
 /// ATR% distribution across the tracked universe (`GET
 /// /api/insights/volatility`) — how spread-out today's daily ranges are,
 /// bucketed. Refreshes at scan cadence (up to 7×/day), like [MomentumTilt]
