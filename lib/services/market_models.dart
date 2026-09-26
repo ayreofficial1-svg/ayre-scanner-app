@@ -496,6 +496,15 @@ class WeeklyReportStock {
     required this.symbol,
     required this.profitPct,
     required this.outcome,
+    this.name,
+    this.bullish = true,
+    this.tradeLabel,
+    this.entryPrice,
+    this.exitPrice,
+    this.pnlAmount,
+    this.dateOfRecommendation,
+    this.exitDate,
+    this.durationDays,
   });
 
   final String symbol;
@@ -503,6 +512,38 @@ class WeeklyReportStock {
 
   /// `"target"` or `"stop_loss"` — see [targetHit].
   final String outcome;
+
+  /// Optional company name shown under the symbol (Phase 6). Never required
+  /// — older admin-entered rows simply have this null.
+  final String? name;
+
+  /// Optional bullish/bearish tag (Phase 6), rendered with the same
+  /// [DirectionBadge] `Signal.bullish` already uses on the Signals tab.
+  /// Defaults to `true` (bullish) when the admin hasn't set it, matching
+  /// [Signal]'s own default direction.
+  final bool bullish;
+
+  /// Optional trade description, e.g. "BUY SEP 3850 CE" (Phase 6).
+  final String? tradeLabel;
+
+  /// Optional entry/exit prices (Phase 6), shown beside [tradeLabel].
+  final num? entryPrice;
+  final num? exitPrice;
+
+  /// Optional profit/loss amount in rupees (Phase 6). When present, the card
+  /// shows a Profit/Loss ₹ row plus a separate % Return row; when absent, the
+  /// card falls back to Phase 3's single ₹-less % headline.
+  final num? pnlAmount;
+
+  /// Optional per-stock dates (Phase 6). When either is missing, the card
+  /// falls back to the report's own `weekStart`/`weekEnd`.
+  final DateTime? dateOfRecommendation;
+  final DateTime? exitDate;
+
+  /// Optional explicit duration in days (Phase 6). When absent, the card
+  /// computes it from [dateOfRecommendation]/[exitDate] (or their week-level
+  /// fallbacks) instead.
+  final int? durationDays;
 
   bool get targetHit => outcome == 'target';
 
@@ -519,10 +560,26 @@ class WeeklyReportStock {
     final rawOutcome = _str(json, const ['outcome'])?.toLowerCase();
     if (rawOutcome != 'target' && rawOutcome != 'stop_loss') return null;
     final String outcome = rawOutcome == 'target' ? 'target' : 'stop_loss';
+    final rawBullish = json['bullish'];
     return WeeklyReportStock(
       symbol: symbol,
       profitPct: _num(json, const ['profit_pct', 'profitPct']) ?? 0,
       outcome: outcome,
+      name: _str(json, const ['name', 'company_name', 'companyName']),
+      bullish: rawBullish is bool ? rawBullish : true,
+      tradeLabel: _str(json, const ['trade_label', 'tradeLabel']),
+      entryPrice: _num(json, const ['entry_price', 'entryPrice']),
+      exitPrice: _num(json, const ['exit_price', 'exitPrice']),
+      pnlAmount: _num(json, const ['pnl_amount', 'pnlAmount']),
+      dateOfRecommendation: _time(json, const [
+        'date_of_recommendation',
+        'dateOfRecommendation',
+      ]),
+      exitDate: _time(json, const ['exit_date', 'exitDate']),
+      durationDays: _num(json, const [
+        'duration_days',
+        'durationDays',
+      ])?.round(),
     );
   }
 }
