@@ -9,8 +9,8 @@ library;
 /// The three instruments Home treats as primary gateways.
 enum IndexId {
   nifty50(id: 'NIFTY50', label: 'NIFTY 50', apiKey: 'nifty'),
-  sensex(id: 'SENSEX', label: 'SENSEX', apiKey: 'sensex'),
-  bankNifty(id: 'BANKNIFTY', label: 'BANK NIFTY', apiKey: 'bank_nifty');
+  bankNifty(id: 'BANKNIFTY', label: 'BANK NIFTY', apiKey: 'bank_nifty'),
+  sensex(id: 'SENSEX', label: 'SENSEX', apiKey: 'sensex');
 
   const IndexId({required this.id, required this.label, required this.apiKey});
 

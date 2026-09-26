@@ -30,7 +30,7 @@ import 'notifications_screen.dart';
 ///
 /// Order: greeting header (with the decorative hill ornament behind it) →
 /// **Market Sentiment card** → index board → **Market Insight carousel** →
-/// footer line.
+/// closing divider.
 ///
 /// The "Market breadth" donut card that used to sit between the index board
 /// and the insight carousel has been removed; nothing replaces it, and the
@@ -43,6 +43,9 @@ import 'notifications_screen.dart';
 ///   them as live is the LIVE chip and the trace, not a plate behind them.
 /// * **The inlined direction rendering.** `DirectionBadge` carries direction
 ///   wherever a badge is what's wanted.
+/// * **The "For informational purposes only, not investment advice."
+///   footer text.** Removed; the hairline divider that sat above it is kept,
+///   unchanged, as the boundary a later phase uses for new content.
 class HomeTab extends StatefulWidget {
   const HomeTab({
     super.key,
@@ -75,9 +78,13 @@ class _HomeTabState extends State<HomeTab> {
   DataResult<List<Quote>>? _board;
   DataResult<Sentiment>? _breadth;
   // The full Nifty-500 advance/decline count from `/api/breadth/full`. It no
-  // longer has a card of its own on Home; the Market Sentiment card reads it
-  // as the fallback for its one-line description ("X of Y stocks advancing")
-  // when the sentiment feed carries no note or counts of its own.
+  // longer has a card of its own on Home, and as of this phase the Market
+  // Sentiment card no longer shows a description line either, so this fetch
+  // currently has no consumer anywhere in the app. It is kept — rather than
+  // silently removed — because deleting a working fetch other code might
+  // still be expected to rely on is a bigger decision than this phase's
+  // scope; flagged here for a later phase or a deliberate follow-up decision
+  // to actually remove it if it stays unused.
   // Refreshes on its own fixed hourly schedule server-side — cache-only on
   // every request — so it's loaded in `_load` alongside everything else but
   // deliberately left out of `_refreshLive`'s 10s tick, the same way
@@ -272,7 +279,7 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ],
             const SizedBox(height: AppSpace.sectionGap),
-            const Entrance(index: 4, child: _FooterLine()),
+            const Entrance(index: 4, child: _HomeDivider()),
           ],
         ),
       ),
@@ -649,6 +656,22 @@ class _IndexBoard extends StatelessWidget {
   }
 }
 
+/// Scoped-down sizes for the (now more compact) index cards. These are
+/// deliberately *not* changes to the shared `AppTextScale`/`AppSpace` tokens
+/// — those are also used by other surfaces (`app_theme.dart` itself and
+/// `ayre_charts.dart` among them) that this phase must not affect. Each
+/// constant here is a modest reduction from its shared counterpart
+/// (`AppTextScale.hero` 40, `AppSpace.inCardGap` 12, `AppTextScale.rowLabel`
+/// 15, `AppTextScale.hint` 12.5), scoped to `_IndexCard`/`_IndexCardSkeleton`
+/// only.
+abstract final class _IndexCardScale {
+  static const double heroFontSize = 30;
+  static const double inCardGap = 8;
+  static const double rowLabelFontSize = 13;
+  static const double hintFontSize = 11;
+  static const double captionFontSize = 10;
+}
+
 /// One index card (v5 §2.1): a circular, radial-gradient icon tile + name +
 /// exchange, the LIVE chip opposite, the hero level, the change row, and the
 /// "VIEW CONSTITUENTS" link — on the index's own identity tint (§2A).
@@ -658,6 +681,10 @@ class _IndexBoard extends StatelessWidget {
 /// ([AyreIndexFlourish]) behind the figures — and only while `trace` is empty.
 /// The moment a quote carries a real trace, the flourish is not built and the
 /// sparkline draws beneath the change row as before.
+///
+/// Sized more compactly than earlier versions: a smaller hero figure,
+/// tighter internal gaps and smaller supporting type, all via
+/// [_IndexCardScale] rather than any shared, app-wide constant.
 class _IndexCard extends StatelessWidget {
   const _IndexCard({
     required this.quote,
@@ -698,7 +725,7 @@ class _IndexCard extends StatelessWidget {
             // exact case `CountUpFigure`'s `from` exists for.
             from: quote.lastPrice.toDouble() - quote.change.toDouble(),
             format: (v) => formatPrice(v),
-            fontSize: AppTextScale.hero,
+            fontSize: _IndexCardScale.heroFontSize,
             color: t.textPrimary,
             semanticsLabel: '${quote.name} at ${formatPrice(quote.lastPrice)}',
           ),
@@ -711,12 +738,12 @@ class _IndexCard extends StatelessWidget {
             children: [
               DeltaFigure(
                 change: quote.percentChange,
-                fontSize: AppTextScale.rowLabel,
+                fontSize: _IndexCardScale.rowLabelFontSize,
               ),
               const SizedBox(width: AppSpace.xs),
               Figure(
                 formatDelta(quote.change, percent: false),
-                fontSize: AppTextScale.hint,
+                fontSize: _IndexCardScale.hintFontSize,
                 color: t.foregroundMuted,
               ),
             ],
@@ -774,13 +801,13 @@ class _IndexCard extends StatelessWidget {
               ],
             ],
           ),
-          const SizedBox(height: AppSpace.inCardGap),
+          const SizedBox(height: _IndexCardScale.inCardGap),
           if (hasTrace)
             figures
           else
             AyreIndexFlourish(color: tint.trace, child: figures),
           if (hasTrace) ...[
-            const SizedBox(height: AppSpace.inCardGap),
+            const SizedBox(height: _IndexCardScale.inCardGap),
             // Full card width rather than §12.2's fixed 96px sparkline box:
             // this is the card's own trend, not an inline marker beside a row.
             TickerTrace(
@@ -790,13 +817,17 @@ class _IndexCard extends StatelessWidget {
               fill: true,
             ),
           ],
-          const SizedBox(height: AppSpace.inCardGap),
+          const SizedBox(height: _IndexCardScale.inCardGap),
           Row(
             children: [
               Expanded(
                 child: Text(
                   'VIEW CONSTITUENTS',
-                  style: AppTypo.label(t, color: t.accentInk),
+                  style: AppTypo.label(
+                    t,
+                    color: t.accentInk,
+                    fontSize: _IndexCardScale.captionFontSize,
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -838,12 +869,12 @@ class _IndexCardSkeleton extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: AppSpace.inCardGap),
-          SkeletonBlock(width: 170, height: 34, radius: AppRadius.inset),
+          SizedBox(height: _IndexCardScale.inCardGap),
+          SkeletonBlock(width: 140, height: 26, radius: AppRadius.inset),
           SizedBox(height: AppSpace.xs),
-          SkeletonBlock(width: 140, height: 12),
-          SizedBox(height: AppSpace.inCardGap),
-          SkeletonBlock(width: 110, height: 11),
+          SkeletonBlock(width: 120, height: 10),
+          SizedBox(height: _IndexCardScale.inCardGap),
+          SkeletonBlock(width: 100, height: 9),
         ],
       ),
     );
@@ -917,20 +948,14 @@ abstract final class _SentimentCardColors {
   ];
   static const Color labelLight = Color(0xFF3D5045);
   static const Color labelDark = Color(0xFFD0DCD3);
-  static const Color descriptionLight = Color(0xFF4C5E52);
-  static const Color descriptionDark = Color(0xFFD0DCD3);
 }
 
-/// The top-of-page Market Sentiment card (§2.1): a small icon + label, the
-/// bucketed reading set large and bold with a directional glyph, and a
-/// one-line description.
+/// The top-of-page Market Sentiment card (§2.1): a small icon + label and the
+/// bucketed reading set large and bold with a directional glyph.
 ///
 /// **Everything on it is real.** The bucket comes from the `/api/sentiment`
-/// 0–100 score. The description is, in order of preference: the feed's own
-/// `note` when there is one; else "X of Y stocks advancing" from the real
-/// advance/decline counts (the sentiment feed's own live-tick counts first,
-/// the full Nifty-500 breadth second); else a generic line that states no
-/// numbers. It never implies data the API didn't return.
+/// 0–100 score alone. The card no longer carries a one-line description
+/// ("X of Y stocks advancing") — status only.
 ///
 /// Neutral carries no glyph, matching `DirectionBadge`'s convention for a
 /// flat reading: the word itself is the non-color channel.
@@ -943,7 +968,12 @@ class _SentimentCard extends StatelessWidget {
 
   final DataResult<Sentiment>? sentimentResult;
 
-  /// Only consulted for the description fallback — never for the bucket.
+  /// The full Nifty-500 breadth reading. No longer consulted by this card
+  /// now that its description line is gone — kept as a constructor
+  /// parameter (unused here) because `HomeTab._fullBreadth` still fetches it
+  /// each load and nothing else in the app currently reads `FullBreadth`;
+  /// removing the fetch itself is outside this phase's scope (see
+  /// `_HomeTabState._fullBreadth`'s doc comment).
   final DataResult<FullBreadth>? breadthResult;
   final Future<void> Function() onRetry;
 
@@ -979,13 +1009,9 @@ class _SentimentCard extends StatelessWidget {
       _Mood.neutral => ('Neutral', t.neutral, null),
       _Mood.bearish => ('Bearish', t.negative, AyreGlyph.trendDown),
     };
-    final description = _describe(sentiment, breadthResult?.value);
     final labelColor = dark
         ? _SentimentCardColors.labelDark
         : _SentimentCardColors.labelLight;
-    final descriptionColor = dark
-        ? _SentimentCardColors.descriptionDark
-        : _SentimentCardColors.descriptionLight;
 
     return AyreCard(
       // The gradient has to reach the card's edge, so the padding moves
@@ -1010,9 +1036,8 @@ class _SentimentCard extends StatelessWidget {
               Semantics(
                 container: true,
                 excludeSemantics: true,
-                label:
-                    'Market sentiment: $word, score ${sentiment.score} out '
-                    'of 100. $description',
+                label: 'Market sentiment: $word, score ${sentiment.score} out '
+                    'of 100.',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1027,7 +1052,7 @@ class _SentimentCard extends StatelessWidget {
                         const SizedBox(width: AppSpace.xs),
                         Expanded(
                           child: Text(
-                            'Market Sentiment',
+                            'Sentiment',
                             style: AppTypo.ui(
                               fontSize: AppTextScale.body,
                               fontWeight: FontWeight.w600,
@@ -1064,11 +1089,6 @@ class _SentimentCard extends StatelessWidget {
                         ],
                       ],
                     ),
-                    const SizedBox(height: AppSpace.xs),
-                    Text(
-                      description,
-                      style: AppTypo.body(t, color: descriptionColor),
-                    ),
                   ],
                 ),
               ),
@@ -1079,31 +1099,6 @@ class _SentimentCard extends StatelessWidget {
     );
   }
 
-  /// The one-line reading under the bucket. See the class doc for the
-  /// fallback order; nothing here is invented.
-  static String _describe(Sentiment sentiment, FullBreadth? fullBreadth) {
-    final note = sentiment.note?.trim();
-    if (note != null && note.isNotEmpty) return note;
-
-    final adv = sentiment.advances;
-    final dec = sentiment.declines;
-    if (adv != null && dec != null) {
-      final total = adv + dec + (sentiment.unchanged ?? 0);
-      if (total > 0) return _advancing(adv, total);
-    }
-
-    if (fullBreadth != null) {
-      final total =
-          fullBreadth.advances + fullBreadth.declines + fullBreadth.unchanged;
-      if (total > 0) return _advancing(fullBreadth.advances, total);
-    }
-
-    return 'Overall market mood, from the latest sentiment reading.';
-  }
-
-  static String _advancing(int advances, int total) =>
-      '${formatPrice(advances, decimals: 0)} of '
-      '${formatPrice(total, decimals: 0)} stocks advancing';
 }
 
 /// Mirrors the real card's blocks — label, bucket word, description — so the
@@ -1129,24 +1124,15 @@ class _SentimentSkeleton extends StatelessWidget {
   }
 }
 
-/// The footer line (§13.1) — the quiet last word on the page, stating what the
-/// data is rather than advertising anything.
-class _FooterLine extends StatelessWidget {
-  const _FooterLine();
+/// The divider that used to sit above the "not investment advice" footer
+/// text (§13.1). The text is gone; this divider is kept, in exactly its
+/// former position and spacing, as the boundary Phase 2 uses to place the
+/// Weekly Report section immediately beneath it.
+class _HomeDivider extends StatelessWidget {
+  const _HomeDivider();
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Column(
-      children: [
-        const HairlineDivider(),
-        const SizedBox(height: AppSpace.md),
-        Text(
-          'For informational purposes only, not investment advice.',
-          textAlign: TextAlign.center,
-          style: AppTypo.hint(t),
-        ),
-      ],
-    );
+    return const HairlineDivider();
   }
 }
