@@ -16,6 +16,7 @@ import '../widgets/ayre_icons.dart';
 import '../widgets/ayre_index_art.dart';
 import '../widgets/ayre_insight_carousel.dart';
 import '../widgets/ayre_logo.dart';
+import '../widgets/ayre_weekly_report.dart';
 import '../widgets/figure.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/responsive.dart';
@@ -29,8 +30,9 @@ import 'notifications_screen.dart';
 /// Home — the market gateway (Spec §13.1).
 ///
 /// Order: greeting header (with the decorative hill ornament behind it) →
-/// **Market Sentiment card** → index board → **Market Insight carousel** →
-/// closing divider.
+/// **Market Sentiment card** → index board → **Weekly Report** (moved here
+/// from the Signals tab in Phase 2) → **Market Insight carousel** → closing
+/// divider.
 ///
 /// The "Market breadth" donut card that used to sit between the index board
 /// and the insight carousel has been removed; nothing replaces it, and the
@@ -97,6 +99,13 @@ class _HomeTabState extends State<HomeTab> {
   // a few times a day at most, so — like `_fullBreadth` — it loads in `_load`
   // and is left out of `_refreshLive`'s 10s tick.
   DataResult<List<InsightNote>>? _notes;
+  // Phase 5: admin-entered weekly performance (`GET /api/weekly-report`),
+  // moved in Phase 2 from the Signals tab onto Home, directly below the
+  // index board. Historical, admin-entered content that doesn't change on a
+  // live cadence, so — like `_fullBreadth` and `_notes` — it loads once in
+  // `_load` (and on pull-to-refresh) and is deliberately left out of
+  // `_refreshLive`'s 10s tick.
+  DataResult<List<WeeklyReport>>? _weeklyResult;
   String _accountName = '';
   bool _loading = true;
   Timer? _liveTimer;
@@ -180,6 +189,7 @@ class _HomeTabState extends State<HomeTab> {
     final breadth = await widget.marketData.getSentiment(monthly: false);
     final fullBreadth = await widget.marketData.getFullBreadth();
     final notes = await widget.marketData.getInsightNotes();
+    final weekly = await widget.marketData.getWeeklyReports();
     if (!mounted) return;
 
     final name =
@@ -193,6 +203,7 @@ class _HomeTabState extends State<HomeTab> {
       _breadth = breadth.keepingLastGood(_breadth);
       _fullBreadth = fullBreadth.keepingLastGood(_fullBreadth);
       _notes = notes.keepingLastGood(_notes);
+      _weeklyResult = weekly.keepingLastGood(_weeklyResult);
       _loading = false;
     });
     widget.onAccountResolved?.call(name);
@@ -265,6 +276,7 @@ class _HomeTabState extends State<HomeTab> {
               onOpen: _openIndex,
               onRetry: _load,
             ),
+            ..._weeklyReportSection(),
             // An empty desk omits the card *and* its gap, so Home doesn't end
             // in a hole; loading and failed still show their own states.
             if (_showsInsights) ...[
@@ -284,6 +296,55 @@ class _HomeTabState extends State<HomeTab> {
         ),
       ),
     );
+  }
+
+  /// The Weekly Report section, directly below the index board — an
+  /// admin-entered, hand-verified record of one past week's outcomes (§A.3).
+  /// Moved here from the Signals tab in Phase 2, unchanged in visual form.
+  /// Loads and fails independently of the index board above it
+  /// (`_weeklyResult`), and renders nothing at all when there's simply no
+  /// report yet, per §A.8 ("render nothing or a minimal state rather than a
+  /// broken-looking empty section").
+  List<Widget> _weeklyReportSection() {
+    if (_loading) {
+      return const [
+        SizedBox(height: AppSpace.sectionGap),
+        WeeklyReportSkeleton(),
+      ];
+    }
+
+    final weekly = _weeklyResult;
+    if (weekly == null || weekly.isEmpty) return const [];
+
+    if (weekly.isFailed) {
+      return [
+        const SizedBox(height: AppSpace.sectionGap),
+        StatePanel.failed(
+          headline: "Weekly report didn't load",
+          message: 'The index board above is unaffected.',
+          compact: true,
+          onRetry: _load,
+        ),
+      ];
+    }
+
+    final reports = weekly.value;
+    final report = (reports != null && reports.isNotEmpty)
+        ? reports.first
+        : null;
+    if (report == null) return const [];
+
+    return [
+      const SizedBox(height: AppSpace.sectionGap),
+      Entrance(
+        index: 3,
+        child: SectionLabel(
+          label: 'Weekly Report',
+          subtitle: formatWeekRange(report.weekStart, report.weekEnd),
+        ),
+      ),
+      Entrance(index: 4, child: WeeklyReportCard(report: report)),
+    ];
   }
 
   /// False only when the desk answered with nothing to show.

@@ -48,12 +48,6 @@ class SignalsTab extends StatefulWidget {
 
 class _SignalsTabState extends State<SignalsTab> {
   DataResult<List<Signal>>? _result;
-
-  /// Phase 5: admin-entered weekly performance (`GET /api/weekly-report`),
-  /// shown as its own section below the board. Loaded alongside the board
-  /// so one pull-to-refresh covers both; kept as a separate result so a
-  /// failure here never touches the board above it.
-  DataResult<List<WeeklyReport>>? _weeklyResult;
   bool _loading = true;
 
   @override
@@ -88,20 +82,12 @@ class _SignalsTabState extends State<SignalsTab> {
   }
 
   Future<void> _load({bool initial = false}) async {
-    // Fired together so a slow weekly-report fetch never holds up the board.
-    final results = await Future.wait([
-      widget.marketData.getSignals(),
-      widget.marketData.getWeeklyReports(),
-    ]);
-    if (!mounted) return;
-    final result = (results[0] as DataResult<List<Signal>>).keepingLastGood(
+    final result = (await widget.marketData.getSignals()).keepingLastGood(
       _result,
     );
-    final weekly = (results[1] as DataResult<List<WeeklyReport>>)
-        .keepingLastGood(_weeklyResult);
+    if (!mounted) return;
     setState(() {
       _result = result;
-      _weeklyResult = weekly;
       _loading = false;
     });
     if (!initial) HapticFeedback.mediumImpact();
@@ -178,7 +164,6 @@ class _SignalsTabState extends State<SignalsTab> {
             ),
             const SizedBox(height: AppSpace.sectionGap),
             ..._board(columns),
-            ..._weeklyReportSection(),
           ],
         ),
       ),
@@ -237,84 +222,6 @@ class _SignalsTabState extends State<SignalsTab> {
     ];
   }
 
-  /// Phase 5: the Weekly Report section, directly below the board — an
-  /// admin-entered, hand-verified record of one past week's outcomes (§A.3).
-  /// Loads and fails independently of the board above it (`_weeklyResult`),
-  /// and renders nothing at all when there's simply no report yet, per §A.8
-  /// ("render nothing or a minimal state rather than a broken-looking empty
-  /// section").
-  List<Widget> _weeklyReportSection() {
-    if (_loading) {
-      return const [
-        SizedBox(height: AppSpace.sectionGap),
-        _WeeklyReportSkeleton(),
-      ];
-    }
-
-    final weekly = _weeklyResult;
-    if (weekly == null || weekly.isEmpty) return const [];
-
-    if (weekly.isFailed) {
-      return [
-        const SizedBox(height: AppSpace.sectionGap),
-        StatePanel.failed(
-          headline: "Weekly report didn't load",
-          message: 'The signal board above is unaffected.',
-          compact: true,
-          onRetry: _load,
-        ),
-      ];
-    }
-
-    final reports = weekly.value;
-    final report = (reports != null && reports.isNotEmpty)
-        ? reports.first
-        : null;
-    if (report == null) return const [];
-
-    return [
-      const SizedBox(height: AppSpace.sectionGap),
-      Entrance(
-        index: 4,
-        child: SectionLabel(
-          label: 'Weekly Report',
-          subtitle: formatWeekRange(report.weekStart, report.weekEnd),
-        ),
-      ),
-      Entrance(index: 5, child: _WeeklyReportCard(report: report)),
-    ];
-  }
-}
-
-/// Formats a week's date range the way the Weekly Report section always
-/// shows it — e.g. "6th September to 12th September". Computed here, from
-/// the plain ISO dates the backend sends, rather than expecting a
-/// pre-formatted string from the API (see [WeeklyReport]'s doc comment) —
-/// so the display format can change later without a data migration.
-String formatWeekRange(DateTime start, DateTime end) {
-  return '${_ordinalDay(start)} to ${_ordinalDay(end)}';
-}
-
-const List<String> _monthNames = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-
-String _ordinalDay(DateTime date) =>
-    '${date.day}${_ordinalSuffix(date.day)} ${_monthNames[date.month - 1]}';
-
-String _ordinalSuffix(int day) {
-  if (day >= 11 && day <= 13) return 'th';
-  switch (day % 10) {
-    case 1:
-      return 'st';
-    case 2:
-      return 'nd';
-    case 3:
-      return 'rd';
-    default:
-      return 'th';
-  }
 }
 
 /// The "also on watch" list, single-column below [AppBreakpoints.twoColumn]
@@ -713,129 +620,3 @@ class _SignalsSkeleton extends StatelessWidget {
   }
 }
 
-// ─── Weekly Report (Phase 5) ────────────────────────────────────────────────
-
-/// The Weekly Report card — one week's admin-entered rows plus the
-/// always-visible disclaimer (§A.3, §A.9). An accent-edged border marks it as
-/// a highlight, the same "tinted border, never a tinted fill" convention
-/// [_FeaturedSignal] uses above, rather than introducing a new treatment.
-class _WeeklyReportCard extends StatelessWidget {
-  const _WeeklyReportCard({required this.report});
-
-  final WeeklyReport report;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return AyreCard(
-      accentEdge: true,
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < report.stocks.length; i++) ...[
-            if (i > 0) const HairlineDivider(indent: AppSpace.md),
-            _WeeklyReportRow(stock: report.stocks[i]),
-          ],
-          const HairlineDivider(),
-          // Compliance-relevant, so this stays plain, factual and always
-          // visible — never behind a tap, never marketing copy (§A.3, §A.9).
-          Padding(
-            padding: const EdgeInsets.all(AppSpace.md),
-            child: Text(
-              'Historical results, shown for transparency. Past performance '
-              'does not guarantee similar results in future.',
-              style: AppTypo.hint(t, color: t.foregroundSubtle),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// One stock row in the Weekly Report card: symbol + outcome on the left,
-/// the profit percentage on the right. The direction glyph and figure are
-/// colored by [WeeklyReportStock.outcome], not by the sign of the percentage
-/// — a stop-loss row is transparency, not an error state, so it takes
-/// `t.negative` the same way [_Mood.bearish] does for a plain market
-/// reading elsewhere in the app (§A.9), never an alarm color.
-class _WeeklyReportRow extends StatelessWidget {
-  const _WeeklyReportRow({required this.stock});
-
-  final WeeklyReportStock stock;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final tone = stock.targetHit ? t.positive : t.negative;
-    final outcomeLabel = stock.targetHit ? 'Target hit' : 'Stop-loss hit';
-
-    return Semantics(
-      label:
-          '${stock.symbol}, $outcomeLabel, '
-          '${stock.profitPct.toStringAsFixed(2)} percent',
-      excludeSemantics: true,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpace.md,
-          vertical: AppSpace.hairlineRowPadding,
-        ),
-        child: Row(
-          children: [
-            AyreIcon(
-              stock.targetHit ? AyreGlyph.trendUp : AyreGlyph.trendDown,
-              size: 16,
-              color: tone,
-            ),
-            const SizedBox(width: AppSpace.sm),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    stock.symbol,
-                    style: AppTypo.rowLabel(t),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(outcomeLabel, style: AppTypo.hint(t, color: tone)),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpace.sm),
-            DeltaFigure(
-              change: stock.profitPct,
-              color: tone,
-              fontSize: AppTextScale.body,
-              // The leading AyreIcon above already carries the outcome's
-              // direction; a second arrow here (which DeltaFigure would key
-              // to profit_pct's sign, not outcome) could disagree with it on
-              // an edge-case row and read as a contradiction.
-              showGlyph: false,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Mirrors [_WeeklyReportCard]'s shape, so nothing jumps when data lands.
-class _WeeklyReportSkeleton extends StatelessWidget {
-  const _WeeklyReportSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return const AyreCard(
-      padding: EdgeInsets.symmetric(vertical: AppSpace.xs),
-      child: Column(
-        children: [
-          SkeletonTickerRow(),
-          SkeletonTickerRow(),
-          SkeletonTickerRow(),
-        ],
-      ),
-    );
-  }
-}
