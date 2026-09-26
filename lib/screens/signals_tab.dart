@@ -155,7 +155,10 @@ class _SignalsTabState extends State<SignalsTab> {
                     Text('Signal board', style: AppTypo.pageTitle(t)),
                     const SizedBox(height: AppSpace.xxs),
                     Text(
-                      'Stocks flagged as potential opportunities.',
+                      // Phase 4: replaces "Stocks flagged as potential
+                      // opportunities." with a short, plain, four-word
+                      // phrase — no financial jargon, no outcome guarantee.
+                      'Picks worth watching.',
                       style: AppTypo.body(t),
                     ),
                   ],

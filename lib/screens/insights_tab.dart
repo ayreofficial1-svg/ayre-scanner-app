@@ -233,7 +233,7 @@ class _InsightsTabState extends State<InsightsTab> {
       return const [
         StatePanel.empty(
           headline: 'No notes published today',
-          message: 'The desk publishes written notes through the session.',
+          message: _kInsightsEmptyMessage,
           compact: true,
         ),
       ];
@@ -298,37 +298,29 @@ class _InsightsTabState extends State<InsightsTab> {
             // ── Sections 1–3: the movers lists ──────────────────────────────
             _MoversSection(
               label: 'Top gainers',
-              subtitle: 'Stocks rising the most',
               info: _InsightInfo.topGainers,
               result: _loading ? null : _gainers,
               onOpen: _openEquity,
               columns: columns,
-              emptyMessage:
-                  'No advancing equities reported for this session yet.',
               failedMessage: "Top Gainers didn't load.",
             ),
             const SizedBox(height: AppSpace.sectionGap),
             _MoversSection(
               label: 'Top losers',
-              subtitle: 'Stocks falling the most',
               info: _InsightInfo.topLosers,
               result: _loading ? null : _losers,
               onOpen: _openEquity,
               columns: columns,
-              emptyMessage:
-                  'No declining equities reported for this session yet.',
               failedMessage: "Top Losers didn't load.",
             ),
             const SizedBox(height: AppSpace.sectionGap),
             _MoversSection(
               label: 'Most active',
-              subtitle: 'Stocks traded the most',
               info: _InsightInfo.mostActive,
               result: _loading ? null : _mostActive,
               onOpen: _openEquity,
               byVolume: true,
               columns: columns,
-              emptyMessage: 'No traded volume reported for this session yet.',
               failedMessage: "Most Active didn't load.",
             ),
 
@@ -369,7 +361,6 @@ class _InsightsTabState extends State<InsightsTab> {
               const SizedBox(height: AppSpace.sectionGap),
               const SectionLabel(
                 label: 'Desk notes',
-                subtitle: 'Short notes from us',
                 info: _InsightInfo.deskNotes,
               ),
               ..._deskNotes(),
@@ -478,24 +469,25 @@ class _MoversSection extends StatefulWidget {
     required this.label,
     required this.result,
     required this.onOpen,
-    required this.emptyMessage,
     required this.failedMessage,
     required this.columns,
-    required this.subtitle,
     required this.info,
     this.byVolume = false,
   });
 
   final String label;
 
-  /// The short description shown directly under the heading.
-  final String subtitle;
-
   /// The plain-language explanation opened by the heading's "i" icon.
+  /// Phase 4: the redundant one-line subtitle that used to sit under this
+  /// heading was removed — every heading here already carries an "i" icon
+  /// with this same explanation, so the subtitle only repeated it.
   final String info;
   final DataResult<List<Quote>>? result;
   final ValueChanged<Quote> onOpen;
-  final String emptyMessage;
+
+  /// Phase 4: this section's own empty-state sentence was replaced by
+  /// [_kInsightsEmptyMessage], the one message shared by every empty state
+  /// on this screen — there is no longer a per-section string to hold here.
   final String failedMessage;
   final bool byVolume;
 
@@ -542,7 +534,6 @@ class _MoversSectionState extends State<_MoversSection> {
       children: [
         SectionLabel(
           label: widget.label,
-          subtitle: widget.subtitle,
           info: widget.info,
           // The "See all" link carries its own vertical tap padding, which
           // already supplies most of the gap under the label. The
@@ -581,9 +572,9 @@ class _MoversSectionState extends State<_MoversSection> {
             compact: true,
           )
         else if (result.isEmpty || _all.isEmpty)
-          StatePanel.empty(
+          const StatePanel.empty(
             headline: 'No movers',
-            message: widget.emptyMessage,
+            message: _kInsightsEmptyMessage,
             compact: true,
           )
         else
@@ -725,6 +716,15 @@ class _SeeAllLink extends StatelessWidget {
 /// everyday words, short sentences, and each one says what the bars, rings or
 /// numbers on the card actually stand for. Edit the wording here — nothing else
 /// needs to change.
+/// The one shared empty-state message for this screen (Phase 4) — every
+/// section below used to write its own sentence ("The desk has not
+/// published a reading for this session yet.", "No stock is trading
+/// meaningfully above its 20-day average volume right now.", and so on);
+/// now every one of them reads this same short, plain, gently witty line,
+/// so an empty section always feels like part of one consistent screen
+/// rather than each section improvising its own tone.
+const String _kInsightsEmptyMessage = 'Nothing to report yet.';
+
 abstract final class _InsightInfo {
   static const String topGainers =
       'These are the stocks whose price has gone up the most today, compared '
@@ -791,7 +791,6 @@ class _VolatilitySection extends StatelessWidget {
       children: [
         const SectionLabel(
           label: 'Volatility',
-          subtitle: 'How much prices swing',
           info: _InsightInfo.volatility,
         ),
         if (result == null)
@@ -808,7 +807,7 @@ class _VolatilitySection extends StatelessWidget {
         else if (result!.isEmpty)
           const StatePanel.empty(
             headline: 'No volatility reading',
-            message: 'The desk has not published a reading for this session yet.',
+            message: _kInsightsEmptyMessage,
             compact: true,
           )
         else
@@ -834,7 +833,6 @@ class _MomentumSection extends StatelessWidget {
       children: [
         const SectionLabel(
           label: 'Momentum',
-          subtitle: 'Which way stocks lean',
           info: _InsightInfo.momentum,
         ),
         if (result == null)
@@ -854,7 +852,7 @@ class _MomentumSection extends StatelessWidget {
         else if (result!.isEmpty)
           const StatePanel.empty(
             headline: 'No momentum reading',
-            message: 'The desk has not published a reading for this session yet.',
+            message: _kInsightsEmptyMessage,
             compact: true,
           )
         else
@@ -893,7 +891,6 @@ class _VolumeSurgeSection extends StatelessWidget {
       children: [
         const SectionLabel(
           label: 'Volume surge',
-          subtitle: 'Stocks with sudden activity',
           info: _InsightInfo.volumeSurge,
         ),
         if (result == null)
@@ -917,8 +914,7 @@ class _VolumeSurgeSection extends StatelessWidget {
         else if (result!.isEmpty)
           const StatePanel.empty(
             headline: 'No volume surge',
-            message: 'No stock is trading meaningfully above its 20-day '
-                'average volume right now.',
+            message: _kInsightsEmptyMessage,
             compact: true,
           )
         else

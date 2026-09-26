@@ -286,8 +286,11 @@ class StatePanel extends StatelessWidget {
             ),
           ] else if (pullToRefreshHint) ...[
             const SizedBox(height: AppSpace.sm),
+            // Phase 4: shortened from "Pull down to try again" — the one
+            // shared location for this hint, used across every empty state
+            // in the app that sets `pullToRefreshHint`.
             Text(
-              'Pull down to try again',
+              'Pull to refresh',
               textAlign: TextAlign.center,
               style: AppTypo.label(t),
             ),
