@@ -36,17 +36,15 @@ import 'figure.dart';
 // `AppThemeTokens` value — no new component-specific colour constant was
 // needed.
 //
-// Outcome band redesign: `profitPct` (calculated automatically on the
-// website from Entry Price/Exit Price — never hand-typed) is always the
-// single "% Return" headline, shown to 2 decimal places; `pnlAmount` (the
-// admin's manually-entered Profit/Loss per share) sits directly to its
-// right when present, rather than as its own separate row. The line below
-// is a single short result word ("Target" / "Stop-loss") instead of a full
-// sentence.
+// Outcome band redesign: `profitPct` and `pnlAmount` are both calculated
+// automatically on the website from Entry Price/Exit Price — never
+// hand-typed. They're shown as two equal-weight stats side by side,
+// labelled "Return %" and "Profit/Share", with matching size and visual
+// weight (`pnlAmount`'s stat is only shown once it's present, i.e. once the
+// row has both an entry and an exit price).
 
 /// The Weekly Report section body — each stock in its own
-/// [WeeklyReportStockCard], followed by the always-visible disclaimer
-/// (§A.3, §A.9).
+/// [WeeklyReportStockCard].
 class WeeklyReportCard extends StatelessWidget {
   const WeeklyReportCard({super.key, required this.report});
 
@@ -54,7 +52,6 @@ class WeeklyReportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -66,14 +63,6 @@ class WeeklyReportCard extends StatelessWidget {
             fallbackEnd: report.weekEnd,
           ),
         ],
-        const SizedBox(height: AppSpace.sm),
-        // Compliance-relevant, so this stays plain, factual and always
-        // visible — never behind a tap, never marketing copy (§A.3, §A.9).
-        Text(
-          'Historical results, shown for transparency. Past performance '
-          'does not guarantee similar results in future.',
-          style: AppTypo.hint(t, color: t.foregroundSubtle),
-        ),
       ],
     );
   }
@@ -290,12 +279,10 @@ class _PriceStat extends StatelessWidget {
   }
 }
 
-/// The outcome-tinted headline band — always a single "% Return" row (to 2
-/// decimal places, via [DeltaFigure]'s own default), with
-/// [WeeklyReportStock.pnlAmount] (the admin's manually-entered Profit/Loss
-/// per share) shown directly to its right whenever it's present, and a
-/// single short result word underneath instead of a full sentence, so the
-/// outcome reads at a glance.
+/// The outcome-tinted headline band — two equal-weight stat columns,
+/// "Return %" and "Profit/Share", side by side with matching size and
+/// weight (both computed automatically from Entry Price/Exit Price on the
+/// website — never hand-typed).
 class _OutcomeBand extends StatelessWidget {
   const _OutcomeBand({
     required this.stock,
@@ -309,7 +296,6 @@ class _OutcomeBand extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
     final pnl = stock.pnlAmount;
 
     return DecoratedBox(
@@ -321,51 +307,73 @@ class _OutcomeBand extends StatelessWidget {
           AppSpace.md,
           AppSpace.md,
         ),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '% Return',
-                  style: AppTypo.body(t, color: t.foregroundSubtle),
-                ),
-                const Spacer(),
-                DeltaFigure(
+            Expanded(
+              child: _OutcomeStat(
+                label: 'Return %',
+                valueWidget: DeltaFigure(
                   change: stock.profitPct,
                   color: tone,
                   fontSize: AppTextScale.featuredHeadline,
                   fontWeight: FontWeight.w700,
                   // `outcome` (target/stop-loss) already carries direction
-                  // via the single word below; a second arrow here (keyed to
-                  // `profitPct`'s sign) could disagree with it on an
-                  // edge-case row and read as a contradiction.
+                  // via this band's tint colour; a second arrow here
+                  // (keyed to `profitPct`'s sign) could disagree with it
+                  // on an edge-case row and read as a contradiction.
                   showGlyph: false,
                 ),
-                // Profit/Loss per share — manually entered by the admin on
-                // the website — sits directly to the right of % Return,
-                // rather than as its own separate headline row.
-                if (pnl != null) ...[
-                  const SizedBox(width: AppSpace.xs),
-                  Figure(
+              ),
+            ),
+            // Profit/Loss per share — calculated automatically from Entry
+            // Price/Exit Price on the website — shown as its own
+            // equal-weight stat beside Return %, only when the admin has
+            // entered both prices for this row.
+            if (pnl != null) ...[
+              const SizedBox(width: AppSpace.md),
+              Expanded(
+                child: _OutcomeStat(
+                  label: 'Profit/Share',
+                  valueWidget: Figure(
                     _formatSignedRupees(pnl),
-                    fontSize: AppTextScale.rowLabel,
+                    fontSize: AppTextScale.featuredHeadline,
                     fontWeight: FontWeight.w700,
                     color: tone,
                   ),
-                ],
-              ],
-            ),
-            const SizedBox(height: AppSpace.xxs),
-            // One short word, not a sentence — "Target" / "Stop-loss".
-            Text(
-              stock.targetHit ? 'Target' : 'Stop-loss',
-              style: AppTypo.hint(t, color: t.foregroundSubtle),
-            ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
+    );
+  }
+}
+
+/// One labelled stat in the outcome band — a small subtle caption above a
+/// full-weight value — used for both "Return %" and "Profit/Share" so the
+/// two read with identical size and visual weight side by side.
+class _OutcomeStat extends StatelessWidget {
+  const _OutcomeStat({required this.label, required this.valueWidget});
+
+  final String label;
+  final Widget valueWidget;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: AppTypo.body(t, color: t.foregroundSubtle),
+        ),
+        const SizedBox(height: AppSpace.xxs),
+        valueWidget,
+      ],
     );
   }
 }
