@@ -134,6 +134,24 @@ class Quote {
       trace: _numList(json, const ['trace', 'intraday', 'series', 'points']),
     );
   }
+
+  /// Round-trips through [tryParse] — used to persist the last good reading
+  /// to disk (`MarketDataCache`) so it survives process death, not just an
+  /// in-memory `keepingLastGood`. Key names match [tryParse]'s first-choice
+  /// alias for each field.
+  Map<String, dynamic> toJson() => {
+    'symbol': symbol,
+    'name': name,
+    'lastPrice': lastPrice,
+    'change_points': change,
+    'percentChange': percentChange,
+    'asOf': asOf.toIso8601String(),
+    if (previousClose != null) 'previousClose': previousClose,
+    if (dayLow != null) 'dayLow': dayLow,
+    if (dayHigh != null) 'dayHigh': dayHigh,
+    if (volume != null) 'volume': volume,
+    if (trace.isNotEmpty) 'trace': trace,
+  };
 }
 
 /// A market sentiment/breadth reading.
@@ -177,6 +195,16 @@ class Sentiment {
       unchanged: _num(json, const ['unchanged', 'flat'])?.round(),
     );
   }
+
+  /// Round-trips through [tryParse]; see [Quote.toJson].
+  Map<String, dynamic> toJson() => {
+    'sentiment': score,
+    'asOf': asOf.toIso8601String(),
+    if (note != null) 'note': note,
+    if (advances != null) 'advances': advances,
+    if (declines != null) 'declines': declines,
+    if (unchanged != null) 'unchanged': unchanged,
+  };
 }
 
 /// Full Nifty-500 market breadth (`GET /api/breadth/full`) — a separate,
@@ -217,6 +245,20 @@ class FullBreadth {
       asOf: _asOfStamp(json),
     );
   }
+
+  /// Round-trips through [tryParse]; see [Quote.toJson]. `as_of` is written
+  /// as plain ISO-8601 — [_asOfStamp] falls back to [DateTime.tryParse] when
+  /// the backend's own "18 Sep 2026 11:45:12" wall-clock format doesn't
+  /// match, so this reads back correctly even though the backend never
+  /// sends this exact shape itself.
+  Map<String, dynamic> toJson() => {
+    'advances': advances,
+    'declines': declines,
+    'unchanged': unchanged,
+    'avg_change_pct': avgChangePct,
+    'coverage': coverage,
+    if (asOf != null) 'as_of': asOf!.toIso8601String(),
+  };
 }
 
 /// The SEBI Research Analyst registration number and its accompanying
@@ -245,6 +287,12 @@ class ComplianceInfo {
       disclaimer: disclaimer,
     );
   }
+
+  /// Round-trips through [tryParse]; see [Quote.toJson].
+  Map<String, dynamic> toJson() => {
+    'ra_registration_number': registrationNumber,
+    'disclaimer': disclaimer,
+  };
 }
 
 /// ATR% distribution across the tracked universe (`GET
@@ -273,6 +321,12 @@ class VolatilityHistogram {
     if (buckets.isEmpty) return null;
     return VolatilityHistogram(buckets: buckets, asOf: _asOfStamp(json));
   }
+
+  /// Round-trips through [tryParse]; see [Quote.toJson].
+  Map<String, dynamic> toJson() => {
+    'buckets': buckets,
+    if (asOf != null) 'as_of': asOf!.toIso8601String(),
+  };
 }
 
 /// Bullish/bearish MACD tilt across the tracked universe (`GET
@@ -300,6 +354,13 @@ class MomentumTilt {
       asOf: _asOfStamp(json),
     );
   }
+
+  /// Round-trips through [tryParse]; see [Quote.toJson].
+  Map<String, dynamic> toJson() => {
+    'bullish': bullish,
+    'bearish': bearish,
+    if (asOf != null) 'as_of': asOf!.toIso8601String(),
+  };
 }
 
 /// One row of the volume-surge leaderboard (`GET
@@ -328,6 +389,13 @@ class VolumeSurgeRow {
       close: _num(json, const ['close']),
     );
   }
+
+  /// Round-trips through [tryParse]; see [Quote.toJson].
+  Map<String, dynamic> toJson() => {
+    'symbol': symbol,
+    'volume_surge': surge,
+    if (close != null) 'close': close,
+  };
 }
 
 /// The volume-surge leaderboard as a whole: the ranked rows plus the batch's
@@ -350,6 +418,12 @@ class VolumeSurgeBoard {
     }
     return VolumeSurgeBoard(rows: rows, asOf: _asOfStamp(json));
   }
+
+  /// Round-trips through [tryParse]; see [Quote.toJson].
+  Map<String, dynamic> toJson() => {
+    'items': rows.map((r) => r.toJson()).toList(),
+    if (asOf != null) 'as_of': asOf!.toIso8601String(),
+  };
 }
 
 /// A scanner setup on the Signals board.
@@ -412,6 +486,24 @@ class Signal {
       addedOn: _str(json, const ['date_added', 'added_on', 'created_at']),
     );
   }
+
+  /// Round-trips through [tryParse]; see [Quote.toJson]. Writes an explicit
+  /// `bias` string rather than relying on `percentChange`'s sign, since
+  /// [tryParse] prefers `bias` when present and a signal can be bullish or
+  /// bearish with no `percentChange` at all.
+  Map<String, dynamic> toJson() => {
+    'symbol': symbol,
+    'rationale': rationale,
+    if (name != null) 'name': name,
+    if (lastPrice != null) 'last_price': lastPrice,
+    if (percentChange != null) 'change_pct': percentChange,
+    if (entry != null) 'entry': entry,
+    if (target != null) 'target': target,
+    if (stop != null) 'stop': stop,
+    if (strength != null) 'strength': strength,
+    'bias': bullish ? 'bullish' : 'bearish',
+    if (addedOn != null) 'date_added': addedOn,
+  };
 }
 
 /// A Learn course/lesson entry.
@@ -457,6 +549,15 @@ class Course {
       ])?.round(),
     );
   }
+
+  /// Round-trips through [tryParse]; see [Quote.toJson].
+  Map<String, dynamic> toJson() => {
+    'title': title,
+    'category': category,
+    'body': body,
+    if (lessonsTotal != null) 'lessons': lessonsTotal,
+    if (lessonsDone != null) 'completed': lessonsDone,
+  };
 }
 
 /// A written insight on the Insights desk.
@@ -483,6 +584,14 @@ class InsightNote {
       featured: json['featured'] == true || json['pinned'] == true,
     );
   }
+
+  /// Round-trips through [tryParse]; see [Quote.toJson].
+  Map<String, dynamic> toJson() => {
+    'title': title,
+    'body': body,
+    if (category != null) 'category': category,
+    'featured': featured,
+  };
 }
 
 /// One stock row inside a [WeeklyReport] — an admin-confirmed outcome for a
@@ -582,6 +691,23 @@ class WeeklyReportStock {
       ])?.round(),
     );
   }
+
+  /// Round-trips through [tryParse]; see [Quote.toJson].
+  Map<String, dynamic> toJson() => {
+    'symbol': symbol,
+    'profit_pct': profitPct,
+    'outcome': outcome,
+    if (name != null) 'name': name,
+    'bullish': bullish,
+    if (tradeLabel != null) 'trade_label': tradeLabel,
+    if (entryPrice != null) 'entry_price': entryPrice,
+    if (exitPrice != null) 'exit_price': exitPrice,
+    if (pnlAmount != null) 'pnl_amount': pnlAmount,
+    if (dateOfRecommendation != null)
+      'date_of_recommendation': dateOfRecommendation!.toIso8601String(),
+    if (exitDate != null) 'exit_date': exitDate!.toIso8601String(),
+    if (durationDays != null) 'duration_days': durationDays,
+  };
 }
 
 /// One week's admin-entered performance record (`GET /api/weekly-report`),
@@ -636,6 +762,14 @@ class WeeklyReport {
       stocks: stocks,
     );
   }
+
+  /// Round-trips through [tryParse]; see [Quote.toJson].
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'week_start': weekStart.toIso8601String(),
+    'week_end': weekEnd.toIso8601String(),
+    'stocks': stocks.map((s) => s.toJson()).toList(),
+  };
 }
 
 /// Parses the scanner backend's "18 Sep 2026 11:45:12" IST wall-clock

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/market_data_service.dart';
+import '../services/persistent_market_data_service.dart';
 import '../services/push_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
@@ -18,9 +19,15 @@ import 'signals_tab.dart';
 class HomeShell extends StatefulWidget {
   // Not const: the remote service holds a short-lived constituents cache, which
   // it needs because movers and breadth are derived from that data rather than
-  // served by dedicated endpoints.
+  // served by dedicated endpoints. Wrapped in `PersistentMarketDataService` so
+  // every surface it serves falls back to the last on-device saved reading —
+  // rather than an empty or failed state — when the market is closed longer
+  // than the in-memory session remembers, the backend is unreachable, or the
+  // app was relaunched after being closed. See that class's doc for exactly
+  // what it changes (nothing any screen below this needs to know about).
   HomeShell({super.key, MarketDataService? marketData})
-    : marketData = marketData ?? RemoteMarketDataService();
+    : marketData =
+          marketData ?? PersistentMarketDataService(RemoteMarketDataService());
 
   /// Injected so every screen can be rendered with known data in tests.
   final MarketDataService marketData;
