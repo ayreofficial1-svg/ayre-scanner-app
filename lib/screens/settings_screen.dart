@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../main.dart';
 import '../services/api_service.dart';
@@ -222,6 +223,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       fontSize: AppTextScale.hint,
                       color: t.foregroundMuted,
                     ),
+                  ),
+                  // Required attribution for the free "Ticker Logos by
+                  // AllInvestView" service AyreInstrumentTile uses to show
+                  // company logos (see lib/services/stock_logo_service.dart).
+                  // Its free/keyless tier's terms of use require a visible,
+                  // clickable link back to the tool — this row is that link,
+                  // kept in the same "About" group as Version/Support rather
+                  // than surfaced anywhere more prominent.
+                  SettingRow(
+                    glyph: AyreGlyph.about,
+                    title: 'Logo credits',
+                    subtitle: 'Company logos by AllInvestView',
+                    onTap: () async {
+                      HapticFeedback.selectionClick();
+                      final uri = Uri.parse(
+                        'https://www.allinvestview.com/tools/ticker-logos/',
+                      );
+                      if (await canLaunchUrl(uri)) {
+                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      }
+                    },
                   ),
                 ],
               ),

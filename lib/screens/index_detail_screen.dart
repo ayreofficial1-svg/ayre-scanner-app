@@ -252,7 +252,10 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
                                 AppSpace.md,
                           ),
                         TickerRow(
-                          leading: AyreInstrumentTile(symbol: row.symbol),
+                          leading: AyreInstrumentTile(
+                            symbol: row.symbol,
+                            name: row.name == row.symbol ? null : row.name,
+                          ),
                           symbol: row.symbol,
                           name: row.name == row.symbol ? null : row.name,
                           price: row.lastPrice,

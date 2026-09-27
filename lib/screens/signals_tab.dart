@@ -325,7 +325,11 @@ class _FeaturedSignal extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AyreInstrumentTile(symbol: signal.symbol, size: 40),
+              AyreInstrumentTile(
+                symbol: signal.symbol,
+                size: 40,
+                name: signal.name,
+              ),
               const SizedBox(width: AppSpace.sm),
               Expanded(
                 child: Column(
@@ -485,7 +489,11 @@ class _CompactSignalRow extends StatelessWidget {
           ),
         child: Row(
           children: [
-            AyreInstrumentTile(symbol: signal.symbol, size: 28),
+            AyreInstrumentTile(
+              symbol: signal.symbol,
+              size: 28,
+              name: signal.name,
+            ),
             const SizedBox(width: AppSpace.xs),
             AyreIcon(
               signal.bullish ? AyreGlyph.trendUp : AyreGlyph.trendDown,

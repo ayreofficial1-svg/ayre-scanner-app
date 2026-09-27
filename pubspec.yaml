@@ -17,6 +17,9 @@ dependencies:
   # Push notifications (FCM). See lib/services/push_service.dart.
   firebase_core: ^4.13.0
   firebase_messaging: ^16.4.3
+  # Opens the required attribution link for the free Ticker Logos service
+  # used by AyreInstrumentTile (see lib/services/stock_logo_service.dart).
+  url_launcher: ^6.3.0
 
 dev_dependencies:
   flutter_test:

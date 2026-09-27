@@ -623,7 +623,10 @@ class _MoversSectionState extends State<_MoversSection> {
   // and the tile is the leading element now. No sparkline: the feed carries
   // no series for movers (§3).
   Widget _row(Quote quote) => TickerRow(
-        leading: AyreInstrumentTile(symbol: quote.symbol),
+        leading: AyreInstrumentTile(
+          symbol: quote.symbol,
+          name: quote.name == quote.symbol ? null : quote.name,
+        ),
         symbol: quote.symbol,
         name: quote.name == quote.symbol ? null : quote.name,
         price: quote.lastPrice,

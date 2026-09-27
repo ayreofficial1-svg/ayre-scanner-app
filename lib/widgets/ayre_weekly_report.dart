@@ -170,7 +170,11 @@ class _StockHeader extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AyreInstrumentTile(symbol: stock.symbol, size: 32),
+          AyreInstrumentTile(
+            symbol: stock.symbol,
+            size: 32,
+            name: hasName ? stock.name : null,
+          ),
           const SizedBox(width: AppSpace.sm),
           Expanded(
             child: Column(

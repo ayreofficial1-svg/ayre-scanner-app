@@ -197,7 +197,11 @@ class _EquityHeader extends StatelessWidget {
           children: [
             Row(
               children: [
-                AyreInstrumentTile(symbol: quote.symbol, size: 40),
+                AyreInstrumentTile(
+                  symbol: quote.symbol,
+                  size: 40,
+                  name: quote.name == quote.symbol ? null : quote.name,
+                ),
                 const SizedBox(width: AppSpace.sm),
                 Expanded(
                   child: Column(
