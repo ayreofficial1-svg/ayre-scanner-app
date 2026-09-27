@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../services/api_service.dart';
 import '../services/market_data_service.dart';
@@ -235,6 +236,38 @@ class _ProfileTabState extends State<ProfileTab> {
                 // A "Saved / Watchlist" row belongs here once there is a
                 // watchlist feature to open. There isn't, so it isn't shown.
               ],
+            ),
+          ),
+
+          // Required attribution for the free "Ticker Logos by
+          // AllInvestView" service the bundled `assets/logos/` images (see
+          // lib/services/stock_logo_service.dart) were sourced from. Kept
+          // deliberately small/quiet — a footnote under Support rather than
+          // a full settings row — since it's a credit, not something the
+          // user needs to act on.
+          const SizedBox(height: AppSpace.sm),
+          Center(
+            child: GestureDetector(
+              onTap: () async {
+                HapticFeedback.selectionClick();
+                final uri = Uri.parse(
+                  'https://www.allinvestview.com/tools/ticker-logos/',
+                );
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+              child: Text(
+                'Logos by AllInvestView',
+                style: AppTypo.ui(
+                  fontSize: AppTextScale.navLabel,
+                  fontWeight: FontWeight.w400,
+                  color: t.foregroundSubtle,
+                ).copyWith(
+                  decoration: TextDecoration.underline,
+                  decorationColor: t.foregroundSubtle,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: AppSpace.lg),

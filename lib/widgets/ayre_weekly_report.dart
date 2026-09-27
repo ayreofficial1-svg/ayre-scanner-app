@@ -168,7 +168,12 @@ class _StockHeader extends StatelessWidget {
         AppSpace.sm,
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        // Top-aligned when there's a two-line symbol+name block, so that
+        // block starts level with the tile's top edge; centered when it's
+        // just the bare symbol, so a single short line of text doesn't sit
+        // above the vertical center of the (taller) logo tile beside it.
+        crossAxisAlignment:
+            hasName ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
           AyreInstrumentTile(
             symbol: stock.symbol,

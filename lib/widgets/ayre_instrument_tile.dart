@@ -10,12 +10,11 @@ import '../theme/app_theme.dart';
 ///
 /// **Shows a real company logo when one can be found, its monogram
 /// otherwise.** Neither the backend nor NSE's own public data gives this app
-/// company imagery directly, so [StockLogoService] resolves one on-device
-/// from free, keyless lookups (see that class's doc for the full chain and
-/// why a wrong logo is treated as worse than none). Whenever nothing
-/// confident is found — the service is unreachable, the stock isn't in
-/// either lookup's data, or a previously-good URL stops loading — this tile
-/// falls back to the same deterministic, offline monogram it always drew:
+/// company imagery directly, so [StockLogoService] resolves one from a fixed
+/// set of logo images bundled with the app (`assets/logos/`, see that
+/// class's doc). Whenever nothing is found — the stock isn't in the bundled
+/// set, or a bundled asset somehow fails to load — this tile falls back to
+/// the same deterministic, offline monogram it always drew:
 /// a neutral tonal fill (`surfaceRaised`, `foregroundMuted` ink), never
 /// direction-tinted (gain/loss color belongs to the figures at the trailing
 /// edge, and a green tile in a Top Losers list would contradict them), and
@@ -132,26 +131,23 @@ class _AyreInstrumentTileState extends State<AyreInstrumentTile> {
         ),
         child: showLogo
             ? Padding(
-                // Logos come from third parties at arbitrary aspect ratios
-                // and edge-to-edge crops; a little breathing room keeps them
+                // Logos are bundled at arbitrary aspect ratios and
+                // edge-to-edge crops; a little breathing room keeps them
                 // from looking cramped against the tile's rounded corners.
                 padding: EdgeInsets.all(size * 0.08),
-                child: Image.network(
+                child: Image.asset(
                   logoUrl,
                   key: ValueKey(logoUrl),
                   fit: BoxFit.contain,
-                  // A logo that fails to load (dead domain, transient CDN
-                  // error) reports itself broken and this build falls
-                  // through to the monogram on the next frame — never a
-                  // broken-image icon.
+                  // A bundled logo that somehow fails to decode reports
+                  // itself broken and this build falls through to the
+                  // monogram on the next frame — never a broken-image icon.
+                  // Shouldn't normally trigger since every path here points
+                  // at a real, bundled asset.
                   errorBuilder: (_, _, _) {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       _onLoadFailed();
                     });
-                    return _Monogram(symbol: widget.symbol, size: size, t: t);
-                  },
-                  loadingBuilder: (context, child, progress) {
-                    if (progress == null) return child;
                     return _Monogram(symbol: widget.symbol, size: size, t: t);
                   },
                 ),

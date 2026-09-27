@@ -224,28 +224,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: t.foregroundMuted,
                     ),
                   ),
-                  // Required attribution for the free "Ticker Logos by
-                  // AllInvestView" service AyreInstrumentTile uses to show
-                  // company logos (see lib/services/stock_logo_service.dart).
-                  // Its free/keyless tier's terms of use require a visible,
-                  // clickable link back to the tool — this row is that link,
-                  // kept in the same "About" group as Version/Support rather
-                  // than surfaced anywhere more prominent.
-                  SettingRow(
-                    glyph: AyreGlyph.about,
-                    title: 'Logo credits',
-                    subtitle: 'Company logos by AllInvestView',
-                    onTap: () async {
-                      HapticFeedback.selectionClick();
-                      final uri = Uri.parse(
-                        'https://www.allinvestview.com/tools/ticker-logos/',
-                      );
-                      if (await canLaunchUrl(uri)) {
-                        await launchUrl(uri, mode: LaunchMode.externalApplication);
-                      }
-                    },
-                  ),
                 ],
+              ),
+
+              // Required attribution for the free "Ticker Logos by
+              // AllInvestView" service the bundled `assets/logos/` images
+              // (see lib/services/stock_logo_service.dart) were sourced
+              // from. Kept deliberately small/quiet — a footnote under the
+              // About group rather than a full settings row — since it's a
+              // credit, not something the user needs to act on.
+              const SizedBox(height: AppSpace.sm),
+              Center(
+                child: GestureDetector(
+                  onTap: () async {
+                    HapticFeedback.selectionClick();
+                    final uri = Uri.parse(
+                      'https://www.allinvestview.com/tools/ticker-logos/',
+                    );
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                  child: Text(
+                    'Logos by AllInvestView',
+                    style: AppTypo.ui(
+                      fontSize: AppTextScale.navLabel,
+                      fontWeight: FontWeight.w400,
+                      color: t.foregroundSubtle,
+                    ).copyWith(
+                      decoration: TextDecoration.underline,
+                      decorationColor: t.foregroundSubtle,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
