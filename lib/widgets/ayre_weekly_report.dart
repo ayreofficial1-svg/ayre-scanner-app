@@ -103,9 +103,7 @@ class WeeklyReportStockCard extends StatelessWidget {
     final recDate = stock.dateOfRecommendation ?? fallbackStart;
     final exitDate = stock.exitDate ?? fallbackEnd;
 
-    final hasTradeRow = (stock.tradeLabel != null && stock.tradeLabel!.isNotEmpty) ||
-        stock.entryPrice != null ||
-        stock.exitPrice != null;
+    final hasTradeRow = stock.entryPrice != null || stock.exitPrice != null;
     final hasDetails = recDate != null || exitDate != null;
 
     return Semantics(
@@ -121,7 +119,7 @@ class WeeklyReportStockCard extends StatelessWidget {
             _StockHeader(stock: stock),
             if (hasTradeRow) ...[
               const HairlineDivider(),
-              _TradeRow(stock: stock, tone: tone),
+              _TradeRow(stock: stock),
             ],
             const HairlineDivider(),
             _OutcomeBand(
@@ -201,56 +199,36 @@ class _StockHeader extends StatelessWidget {
   }
 }
 
-/// The trade-description row — e.g. "BUY SEP 3850 CE" — with right-aligned
-/// entry/exit price columns. Only rendered when the admin has entered a
-/// trade label or a price, since not every historical row will have one.
+/// The entry/exit price row. Only rendered when at least one price is present.
 class _TradeRow extends StatelessWidget {
-  const _TradeRow({required this.stock, required this.tone});
+  const _TradeRow({required this.stock});
 
   final WeeklyReportStock stock;
-  final Color tone;
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpace.md,
         vertical: AppSpace.sm,
       ),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Row(
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  margin: const EdgeInsets.only(top: 6),
-                  decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
-                ),
-                const SizedBox(width: AppSpace.xs),
-                Expanded(
-                  child: Text(
-                    (stock.tradeLabel != null && stock.tradeLabel!.isNotEmpty)
-                        ? stock.tradeLabel!
-                        : 'Single stock trade',
-                    style: AppTypo.rowLabel(t),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
           if (stock.entryPrice != null) ...[
-            const SizedBox(width: AppSpace.md),
-            _PriceStat(label: 'Entry', value: stock.entryPrice!),
+            _PriceStat(
+              label: 'Entry',
+              value: stock.entryPrice!,
+              alignment: CrossAxisAlignment.start,
+            ),
           ],
           if (stock.exitPrice != null) ...[
-            const SizedBox(width: AppSpace.md),
-            _PriceStat(label: 'Exit', value: stock.exitPrice!),
+            _PriceStat(
+              label: 'Exit',
+              value: stock.exitPrice!,
+              alignment: CrossAxisAlignment.end,
+            ),
           ],
         ],
       ),
@@ -259,21 +237,26 @@ class _TradeRow extends StatelessWidget {
 }
 
 class _PriceStat extends StatelessWidget {
-  const _PriceStat({required this.label, required this.value});
+  const _PriceStat({
+    required this.label,
+    required this.value,
+    required this.alignment,
+  });
 
   final String label;
   final num value;
+  final CrossAxisAlignment alignment;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: alignment,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label.toUpperCase(), style: AppTypo.label(t, fontSize: 10)),
+        Text(label.toUpperCase(), style: AppTypo.label(t, fontSize: 11)),
         const SizedBox(height: 2),
-        Figure('₹${formatPrice(value)}', fontSize: 13, fontWeight: FontWeight.w600),
+        Figure('₹${formatPrice(value)}', fontSize: 15, fontWeight: FontWeight.w600),
       ],
     );
   }
@@ -316,7 +299,7 @@ class _OutcomeBand extends StatelessWidget {
                 valueWidget: DeltaFigure(
                   change: stock.profitPct,
                   color: tone,
-                  fontSize: AppTextScale.featuredHeadline,
+                  fontSize: 15,
                   fontWeight: FontWeight.w700,
                   // `outcome` (target/stop-loss) already carries direction
                   // via this band's tint colour; a second arrow here
@@ -337,7 +320,7 @@ class _OutcomeBand extends StatelessWidget {
                   label: 'Profit/Share',
                   valueWidget: Figure(
                     _formatSignedRupees(pnl),
-                    fontSize: AppTextScale.featuredHeadline,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: tone,
                   ),
