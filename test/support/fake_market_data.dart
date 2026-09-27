@@ -149,23 +149,17 @@ class FakeMarketData implements MarketDataService {
       Signal(
         symbol: 'RELIANCE',
         name: longNames ? 'Reliance Industries and Holdings Limited' : 'Reliance',
-        rationale: 'Reclaimed the 20-day mean on expanding volume with the '
-            'sector breadth confirming.',
         lastPrice: 2984.55,
         percentChange: 1.84,
         entry: 2960,
-        target: 3120,
+        exitPrice: 3120,
         stop: 2895,
-        strength: 3,
         addedOn: '28 Aug',
       ),
       const Signal(
         symbol: 'HDFCLIFE',
-        rationale: 'Lower high against a falling 50-day mean.',
         lastPrice: 642.15,
         percentChange: -2.08,
-        strength: 2,
-        bullish: false,
       ),
     ]);
   }

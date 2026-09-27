@@ -426,82 +426,74 @@ class VolumeSurgeBoard {
   };
 }
 
-/// A scanner setup on the Signals board.
+/// An admin-curated stock pick on the Signals board (`GET /api/signals`,
+/// `data/app_signals.py`). The website's admin panel only ever sets
+/// `symbol`, `entry_price`, `exit_price`, `stop_loss` and `enabled` — there
+/// is no `rationale`, `bias`/direction, or `strength`/conviction score in
+/// the current backend response, so none of those are parsed here.
 class Signal {
   const Signal({
     required this.symbol,
-    required this.rationale,
+    this.rationale = '',
     this.name,
     this.lastPrice,
     this.percentChange,
     this.entry,
-    this.target,
+    this.exitPrice,
     this.stop,
-    this.strength,
-    this.bullish = true,
     this.addedOn,
   });
 
   final String symbol;
+
+  /// Still accepted/stored by the backend (older admin-created rows may
+  /// have one), but the current admin panel no longer has a field for it —
+  /// almost always empty for anything created recently.
   final String rationale;
   final String? name;
   final num? lastPrice;
   final num? percentChange;
   final num? entry;
-  final num? target;
+  final num? exitPrice;
   final num? stop;
-
-  /// 0..4 — rendered as filled/unfilled ticks, never a dial.
-  final int? strength;
-  final bool bullish;
   final String? addedOn;
+
+  /// Purely a price-move indicator (percent change >= 0), used only to tint
+  /// the up/down glyph next to the move — the backend has no separate
+  /// bullish/bearish classification for an admin-curated pick.
+  bool get bullish => (percentChange ?? 0) >= 0;
 
   static Signal? tryParse(Map<String, dynamic> json) {
     final symbol = _str(json, const ['symbol', 'ticker', 'scrip']);
     if (symbol == null || symbol.isEmpty) return null;
-    final percent = _num(json, const [
-      'change_pct',
-      'percentChange',
-      'percent_change',
-    ]);
-    final bias = _str(json, const ['bias', 'direction', 'side'])?.toLowerCase();
     return Signal(
       symbol: symbol,
       rationale:
           _str(json, const ['rationale', 'reason', 'note', 'body']) ?? '',
       name: _str(json, const ['name', 'companyName', 'company_name']),
       lastPrice: _num(json, const ['last_price', 'lastPrice', 'ltp', 'price']),
-      percentChange: percent,
-      entry: _num(json, const ['entry', 'entry_price']),
-      target: _num(json, const ['target', 'target_price']),
-      stop: _num(json, const ['stop', 'stop_loss', 'stoploss']),
-      strength: _num(json, const [
-        'strength',
-        'score',
-        'conviction',
-      ])?.round().clamp(0, 4),
-      bullish: bias != null
-          ? (bias == 'long' || bias == 'buy' || bias == 'bullish')
-          : (percent ?? 0) >= 0,
+      percentChange: _num(json, const [
+        'change_pct',
+        'percentChange',
+        'percent_change',
+      ]),
+      entry: _num(json, const ['entry_price', 'entry']),
+      exitPrice: _num(json, const ['exit_price', 'exitPrice']),
+      stop: _num(json, const ['stop_loss', 'stoploss', 'stop']),
       addedOn: _str(json, const ['date_added', 'added_on', 'created_at']),
     );
   }
 
-  /// Round-trips through [tryParse]; see [Quote.toJson]. Writes an explicit
-  /// `bias` string rather than relying on `percentChange`'s sign, since
-  /// [tryParse] prefers `bias` when present and a signal can be bullish or
-  /// bearish with no `percentChange` at all.
+  /// Round-trips through [tryParse]; see [Quote.toJson].
   Map<String, dynamic> toJson() => {
     'symbol': symbol,
     'rationale': rationale,
     if (name != null) 'name': name,
     if (lastPrice != null) 'last_price': lastPrice,
     if (percentChange != null) 'change_pct': percentChange,
-    if (entry != null) 'entry': entry,
-    if (target != null) 'target': target,
-    if (stop != null) 'stop': stop,
-    if (strength != null) 'strength': strength,
-    'bias': bullish ? 'bullish' : 'bearish',
+    if (entry != null) 'entry_price': entry,
+    if (exitPrice != null) 'exit_price': exitPrice,
+    if (stop != null) 'stop_loss': stop,
     if (addedOn != null) 'date_added': addedOn,
   };
 }
@@ -626,10 +618,10 @@ class WeeklyReportStock {
   /// — older admin-entered rows simply have this null.
   final String? name;
 
-  /// Optional bullish/bearish tag (Phase 6), rendered with the same
-  /// [DirectionBadge] `Signal.bullish` already uses on the Signals tab.
-  /// Defaults to `true` (bullish) when the admin hasn't set it, matching
-  /// [Signal]'s own default direction.
+  /// Optional bullish/bearish flag (Phase 6). No longer rendered anywhere —
+  /// the website's admin panel has no field for it and neither the Weekly
+  /// Report card nor the Signals cards show a bullish/bearish tag anymore —
+  /// kept only so old admin-entered rows still round-trip through parsing.
   final bool bullish;
 
   /// Optional trade description, e.g. "BUY SEP 3850 CE" (Phase 6).

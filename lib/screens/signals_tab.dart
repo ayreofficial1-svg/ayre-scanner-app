@@ -17,10 +17,12 @@ import 'equity_detail_screen.dart';
 
 /// Signals — the signal board (Spec §13.2).
 ///
-/// One view of every stock the backend has pushed: a featured signal card, a
-/// compact signal list, and the bar strength meter. There are deliberately no
-/// filters — no All / Bullish / Bearish switch — so what the backend pushes is
-/// exactly what is shown.
+/// One view of every admin-curated stock pick the backend has published: a
+/// featured pick card and a compact list of the rest, in exactly the order
+/// `GET /api/signals` returns them. There are deliberately no filters — no
+/// All / Bullish / Bearish switch, and no per-card Bullish/Bearish tag either
+/// — an admin pick has no long/short direction of its own; that concept
+/// lives only in the separate market-sentiment system on Home.
 ///
 /// v3 rendered every signal as an identical mid-weight card, which meant the
 /// board had no shape — twelve equally loud things and no way in. §13.2's
@@ -196,19 +198,13 @@ class _SignalsTabState extends State<SignalsTab> {
       ];
     }
 
-    // The featured slot goes to the highest conviction, and ties break toward
-    // the largest move — otherwise the "featured" pick would silently be
-    // whichever the feed happened to list first.
-    final ranked = [..._result!.value!]
-      ..sort((a, b) {
-        final byStrength = (b.strength ?? 0).compareTo(a.strength ?? 0);
-        if (byStrength != 0) return byStrength;
-        return (b.percentChange ?? 0).abs().compareTo(
-          (a.percentChange ?? 0).abs(),
-        );
-      });
-    final featured = ranked.first;
-    final rest = ranked.skip(1).toList();
+    // The backend already returns signals in its own display order (pinned,
+    // then display_order, then most-recently-updated — see
+    // `data/app_signals.py::_sort_key`), so the first entry is the featured
+    // one; Flutter doesn't re-rank by anything invented client-side.
+    final signals = _result!.value!;
+    final featured = signals.first;
+    final rest = signals.skip(1).toList();
 
     return [
       Entrance(
@@ -295,11 +291,15 @@ class _FeaturedSignal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final tone = signal.bullish ? t.positive : t.negative;
+    final hasName = signal.name != null && signal.name!.isNotEmpty;
 
     // Phase 5: content-dense card — mark tappable without collapsing the
     // rationale/levels detail children carry (unlike TickerRow's terse
     // grouped-label treatment).
+    //
+    // No Bullish/Bearish badge here — an admin-curated pick has no
+    // long/short direction of its own; that concept lives only in the
+    // separate market-sentiment system on Home.
     return Semantics(
       button: true,
       child: AyreCard(
@@ -309,21 +309,14 @@ class _FeaturedSignal extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text('TOP CONVICTION', style: AppTypo.label(t, color: t.accentInk)),
-              const Spacer(),
-              ShrinkTrailing(
-                child: DirectionBadge(
-                  up: signal.bullish,
-                  label: signal.bullish ? 'Bullish' : 'Bearish',
-                ),
-              ),
-            ],
-          ),
+          Text('FEATURED PICK', style: AppTypo.label(t, color: t.accentInk)),
           const SizedBox(height: AppSpace.inCardGap),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            // Top-aligned when there's a two-line symbol+name block, so it
+            // starts level with the tile's top edge; centered for a bare
+            // symbol, matching the Weekly Report card header's convention.
+            crossAxisAlignment:
+                hasName ? CrossAxisAlignment.start : CrossAxisAlignment.center,
             children: [
               AyreInstrumentTile(
                 symbol: signal.symbol,
@@ -334,6 +327,7 @@ class _FeaturedSignal extends StatelessWidget {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       signal.symbol,
@@ -341,13 +335,15 @@ class _FeaturedSignal extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (signal.name != null && signal.name!.isNotEmpty)
+                    if (hasName) ...[
+                      const SizedBox(height: 2),
+                      // No maxLines/ellipsis — the full company name must
+                      // stay visible even when it runs to two lines.
                       Text(
                         signal.name!,
                         style: AppTypo.body(t),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
+                    ],
                   ],
                 ),
               ),
@@ -385,18 +381,8 @@ class _FeaturedSignal extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ],
-          if (signal.strength != null) ...[
-            const SizedBox(height: AppSpace.inCardGap),
-            Row(
-              children: [
-                Text('CONVICTION', style: AppTypo.label(t)),
-                const SizedBox(width: AppSpace.xs),
-                SignalStrength(level: signal.strength!, color: tone, height: 18),
-              ],
-            ),
-          ],
           if (signal.entry != null ||
-              signal.target != null ||
+              signal.exitPrice != null ||
               signal.stop != null) ...[
             const SizedBox(height: AppSpace.md),
             // A sunken inset, not a nested card (§8.3) — the levels are a
@@ -410,11 +396,11 @@ class _FeaturedSignal extends StatelessWidget {
                 children: [
                   if (signal.entry != null)
                     Expanded(child: _Level(label: 'Entry', value: signal.entry)),
-                  if (signal.target != null)
+                  if (signal.exitPrice != null)
                     Expanded(
                       child: _Level(
-                        label: 'Target',
-                        value: signal.target,
+                        label: 'Exit',
+                        value: signal.exitPrice,
                         tone: t.positive,
                       ),
                     ),
@@ -445,8 +431,8 @@ class _FeaturedSignal extends StatelessWidget {
 
 /// One row of the "also on watch" list (§13.2's compact signal list, §11.7's
 /// row convention). Deliberately thinner than the featured card: symbol,
-/// direction, move, conviction. The rationale and the levels live one tap
-/// away, on Equity Detail.
+/// name, move. The rationale and the levels live one tap away, on Equity
+/// Detail.
 class _CompactSignalRow extends StatelessWidget {
   const _CompactSignalRow({required this.signal, required this.onTap});
 
@@ -516,17 +502,13 @@ class _CompactSignalRow extends StatelessWidget {
                     Text(
                       signal.name!,
                       style: AppTypo.hint(t),
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
                 ],
               ),
             ),
             const SizedBox(width: AppSpace.sm),
-            if (signal.strength != null) ...[
-              SignalStrength(level: signal.strength!, color: tone),
-              const SizedBox(width: AppSpace.sm),
-            ],
             Flexible(
               flex: 3,
               child: FittedBox(
