@@ -8,6 +8,7 @@ import '../services/market_models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
+import '../widgets/ayre_instrument_tile.dart';
 import '../widgets/figure.dart';
 import '../widgets/state_views.dart';
 import '../widgets/ticker_trace.dart';
@@ -196,6 +197,8 @@ class _EquityHeader extends StatelessWidget {
           children: [
             Row(
               children: [
+                AyreInstrumentTile(symbol: quote.symbol, size: 40),
+                const SizedBox(width: AppSpace.sm),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

@@ -19,6 +19,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/market_models.dart';
 import 'ayre_components.dart';
+import 'ayre_instrument_tile.dart';
 import 'figure.dart';
 
 // ─── Shared arc geometry ───────────────────────────────────────────────────
@@ -1002,6 +1003,8 @@ class _VolumeSurgeRowTile extends StatelessWidget {
                 style: AppTypo.hint(t, color: t.foregroundSubtle),
               ),
             ),
+            const SizedBox(width: AppSpace.xs),
+            AyreInstrumentTile(symbol: row.symbol, size: 28),
             const SizedBox(width: AppSpace.sm),
             Expanded(
               flex: 3,

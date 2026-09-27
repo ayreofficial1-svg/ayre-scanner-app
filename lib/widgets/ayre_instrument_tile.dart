@@ -2,25 +2,32 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// A rounded-square monogram tile for a tradeable instrument — the leading
-/// element of the shared "tile + two text lines + trailing value/delta" row
-/// grammar (redesign plan §2.2).
+/// A rounded-square monogram "logo" tile for a tradeable instrument — the
+/// leading element of the shared "tile + two text lines + trailing
+/// value/delta" row grammar (redesign plan §2.2), and now the app-wide stand-
+/// in for a company logo wherever a stock's symbol/name is shown.
 ///
-/// **No logos.** The backend supplies no company imagery, so the tile carries
-/// up to two characters of the ticker instead. It is a neutral tonal fill
-/// (`surfaceRaised`, `foregroundMuted` ink), never direction-tinted: gain/loss
-/// color belongs to the figures at the trailing edge, and a green tile in a
-/// Top Losers list would contradict them. It is also not an identity accent —
-/// that role is [AyreAvatar]'s and is reserved for people.
+/// **No real company logos.** Neither the backend nor NSE's own public data
+/// gives this app reliable company imagery (no ISIN, no logo CDN reachable
+/// without a paid, keyed third-party API), so every free option would add a
+/// network dependency that can silently break or rate-limit. This tile is
+/// the reliable substitute: a deterministic, offline monogram built only
+/// from the symbol string that is already flowing through every screen, so
+/// it never fails to render and needs no new data plumbing. It is a neutral
+/// tonal fill (`surfaceRaised`, `foregroundMuted` ink), never
+/// direction-tinted: gain/loss color belongs to the figures at the trailing
+/// edge, and a green tile in a Top Losers list would contradict them. It is
+/// also not an identity accent — that role is [AyreAvatar]'s and is reserved
+/// for people.
 ///
 /// Rounded square by design ([AppRadius.iconTile]); the circular treatment is
 /// the Home index-card icon tile's one deliberate exception (§2A) and does not
 /// carry over here.
 ///
-/// Phase 4 wires it into the Insights movers lists. `index_detail_screen.dart`'s
-/// constituent rows and `equity_detail_screen.dart`'s related lists are the
-/// remaining instrument lists; they adopt it in Phase 7's secondary-screen
-/// sweep rather than being touched here.
+/// Used by the Insights movers lists, `index_detail_screen.dart`'s constituent
+/// rows, `equity_detail_screen.dart`'s header, `signals_tab.dart`'s featured
+/// and compact rows, the Volume Surge leaderboard, and the Weekly Report card
+/// header — every place a stock's symbol/name appears in the app.
 class AyreInstrumentTile extends StatelessWidget {
   const AyreInstrumentTile({
     super.key,

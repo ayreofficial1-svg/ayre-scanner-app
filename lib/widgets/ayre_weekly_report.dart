@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../services/market_models.dart';
 import '../theme/app_theme.dart';
 import 'ayre_components.dart';
-import 'ayre_icons.dart';
+import 'ayre_instrument_tile.dart';
 import 'figure.dart';
 
 // ─── Weekly Report (Phase 5; moved to Home in Phase 2; restyled in Phase 3;
@@ -23,20 +23,19 @@ import 'figure.dart';
 //
 // Two week-level dates already existed and are real, not invented
 // (`report.weekStart`/`weekEnd`, shown in the section's subtitle via
-// [formatWeekRange]); the new details band's Date/Duration/Exit-date rows
-// fall back to those when a stock doesn't carry its own dates, rather than
-// fabricating a value the backend never sent.
+// [formatWeekRange]); the details band's Date/Exit-date rows fall back to
+// those when a stock doesn't carry its own dates, rather than fabricating a
+// value the backend never sent.
 //
-// What's carried over from the reference image, adapted to this app's own
-// components rather than copied: per-stock containment in its own card
-// (unchanged since Phase 3); a bullish/bearish tag using the exact
-// [DirectionBadge] component `signals_tab.dart`'s featured signal already
-// uses for the same concept; a trade-description row with right-aligned
-// entry/exit columns; a colour-tinted headline band split into a P&L amount
-// row and a % return row; and a plain details band for the recommendation
-// date, duration and exit date. Every colour is an existing
-// `AppThemeTokens` value — no new component-specific colour constant was
-// needed.
+// Visual-refresh pass: the header now leads with [AyreInstrumentTile] (the
+// same monogram "logo" tile used everywhere else a stock is listed) instead
+// of a plain tinted icon circle; the company name is no longer truncated;
+// the bullish/bearish tag is dropped from this card only (it still lives on
+// the Signals featured card and the Home sentiment card); the Duration row
+// is dropped from the details band; and the P&L headline is labelled
+// "Profit / Share" / "Loss / Share" to make clear the ₹ figure is per share,
+// not a total. Every colour is an existing `AppThemeTokens` value — no new
+// component-specific colour constant was needed.
 
 /// The Weekly Report section body — each stock in its own
 /// [WeeklyReportStockCard], followed by the always-visible disclaimer
@@ -76,10 +75,11 @@ class WeeklyReportCard extends StatelessWidget {
 /// One stock's result, as its own bounded, tinted, radiused card.
 ///
 /// Three visually distinct bands, so identity, trade detail and outcome
-/// never blur together: a plain header carrying the symbol/name and a
-/// bullish/bearish tag; an optional trade-description row with right-aligned
-/// entry/exit prices; an outcome-tinted band holding the P&L headline; and a
-/// plain details band for the recommendation date, duration and exit date.
+/// never blur together: a plain header carrying the logo tile, symbol and
+/// full company name; an optional trade-description row with right-aligned
+/// entry/exit prices; an outcome-tinted band holding the per-share P&L
+/// headline; and a plain details band for the recommendation date and exit
+/// date.
 ///
 /// [fallbackStart]/[fallbackEnd] are the report's own week range, used only
 /// when this stock doesn't carry its own [WeeklyReportStock.dateOfRecommendation]
@@ -106,16 +106,11 @@ class WeeklyReportStockCard extends StatelessWidget {
 
     final recDate = stock.dateOfRecommendation ?? fallbackStart;
     final exitDate = stock.exitDate ?? fallbackEnd;
-    final duration =
-        stock.durationDays ??
-        ((recDate != null && exitDate != null)
-            ? exitDate.difference(recDate).inDays + 1
-            : null);
 
     final hasTradeRow = (stock.tradeLabel != null && stock.tradeLabel!.isNotEmpty) ||
         stock.entryPrice != null ||
         stock.exitPrice != null;
-    final hasDetails = recDate != null || exitDate != null || duration != null;
+    final hasDetails = recDate != null || exitDate != null;
 
     return Semantics(
       label:
@@ -127,7 +122,7 @@ class WeeklyReportStockCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _StockHeader(stock: stock, tone: tone, soft: soft),
+            _StockHeader(stock: stock),
             if (hasTradeRow) ...[
               const HairlineDivider(),
               _TradeRow(stock: stock, tone: tone),
@@ -140,11 +135,7 @@ class WeeklyReportStockCard extends StatelessWidget {
             ),
             if (hasDetails) ...[
               const HairlineDivider(),
-              _DetailsBand(
-                recDate: recDate,
-                exitDate: exitDate,
-                duration: duration,
-              ),
+              _DetailsBand(recDate: recDate, exitDate: exitDate),
             ],
           ],
         ),
@@ -153,15 +144,14 @@ class WeeklyReportStockCard extends StatelessWidget {
   }
 }
 
-/// Identity header — symbol, optional company name, and a bullish/bearish
-/// tag using the same [DirectionBadge] `signals_tab.dart`'s featured signal
-/// card already uses for this exact concept.
+/// Identity header — company logo tile, symbol and full company name. The
+/// bullish/bearish tag lives only on the Signals featured card and the
+/// Home sentiment card now — the Weekly Report is a historical outcome
+/// record, not a live call, so it no longer repeats that tag here.
 class _StockHeader extends StatelessWidget {
-  const _StockHeader({required this.stock, required this.tone, required this.soft});
+  const _StockHeader({required this.stock});
 
   final WeeklyReportStock stock;
-  final Color tone;
-  final Color soft;
 
   @override
   Widget build(BuildContext context) {
@@ -178,42 +168,26 @@ class _StockHeader extends StatelessWidget {
         AppSpace.sm,
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 32,
-            height: 32,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: soft),
-            child: AyreIcon(AyreGlyph.equity, size: 16, color: tone),
-          ),
+          AyreInstrumentTile(symbol: stock.symbol, size: 32),
           const SizedBox(width: AppSpace.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  stock.symbol,
-                  style: AppTypo.cardTitle(t),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (hasName)
+                Text(stock.symbol, style: AppTypo.cardTitle(t)),
+                if (hasName) ...[
+                  const SizedBox(height: 2),
+                  // No maxLines/ellipsis — the full company name must stay
+                  // visible even when it runs to two lines.
                   Text(
                     stock.name!,
                     style: AppTypo.hint(t, color: t.foregroundSubtle),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
+                ],
               ],
-            ),
-          ),
-          const SizedBox(width: AppSpace.sm),
-          ShrinkTrailing(
-            child: DirectionBadge(
-              up: stock.bullish,
-              label: stock.bullish ? 'Bullish' : 'Bearish',
             ),
           ),
         ],
@@ -339,9 +313,9 @@ class _OutcomeBand extends StatelessWidget {
                     color: tone,
                     fontSize: AppTextScale.featuredHeadline,
                     fontWeight: FontWeight.w700,
-                    // The header's bullish/bearish tag already carries
-                    // direction; a second arrow here (keyed to `profitPct`'s
-                    // sign, not `outcome`) could disagree with it on an
+                    // `outcome` (target/stop-loss) already carries direction
+                    // via the sentence below; a second arrow here (keyed to
+                    // `profitPct`'s sign) could disagree with it on an
                     // edge-case row and read as a contradiction.
                     showGlyph: false,
                   ),
@@ -361,7 +335,7 @@ class _OutcomeBand extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        pnl >= 0 ? 'Profit' : 'Loss',
+                        pnl >= 0 ? 'Profit / Share' : 'Loss / Share',
                         style: AppTypo.body(t, color: t.foregroundSubtle),
                       ),
                       const Spacer(),
@@ -400,22 +374,20 @@ class _OutcomeBand extends StatelessWidget {
   }
 }
 
-/// The plain details band — recommendation date, duration (in days) and
-/// exit date — separated from the outcome band by a hairline so it reads as
-/// bookkeeping rather than part of the P&L headline.
+/// The plain details band — recommendation date and exit date — separated
+/// from the outcome band by a hairline so it reads as bookkeeping rather
+/// than part of the P&L headline. Duration is intentionally not shown here.
 class _DetailsBand extends StatelessWidget {
-  const _DetailsBand({this.recDate, this.exitDate, this.duration});
+  const _DetailsBand({this.recDate, this.exitDate});
 
   final DateTime? recDate;
   final DateTime? exitDate;
-  final int? duration;
 
   @override
   Widget build(BuildContext context) {
     final rows = <_DetailRow>[
       if (recDate != null)
         _DetailRow('Date of recommendation', _shortDate(recDate!)),
-      if (duration != null) _DetailRow('Duration', '$duration'),
       if (exitDate != null) _DetailRow('Exit Date', _shortDate(exitDate!)),
     ];
     if (rows.isEmpty) return const SizedBox.shrink();
@@ -494,11 +466,9 @@ class _WeeklyReportStockCardSkeleton extends StatelessWidget {
             ),
             child: Row(
               children: [
-                SkeletonBlock(width: 32, height: 32, radius: AppRadius.circle),
+                SkeletonBlock(width: 32, height: 32, radius: AppRadius.iconTile),
                 SizedBox(width: AppSpace.sm),
                 Expanded(child: SkeletonBlock(height: 16)),
-                SizedBox(width: AppSpace.sm),
-                SkeletonBlock(width: 72, height: 20, radius: AppRadius.pill),
               ],
             ),
           ),

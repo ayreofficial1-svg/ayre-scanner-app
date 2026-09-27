@@ -8,6 +8,7 @@ import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
+import '../widgets/ayre_instrument_tile.dart';
 import '../widgets/figure.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/responsive.dart';
@@ -324,6 +325,8 @@ class _FeaturedSignal extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              AyreInstrumentTile(symbol: signal.symbol, size: 40),
+              const SizedBox(width: AppSpace.sm),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -482,6 +485,8 @@ class _CompactSignalRow extends StatelessWidget {
           ),
         child: Row(
           children: [
+            AyreInstrumentTile(symbol: signal.symbol, size: 28),
+            const SizedBox(width: AppSpace.xs),
             AyreIcon(
               signal.bullish ? AyreGlyph.trendUp : AyreGlyph.trendDown,
               size: 17,
