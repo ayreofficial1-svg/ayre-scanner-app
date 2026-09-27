@@ -17,9 +17,9 @@ import 'figure.dart';
 // the feature. Every one of Phase 3's original fields (`symbol`,
 // `profitPct`, `outcome`) keeps meaning exactly what it always has, and a
 // report saved before Phase 6 (none of the new fields present) still
-// renders correctly: [WeeklyReportStockCard] falls back to Phase 3's plain
-// single-headline layout whenever `pnlAmount` is absent, so nothing that
-// used to display now shows a hole or an invented number.
+// renders correctly: [WeeklyReportStockCard] simply omits the `pnlAmount`
+// figure from the outcome band whenever it's absent, so nothing that used
+// to display now shows a hole or an invented number.
 //
 // Two week-level dates already existed and are real, not invented
 // (`report.weekStart`/`weekEnd`, shown in the section's subtitle via
@@ -31,11 +31,18 @@ import 'figure.dart';
 // same monogram "logo" tile used everywhere else a stock is listed) instead
 // of a plain tinted icon circle; the company name is no longer truncated;
 // the bullish/bearish tag is dropped from this card only (it still lives on
-// the Signals featured card and the Home sentiment card); the Duration row
-// is dropped from the details band; and the P&L headline is labelled
-// "Profit / Share" / "Loss / Share" to make clear the ₹ figure is per share,
-// not a total. Every colour is an existing `AppThemeTokens` value — no new
-// component-specific colour constant was needed.
+// the Signals featured card and the Home sentiment card); and the Duration
+// row is dropped from the details band. Every colour is an existing
+// `AppThemeTokens` value — no new component-specific colour constant was
+// needed.
+//
+// Outcome band redesign: `profitPct` (calculated automatically on the
+// website from Entry Price/Exit Price — never hand-typed) is always the
+// single "% Return" headline, shown to 2 decimal places; `pnlAmount` (the
+// admin's manually-entered Profit/Loss per share) sits directly to its
+// right when present, rather than as its own separate row. The line below
+// is a single short result word ("Target" / "Stop-loss") instead of a full
+// sentence.
 
 /// The Weekly Report section body — each stock in its own
 /// [WeeklyReportStockCard], followed by the always-visible disclaimer
@@ -283,11 +290,12 @@ class _PriceStat extends StatelessWidget {
   }
 }
 
-/// The outcome-tinted headline band. With [WeeklyReportStock.pnlAmount] set,
-/// shows a Profit/Loss ₹ amount row and a separate % Return row (the
-/// reference-image split); without it, falls back exactly to Phase 3's
-/// single big % headline plus supporting sentence, so older admin-entered
-/// rows are unaffected.
+/// The outcome-tinted headline band — always a single "% Return" row (to 2
+/// decimal places, via [DeltaFigure]'s own default), with
+/// [WeeklyReportStock.pnlAmount] (the admin's manually-entered Profit/Loss
+/// per share) shown directly to its right whenever it's present, and a
+/// single short result word underneath instead of a full sentence, so the
+/// outcome reads at a glance.
 class _OutcomeBand extends StatelessWidget {
   const _OutcomeBand({
     required this.stock,
@@ -313,71 +321,50 @@ class _OutcomeBand extends StatelessWidget {
           AppSpace.md,
           AppSpace.md,
         ),
-        child: pnl == null
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  DeltaFigure(
-                    change: stock.profitPct,
-                    color: tone,
-                    fontSize: AppTextScale.featuredHeadline,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  '% Return',
+                  style: AppTypo.body(t, color: t.foregroundSubtle),
+                ),
+                const Spacer(),
+                DeltaFigure(
+                  change: stock.profitPct,
+                  color: tone,
+                  fontSize: AppTextScale.featuredHeadline,
+                  fontWeight: FontWeight.w700,
+                  // `outcome` (target/stop-loss) already carries direction
+                  // via the single word below; a second arrow here (keyed to
+                  // `profitPct`'s sign) could disagree with it on an
+                  // edge-case row and read as a contradiction.
+                  showGlyph: false,
+                ),
+                // Profit/Loss per share — manually entered by the admin on
+                // the website — sits directly to the right of % Return,
+                // rather than as its own separate headline row.
+                if (pnl != null) ...[
+                  const SizedBox(width: AppSpace.xs),
+                  Figure(
+                    _formatSignedRupees(pnl),
+                    fontSize: AppTextScale.rowLabel,
                     fontWeight: FontWeight.w700,
-                    // `outcome` (target/stop-loss) already carries direction
-                    // via the sentence below; a second arrow here (keyed to
-                    // `profitPct`'s sign) could disagree with it on an
-                    // edge-case row and read as a contradiction.
-                    showGlyph: false,
-                  ),
-                  const SizedBox(height: AppSpace.xxs),
-                  Text(
-                    stock.targetHit
-                        ? 'Closed the week at target.'
-                        : 'Closed the week at stop-loss.',
-                    style: AppTypo.hint(t, color: t.foregroundSubtle),
+                    color: tone,
                   ),
                 ],
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        pnl >= 0 ? 'Profit / Share' : 'Loss / Share',
-                        style: AppTypo.body(t, color: t.foregroundSubtle),
-                      ),
-                      const Spacer(),
-                      Figure(
-                        _formatSignedRupees(pnl),
-                        fontSize: AppTextScale.featuredHeadline,
-                        fontWeight: FontWeight.w700,
-                        color: tone,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpace.sm),
-                  const HairlineDivider(indent: 0, endIndent: 0),
-                  const SizedBox(height: AppSpace.sm),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Text(
-                        '% Return',
-                        style: AppTypo.body(t, color: t.foregroundSubtle),
-                      ),
-                      const Spacer(),
-                      DeltaFigure(
-                        change: stock.profitPct,
-                        color: tone,
-                        fontSize: AppTextScale.rowLabel,
-                        fontWeight: FontWeight.w700,
-                        showGlyph: false,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+              ],
+            ),
+            const SizedBox(height: AppSpace.xxs),
+            // One short word, not a sentence — "Target" / "Stop-loss".
+            Text(
+              stock.targetHit ? 'Target' : 'Stop-loss',
+              style: AppTypo.hint(t, color: t.foregroundSubtle),
+            ),
+          ],
+        ),
       ),
     );
   }
