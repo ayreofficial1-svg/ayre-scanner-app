@@ -318,6 +318,7 @@ class _OutcomeBand extends StatelessWidget {
               Expanded(
                 child: _OutcomeStat(
                   label: 'Profit/Share',
+                  alignment: CrossAxisAlignment.end,
                   valueWidget: Figure(
                     _formatSignedRupees(pnl),
                     fontSize: 15,
@@ -338,16 +339,21 @@ class _OutcomeBand extends StatelessWidget {
 /// full-weight value — used for both "Return %" and "Profit/Share" so the
 /// two read with identical size and visual weight side by side.
 class _OutcomeStat extends StatelessWidget {
-  const _OutcomeStat({required this.label, required this.valueWidget});
+  const _OutcomeStat({
+    required this.label,
+    required this.valueWidget,
+    this.alignment = CrossAxisAlignment.start,
+  });
 
   final String label;
   final Widget valueWidget;
+  final CrossAxisAlignment alignment;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: alignment,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
