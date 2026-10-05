@@ -173,9 +173,7 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
 
 // ─── Section rule ──────────────────────────────────────────────────────────
 
-/// The line that marks where the Weekly Report starts: 2pt, solid, pure
-/// black in Light mode and pure white in Dark mode — clearly stronger than
-/// the 1pt hairlines used inside cards, so it reads as a section break.
+/// A subtle line marking where the Weekly Report starts.
 class _SectionRule extends StatelessWidget {
   const _SectionRule();
 
@@ -184,10 +182,11 @@ class _SectionRule extends StatelessWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return ExcludeSemantics(
       child: Container(
-        height: 2,
+        height: 1,
         decoration: BoxDecoration(
-          color: dark ? const Color(0xFFFFFFFF) : const Color(0xFF000000),
-          borderRadius: BorderRadius.circular(1),
+          color: (dark ? const Color(0xFFFFFFFF) : const Color(0xFF000000))
+              .withValues(alpha: 0.55),
+          borderRadius: BorderRadius.circular(0.5),
         ),
       ),
     );
