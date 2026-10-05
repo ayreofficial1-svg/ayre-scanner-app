@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'api_service.dart';
 import 'app_lifecycle.dart';
+import 'notification_copy.dart';
 import 'settings_store.dart';
 
 /// Push notifications (Firebase Cloud Messaging).
@@ -17,10 +18,16 @@ import 'settings_store.dart';
 /// second one:
 ///
 ///  * **Background / terminated** — the OS shows the notification itself (the
-///    backend sends an FCM `notification` payload). Tapping it opens the app on
-///    the Signals tab. The Alerts list then fills in through the same
-///    [SeenSignalsStore] diff that has always recorded new picks when Signals
-///    loads, so there is one code path and no duplicate entry.
+///    backend sends an FCM `notification` payload). Three kinds arrive, told
+///    apart by the `type` in the message data:
+///      - `signal`        a new pick → tap opens the Signals tab. The Alerts
+///                        list fills in through the [SeenSignalsStore] diff
+///                        when Signals loads, so there is no duplicate entry.
+///      - `signal_update` an already-announced pick that changed → tap opens
+///                        the Signals tab and the change is added to Alerts.
+///      - `exit`          a call to exit a pick (`symbol`, `profit`,
+///                        `exit_price`) → tap opens the Alerts screen, where
+///                        the entry is added.
 ///  * **Foreground** — FCM shows nothing while the app is open, so the message
 ///    is recorded straight into [NotificationLog] (the list behind Home's
 ///    bell) and surfaced as an in-app banner.
@@ -51,11 +58,16 @@ class PushService extends ChangeNotifier {
   /// `HomeShell` listens and switches tab.
   final ValueNotifier<int> openSignalsRequests = ValueNotifier<int>(0);
 
+  /// Bumps when the user taps a notification that should land on the Alerts
+  /// screen (exit calls). `HomeShell` listens and opens it.
+  final ValueNotifier<int> openAlertsRequests = ValueNotifier<int>(0);
+
   bool _started = false;
   bool _available = false;
   bool _permissionChecked = false;
   bool _denied = false;
   bool _pendingOpenSignals = false;
+  bool _pendingOpenAlerts = false;
   String? _token;
   String? _lastSynced;
 
@@ -71,6 +83,13 @@ class PushService extends ChangeNotifier {
   bool consumePendingOpenSignals() {
     final pending = _pendingOpenSignals;
     _pendingOpenSignals = false;
+    return pending;
+  }
+
+  /// Same as [consumePendingOpenSignals], for the Alerts screen.
+  bool consumePendingOpenAlerts() {
+    final pending = _pendingOpenAlerts;
+    _pendingOpenAlerts = false;
     return pending;
   }
 
@@ -177,31 +196,64 @@ class PushService extends ChangeNotifier {
 
   // ── Incoming messages ────────────────────────────────────────────────────
 
+  static const _typeSignal = 'signal';
+  static const _typeRevised = 'signal_update';
+  static const _typeExit = 'exit';
+
+  /// Turns a push into an Alerts entry. The wording the backend put in the
+  /// notification is used as-is, so the list matches what the phone showed;
+  /// the app's own copy only fills in if that text is missing.
   Notice? _noticeFrom(RemoteMessage message) {
     final data = message.data;
-    final title = message.notification?.title;
-    final body = message.notification?.body;
+    final type = data['type']?.toString();
+    final title = message.notification?.title?.trim() ?? '';
+    final body = message.notification?.body?.trim() ?? '';
+    final symbol = (data['symbol'] ?? '').toString().trim().toUpperCase();
 
-    if (data['type'] == 'signal') {
-      final symbol = (data['symbol'] ?? '').toString().trim();
-      if (symbol.isEmpty) return null;
-      return Notice(
-        kind: NoticeKind.signal,
-        // Same wording Signals uses when it detects the pick itself, so the
-        // list's own repeat-collapsing treats the two as one entry.
-        title: 'New scanner pick: $symbol',
-        body: (body != null && body.trim().isNotEmpty)
-            ? body.trim()
-            : 'A new pick is on the Signals tab.',
-        at: DateTime.now(),
-      );
+    switch (type) {
+      case _typeSignal:
+      case _typeRevised:
+        if (symbol.isEmpty) return null;
+        final fallback = type == _typeSignal
+            ? NotificationCopy.newSignal(symbol)
+            : NotificationCopy.revisedSignal(symbol);
+        return Notice(
+          kind: type == _typeSignal ? NoticeKind.signal : NoticeKind.revised,
+          title: title.isNotEmpty ? title : fallback.title,
+          body: body.isNotEmpty ? body : fallback.body,
+          at: DateTime.now(),
+        );
+
+      case _typeExit:
+        if (title.isNotEmpty && body.isNotEmpty) {
+          return Notice(
+            kind: NoticeKind.exit,
+            title: title,
+            body: body,
+            at: DateTime.now(),
+          );
+        }
+        final profit = NotificationCopy.parseAmount(data['profit']);
+        final exitPrice = NotificationCopy.parseAmount(data['exit_price']);
+        if (symbol.isEmpty || profit == null || exitPrice == null) return null;
+        final copy = NotificationCopy.exitSignal(
+          stock: symbol,
+          profit: profit,
+          exitPrice: exitPrice,
+        );
+        return Notice(
+          kind: NoticeKind.exit,
+          title: copy.title,
+          body: copy.body,
+          at: DateTime.now(),
+        );
     }
 
-    if (title == null || title.trim().isEmpty) return null;
+    if (title.isEmpty) return null;
     return Notice(
       kind: NoticeKind.general,
-      title: title.trim(),
-      body: body?.trim() ?? '',
+      title: title,
+      body: body,
       at: DateTime.now(),
     );
   }
@@ -212,7 +264,9 @@ class PushService extends ChangeNotifier {
 
     final settings = SettingsStore.instance;
     if (!settings.pushEnabled) return;
-    if (notice.kind == NoticeKind.signal && !settings.newSignalAlerts) return;
+    final isSignalKind =
+        notice.kind == NoticeKind.signal || notice.kind == NoticeKind.revised;
+    if (isSignalKind && !settings.newSignalAlerts) return;
 
     await NotificationLog.instance.add(notice);
     if (notice.kind == NoticeKind.signal) {
@@ -225,12 +279,40 @@ class PushService extends ChangeNotifier {
     _showBanner(notice);
   }
 
+  /// A notification was tapped while the app was closed or in the background.
   void _onMessageOpened(RemoteMessage message) {
-    if (message.data['type'] != 'signal') return;
+    switch (message.data['type']?.toString()) {
+      case _typeSignal:
+        // Signals records this one itself when it loads (see class doc).
+        _requestOpenSignals();
+      case _typeRevised:
+        // Signals can't tell a revision from a pick it already knows, so the
+        // entry is recorded here, from the tap.
+        _recordFromTap(message);
+        _requestOpenSignals();
+      case _typeExit:
+        _recordFromTap(message);
+        _requestOpenAlerts();
+    }
+  }
+
+  void _recordFromTap(RemoteMessage message) {
+    final notice = _noticeFrom(message);
+    if (notice == null || !SettingsStore.instance.pushEnabled) return;
+    unawaited(NotificationLog.instance.add(notice));
+  }
+
+  void _requestOpenSignals() {
     _pendingOpenSignals = true;
     openSignalsRequests.value++;
     // Anything pushed over the shell (Alerts, a detail page) would hide the
     // tab switch, so return to the shell first.
+    navigatorKey.currentState?.popUntil((route) => route.isFirst);
+  }
+
+  void _requestOpenAlerts() {
+    _pendingOpenAlerts = true;
+    openAlertsRequests.value++;
     navigatorKey.currentState?.popUntil((route) => route.isFirst);
   }
 
@@ -239,6 +321,12 @@ class PushService extends ChangeNotifier {
     if (messenger == null) return;
     final context = navigatorKey.currentContext;
     final tokens = context?.tokens;
+
+    final VoidCallback? onView = switch (notice.kind) {
+      NoticeKind.signal || NoticeKind.revised => _requestOpenSignals,
+      NoticeKind.exit => _requestOpenAlerts,
+      NoticeKind.general => null,
+    };
 
     messenger
       ..hideCurrentSnackBar()
@@ -259,19 +347,13 @@ class PushService extends ChangeNotifier {
                 ),
             ],
           ),
-          action: notice.kind == NoticeKind.signal
-              ? SnackBarAction(
+          action: onView == null
+              ? null
+              : SnackBarAction(
                   label: 'View',
                   textColor: tokens?.accentInk,
-                  onPressed: () {
-                    _pendingOpenSignals = true;
-                    openSignalsRequests.value++;
-                    navigatorKey.currentState?.popUntil(
-                      (route) => route.isFirst,
-                    );
-                  },
-                )
-              : null,
+                  onPressed: onView,
+                ),
         ),
       );
   }

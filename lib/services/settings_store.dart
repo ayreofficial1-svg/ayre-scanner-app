@@ -40,7 +40,8 @@ class SettingsStore extends ChangeNotifier {
   bool get inAppAlerts => _inAppAlerts;
 
   /// Records an entry when the scanner returns a pick you haven't seen. Also
-  /// decides whether new-pick push notifications are sent to this device.
+  /// decides whether new-pick and updated-pick push notifications are sent to
+  /// this device.
   bool get newSignalAlerts => _newSignalAlerts;
 
   /// Whether this device is registered for push notifications at all. Turning
@@ -118,9 +119,13 @@ enum AppTextSize {
   final double scale;
 }
 
-/// [signal] is a new scanner pick; [general] is a custom message the team sent
-/// to everyone's phone.
-enum NoticeKind { signal, general }
+/// [signal] is a new scanner pick; [revised] is a pick that was already
+/// announced and has since changed; [exit] is a call to exit a pick;
+/// [general] is a custom message the team sent to everyone's phone.
+///
+/// New kinds are only ever appended: entries are stored by name, so older
+/// saved entries keep loading.
+enum NoticeKind { signal, general, revised, exit }
 
 /// One entry in the alerts list.
 class Notice {
@@ -210,6 +215,8 @@ class NotificationLog extends ChangeNotifier {
     if (!settings.inAppAlerts) return false;
     return switch (kind) {
       NoticeKind.signal => settings.newSignalAlerts,
+      NoticeKind.revised => settings.newSignalAlerts,
+      NoticeKind.exit => true,
       NoticeKind.general => true,
     };
   }

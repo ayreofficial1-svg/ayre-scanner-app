@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
+import '../services/notification_copy.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
@@ -100,15 +101,17 @@ class _SignalsTabState extends State<SignalsTab> {
       result.value!.map((s) => s.symbol),
     );
     if (fresh.isEmpty) return;
+    final single = fresh.length == 1
+        ? NotificationCopy.newSignal(fresh.first)
+        : null;
     await NotificationLog.instance.add(
       Notice(
         kind: NoticeKind.signal,
-        title: fresh.length == 1
-            ? 'New scanner pick: ${fresh.first}'
-            : '${fresh.length} new scanner picks',
+        title: single?.title ?? '${fresh.length} New Picks',
         body:
+            single?.body ??
             '${fresh.take(4).join(', ')}'
-            '${fresh.length > 4 ? ', and more' : ''}',
+                '${fresh.length > 4 ? ', and more' : ''}',
         at: DateTime.now(),
       ),
     );

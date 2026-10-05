@@ -144,7 +144,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       _SwitchRow(
                         glyph: AyreGlyph.alerts,
                         title: 'New signal alerts',
-                        subtitle: 'Alerts for new scanner picks.',
+                        subtitle: 'New picks and changes to existing ones.',
                         value: settings.newSignalAlerts,
                         // Governs both the in-app list and push, so it stays
                         // usable while either of them is on.

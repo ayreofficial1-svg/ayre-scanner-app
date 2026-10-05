@@ -10,6 +10,7 @@ import '../widgets/responsive.dart';
 import 'home_tab.dart';
 import 'insights_tab.dart';
 import 'learn_tab.dart';
+import 'notifications_screen.dart';
 import 'profile_tab.dart';
 import 'signals_tab.dart';
 
@@ -48,6 +49,12 @@ class _HomeShellState extends State<HomeShell> {
     // build; one tapped while it's running arrives through the notifier.
     if (push.consumePendingOpenSignals()) _index = 1;
     push.openSignalsRequests.addListener(_onOpenSignalsRequested);
+    push.openAlertsRequests.addListener(_onOpenAlertsRequested);
+    // Same for an exit notification: it lands on the Alerts screen, which can
+    // only be pushed once this shell has built.
+    if (push.consumePendingOpenAlerts()) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openAlerts());
+    }
   }
 
   @override
@@ -55,7 +62,26 @@ class _HomeShellState extends State<HomeShell> {
     PushService.instance.openSignalsRequests.removeListener(
       _onOpenSignalsRequested,
     );
+    PushService.instance.openAlertsRequests.removeListener(
+      _onOpenAlertsRequested,
+    );
     super.dispose();
+  }
+
+  void _onOpenAlertsRequested() {
+    if (!mounted) return;
+    if (PushService.instance.consumePendingOpenAlerts()) {
+      // PushService has just popped back to this shell; push on the next
+      // frame so the pop has finished.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openAlerts());
+    }
+  }
+
+  void _openAlerts() {
+    if (!mounted) return;
+    Navigator.of(context).push(
+      terminalRoute(builder: (_) => const NotificationsScreen()),
+    );
   }
 
   void _onOpenSignalsRequested() {

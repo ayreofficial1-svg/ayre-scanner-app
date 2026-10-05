@@ -15,28 +15,31 @@ import 'pressable_scale.dart';
 // Presentation-only. Same data, same week navigation, same picker, same
 // "See all". Nothing is added to the model.
 //
-//   ───────────────────────────────────────           hairline separator
-//   WEEKLY REPORT                                  ‹ ›
-//   1 – 8 Sep 2026 ⌄                                  ← the week, large
-//   Latest week · 1 of 3
+//   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   black / white section rule
+//   ┌──────────────────────────────────────┐
+//   │ Weekly Report                    ‹ ›  │   teal gradient header (light wash / dark):
+//   │ 1 – 8 Sep 2026 ⌄                      │   heading first, date second
+//   │ Latest week · 1 of 3                  │
+//   └──────────────────────────────────────┘
 //
 //   ┌──────────────────────────────────────┐
-//   │ [logo]  RELIANCE            ┌────────┐│     one card per stock,
-//   │         ● Target hit        │+896.40%││     always fully visible:
-//   │                             └────────┘│     who → how it ended → how
+//   │ [logo]  RELIANCE                +896.40%│     one card per stock,
+//   │         ● Target hit                   │     always fully visible:
+//   │                                        │     who → how it ended → how
 //   │ ┌─────────────┐ ┌─────────────┐       │     much → the trade
 //   │ │ ENTRY       │ │ EXIT        │       │
 //   │ │ ₹444.00     │ │ ₹4,424.00   │       │     Entry carries the date of
 //   │ │ 1 Sep 2026  │ │ 8 Sep 2026  │       │     recommendation, Exit
 //   │ └─────────────┘ └─────────────┘       │     carries the exit date.
+//   │ ─────────────────────────────────────  │
 //   │ PROFIT / SHARE             +₹3,980    │
 //   └──────────────────────────────────────┘
 //
-// Cards are separated by space, not dividers; the soft green hills in each
-// card's corner are the Ayre device, which is what sets this section apart
-// from the other Home cards. The return and the profit tile are tinted by
-// outcome (green for target, red for stop-loss); direction is also in the
-// sign and the written outcome, never colour alone.
+// Cards are separated by space, not dividers. The gradient header is what
+// sets this section apart from the other Home cards; the stock cards stay
+// quiet — a faint corner of hills, no fills behind the results. Outcome
+// colour sits on text only (green target / red stop-loss), and direction is
+// also in the sign and the written outcome, never colour alone.
 //
 // Every colour is an `AppThemeTokens` value, so Light and Dark follow the
 // theme with no per-mode code.
@@ -114,7 +117,7 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const HairlineDivider(),
+        const _SectionRule(),
         const SizedBox(height: AppSpace.md),
         _WeekHeader(
           report: report,
@@ -168,11 +171,39 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
   }
 }
 
+// ─── Section rule ──────────────────────────────────────────────────────────
+
+/// The line that marks where the Weekly Report starts: 2pt, solid, pure
+/// black in Light mode and pure white in Dark mode — clearly stronger than
+/// the 1pt hairlines used inside cards, so it reads as a section break.
+class _SectionRule extends StatelessWidget {
+  const _SectionRule();
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return ExcludeSemantics(
+      child: Container(
+        height: 2,
+        decoration: BoxDecoration(
+          color: dark ? const Color(0xFFFFFFFF) : const Color(0xFF000000),
+          borderRadius: BorderRadius.circular(1),
+        ),
+      ),
+    );
+  }
+}
+
 // ─── Week header ───────────────────────────────────────────────────────────
 
-/// Eyebrow, the week at display size, and where it sits in the list — on the
-/// page itself, not in a card. Older / newer are quiet round buttons on the
-/// right; tapping the date opens the week list.
+/// The section's title card: the heading, the week under it, and where it
+/// sits in the list — on a teal gradient that follows the theme, with round older /
+/// newer buttons on the right. Tapping the date opens the week list.
+///
+/// The gradient is a fixed pair per brightness rather than a token: it is
+/// the one strongly coloured block in the section, and white text on it must
+/// hold contrast in both themes. Dark runs a darker petrol so it sits in the
+/// dark canvas instead of glowing on it.
 class _WeekHeader extends StatelessWidget {
   const _WeekHeader({
     required this.report,
@@ -190,9 +221,37 @@ class _WeekHeader extends StatelessWidget {
   final VoidCallback? onNewer;
   final VoidCallback? onPick;
 
+  // Teal-blue with a warm amber glow. Every other gradient on Home is a
+  // green (sentiment card, insight carousel, index art); this one sits at the
+  // cool teal end of the Ayre palette so the Weekly Report is unmistakable
+  // at a glance. It follows the theme: a soft, light wash with petrol text in
+  // Light mode; a deep petrol with white text in Dark mode.
+  static const List<Color> _lightGradient = [
+    Color(0xFFE4F3F5),
+    Color(0xFFC9E8EB),
+    Color(0xFFABDCDD),
+  ];
+  static const List<Color> _darkGradient = [
+    Color(0xFF061821),
+    Color(0xFF0A2C38),
+    Color(0xFF0E4850),
+  ];
+  static const Color _glow = Color(0xFFF2C46D);
+
+  // Ink on the light wash.
+  static const Color _lightHeading = Color(0xFF0B2E3D);
+  static const Color _lightDate = Color(0xFF0E6A70);
+  static const Color _lightCaption = Color(0xFF4A6B74);
+
+  // Ink on the dark gradient.
+  static const Color _darkHeading = Color(0xFFFFFFFF);
+  static const Color _darkDate = Color(0xFFA6EBCB);
+  static const Color _darkCaption = Color(0xFFBCD3D6);
+
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final range = formatWeekRange(report.weekStart, report.weekEnd);
     final spoken = _spokenWeekRange(report.weekStart, report.weekEnd);
     final multiple = total > 1;
@@ -202,17 +261,35 @@ class _WeekHeader extends StatelessWidget {
               ? 'Latest week · 1 of $total'
               : 'Earlier week · ${index + 1} of $total');
 
+    final headingColor = dark ? _darkHeading : _lightHeading;
+    final dateColor = dark ? _darkDate : _lightDate;
+    final captionColor = dark ? _darkCaption : _lightCaption;
+    // Arrow buttons and the faint ring take the heading's ink, so they work
+    // on both washes.
+    final arrowFill = headingColor.withValues(alpha: dark ? 0.16 : 0.09);
+
+    // Hierarchy, in order: the heading (what this is), the date (which
+    // week), the position caption (where it sits in the list).
     final titleBlock = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          'WEEKLY REPORT',
-          style: AppTypo.label(t, color: t.foregroundMuted),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Weekly Report',
+            maxLines: 1,
+            style: AppTypo.ui(
+              fontSize: 32,
+              fontWeight: FontWeight.w800,
+              color: headingColor,
+              height: 1.08,
+              letterSpacing: -1.0,
+            ),
+          ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 10),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -224,79 +301,154 @@ class _WeekHeader extends StatelessWidget {
                   range,
                   maxLines: 1,
                   style: AppTypo.ui(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w700,
-                    color: t.textPrimary,
-                    height: 1.1,
-                    letterSpacing: -0.8,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: dateColor,
+                    height: 1.2,
+                    letterSpacing: -0.1,
                   ),
                 ),
               ),
             ),
             if (multiple) ...[
               const SizedBox(width: 2),
-              Icon(
-                Icons.expand_more_rounded,
-                size: 22,
-                color: t.foregroundMuted,
-              ),
+              Icon(Icons.expand_more_rounded, size: 18, color: dateColor),
             ],
           ],
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         Text(
           sub,
-          style: AppTypo.hint(t, color: t.foregroundMuted),
+          style: AppTypo.hint(t, color: captionColor),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
       ],
     );
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Semantics(
-            header: true,
-            button: onPick != null,
-            label: 'Weekly report, $spoken. $sub.',
-            hint: onPick != null ? 'Opens a list of weeks' : null,
-            excludeSemantics: true,
-            child: onPick == null
-                ? titleBlock
-                : GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onPick,
-                    child: titleBlock,
-                  ),
+    return AyreCard(
+      padding: EdgeInsets.zero,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: dark ? _darkGradient : _lightGradient,
           ),
         ),
-        if (multiple) ...[
-          const SizedBox(width: AppSpace.xs),
-          _WeekArrow(
-            glyph: AyreGlyph.back,
-            label: 'Older week',
-            onTap: onOlder,
-          ),
-          _WeekArrow(
-            glyph: AyreGlyph.forward,
-            label: 'Newer week',
-            onTap: onNewer,
-          ),
-        ],
-      ],
+        child: Stack(
+          children: [
+            // A warm amber glow in the top-right corner and one faint ring.
+            // Decorative only.
+            Positioned(
+              top: -90,
+              right: -70,
+              child: IgnorePointer(
+                child: ExcludeSemantics(
+                  child: Container(
+                    width: 260,
+                    height: 260,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          _glow.withValues(alpha: dark ? 0.20 : 0.50),
+                          _glow.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: -80,
+              right: -30,
+              child: _Disc(size: 170, color: headingColor.withValues(alpha: 0.05)),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpace.lg,
+                AppSpace.lg,
+                AppSpace.sm,
+                AppSpace.lg,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Semantics(
+                      header: true,
+                      button: onPick != null,
+                      label: 'Weekly report, $spoken. $sub.',
+                      hint: onPick != null ? 'Opens a list of weeks' : null,
+                      excludeSemantics: true,
+                      child: onPick == null
+                          ? titleBlock
+                          : GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: onPick,
+                              child: titleBlock,
+                            ),
+                    ),
+                  ),
+                  if (multiple) ...[
+                    const SizedBox(width: AppSpace.xs),
+                    _WeekArrow(
+                      glyph: AyreGlyph.back,
+                      label: 'Older week',
+                      onTap: onOlder,
+                      fill: arrowFill,
+                      ink: headingColor,
+                    ),
+                    _WeekArrow(
+                      glyph: AyreGlyph.forward,
+                      label: 'Newer week',
+                      onTap: onNewer,
+                      fill: arrowFill,
+                      ink: headingColor,
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-/// A 44pt tap target holding a 34pt recessed circle and a chevron. The
+class _Disc extends StatelessWidget {
+  const _Disc({required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: ExcludeSemantics(
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+        ),
+      ),
+    );
+  }
+}
+
+/// A 44pt tap target holding a 34pt tinted circle and a chevron, coloured
+/// from the header's ink so it reads on both the light and dark wash. The
 /// disabled end fades rather than disappears, so the pair never shifts.
 class _WeekArrow extends StatelessWidget {
   const _WeekArrow({
     required this.glyph,
     required this.label,
     required this.onTap,
+    required this.fill,
+    required this.ink,
   });
 
   static const double size = 44;
@@ -304,10 +456,11 @@ class _WeekArrow extends StatelessWidget {
   final AyreGlyph glyph;
   final String label;
   final VoidCallback? onTap;
+  final Color fill;
+  final Color ink;
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
     final enabled = onTap != null;
     return Semantics(
       button: true,
@@ -322,20 +475,13 @@ class _WeekArrow extends StatelessWidget {
           borderRadius: size / 2,
           scale: 0.9,
           child: Center(
-            child: Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: t.surfaceSunken,
-                border: Border.all(color: t.hairline),
-              ),
-              child: Center(
-                child: AyreIcon(
-                  glyph,
-                  size: 16,
-                  color: enabled ? t.textPrimary : t.textDisabled,
-                ),
+            child: Opacity(
+              opacity: enabled ? 1 : 0.4,
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: fill),
+                child: Center(child: AyreIcon(glyph, size: 16, color: ink)),
               ),
             ),
           ),
@@ -469,7 +615,6 @@ class _StockCard extends StatelessWidget {
     final t = context.tokens;
     final hit = stock.targetHit;
     final tone = hit ? t.positive : t.negative;
-    final toneSoft = hit ? t.positiveSoft : t.negativeSoft;
     final outcomeLabel = hit ? 'Target hit' : 'Stop-loss hit';
 
     final recDate = stock.dateOfRecommendation ?? fallbackStart;
@@ -529,26 +674,16 @@ class _StockCard extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 6),
-              _OutcomeChip(label: outcomeLabel, tone: tone, soft: toneSoft),
+              _OutcomeChip(label: outcomeLabel, tone: tone),
             ],
           ),
         ),
         const SizedBox(width: AppSpace.sm),
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpace.sm,
-            vertical: 10,
-          ),
-          decoration: BoxDecoration(
-            color: toneSoft,
-            borderRadius: BorderRadius.circular(AppRadius.iconTile),
-          ),
-          child: Figure.static(
-            formatDelta(stock.profitPct),
-            fontSize: 19,
-            fontWeight: FontWeight.w700,
-            color: tone,
-          ),
+        Figure.static(
+          formatDelta(stock.profitPct),
+          fontSize: 21,
+          fontWeight: FontWeight.w700,
+          color: tone,
         ),
       ],
     );
@@ -582,11 +717,12 @@ class _StockCard extends StatelessWidget {
         padding: EdgeInsets.zero,
         child: Stack(
           children: [
-            // The Ayre hills, bleeding off the card's top-right corner.
+            // A small, faint touch of the Ayre hills in the corner — kept
+            // quiet so the header above is the one place the section is loud.
             const Positioned(
               top: 0,
               right: 0,
-              child: AyreHills(width: 190, height: 120),
+              child: AyreHills(width: 110, height: 70),
             ),
             Padding(
               padding: const EdgeInsets.all(AppSpace.md),
@@ -604,8 +740,9 @@ class _StockCard extends StatelessWidget {
                     ),
                   ],
                   if (pnl != null) ...[
-                    const SizedBox(height: AppSpace.xs),
-                    _ProfitTile(value: pnl, tone: tone, soft: toneSoft),
+                    const SizedBox(height: AppSpace.sm),
+                    const HairlineDivider(),
+                    _ProfitRow(value: pnl, tone: tone),
                   ],
                 ],
               ),
@@ -617,50 +754,38 @@ class _StockCard extends StatelessWidget {
   }
 }
 
-/// `● Target hit` — a small tinted chip; the outcome in words.
+/// `● Target hit` — a dot and the outcome in words, no fill.
 class _OutcomeChip extends StatelessWidget {
-  const _OutcomeChip({
-    required this.label,
-    required this.tone,
-    required this.soft,
-  });
+  const _OutcomeChip({required this.label, required this.tone});
 
   final String label;
   final Color tone;
-  final Color soft;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: soft,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              label,
-              style: AppTypo.ui(
-                fontSize: AppTextScale.hint,
-                fontWeight: FontWeight.w600,
-                color: t.textPrimary,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Flexible(
+          child: Text(
+            label,
+            style: AppTypo.ui(
+              fontSize: AppTextScale.hint,
+              fontWeight: FontWeight.w600,
+              color: t.foregroundMuted,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
@@ -718,50 +843,36 @@ class _PriceTile extends StatelessWidget {
   }
 }
 
-/// PROFIT / SHARE as one slim line — label left, value right — so it
-/// supports the return above rather than competing with it.
-class _ProfitTile extends StatelessWidget {
-  const _ProfitTile({
-    required this.value,
-    required this.tone,
-    required this.soft,
-  });
+/// PROFIT / SHARE as one slim line — label left, value right, no fill —
+/// under a hairline, so it supports the return above rather than competing.
+class _ProfitRow extends StatelessWidget {
+  const _ProfitRow({required this.value, required this.tone});
 
   final num value;
   final Color tone;
-  final Color soft;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: soft,
-        borderRadius: BorderRadius.circular(AppRadius.inset + 2),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpace.sm,
-          vertical: AppSpace.sm,
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                'PROFIT / SHARE',
-                style: AppTypo.label(t, fontSize: 10.5),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpace.sm),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'PROFIT / SHARE',
+              style: AppTypo.label(t, fontSize: 10.5),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            Figure.static(
-              _formatSignedRupees(value),
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: tone,
-            ),
-          ],
-        ),
+          ),
+          Figure.static(
+            _formatSignedRupees(value),
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            color: tone,
+          ),
+        ],
       ),
     );
   }
