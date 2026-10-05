@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../services/api_service.dart';
+import '../services/account_session.dart';
+import '../services/auth_service.dart';
 import '../services/market_data_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
@@ -14,7 +15,6 @@ import '../widgets/figure.dart';
 import 'edit_profile_screen.dart';
 import 'faq_screen.dart';
 import 'home_shell.dart' show initialsFor;
-import 'login_screen.dart';
 import 'notifications_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'research_analyst_screen.dart';
@@ -42,26 +42,16 @@ class ProfileTab extends StatefulWidget {
 }
 
 class _ProfileTabState extends State<ProfileTab> {
-  String? _handle;
-  String? _sessionName;
-  String? _tier;
   bool _signingOut = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadIdentity();
+  /// The account email, shown where the old username was.
+  String? get _handle {
+    final email = AuthService.instance.currentUser?.email;
+    return (email == null || email.isEmpty) ? null : email;
   }
 
-  Future<void> _loadIdentity() async {
-    final session = await ApiService.getSession();
-    if (!mounted || session == null) return;
-    setState(() {
-      _handle = session['username']?.toString();
-      _sessionName = session['display_name']?.toString();
-      _tier = session['tier']?.toString() ?? session['plan']?.toString();
-    });
-  }
+  String? get _sessionName => AuthService.instance.currentUser?.displayName;
+  String? get _tier => null;
 
   /// The shell resolves the saved name over the session's, so what it hands down
   /// wins; the session value only covers the moment before it has one.
@@ -98,12 +88,11 @@ class _ProfileTabState extends State<ProfileTab> {
 
     HapticFeedback.heavyImpact();
     setState(() => _signingOut = true);
-    await ApiService.logout();
+    // The startup gate returns to Sign in by itself once the account signs
+    // out, and clears the navigation stack.
+    await AccountSession.signOut();
     if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
-      terminalRoute(builder: (_) => const LoginScreen()),
-      (route) => false,
-    );
+    setState(() => _signingOut = false);
   }
 
   @override
@@ -160,7 +149,7 @@ class _ProfileTabState extends State<ProfileTab> {
                 ),
                 SettingRow(
                   glyph: AyreGlyph.account,
-                  title: 'Username',
+                  title: 'Email',
                   subtitle: 'Identifies the account and cannot be changed here',
                   trailing: Text(
                     _handle ?? '—',
@@ -434,7 +423,7 @@ class _IdentityBlock extends StatelessWidget {
                   const SizedBox(height: AppSpace.xxs),
                   if (handle != null && handle!.isNotEmpty)
                     Text(
-                      '@$handle',
+                      handle!,
                       style: AppTypo.caption(t),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -553,7 +542,7 @@ class _SignOutSheet extends StatelessWidget {
           Text('Sign out?', style: AppTypo.sectionTitle(t)),
           const SizedBox(height: AppSpace.sm),
           Text(
-            'You will need your username and password to sign back in on this '
+            'You will need your email and password to sign back in on this '
             'device.',
             style: AppTypo.body(t),
           ),

@@ -187,7 +187,7 @@ class StatePanel extends StatelessWidget {
   const StatePanel.sessionExpired({
     super.key,
     this.headline = 'Session expired',
-    this.message = "Your session's expired — sign in again to continue.",
+    this.message = 'Your session ended. Sign in again to continue.',
     this.glyph,
     this.compact = false,
     this.onRetry,

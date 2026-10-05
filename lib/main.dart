@@ -6,28 +6,17 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_shell.dart';
 import 'screens/login_screen.dart';
 import 'screens/splash_screen.dart';
+import 'services/account_session.dart';
 import 'services/api_service.dart';
 import 'services/app_lifecycle.dart';
+import 'services/auth_service.dart';
 import 'services/push_service.dart';
 import 'services/reachability.dart';
 import 'services/settings_store.dart';
 import 'theme/app_theme.dart';
 import 'widgets/ayre_components.dart';
+import 'widgets/ayre_icons.dart';
 import 'widgets/state_views.dart';
-
-/// The single switch for the client-side sign-in gate.
-///
-/// `false` (current): startup skips `ApiService.loadSavedCookie()` /
-/// `getSession()` and goes straight to `HomeShell`. Set to `true` to restore
-/// the login gate; nothing else needs to change — `LoginScreen`,
-/// `ApiService.login/logout/getSession` and `SessionExpiredScreen` are all
-/// still wired.
-///
-/// This flag only controls the app. The backend enforces sign-in on its own
-/// (`_require_authentication`, an `@app.before_request` hook in the scanner's
-/// `main.py`), so while that hook is active, unauthenticated `/api/*` calls
-/// still return 401 and the app routes to `SessionExpiredScreen`.
-const bool kEnableAuthStartupGate = false;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -51,18 +40,15 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
   // only ever reached by an explicit user choice now.
   ThemeMode _themeMode = ThemeMode.dark;
   bool _splashComplete = false;
-  bool _sessionExpired = false;
+  AuthPhase? _lastPhase;
 
   @override
   void initState() {
     super.initState();
     _bootstrap();
-    // A session dying mid-use routes to a calm re-auth prompt rather than
-    // leaving the user on a screen that will never load.
-    ApiService.onSessionExpired = () {
-      if (!mounted || _sessionExpired) return;
-      setState(() => _sessionExpired = true);
-    };
+    // Sign-in, sign-out and a session ended elsewhere all arrive here; the
+    // gate below swaps screens by itself, so nothing pushes a login by hand.
+    AuthService.instance.phase.addListener(_onAuthPhase);
     // Scoped to its own ChangeNotifier rather than this widget's setState —
     // see ReachabilityStore's doc for why a root-level setState here was a
     // problem.
@@ -71,20 +57,43 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
 
   @override
   void dispose() {
-    ApiService.onSessionExpired = null;
+    AuthService.instance.phase.removeListener(_onAuthPhase);
     ApiService.onReachabilityChanged = null;
     super.dispose();
   }
 
+  void _onAuthPhase() {
+    final phase = AuthService.instance.phase.value;
+    final previous = _lastPhase;
+    _lastPhase = phase;
+    if (phase == previous) return;
+
+    // Anything pushed over the gate (Register, Forgot password, Profile
+    // sub-pages) must not outlive the state change.
+    if (phase == AuthPhase.signedIn || phase == AuthPhase.signedOut) {
+      PushService.instance.navigatorKey.currentState?.popUntil(
+        (route) => route.isFirst,
+      );
+    }
+    if (phase == AuthPhase.signedOut && previous == AuthPhase.signedIn) {
+      unawaited(AccountSession.clearLocalData());
+    }
+  }
+
   Future<void> _bootstrap() async {
+    // Firebase and the auth state come first: the first screen decision
+    // depends on them. Push init follows, once someone could be signed in.
+    final authReady = AuthService.instance.init();
     await Future.wait([
       _loadThemeMode(),
       SettingsStore.instance.load(),
       NotificationLog.instance.load(),
+      ApiService.purgeLegacyCookie(),
     ]);
-    // After settings are loaded (push reads them) and deliberately not awaited
-    // into the UI path: the permission prompt and token fetch must never hold
-    // up first paint. Failures are contained inside PushService.
+    await authReady;
+    // Deliberately not awaited into the UI path: the permission prompt and
+    // token fetch must never hold up first paint. Failures are contained
+    // inside PushService.
     unawaited(PushService.instance.init());
   }
 
@@ -184,14 +193,10 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
             },
           );
         },
-        home: _sessionExpired
-            ? SessionExpiredScreen(
-                onSignIn: () => setState(() => _sessionExpired = false),
-              )
-            : _StartupGate(
-                onSplashComplete: _onSplashComplete,
-                splashComplete: _splashComplete,
-              ),
+        home: _StartupGate(
+          onSplashComplete: _onSplashComplete,
+          splashComplete: _splashComplete,
+        ),
       ),
     );
   }
@@ -223,12 +228,12 @@ class AppThemeController extends InheritedWidget {
   }
 }
 
-/// Shown when an authenticated call is rejected. Deliberately calm and plain: no
-/// status code, no crash, one clear action.
-class SessionExpiredScreen extends StatelessWidget {
-  const SessionExpiredScreen({super.key, required this.onSignIn});
+/// Blocking screen shown when sign-in cannot start (for example Firebase is not
+/// configured in this build). The app is never entered unauthenticated.
+class AuthUnavailableScreen extends StatelessWidget {
+  const AuthUnavailableScreen({super.key, required this.onRetry});
 
-  final VoidCallback onSignIn;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -244,19 +249,13 @@ class SessionExpiredScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Phase 4: the headline, message, glyph and verb all come
-                // from the preset now — the literal 'Sign in' label this used
-                // to pass by hand is exactly the §14.5 drift the preset
-                // exists to stop ("Sign in again" is the verb for an expired
-                // session; "Sign in" is the verb for a login screen).
-                StatePanel.sessionExpired(
-                  onRetry: () {
-                    onSignIn();
-                    Navigator.of(context).pushAndRemoveUntil(
-                      terminalRoute(builder: (_) => const LoginScreen()),
-                      (route) => false,
-                    );
-                  },
+                StatePanel.failed(
+                  headline: 'Sign-in unavailable',
+                  message:
+                      "We couldn't start sign-in. Check your connection and "
+                      'try again.',
+                  glyph: AyreGlyph.lock,
+                  onRetry: onRetry,
                 ),
               ],
             ),
@@ -267,8 +266,10 @@ class SessionExpiredScreen extends StatelessWidget {
   }
 }
 
-/// Runs the splash, then checks for a session.
-class _StartupGate extends StatefulWidget {
+/// Runs the splash, then shows whichever screen the auth state calls for:
+/// initialising → splash, unavailable → blocking error, signed out → sign in,
+/// signed in → the app. A cached signed-in user enters the app even offline.
+class _StartupGate extends StatelessWidget {
   const _StartupGate({
     required this.onSplashComplete,
     required this.splashComplete,
@@ -278,48 +279,24 @@ class _StartupGate extends StatefulWidget {
   final bool splashComplete;
 
   @override
-  State<_StartupGate> createState() => _StartupGateState();
-}
-
-class _StartupGateState extends State<_StartupGate> {
-  bool _checking = true;
-  bool _loggedIn = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _check();
-  }
-
-  Future<void> _check() async {
-    if (!widget.splashComplete) {
-      await Future<void>.delayed(const Duration(milliseconds: 200));
-      if (!mounted) return;
-    }
-
-    if (!kEnableAuthStartupGate) {
-      if (!mounted) return;
-      setState(() {
-        _loggedIn = true;
-        _checking = false;
-      });
-      return;
-    }
-
-    await ApiService.loadSavedCookie();
-    final session = await ApiService.getSession();
-    if (!mounted) return;
-    setState(() {
-      _loggedIn = session != null;
-      _checking = false;
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_checking || !widget.splashComplete) {
-      return AyreSplashScreen(onFinished: widget.onSplashComplete);
-    }
-    return _loggedIn ? HomeShell() : const LoginScreen();
+    return ValueListenableBuilder<AuthPhase>(
+      valueListenable: AuthService.instance.phase,
+      builder: (context, phase, _) {
+        if (!splashComplete) {
+          return AyreSplashScreen(onFinished: onSplashComplete);
+        }
+        return switch (phase) {
+          AuthPhase.initializing => AyreSplashScreen(
+            onFinished: onSplashComplete,
+          ),
+          AuthPhase.unavailable => AuthUnavailableScreen(
+            onRetry: () => unawaited(AuthService.instance.init()),
+          ),
+          AuthPhase.signedOut => const LoginScreen(),
+          AuthPhase.signedIn => HomeShell(),
+        };
+      },
+    );
   }
 }

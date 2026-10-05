@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 
 import '../main.dart' show AppThemeController;
-import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
@@ -184,7 +184,6 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _load({bool initial = false}) async {
-    final session = await ApiService.getSession();
     final board = await widget.marketData.getIndexBoard();
     final breadth = await widget.marketData.getSentiment(monthly: false);
     final fullBreadth = await widget.marketData.getFullBreadth();
@@ -192,10 +191,7 @@ class _HomeTabState extends State<HomeTab> {
     final weekly = await widget.marketData.getWeeklyReports();
     if (!mounted) return;
 
-    final name =
-        session?['display_name']?.toString() ??
-        session?['username']?.toString() ??
-        '';
+    final name = AuthService.instance.currentUser?.shownName ?? '';
 
     setState(() {
       _accountName = name;

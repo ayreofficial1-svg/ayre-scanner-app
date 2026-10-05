@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
 
 import 'api_service.dart';
 import 'fault_injection.dart';
@@ -628,7 +627,7 @@ class RemoteMarketDataService implements MarketDataService {
   static bool _isTransientStatus(int code) =>
       code == 502 || code == 503 || code == 504;
 
-  /// Every HTTP concern lives here: the session cookie, the timeout, retries,
+  /// Every HTTP concern lives here: the bearer token, the timeout, retries,
   /// and the mapping from transport outcomes onto [DataFailure].
   ///
   /// Transient failures (socket/DNS errors while the network comes back after
@@ -640,12 +639,18 @@ class RemoteMarketDataService implements MarketDataService {
     for (var attempt = 0; attempt < _maxAttempts; attempt++) {
       if (attempt > 0) await Future<void>.delayed(_retryDelays[attempt - 1]);
       try {
-        final response = await http
-            .get(Uri.parse('$baseUrl$path'), headers: ApiService.authHeaders())
-            .timeout(timeout);
-        if (response.statusCode == 401 || response.statusCode == 403) {
-          ApiService.notifySessionExpired();
+        final response = await ApiService.authedGet(
+          Uri.parse('$baseUrl$path'),
+          timeout: timeout,
+        );
+        // ApiService has already refreshed the token once and, if the server
+        // still refuses it, returned the user to Sign in.
+        if (response.statusCode == 401) {
           throw const DataFailure.session();
+        }
+        // 403 means "not allowed here", never "signed out".
+        if (response.statusCode == 403) {
+          throw const DataFailure.api(statusCode: 403);
         }
         if (_isTransientStatus(response.statusCode)) {
           lastFailure = DataFailure.api(statusCode: response.statusCode);

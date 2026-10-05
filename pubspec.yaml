@@ -17,6 +17,9 @@ dependencies:
   # Push notifications (FCM). See lib/services/push_service.dart.
   firebase_core: ^4.13.0
   firebase_messaging: ^16.4.3
+  # Account sign-in (email + password). Only lib/services/auth_service.dart
+  # talks to this package.
+  firebase_auth: ^6.1.0
   # Opens the required attribution link for the free "Ticker Logos by
   # AllInvestView" service the bundled assets/logos/ images were sourced
   # from (see lib/screens/settings_screen.dart).

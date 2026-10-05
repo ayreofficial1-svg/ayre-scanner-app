@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
@@ -9,6 +8,8 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'api_service.dart';
 import 'app_lifecycle.dart';
+import 'auth_service.dart';
+import 'firebase_bootstrap.dart';
 import 'notification_copy.dart';
 import 'settings_store.dart';
 
@@ -104,11 +105,11 @@ class PushService extends ChangeNotifier {
       return;
     }
 
-    try {
-      await Firebase.initializeApp();
-    } catch (e) {
+    // Firebase is normally already initialised by authentication at startup;
+    // this is idempotent.
+    if (!await FirebaseBootstrap.ensureInitialised()) {
       // No Firebase config in this build. Push stays off; nothing else cares.
-      debugPrint('Push disabled — Firebase is not configured: $e');
+      debugPrint('Push disabled — Firebase is not configured.');
       return;
     }
 
@@ -130,9 +131,31 @@ class PushService extends ChangeNotifier {
     final initial = await messaging.getInitialMessage();
     if (initial != null) _onMessageOpened(initial);
 
-    if (SettingsStore.instance.pushEnabled) {
-      await _enable();
+    // Push registration only happens while someone is signed in.
+    AuthService.instance.phase.addListener(_onAuthChanged);
+    _onAuthChanged();
+  }
+
+  bool get _signedIn => AuthService.instance.phase.value == AuthPhase.signedIn;
+
+  void _onAuthChanged() {
+    if (!_signedIn) return;
+    // A different account may now own this device: register again.
+    _lastSynced = null;
+    if (SettingsStore.instance.pushEnabled && !_permissionChecked) {
+      unawaited(_enable());
+    } else {
+      unawaited(_sync());
     }
+  }
+
+  /// Best-effort removal of this device's token, called just before sign out
+  /// (while the sign-in is still valid).
+  Future<void> unregisterForSignOut() async {
+    final token = _token;
+    if (!_available || token == null) return;
+    final ok = await ApiService.unregisterDevice(token);
+    if (ok) _lastSynced = 'off|$token';
   }
 
   // ── Registration ─────────────────────────────────────────────────────────
@@ -160,6 +183,7 @@ class PushService extends ChangeNotifier {
   }
 
   void _onSettingsChanged() {
+    if (!_signedIn) return;
     final settings = SettingsStore.instance;
     if (settings.pushEnabled && !_permissionChecked) {
       unawaited(_enable());
@@ -168,14 +192,16 @@ class PushService extends ChangeNotifier {
     }
   }
 
-  void _onResumed() => unawaited(_sync());
+  void _onResumed() {
+    if (_signedIn) unawaited(_sync());
+  }
 
   /// Brings the backend's record of this device in line with Settings. Cheap
   /// to call repeatedly: it does nothing unless something actually changed
   /// since the last successful sync.
   Future<void> _sync() async {
     final token = _token;
-    if (!_available || token == null) return;
+    if (!_available || token == null || !_signedIn) return;
 
     final settings = SettingsStore.instance;
     final wantPush = settings.pushEnabled && !_denied;

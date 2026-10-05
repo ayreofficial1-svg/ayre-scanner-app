@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../main.dart';
-import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../services/push_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
@@ -26,23 +26,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  Map<String, dynamic>? _session;
-  bool _loadingSession = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSession();
-  }
-
-  Future<void> _loadSession() async {
-    final session = await ApiService.getSession();
-    if (!mounted) return;
-    setState(() {
-      _session = session;
-      _loadingSession = false;
-    });
-  }
+  AuthUser? get _user => AuthService.instance.currentUser;
 
   @override
   Widget build(BuildContext context) {
@@ -166,29 +150,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   SettingRow(
                     glyph: AyreGlyph.account,
                     title: 'Signed in as',
-                    subtitle: _loadingSession
-                        ? 'Checking your session.'
-                        : 'The identity the scanner uses',
-                    trailing: _loadingSession
-                        ? const SkeletonBlock(width: 72, height: 11)
-                        : Text(
-                            _session?['username']?.toString() ??
-                                'Not signed in',
-                            style: AppTypo.bodyStrong(
-                              t,
-                              color: t.foregroundMuted,
-                            ),
-                          ),
+                    subtitle: 'The email your account uses',
+                    trailing: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 170),
+                      child: Text(
+                        _user?.email ?? 'Not signed in',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: AppTypo.bodyStrong(t, color: t.foregroundMuted),
+                      ),
+                    ),
                   ),
                   SettingRow(
                     glyph: AyreGlyph.lock,
                     title: 'Session',
-                    subtitle: _session == null
+                    subtitle: _user == null
                         ? 'No active session found.'
                         : 'Active on this device.',
                     trailing: AyreChip(
-                      label: _session == null ? 'Inactive' : 'Active',
-                      tone: _session == null
+                      label: _user == null ? 'Inactive' : 'Active',
+                      tone: _user == null
                           ? ChipTone.neutral
                           : ChipTone.brand,
                     ),

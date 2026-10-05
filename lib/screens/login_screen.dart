@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../services/api_service.dart';
+import '../services/auth_service.dart';
+import '../services/auth_validators.dart';
 import '../theme/app_theme.dart';
+import '../widgets/auth_widgets.dart';
 import '../widgets/ayre_components.dart';
-import '../widgets/ayre_icons.dart';
 import '../widgets/ayre_logo.dart';
-import 'home_shell.dart';
+import 'forgot_password_screen.dart';
+import 'register_screen.dart';
 
+/// Email + password sign in. Success needs no navigation: the startup gate
+/// listens to the auth state and swaps to the app.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -16,7 +20,7 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _username = TextEditingController();
+  final _email = TextEditingController();
   final _password = TextEditingController();
   bool _loading = false;
   bool _submitted = false;
@@ -24,144 +28,124 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _username.dispose();
+    _email.dispose();
     _password.dispose();
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
-    // Phase 6C: every other primary confirming action in the app (Edit
-    // Profile's save, Support's copy) hits haptic on submit; Login's submit
-    // was the one gap. Medium weight to match Edit Profile's save, not the
-    // heavy weight reserved for destructive/session actions.
+  Future<void> _signIn() async {
     HapticFeedback.mediumImpact();
     FocusScope.of(context).unfocus();
+    AuthService.instance.clearNotice();
     setState(() {
-      _loading = true;
       _submitted = true;
       _error = null;
     });
-
-    final success = await ApiService.login(
-      _username.text.trim(),
-      _password.text,
-    );
-    if (!mounted) return;
-    setState(() => _loading = false);
-
-    if (success) {
-      await Navigator.of(
-        context,
-      ).pushReplacement(terminalRoute(builder: (_) => HomeShell()));
-    } else {
-      setState(() => _error = 'Invalid username or password');
+    if (AuthValidators.email(_email.text) != null || _password.text.isEmpty) {
+      return;
+    }
+    setState(() => _loading = true);
+    try {
+      await AuthService.instance.signIn(
+        email: _email.text,
+        password: _password.text,
+      );
+      TextInput.finishAutofillContext();
+    } on AuthFailure catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = e.message;
+      });
     }
   }
 
+  void _open(Widget screen) {
+    AuthService.instance.clearNotice();
+    Navigator.of(context).push(terminalRoute(builder: (_) => screen));
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final missingUser = _submitted && _username.text.trim().isEmpty;
-    final missingPass = _submitted && _password.text.isEmpty;
+    final emailError = _submitted ? AuthValidators.email(_email.text) : null;
+    final passError = _submitted && _password.text.isEmpty
+        ? 'Enter your password'
+        : null;
 
-    return Scaffold(
-      backgroundColor: t.background,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpace.xl),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 380),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // A secondary placement: the mark heads the form once, and is
-                  // not repeated anywhere else in the flow.
-                  const Center(child: LogoMark(placement: LogoPlacement.auth)),
-                  const SizedBox(height: AppSpace.md),
-                  Text('Sign in', style: AppTypo.pageTitle(t)),
-                  const SizedBox(height: AppSpace.xxs),
-                  Text(
-                    'Continue to your market terminal.',
-                    style: AppTypo.body(t),
-                  ),
-                  const SizedBox(height: AppSpace.xxl),
-                  const SectionLabel(label: 'Username'),
-                  TextField(
-                    controller: _username,
-                    textInputAction: TextInputAction.next,
-                    autocorrect: false,
-                    style: AppTypo.bodyStrong(t),
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      hintText: 'Your username',
-                      errorText: missingUser ? 'Enter your username' : null,
-                    ),
-                  ),
-                  const SizedBox(height: AppSpace.lg),
-                  const SectionLabel(label: 'Password'),
-                  TextField(
-                    controller: _password,
-                    obscureText: true,
-                    textInputAction: TextInputAction.done,
-                    style: AppTypo.bodyStrong(t),
-                    onChanged: (_) => setState(() {}),
-                    onSubmitted: (_) => _handleLogin(),
-                    decoration: InputDecoration(
-                      hintText: 'Your password',
-                      errorText: missingPass ? 'Enter your password' : null,
-                    ),
-                  ),
-                  if (_error != null) ...[
-                    const SizedBox(height: AppSpace.lg),
-                    _LoginError(message: _error!),
-                  ],
-                  const SizedBox(height: AppSpace.xl),
-                  AyreButton(
-                    label: 'Sign in',
-                    busy: _loading,
-                    onPressed: _loading ? null : _handleLogin,
-                  ),
-                ],
+    return AuthScaffold(
+      children: [
+        const Center(child: LogoMark(placement: LogoPlacement.auth)),
+        const SizedBox(height: AppSpace.md),
+        Text('Sign in', style: AppTypo.pageTitle(t)),
+        const SizedBox(height: AppSpace.xxs),
+        Text('Continue to your market terminal.', style: AppTypo.body(t)),
+        const SizedBox(height: AppSpace.xl),
+        ValueListenableBuilder<String?>(
+          valueListenable: AuthService.instance.notice,
+          builder: (context, notice, _) => notice == null
+              ? const SizedBox.shrink()
+              : Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpace.lg),
+                  child: AuthMessage(message: notice),
+                ),
+        ),
+        AutofillGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AuthField(
+                label: 'Email',
+                controller: _email,
+                hint: 'you@example.com',
+                keyboardType: TextInputType.emailAddress,
+                autofillHints: const [AutofillHints.email],
+                errorText: emailError,
+                enabled: !_loading,
+                onChanged: (_) => setState(() {}),
               ),
-            ),
+              const SizedBox(height: AppSpace.lg),
+              AuthField(
+                label: 'Password',
+                controller: _password,
+                hint: 'Your password',
+                password: true,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.password],
+                errorText: passError,
+                enabled: !_loading,
+                onChanged: (_) => setState(() {}),
+                onSubmitted: (_) => _signIn(),
+              ),
+            ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _LoginError extends StatelessWidget {
-  const _LoginError({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Container(
-      padding: const EdgeInsets.all(AppSpace.md),
-      // Ink-toned, not rose (state_views.dart / §14 convention, Phase 4):
-      // an auth failure is the app rejecting a credential, not a market
-      // move, so it doesn't borrow the negative/loss colour.
-      decoration: BoxDecoration(
-        color: t.surfaceRaised,
-        border: Border.all(color: t.hairline),
-        borderRadius: BorderRadius.circular(AppRadius.card),
-      ),
-      child: Row(
-        children: [
-          AyreIcon(AyreGlyph.disconnected, size: 15, color: t.foregroundMuted),
-          const SizedBox(width: AppSpace.sm),
-          Expanded(
-            child: Text(
-              message,
-              style: AppTypo.bodyStrong(t, color: t.textPrimary),
-            ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: _loading
+                ? null
+                : () => _open(ForgotPasswordScreen(initialEmail: _email.text)),
+            child: const Text('Forgot password?'),
           ),
+        ),
+        if (_error != null) ...[
+          const SizedBox(height: AppSpace.xs),
+          AuthMessage(message: _error!),
         ],
-      ),
+        const SizedBox(height: AppSpace.lg),
+        AyreButton(
+          label: 'Sign in',
+          busy: _loading,
+          onPressed: _loading ? null : _signIn,
+        ),
+        const SizedBox(height: AppSpace.md),
+        AyreButton(
+          label: 'Create account',
+          kind: AyreButtonKind.outline,
+          onPressed: _loading ? null : () => _open(const RegisterScreen()),
+        ),
+      ],
     );
   }
 }

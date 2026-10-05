@@ -10,7 +10,7 @@ import '../widgets/ayre_icons.dart';
 /// until a field actually changes.
 ///
 /// Only the display name is editable: the backend exposes session identity but no
-/// profile-update endpoint, so the name is stored on the device and the username
+/// profile-update endpoint, so the name is stored on the device and the email
 /// is read-only rather than a field that would silently fail to save.
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({
@@ -113,7 +113,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ),
             if (widget.handle != null && widget.handle!.isNotEmpty) ...[
               const SizedBox(height: AppSpace.xl),
-              const SectionLabel(label: 'Sign-in username'),
+              const SectionLabel(label: 'Sign-in email'),
               AyreCard(
                 // Sunken, not raised: this reads as a locked, inactive
                 // field, so it takes the same tonal fill a disabled text
@@ -140,7 +140,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               ),
               const SizedBox(height: AppSpace.sm),
               Text(
-                'Your username identifies the account and cannot be changed here.',
+                'Your email identifies the account and cannot be changed here.',
                 style: AppTypo.caption(t),
               ),
             ],

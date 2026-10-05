@@ -4,7 +4,9 @@ import 'package:ayre_scanner/screens/equity_detail_screen.dart';
 import 'package:ayre_scanner/screens/home_shell.dart';
 import 'package:ayre_scanner/screens/index_detail_screen.dart';
 import 'package:ayre_scanner/screens/lesson_screen.dart';
+import 'package:ayre_scanner/screens/forgot_password_screen.dart';
 import 'package:ayre_scanner/screens/login_screen.dart';
+import 'package:ayre_scanner/screens/register_screen.dart';
 import 'package:ayre_scanner/screens/notifications_screen.dart';
 import 'package:ayre_scanner/screens/settings_screen.dart';
 import 'package:ayre_scanner/screens/support_screen.dart';
@@ -177,10 +179,9 @@ void main() {
     sweep('NotificationsScreen', () => const NotificationsScreen());
     sweep('SupportScreen', () => const SupportScreen());
     sweep('LoginScreen', () => const LoginScreen());
-    sweep(
-      'SessionExpired',
-      () => SessionExpiredScreen(onSignIn: () {}),
-    );
+    sweep('RegisterScreen', () => const RegisterScreen());
+    sweep('ForgotPasswordScreen', () => const ForgotPasswordScreen());
+    sweep('AuthUnavailable', () => AuthUnavailableScreen(onRetry: () {}));
     sweep(
       'EditProfileScreen',
       () => const EditProfileScreen(
