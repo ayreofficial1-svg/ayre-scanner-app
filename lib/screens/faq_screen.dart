@@ -1,44 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../legal/legal_content.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
 
-/// One question/answer pair.
-class FaqEntry {
-  const FaqEntry({required this.question, required this.answer});
-
-  final String question;
-  final String answer;
-}
-
-/// Placeholder only — the app's real FAQ content has not been supplied yet.
-/// This list is the one place to drop the final questions and answers in;
-/// nothing here is an invented question standing in for a real one. The
-/// screen renders however many entries this list holds, so adding the real
-/// set later needs no other change.
-const List<FaqEntry> kFaqEntries = [
-  FaqEntry(
-    question: 'Question to be added.',
-    answer: 'Answer to be added.',
-  ),
-  FaqEntry(
-    question: 'Question to be added.',
-    answer: 'Answer to be added.',
-  ),
-  FaqEntry(
-    question: 'Question to be added.',
-    answer: 'Answer to be added.',
-  ),
-];
-
-/// Phase 5 — a `SupportScreen`-style destination for the Profile tab's new
-/// "Legal" section. There is no existing expansion-tile pattern anywhere in
-/// this codebase (checked `ayre_components.dart`), so this screen brings its
-/// own small expand/collapse row rather than a plain wall of text, since an
-/// FAQ reads naturally as a list of questions the reader opens one at a
-/// time. See [kFaqEntries] for the placeholder content awaiting the real
-/// questions and answers.
+/// FAQ. Questions and answers live in `lib/legal/legal_content.dart`
+/// ([kLegalFaqs]); this screen only lays them out as expandable rows.
 class FaqScreen extends StatelessWidget {
   const FaqScreen({super.key});
 
@@ -71,7 +39,7 @@ class FaqScreen extends StatelessWidget {
             const SizedBox(height: AppSpace.xl),
             RowGroup(
               children: [
-                for (final entry in kFaqEntries) _FaqTile(entry: entry),
+                for (final entry in kLegalFaqs) _FaqTile(entry: entry),
               ],
             ),
           ],
@@ -81,14 +49,11 @@ class FaqScreen extends StatelessWidget {
   }
 }
 
-/// One expandable question. Tapping the row reveals its answer beneath it;
-/// tapping again closes it. Built from a plain [StatefulWidget] rather than
-/// a Material `ExpansionTile` so it keeps this screen's rows on the same
-/// `RowGroup`/hairline grammar every other list in the app already uses.
+/// One expandable question; tapping reveals or hides the answer.
 class _FaqTile extends StatefulWidget {
   const _FaqTile({required this.entry});
 
-  final FaqEntry entry;
+  final LegalFaq entry;
 
   @override
   State<_FaqTile> createState() => _FaqTileState();

@@ -16,10 +16,12 @@ import '../widgets/figure.dart';
 import '../widgets/verification_banner.dart' show resendVerification, checkVerification;
 import 'edit_profile_screen.dart';
 import 'faq_screen.dart';
+import 'grievance_screen.dart';
 import 'home_shell.dart' show initialsFor;
 import 'notifications_screen.dart';
 import 'privacy_policy_screen.dart';
 import 'research_analyst_screen.dart';
+import 'risk_disclosure_screen.dart';
 import 'settings_screen.dart';
 import 'support_screen.dart' show SupportScreen, kAppVersion, kAppBuild;
 import 'terms_screen.dart';
@@ -331,9 +333,46 @@ class _ProfileTabState extends State<ProfileTab> {
                   },
                 ),
                 SettingRow(
+                  glyph: AyreGlyph.alerts,
+                  title: 'Risk Disclosure',
+                  subtitle: 'The risks of investing in securities',
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).push(
+                      terminalRoute(
+                        builder: (_) => const RiskDisclosureScreen(),
+                      ),
+                    );
+                  },
+                ),
+                SettingRow(
+                  glyph: AyreGlyph.about,
+                  title: 'Most Important Terms and Conditions',
+                  subtitle: 'MITC for research analyst services',
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(
+                      context,
+                    ).push(terminalRoute(builder: (_) => const MitcScreen()));
+                  },
+                ),
+                SettingRow(
+                  glyph: AyreGlyph.check,
+                  title: 'Investor Charter',
+                  subtitle: 'Your rights and the Research Analyst’s duties',
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).push(
+                      terminalRoute(
+                        builder: (_) => const InvestorCharterScreen(),
+                      ),
+                    );
+                  },
+                ),
+                SettingRow(
                   glyph: AyreGlyph.account,
                   title: 'Research Analyst information',
-                  subtitle: 'Registration number and disclaimer',
+                  subtitle: 'Registration, disclosures and disclaimer',
                   onTap: () {
                     HapticFeedback.selectionClick();
                     Navigator.of(context).push(
@@ -342,6 +381,17 @@ class _ProfileTabState extends State<ProfileTab> {
                           marketData: widget.marketData,
                         ),
                       ),
+                    );
+                  },
+                ),
+                SettingRow(
+                  glyph: AyreGlyph.support,
+                  title: 'Grievance redressal',
+                  subtitle: 'How to make a complaint',
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).push(
+                      terminalRoute(builder: (_) => const GrievanceScreen()),
                     );
                   },
                 ),

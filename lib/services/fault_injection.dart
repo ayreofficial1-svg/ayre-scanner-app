@@ -27,7 +27,8 @@ enum FaultKind {
   /// A timestamp older than the freshness threshold.
   staleData,
 
-  /// Expired or invalid session on an authenticated call.
+  /// The signed-in account's token was rejected (401 after one refresh). The
+  /// app returns to Sign in through the auth state, not through a screen.
   sessionExpired,
 }
 
@@ -192,8 +193,9 @@ class DataFailure implements Exception {
   final int? statusCode;
   final String? message;
 
-  /// A session failure is the one case that changes what the app does rather
-  /// than only what it shows.
+  /// A session failure (app token rejected after one refresh) is the one case
+  /// that changes what the app does rather than only what it shows: the app
+  /// returns to the Signed out state. A 403 is never a session failure.
   bool get requiresReauth => reason == DataFailureReason.session;
 
   @override
