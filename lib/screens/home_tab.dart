@@ -23,6 +23,7 @@ import '../widgets/responsive.dart';
 import '../widgets/state_views.dart';
 import '../widgets/ticker_trace.dart';
 import 'home_shell.dart' show initialsFor;
+import 'equity_detail_screen.dart';
 import 'index_detail_screen.dart';
 import 'insight_note_screen.dart';
 import 'notifications_screen.dart';
@@ -300,7 +301,8 @@ class _HomeTabState extends State<HomeTab> {
 
   /// The Weekly Report section, directly below the index board — an
   /// admin-entered, hand-verified record of one past week's outcomes (§A.3).
-  /// Moved here from the Signals tab in Phase 2, unchanged in visual form.
+  /// Moved here from the Signals tab in Phase 2; redesigned in Phase 7 as
+  /// one card per week with compact stock rows and a week switcher.
   /// Loads and fails independently of the index board above it
   /// (`_weeklyResult`), and renders nothing at all when there's simply no
   /// report yet, per §A.8 ("render nothing or a minimal state rather than a
@@ -329,21 +331,20 @@ class _HomeTabState extends State<HomeTab> {
     }
 
     final reports = weekly.value;
-    final report = (reports != null && reports.isNotEmpty)
-        ? reports.first
-        : null;
-    if (report == null) return const [];
+    if (reports == null || reports.isEmpty) return const [];
 
+    // The card carries its own week header (date range with year, older/
+    // newer arrows, week picker), so the section label no longer needs a
+    // date-range subtitle — it would go stale the moment the user moved to
+    // another week. Every week the backend returns is handed over, not just
+    // the newest.
     return [
       const SizedBox(height: AppSpace.sectionGap),
+      const Entrance(index: 3, child: SectionLabel(label: 'Weekly Report')),
       Entrance(
-        index: 3,
-        child: SectionLabel(
-          label: 'Weekly Report',
-          subtitle: formatWeekRange(report.weekStart, report.weekEnd),
-        ),
+        index: 4,
+        child: WeeklyReportCard(reports: reports, onOpenStock: _openStock),
       ),
-      Entrance(index: 4, child: WeeklyReportCard(report: report)),
     ];
   }
 
@@ -353,6 +354,20 @@ class _HomeTabState extends State<HomeTab> {
     final notes = _notes;
     if (notes == null || notes.isFailed) return true;
     return notes.isReady && notes.value!.isNotEmpty;
+  }
+
+  /// A tapped Weekly Report row opens the same Equity Detail screen the
+  /// Signals tab opens for a pick.
+  void _openStock(WeeklyReportStock stock) {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(
+      terminalRoute(
+        builder: (_) => EquityDetailScreen(
+          symbol: stock.symbol,
+          marketData: widget.marketData,
+        ),
+      ),
+    );
   }
 
   void _openInsight(InsightNote note) {
