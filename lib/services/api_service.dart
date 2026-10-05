@@ -7,6 +7,21 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'auth_service.dart';
 
+/// The server's view of the signed-in account (`GET /api/app/me`).
+class AppMe {
+  const AppMe({
+    required this.uid,
+    required this.email,
+    required this.emailVerified,
+    required this.name,
+  });
+
+  final String uid;
+  final String email;
+  final bool emailVerified;
+  final String name;
+}
+
 /// Handles all calls to the Ayre Scanner backend.
 ///
 /// Authentication is a Firebase ID token sent as `Authorization: Bearer ...`.
@@ -43,6 +58,43 @@ class ApiService {
     for (final key in _contentCacheKeys) {
       await prefs.remove(key);
       await prefs.remove('${key}_saved_at');
+    }
+  }
+
+  /// True when the server has said a verified email is required
+  /// (`403 email_not_verified`). Off by default: enforcement is a backend
+  /// switch that is not enabled yet. A 403 never signs the user out.
+  static final ValueNotifier<bool> verificationRequired = ValueNotifier(false);
+
+  static void _noteForbidden(http.Response response) {
+    try {
+      final body = jsonDecode(response.body);
+      if (body is Map && body['code'] == 'email_not_verified') {
+        verificationRequired.value = true;
+      }
+    } catch (_) {
+      // Not JSON: an ordinary 403.
+    }
+  }
+
+  /// Asks the server who it thinks is signed in. Returns null if the call
+  /// fails for any reason; used as a cheap end-to-end check that token auth
+  /// works and that the server sees the latest verification status.
+  static Future<AppMe?> getAppMe() async {
+    try {
+      final response = await authedGet(Uri.parse('$baseUrl/api/app/me'));
+      if (response.statusCode != 200) return null;
+      final body = jsonDecode(response.body);
+      if (body is! Map<String, dynamic>) return null;
+      notifyReachable(true);
+      return AppMe(
+        uid: (body['uid'] ?? '').toString(),
+        email: (body['email'] ?? '').toString(),
+        emailVerified: body['email_verified'] == true,
+        name: (body['name'] ?? '').toString(),
+      );
+    } catch (_) {
+      return null;
     }
   }
 
@@ -91,6 +143,7 @@ class ApiService {
           );
         }
       }
+      if (response.statusCode == 403) _noteForbidden(response);
       return response;
     } on AuthFailure catch (e) {
       throw http.ClientException(e.message);

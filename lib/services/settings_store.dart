@@ -24,17 +24,11 @@ class SettingsStore extends ChangeNotifier {
   bool _inAppAlerts = true;
   bool _newSignalAlerts = true;
   bool _pushEnabled = true;
-  String? _displayNameOverride;
   AppTextSize _textSize = AppTextSize.standard;
 
   /// The user's chosen text size. Applied as a text scale over the whole app, so
   /// it affects Material's own widgets too, not just our typography tokens.
   AppTextSize get textSize => _textSize;
-
-  /// The name shown across the app. The backend exposes session identity but no
-  /// profile-update endpoint, so this is stored on the device — which is why
-  /// Edit Profile offers this field and nothing else.
-  String? get displayNameOverride => _displayNameOverride;
 
   /// The master gate on the in-app alerts list.
   bool get inAppAlerts => _inAppAlerts;
@@ -53,7 +47,10 @@ class SettingsStore extends ChangeNotifier {
     _inAppAlerts = prefs.getBool(_kInAppAlerts) ?? true;
     _newSignalAlerts = prefs.getBool(_kNewSignals) ?? true;
     _pushEnabled = prefs.getBool(_kPush) ?? true;
-    _displayNameOverride = prefs.getString(_kDisplayName);
+    // Retired in Phase 3: the name now lives on the account, not the device.
+    // Dropped rather than migrated, because it may belong to a previous
+    // account that used this phone.
+    if (prefs.containsKey(_kDisplayName)) await prefs.remove(_kDisplayName);
     final storedSize = prefs.getString(_kTextSize);
     _textSize = AppTextSize.values.firstWhere(
       (size) => size.name == storedSize,
@@ -70,20 +67,6 @@ class SettingsStore extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kTextSize, value.name);
-  }
-
-  Future<void> setDisplayName(String? value) async {
-    final trimmed = value?.trim();
-    _displayNameOverride = (trimmed == null || trimmed.isEmpty)
-        ? null
-        : trimmed;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    if (_displayNameOverride == null) {
-      await prefs.remove(_kDisplayName);
-    } else {
-      await prefs.setString(_kDisplayName, _displayNameOverride!);
-    }
   }
 
   Future<void> setInAppAlerts(bool value) =>
@@ -242,6 +225,16 @@ class NotificationLog extends ChangeNotifier {
     );
   }
 
+  /// Forgets every entry. Called when the account that owns them goes away.
+  Future<void> clear() async {
+    _entries = const [];
+    _lastSeen = null;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key);
+    await prefs.remove(_seenKey);
+  }
+
   Future<void> markAllSeen() async {
     if (_entries.isEmpty) return;
     _lastSeen = _entries.first.at;
@@ -257,6 +250,12 @@ class SeenSignalsStore {
   const SeenSignalsStore._();
 
   static const _key = 'seen_signal_symbols';
+
+  /// Forgets what was seen, so the next account starts from a fresh baseline.
+  static Future<void> clear() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_key);
+  }
 
   /// Returns the symbols in [symbols] that hadn't been seen before, and records
   /// all of them as seen.

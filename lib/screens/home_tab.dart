@@ -6,8 +6,8 @@ import '../main.dart' show AppThemeController;
 import '../services/auth_service.dart';
 import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
-import '../services/market_models.dart';
 import '../services/settings_store.dart';
+import '../services/market_models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_avatar.dart';
 import '../widgets/ayre_components.dart';
@@ -212,7 +212,7 @@ class _HomeTabState extends State<HomeTab> {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final displayName =
-        SettingsStore.instance.displayNameOverride ?? _accountName;
+        AuthService.instance.currentUser?.shownName ?? _accountName;
 
     return RefreshIndicator(
       color: t.accentInk,

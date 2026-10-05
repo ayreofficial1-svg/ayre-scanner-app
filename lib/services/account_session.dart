@@ -1,13 +1,19 @@
 import 'dart:async';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'api_service.dart';
 import 'auth_service.dart';
+import 'email_verification.dart';
 import 'push_service.dart';
 import 'settings_store.dart';
 
-/// Ties sign-out to the things that must happen around it.
+/// Ties sign-in and sign-out to the things that must happen around them, so one
+/// account's data never shows up under another.
 class AccountSession {
   const AccountSession._();
+
+  static const _ownerKey = 'data_owner_uid';
 
   /// User-initiated sign out. Order matters: the device's push token is removed
   /// from the backend first (it needs a still-valid sign-in), then the account
@@ -24,10 +30,26 @@ class AccountSession {
     await AuthService.instance.signOut();
   }
 
-  /// Removes data that belongs to the previous account. Device preferences
-  /// (theme, text size) are kept.
+  /// Called whenever someone is signed in. If the data on this device was left
+  /// by a different account — or by no known account, such as an older build,
+  /// or a sign-out that was cut short — it is cleared before use.
+  static Future<void> onSignedIn(String uid) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getString(_ownerKey) != uid) {
+      await clearLocalData();
+    }
+    await prefs.setString(_ownerKey, uid);
+  }
+
+  /// Removes data that belongs to the previous account: cached content, the
+  /// alert log, the seen-signals list and verification state. Device
+  /// preferences (theme, text size, alert switches) are kept.
   static Future<void> clearLocalData() async {
-    await SettingsStore.instance.setDisplayName(null);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_ownerKey);
     await ApiService.clearContentCaches();
+    await NotificationLog.instance.clear();
+    await SeenSignalsStore.clear();
+    EmailVerificationService.instance.reset();
   }
 }

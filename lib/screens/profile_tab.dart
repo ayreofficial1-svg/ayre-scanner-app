@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../services/account_session.dart';
 import '../services/auth_service.dart';
+import '../services/email_verification.dart';
 import '../services/market_data_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
@@ -12,6 +13,7 @@ import '../widgets/ayre_hills.dart';
 import '../widgets/ayre_icons.dart';
 import '../widgets/ayre_stat_tile.dart';
 import '../widgets/figure.dart';
+import '../widgets/verification_banner.dart' show resendVerification, checkVerification;
 import 'edit_profile_screen.dart';
 import 'faq_screen.dart';
 import 'home_shell.dart' show initialsFor;
@@ -139,24 +141,76 @@ class _ProfileTabState extends State<ProfileTab> {
           Entrance(index: 2, child: const SectionLabel(label: 'Account')),
           Entrance(
             index: 2,
-            child: RowGroup(
-              children: [
-                SettingRow(
-                  glyph: AyreGlyph.edit,
-                  title: 'Edit profile',
-                  subtitle: 'Change the name shown across the app',
-                  onTap: _editProfile,
-                ),
-                SettingRow(
-                  glyph: AyreGlyph.account,
-                  title: 'Email',
-                  subtitle: 'Identifies the account and cannot be changed here',
-                  trailing: Text(
-                    _handle ?? '—',
-                    style: AppTypo.bodyStrong(t, color: t.foregroundMuted),
-                  ),
-                ),
-              ],
+            child: ListenableBuilder(
+              listenable: Listenable.merge([
+                AuthService.instance.user,
+                EmailVerificationService.instance,
+              ]),
+              builder: (context, _) {
+                final user = AuthService.instance.currentUser;
+                final verified = user?.emailVerified ?? false;
+                final verification = EmailVerificationService.instance;
+                return RowGroup(
+                  children: [
+                    SettingRow(
+                      glyph: AyreGlyph.edit,
+                      title: 'Edit profile',
+                      subtitle: 'Change the name shown across the app',
+                      onTap: _editProfile,
+                    ),
+                    SettingRow(
+                      glyph: AyreGlyph.account,
+                      title: 'Email',
+                      subtitle: 'Identifies the account and cannot be changed here',
+                      trailing: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 170),
+                        child: Text(
+                          _handle ?? '—',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypo.bodyStrong(t, color: t.foregroundMuted),
+                        ),
+                      ),
+                    ),
+                    if (user != null)
+                      SettingRow(
+                        glyph: AyreGlyph.check,
+                        title: 'Email verification',
+                        subtitle: verified
+                            ? 'Your email address is confirmed'
+                            : 'Not confirmed yet. Nothing is blocked meanwhile.',
+                        trailing: AyreChip(
+                          label: verified ? 'Verified' : 'Unverified',
+                          tone: verified ? ChipTone.brand : ChipTone.attention,
+                        ),
+                      ),
+                    if (user != null && !verified) ...[
+                      SettingRow(
+                        glyph: AyreGlyph.refresh,
+                        title: verification.cooldown > 0
+                            ? 'Resend in ${verification.cooldown}s'
+                            : 'Resend verification email',
+                        subtitle: 'Sends a new link to your inbox',
+                        enabled: verification.canResend,
+                        onTap: verification.canResend
+                            ? () => resendVerification(context)
+                            : null,
+                      ),
+                      SettingRow(
+                        glyph: AyreGlyph.check,
+                        title: verification.checking
+                            ? 'Checking…'
+                            : "I've verified my email",
+                        subtitle: 'Check again after opening the link',
+                        enabled: !verification.checking,
+                        onTap: verification.checking
+                            ? null
+                            : () => checkVerification(context),
+                      ),
+                    ],
+                  ],
+                );
+              },
             ),
           ),
 

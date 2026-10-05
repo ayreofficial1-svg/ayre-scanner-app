@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../services/settings_store.dart';
+import '../services/auth_service.dart';
+import '../services/auth_validators.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
@@ -9,9 +10,8 @@ import '../widgets/ayre_icons.dart';
 /// A pushed route, not a tab. Cancel on the left, Save on the right, disabled
 /// until a field actually changes.
 ///
-/// Only the display name is editable: the backend exposes session identity but no
-/// profile-update endpoint, so the name is stored on the device and the email
-/// is read-only rather than a field that would silently fail to save.
+/// Only the display name is editable. It is saved on the account itself, so it
+/// follows the person to a new phone or a reinstall. The email is read-only.
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({
     super.key,
@@ -30,6 +30,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _name;
   late final String _initial;
   bool _saving = false;
+  String? _saveError;
 
   @override
   void initState() {
@@ -46,11 +47,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   bool get _dirty => _name.text.trim() != _initial.trim();
-  bool get _valid => _name.text.trim().isNotEmpty;
+  String? get _problem => AuthValidators.name(_name.text);
+  bool get _valid => _problem == null;
 
   Future<void> _save() async {
-    setState(() => _saving = true);
-    await SettingsStore.instance.setDisplayName(_name.text);
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _saving = true;
+      _saveError = null;
+    });
+    try {
+      await AuthService.instance.updateDisplayName(_name.text);
+    } on AuthFailure catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _saveError = e.message;
+      });
+      return;
+    }
     if (!mounted) return;
     Navigator.of(context).pop(_name.text.trim());
   }
@@ -107,7 +122,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               style: AppTypo.bodyStrong(t),
               decoration: InputDecoration(
                 hintText: 'How the app should address you',
-                errorText: _dirty && !_valid ? 'Enter a name' : null,
+                errorText: _dirty && !_valid ? _problem : _saveError,
               ),
               onSubmitted: canSave ? (_) => _save() : null,
             ),

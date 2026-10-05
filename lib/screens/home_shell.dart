@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../services/auth_service.dart';
 import '../services/market_data_service.dart';
 import '../services/persistent_market_data_service.dart';
 import '../services/push_service.dart';
-import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_bottom_nav.dart';
 import '../widgets/responsive.dart';
+import '../widgets/verification_banner.dart';
 import 'home_tab.dart';
 import 'insights_tab.dart';
 import 'learn_tab.dart';
@@ -102,9 +103,9 @@ class _HomeShellState extends State<HomeShell> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: SettingsStore.instance,
+      listenable: AuthService.instance.user,
       builder: (context, _) {
-        final name = SettingsStore.instance.displayNameOverride ?? _accountName;
+        final name = AuthService.instance.currentUser?.shownName ?? _accountName;
         return _build(context, name);
       },
     );
@@ -171,10 +172,16 @@ class _HomeShellState extends State<HomeShell> {
           ? Row(
               children: [
                 AyreNavRail(selectedIndex: _index, onSelected: _select),
-                Expanded(child: _TabFade(index: _index, child: tabs)),
+                Expanded(
+                  child: VerificationBannerHost(
+                    child: _TabFade(index: _index, child: tabs),
+                  ),
+                ),
               ],
             )
-          : _TabFade(index: _index, child: tabs),
+          : VerificationBannerHost(
+              child: _TabFade(index: _index, child: tabs),
+            ),
       // Always visible: no scroll listener, no idle timer, no collapsed
       // state. Only shown below the rail pivot — the rail is its own
       // permanent chrome and the two must never both be on screen.

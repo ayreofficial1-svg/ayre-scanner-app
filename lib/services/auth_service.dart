@@ -23,6 +23,17 @@ class AuthUser {
   final String displayName;
   final bool emailVerified;
 
+  @override
+  bool operator ==(Object other) =>
+      other is AuthUser &&
+      other.uid == uid &&
+      other.email == email &&
+      other.displayName == displayName &&
+      other.emailVerified == emailVerified;
+
+  @override
+  int get hashCode => Object.hash(uid, email, displayName, emailVerified);
+
   /// A name to show: the account name, else the part of the email before '@'.
   String get shownName {
     if (displayName.trim().isNotEmpty) return displayName.trim();
@@ -68,6 +79,10 @@ abstract class AuthService {
   /// The signed-in account, or null.
   AuthUser? get currentUser;
 
+  /// The signed-in account as a listenable, so the name and verification
+  /// status update on screen the moment they change.
+  ValueListenable<AuthUser?> get user;
+
   /// Starts (or restarts, for Retry) the service.
   Future<void> init();
 
@@ -107,6 +122,8 @@ class FirebaseAuthService implements AuthService {
   );
   final ValueNotifier<String?> _notice = ValueNotifier(null);
 
+  final ValueNotifier<AuthUser?> _userNotifier = ValueNotifier(null);
+
   StreamSubscription<fb.User?>? _sub;
   bool _explicitSignOut = false;
   bool _holdPublish = false;
@@ -120,6 +137,14 @@ class FirebaseAuthService implements AuthService {
 
   fb.FirebaseAuth? get _auth =>
       FirebaseBootstrap.isInitialised ? fb.FirebaseAuth.instance : null;
+
+  @override
+  ValueListenable<AuthUser?> get user => _userNotifier;
+
+  void _publishUser() {
+    final u = _auth?.currentUser;
+    _userNotifier.value = u == null ? null : _map(u);
+  }
 
   @override
   AuthUser? get currentUser {
@@ -155,6 +180,7 @@ class FirebaseAuthService implements AuthService {
   void _onUser(fb.User? user) {
     final first = !_seenFirstEvent;
     _seenFirstEvent = true;
+    _userNotifier.value = user == null ? null : _map(user);
     if (_holdPublish) return;
 
     if (user != null) {
@@ -263,6 +289,7 @@ class FirebaseAuthService implements AuthService {
     try {
       await user.reload();
       await user.getIdToken(true);
+      _publishUser();
     } on fb.FirebaseAuthException catch (e) {
       throw _translate(e);
     }
@@ -275,6 +302,7 @@ class FirebaseAuthService implements AuthService {
     try {
       await user.updateDisplayName(name.trim());
       await user.reload();
+      _publishUser();
     } on fb.FirebaseAuthException catch (e) {
       throw _translate(e);
     }

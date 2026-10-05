@@ -10,6 +10,7 @@ import 'services/account_session.dart';
 import 'services/api_service.dart';
 import 'services/app_lifecycle.dart';
 import 'services/auth_service.dart';
+import 'services/email_verification.dart';
 import 'services/push_service.dart';
 import 'services/reachability.dart';
 import 'services/settings_store.dart';
@@ -78,11 +79,18 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
     if (phase == AuthPhase.signedOut && previous == AuthPhase.signedIn) {
       unawaited(AccountSession.clearLocalData());
     }
+    // Whenever someone signs in, make sure nothing left on this device by a
+    // different account (or a cut-short sign-out) is shown to them.
+    final uid = AuthService.instance.currentUser?.uid;
+    if (phase == AuthPhase.signedIn && uid != null) {
+      unawaited(AccountSession.onSignedIn(uid));
+    }
   }
 
   Future<void> _bootstrap() async {
     // Firebase and the auth state come first: the first screen decision
     // depends on them. Push init follows, once someone could be signed in.
+    EmailVerificationService.instance.init();
     final authReady = AuthService.instance.init();
     await Future.wait([
       _loadThemeMode(),
