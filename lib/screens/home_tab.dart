@@ -23,7 +23,6 @@ import '../widgets/responsive.dart';
 import '../widgets/state_views.dart';
 import '../widgets/ticker_trace.dart';
 import 'home_shell.dart' show initialsFor;
-import 'equity_detail_screen.dart';
 import 'index_detail_screen.dart';
 import 'insight_note_screen.dart';
 import 'notifications_screen.dart';
@@ -338,12 +337,13 @@ class _HomeTabState extends State<HomeTab> {
     // date-range subtitle — it would go stale the moment the user moved to
     // another week. Every week the backend returns is handed over, not just
     // the newest.
+    // Phase 9: the section draws its own header (separator, title, info
+    // button, one-line description), so no SectionLabel is placed above it.
     return [
       const SizedBox(height: AppSpace.sectionGap),
-      const Entrance(index: 3, child: SectionLabel(label: 'Weekly Report')),
       Entrance(
-        index: 4,
-        child: WeeklyReportCard(reports: reports, onOpenStock: _openStock),
+        index: 3,
+        child: WeeklyReportCard(reports: reports),
       ),
     ];
   }
@@ -354,20 +354,6 @@ class _HomeTabState extends State<HomeTab> {
     final notes = _notes;
     if (notes == null || notes.isFailed) return true;
     return notes.isReady && notes.value!.isNotEmpty;
-  }
-
-  /// A tapped Weekly Report row opens the same Equity Detail screen the
-  /// Signals tab opens for a pick.
-  void _openStock(WeeklyReportStock stock) {
-    HapticFeedback.selectionClick();
-    Navigator.of(context).push(
-      terminalRoute(
-        builder: (_) => EquityDetailScreen(
-          symbol: stock.symbol,
-          marketData: widget.marketData,
-        ),
-      ),
-    );
   }
 
   void _openInsight(InsightNote note) {
