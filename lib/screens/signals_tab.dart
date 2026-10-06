@@ -5,6 +5,7 @@ import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
 import '../services/notification_copy.dart';
+import '../services/push_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
@@ -59,6 +60,13 @@ class _SignalsTabState extends State<SignalsTab> {
     super.initState();
     if (widget.active) _load(initial: true);
     AppLifecycleService.instance.addListener(_onAppResumed);
+    PushService.instance.refreshSignalsRequests.addListener(_onRefreshRequested);
+  }
+
+  /// An entry-reached push arrived or was tapped: reload once, right away.
+  void _onRefreshRequested() {
+    if (!mounted) return;
+    _load(initial: true);
   }
 
   /// Fired once, shortly after the app returns to the foreground. Reloads
@@ -74,6 +82,8 @@ class _SignalsTabState extends State<SignalsTab> {
   @override
   void dispose() {
     AppLifecycleService.instance.removeListener(_onAppResumed);
+    PushService.instance.refreshSignalsRequests
+        .removeListener(_onRefreshRequested);
     super.dispose();
   }
 
@@ -418,7 +428,15 @@ class _FeaturedSignal extends StatelessWidget {
                 ],
               ),
             ),
-          ] else if (signal.addedOn != null) ...[
+          ],
+          if (signal.hasEntryReached) ...[
+            const SizedBox(height: AppSpace.sm),
+            _EntryReachedLine(signal: signal),
+          ],
+          if (!(signal.entry != null ||
+                  signal.exitPrice != null ||
+                  signal.stop != null) &&
+              signal.addedOn != null) ...[
             const SizedBox(height: AppSpace.sm),
             Text('ADDED ${signal.addedOn!.toUpperCase()}',
                 style: AppTypo.label(t)),
@@ -504,6 +522,15 @@ class _CompactSignalRow extends StatelessWidget {
                   if (signal.name != null && signal.name!.isNotEmpty)
                     Text(
                       signal.name!,
+                      style: AppTypo.hint(t),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  if (signal.hasEntryReached)
+                    Text(
+                      'Entry reached'
+                      '${_EntryReachedLine._clock(signal.entryReachedAt!) == null ? '' : ' at ${_EntryReachedLine._clock(signal.entryReachedAt!)}'}'
+                      '${signal.entryReachedExtended ? ' · past the level' : ''}',
                       style: AppTypo.hint(t),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
@@ -621,3 +648,45 @@ class _SignalsSkeleton extends StatelessWidget {
   }
 }
 
+/// "Entry reached at 10:46 AM · ₹2,850", plus a distinct label when the price
+/// had already moved past the level when it was noticed. Shown only for a pick
+/// whose entry-reached fact the team published. Informational, not advice.
+class _EntryReachedLine extends StatelessWidget {
+  const _EntryReachedLine({required this.signal});
+
+  final Signal signal;
+
+  /// Clock time in IST, whatever the phone's own zone is.
+  static String? _clock(String iso) {
+    final parsed = DateTime.tryParse(iso);
+    if (parsed == null) return null;
+    final ist = parsed.toUtc().add(const Duration(hours: 5, minutes: 30));
+    final h12 = ist.hour % 12 == 0 ? 12 : ist.hour % 12;
+    final mm = ist.minute.toString().padLeft(2, '0');
+    return '$h12:$mm ${ist.hour >= 12 ? 'PM' : 'AM'}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    final time = _clock(signal.entryReachedAt!);
+    final price = signal.entryReachedPrice;
+    final parts = <String>[
+      'Entry reached${time == null ? '' : ' at $time'}',
+      if (price != null) formatPrice(price),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(parts.join(' · '), style: AppTypo.body(t)),
+        if (signal.entryReachedExtended) ...[
+          const SizedBox(height: AppSpace.xxs),
+          Text(
+            'ALREADY PAST THE ENTRY LEVEL WHEN NOTICED',
+            style: AppTypo.label(t).copyWith(color: t.negative),
+          ),
+        ],
+      ],
+    );
+  }
+}

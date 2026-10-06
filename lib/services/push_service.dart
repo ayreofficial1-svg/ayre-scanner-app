@@ -26,6 +26,8 @@ import 'settings_store.dart';
 ///                        when Signals loads, so there is no duplicate entry.
 ///      - `signal_update` an already-announced pick that changed → tap opens
 ///                        the Signals tab and the change is added to Alerts.
+///      - `entry_reached` a published pick reached its entry level → tap
+///                        records it in Alerts and opens the Signals tab.
 ///      - `exit`          a call to exit a pick (`symbol`, `profit`,
 ///                        `exit_price`) → tap opens the Alerts screen, where
 ///                        the entry is added.
@@ -62,6 +64,10 @@ class PushService extends ChangeNotifier {
   /// Bumps when the user taps a notification that should land on the Alerts
   /// screen (exit calls). `HomeShell` listens and opens it.
   final ValueNotifier<int> openAlertsRequests = ValueNotifier<int>(0);
+
+  /// Bumps when Signals should reload now (an entry-reached message arrived
+  /// or was tapped). `SignalsTab` listens. No timer; this is event-driven.
+  final ValueNotifier<int> refreshSignalsRequests = ValueNotifier<int>(0);
 
   bool _started = false;
   bool _available = false;
@@ -225,6 +231,7 @@ class PushService extends ChangeNotifier {
   static const _typeSignal = 'signal';
   static const _typeRevised = 'signal_update';
   static const _typeExit = 'exit';
+  static const _typeEntryReached = 'entry_reached';
 
   /// Turns a push into an Alerts entry. The wording the backend put in the
   /// notification is used as-is, so the list matches what the phone showed;
@@ -247,6 +254,16 @@ class PushService extends ChangeNotifier {
           kind: type == _typeSignal ? NoticeKind.signal : NoticeKind.revised,
           title: title.isNotEmpty ? title : fallback.title,
           body: body.isNotEmpty ? body : fallback.body,
+          at: DateTime.now(),
+        );
+
+      case _typeEntryReached:
+        if (symbol.isEmpty && title.isEmpty) return null;
+        final copy = symbol.isEmpty ? null : NotificationCopy.entryReached(symbol);
+        return Notice(
+          kind: NoticeKind.entryReached,
+          title: title.isNotEmpty ? title : copy!.title,
+          body: body.isNotEmpty ? body : (copy?.body ?? ''),
           at: DateTime.now(),
         );
 
@@ -290,8 +307,9 @@ class PushService extends ChangeNotifier {
 
     final settings = SettingsStore.instance;
     if (!settings.pushEnabled) return;
-    final isSignalKind =
-        notice.kind == NoticeKind.signal || notice.kind == NoticeKind.revised;
+    final isSignalKind = notice.kind == NoticeKind.signal ||
+        notice.kind == NoticeKind.revised ||
+        notice.kind == NoticeKind.entryReached;
     if (isSignalKind && !settings.newSignalAlerts) return;
 
     await NotificationLog.instance.add(notice);
@@ -301,6 +319,10 @@ class PushService extends ChangeNotifier {
       await SeenSignalsStore.markSeen([
         (message.data['symbol'] ?? '').toString().trim().toUpperCase(),
       ]);
+    }
+    if (notice.kind == NoticeKind.entryReached) {
+      // The published fact is on the Signals card; load it now.
+      refreshSignalsRequests.value++;
     }
     _showBanner(notice);
   }
@@ -316,7 +338,21 @@ class PushService extends ChangeNotifier {
         // entry is recorded here, from the tap.
         _recordFromTap(message);
         _requestOpenSignals();
+      case _typeEntryReached:
+        // Signals can't tell this from a pick it already knows, so the entry
+        // is recorded here, from the tap.
+        _recordFromTap(message);
+        refreshSignalsRequests.value++;
+        _requestOpenSignals();
       case _typeExit:
+        _recordFromTap(message);
+        _requestOpenAlerts();
+      default:
+        // A custom message (`general`, or any type this build doesn't know)
+        // tapped from the background or a closed app: record it and show it
+        // in Alerts, the same as an exit call.
+        final notice = _noticeFrom(message);
+        if (notice == null) return;
         _recordFromTap(message);
         _requestOpenAlerts();
     }
@@ -349,7 +385,9 @@ class PushService extends ChangeNotifier {
     final tokens = context?.tokens;
 
     final VoidCallback? onView = switch (notice.kind) {
-      NoticeKind.signal || NoticeKind.revised => _requestOpenSignals,
+      NoticeKind.signal ||
+      NoticeKind.revised ||
+      NoticeKind.entryReached => _requestOpenSignals,
       NoticeKind.exit => _requestOpenAlerts,
       NoticeKind.general => null,
     };

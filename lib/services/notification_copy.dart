@@ -36,6 +36,12 @@ class NotificationCopy {
     ('Pick Updated', 'Open Signals for the change.'),
   ];
 
+  static const _entryReached = <(String, String)>[
+    ('Level Reached', 'has reached its entry level.'),
+    ('Entry Level Reached', 'touched its entry level.'),
+    ('Entry Update', 'reached its entry level.'),
+  ];
+
   static const _exitProfit = <String>[
     'Book Profit',
     'Exit Signal',
@@ -56,6 +62,16 @@ class NotificationCopy {
   /// An already-announced pick that has changed.
   static ({String title, String body}) revisedSignal(String stock) =>
       _fromPairs('revised', _revised, stock);
+
+  /// A published pick reached its entry level. Informational only.
+  static ({String title, String body}) entryReached(String stock) {
+    final (heading, line) =
+        _entryReached[_pick('entry-reached', _entryReached.length)];
+    return (
+      title: '$heading: $stock',
+      body: '$stock $line Open Signals for details.',
+    );
+  }
 
   /// An exit call: `Book Profit: RELIANCE` / `Profit ₹120 | Exit ₹2,850`.
   static ({String title, String body}) exitSignal({

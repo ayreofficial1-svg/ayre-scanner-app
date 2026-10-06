@@ -89,6 +89,7 @@ class _NoticeCard extends StatelessWidget {
     final (glyph, tone) = switch (notice.kind) {
       NoticeKind.signal => (AyreGlyph.alerts, t.accentInk),
       NoticeKind.revised => (AyreGlyph.refresh, t.accentInk),
+      NoticeKind.entryReached => (AyreGlyph.trendUp, t.accentInk),
       NoticeKind.exit => (AyreGlyph.trendDown, t.accentInk),
       NoticeKind.general => (AyreGlyph.bell, t.accentInk),
     };

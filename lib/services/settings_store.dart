@@ -104,11 +104,12 @@ enum AppTextSize {
 
 /// [signal] is a new scanner pick; [revised] is a pick that was already
 /// announced and has since changed; [exit] is a call to exit a pick;
-/// [general] is a custom message the team sent to everyone's phone.
+/// [general] is a custom message the team sent to everyone's phone;
+/// [entryReached] says a published pick has reached its entry level.
 ///
 /// New kinds are only ever appended: entries are stored by name, so older
 /// saved entries keep loading.
-enum NoticeKind { signal, general, revised, exit }
+enum NoticeKind { signal, general, revised, exit, entryReached }
 
 /// One entry in the alerts list.
 class Notice {
@@ -199,6 +200,7 @@ class NotificationLog extends ChangeNotifier {
     return switch (kind) {
       NoticeKind.signal => settings.newSignalAlerts,
       NoticeKind.revised => settings.newSignalAlerts,
+      NoticeKind.entryReached => settings.newSignalAlerts,
       NoticeKind.exit => true,
       NoticeKind.general => true,
     };

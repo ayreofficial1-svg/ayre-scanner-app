@@ -442,6 +442,9 @@ class Signal {
     this.exitPrice,
     this.stop,
     this.addedOn,
+    this.entryReachedAt,
+    this.entryReachedPrice,
+    this.entryReachedExtended = false,
   });
 
   final String symbol;
@@ -457,6 +460,17 @@ class Signal {
   final num? exitPrice;
   final num? stop;
   final String? addedOn;
+
+  /// "Entry reached" facts. Present only after the team published them for
+  /// this pick; absent (null / false) for every other signal and for older
+  /// backend responses. [entryReachedAt] is an ISO time (IST offset).
+  final String? entryReachedAt;
+  final num? entryReachedPrice;
+
+  /// The price had already moved past the entry level when it was noticed.
+  final bool entryReachedExtended;
+
+  bool get hasEntryReached => entryReachedAt != null;
 
   /// Purely a price-move indicator (percent change >= 0), used only to tint
   /// the up/down glyph next to the move — the backend has no separate
@@ -481,6 +495,9 @@ class Signal {
       exitPrice: _num(json, const ['exit_price', 'exitPrice']),
       stop: _num(json, const ['stop_loss', 'stoploss', 'stop']),
       addedOn: _str(json, const ['date_added', 'added_on', 'created_at']),
+      entryReachedAt: _str(json, const ['entry_reached_at']),
+      entryReachedPrice: _num(json, const ['entry_reached_price']),
+      entryReachedExtended: json['entry_reached_extended'] == true,
     );
   }
 
@@ -495,6 +512,9 @@ class Signal {
     if (exitPrice != null) 'exit_price': exitPrice,
     if (stop != null) 'stop_loss': stop,
     if (addedOn != null) 'date_added': addedOn,
+    if (entryReachedAt != null) 'entry_reached_at': entryReachedAt,
+    if (entryReachedPrice != null) 'entry_reached_price': entryReachedPrice,
+    if (entryReachedExtended) 'entry_reached_extended': true,
   };
 }
 
