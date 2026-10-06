@@ -247,8 +247,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-/// The font-size control, with a live preview above the picker so the effect is
-/// visible before committing rather than only after.
+/// The font-size control: just the three size options.
 class _TextSizeCard extends StatelessWidget {
   const _TextSizeCard({required this.value, required this.onChanged});
 
@@ -265,11 +264,6 @@ class _TextSizeCard extends StatelessWidget {
         children: [
           Text('TEXT SIZE', style: AppTypo.label(t)),
           const SizedBox(height: AppSpace.sm),
-          // The preview renders at the *selected* scale specifically, rather
-          // than inheriting the app scale, so it still previews correctly at the
-          // moment of choosing.
-          _Preview(scale: value.scale),
-          const SizedBox(height: AppSpace.md),
           // Three-up "big tappable tile" selector (redesign plan §2.4 /
           // Phase 6 step 4): each tile shows "Aa" at its own scale plus a
           // checkmark on the selected tile, replacing the thinner segmented
@@ -281,58 +275,6 @@ class _TextSizeCard extends StatelessWidget {
             style: AppTypo.caption(t),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _Preview extends StatelessWidget {
-  const _Preview({required this.scale});
-
-  final double scale;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: t.surfaceRaised,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: t.hairline),
-      ),
-      // A fixed scale for the sample, so the card demonstrates the choice rather
-      // than reflecting whatever is already applied.
-      child: MediaQuery.withNoTextScaling(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpace.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'NIFTY 50',
-                style: AppTypo.label(t).copyWith(fontSize: 10 * scale),
-              ),
-              const SizedBox(height: AppSpace.xxs),
-              Text(
-                '24,518.40',
-                style: AppTypo.num(
-                  fontSize: AppTextScale.cardTitle * scale,
-                  fontWeight: FontWeight.w600,
-                  color: t.textPrimary,
-                ),
-              ),
-              const SizedBox(height: AppSpace.xxs),
-              Text(
-                'Breadth is constructive across large-cap financials.',
-                style: AppTypo.body(
-                  t,
-                ).copyWith(fontSize: AppTextScale.body * scale),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -526,8 +468,7 @@ class _TileGlyph extends StatelessWidget {
 }
 
 /// Text-size tile's sample — "Aa" rendered at the size's own scale so the
-/// tile previews the choice, same idea as `_Preview` above but compact
-/// enough to sit inside a tile.
+/// tile previews that option, compact enough to sit inside a tile.
 class _TileAa extends StatelessWidget {
   const _TileAa({required this.scale, required this.selected});
 

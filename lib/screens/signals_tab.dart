@@ -9,29 +9,23 @@ import '../services/push_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
-import '../widgets/ayre_icons.dart';
 import '../widgets/ayre_instrument_tile.dart';
 import '../widgets/figure.dart';
-import '../widgets/pressable_scale.dart';
 import '../widgets/responsive.dart';
 import '../widgets/state_views.dart';
 import 'equity_detail_screen.dart';
 
 /// Signals — the signal board (Spec §13.2).
 ///
-/// One view of every admin-curated stock pick the backend has published: a
-/// featured pick card and a compact list of the rest, in exactly the order
-/// `GET /api/signals` returns them. There are deliberately no filters — no
-/// All / Bullish / Bearish switch, and no per-card Bullish/Bearish tag either
-/// — an admin pick has no long/short direction of its own; that concept
+/// One view of every admin-curated stock pick the backend has published. All
+/// picks sit together under a single "Signals" heading and are drawn with the
+/// same card, so no stock outranks another: there is no featured pick and no
+/// "also on watch" tier. However many stocks are published (2, 5, 10 …) they
+/// all appear in one section with identical visual weight, in exactly the
+/// order `GET /api/signals` returns them. There are deliberately no filters —
+/// no All / Bullish / Bearish switch, and no per-card Bullish/Bearish tag
+/// either — an admin pick has no long/short direction of its own; that concept
 /// lives only in the separate market-sentiment system on Home.
-///
-/// v3 rendered every signal as an identical mid-weight card, which meant the
-/// board had no shape — twelve equally loud things and no way in. §13.2's
-/// featured-plus-list structure gives the highest-conviction pick the
-/// accent-edged card (§8.4) and drops the rest to compact hairline-divided
-/// rows inside one card, so the screen reads as "here's the one, here are the
-/// others" rather than as a wall.
 class SignalsTab extends StatefulWidget {
   const SignalsTab({super.key, required this.marketData, this.active = true});
 
@@ -211,38 +205,29 @@ class _SignalsTabState extends State<SignalsTab> {
       ];
     }
 
-    // The backend already returns signals in its own display order (pinned,
-    // then display_order, then most-recently-updated — see
-    // `data/app_signals.py::_sort_key`), so the first entry is the featured
-    // one; Flutter doesn't re-rank by anything invented client-side.
+    // The backend returns every published signal in one neutral order, so
+    // Flutter shows them all the same way and doesn't re-rank anything.
     final signals = _result!.value!;
-    final featured = signals.first;
-    final rest = signals.skip(1).toList();
 
     return [
+      const Entrance(index: 1, child: SectionLabel(label: 'Signals')),
       Entrance(
-        index: 1,
-        child: _FeaturedSignal(
-          signal: featured,
-          onTap: () => _openEquity(featured),
+        index: 2,
+        child: _SignalList(
+          columns: columns,
+          signals: signals,
+          onTap: _openEquity,
         ),
       ),
-      if (rest.isNotEmpty) ...[
-        const SizedBox(height: AppSpace.sectionGap),
-        const Entrance(index: 2, child: SectionLabel(label: 'Also on watch')),
-        Entrance(index: 3, child: _AlsoOnWatch(columns: columns, signals: rest, onTap: _openEquity)),
-      ],
     ];
   }
-
 }
 
-/// The "also on watch" list, single-column below [AppBreakpoints.twoColumn]
-/// (the hairline-divided `RowGroup` §13.2 specifies) and a card grid at or
-/// above it (Phase 2A) — the same column-count pattern `learn_tab.dart`
-/// already applies to its course list, replicated rather than reinvented.
-class _AlsoOnWatch extends StatelessWidget {
-  const _AlsoOnWatch({
+/// Every published signal, one identical card each. Single column below
+/// [AppBreakpoints.twoColumn]; a multi-column grid at or above it — the same
+/// column-count pattern `learn_tab.dart` applies to its course list.
+class _SignalList extends StatelessWidget {
+  const _SignalList({
     required this.columns,
     required this.signals,
     required this.onTap,
@@ -254,49 +239,56 @@ class _AlsoOnWatch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (columns == 1) {
-      // `RowGroup` *is* the card — it wraps its rows in one `AyreCard` with
-      // hairline dividers between them (§8.3). Wrapping it in another card
-      // would nest cards, which §19 forbids outright.
-      return RowGroup(
+    if (columns <= 1) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          for (final signal in signals)
-            _CompactSignalRow(signal: signal, onTap: () => onTap(signal)),
+          for (var i = 0; i < signals.length; i++) ...[
+            if (i > 0) const SizedBox(height: AppSpace.cardGap),
+            _SignalCard(signal: signals[i], onTap: () => onTap(signals[i])),
+          ],
         ],
       );
     }
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      itemCount: signals.length,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: columns,
-        mainAxisSpacing: AppSpace.cardGap,
-        crossAxisSpacing: AppSpace.cardGap,
-        // Ratio-driven, not a fixed extent, so a large accessibility text
-        // scale grows the tile instead of overflowing it — same reasoning
-        // as `learn_tab.dart`'s course grid.
-        childAspectRatio: 3.6,
-      ),
-      itemBuilder: (context, index) => AyreCard(
-        padding: EdgeInsets.zero,
-        child: _CompactSignalRow(
-          signal: signals[index],
-          onTap: () => onTap(signals[index]),
+    // Cards carry variable content (rationale, levels), so rows size to their
+    // tallest card instead of using a fixed aspect ratio.
+    final rows = <Widget>[];
+    for (var start = 0; start < signals.length; start += columns) {
+      final end = (start + columns).clamp(0, signals.length);
+      final slice = signals.sublist(start, end);
+      if (rows.isNotEmpty) rows.add(const SizedBox(height: AppSpace.cardGap));
+      rows.add(
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < columns; i++) ...[
+                if (i > 0) const SizedBox(width: AppSpace.cardGap),
+                Expanded(
+                  child: i < slice.length
+                      ? _SignalCard(
+                          signal: slice[i],
+                          onTap: () => onTap(slice[i]),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: rows);
   }
 }
 
-// ─── Featured signal ───────────────────────────────────────────────────────
+// ─── Signal card ───────────────────────────────────────────────────────────
 
-/// The board's lead pick (§13.2). An accent-tinted border marks it featured
-/// (§8.4) — never a tinted fill behind it, which is the pattern v4 retired.
-class _FeaturedSignal extends StatelessWidget {
-  const _FeaturedSignal({required this.signal, required this.onTap});
+/// One published signal. Every signal uses this same card — no accent edge,
+/// no "featured" label — so all picks carry equal visual importance.
+class _SignalCard extends StatelessWidget {
+  const _SignalCard({required this.signal, required this.onTap});
 
   final Signal signal;
   final VoidCallback onTap;
@@ -317,13 +309,10 @@ class _FeaturedSignal extends StatelessWidget {
       button: true,
       child: AyreCard(
       onTap: onTap,
-      accentEdge: true,
       padding: const EdgeInsets.all(AppSpace.lg),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('FEATURED PICK', style: AppTypo.label(t, color: t.accentInk)),
-          const SizedBox(height: AppSpace.inCardGap),
           Row(
             // Top-aligned when there's a two-line symbol+name block, so it
             // starts level with the tile's top edge; centered for a bare
@@ -448,127 +437,6 @@ class _FeaturedSignal extends StatelessWidget {
   }
 }
 
-// ─── Compact list ──────────────────────────────────────────────────────────
-
-/// One row of the "also on watch" list (§13.2's compact signal list, §11.7's
-/// row convention). Deliberately thinner than the featured card: symbol,
-/// name, move. The rationale and the levels live one tap away, on Equity
-/// Detail.
-class _CompactSignalRow extends StatelessWidget {
-  const _CompactSignalRow({required this.signal, required this.onTap});
-
-  final Signal signal;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final tone = signal.bullish ? t.positive : t.negative;
-
-    // Phase 5: grouped announcement (symbol, direction, price, change) —
-    // same pattern as TickerRow.
-    final buf = StringBuffer(signal.symbol);
-    if (signal.name != null && signal.name!.isNotEmpty) {
-      buf.write(', ${signal.name}');
-    }
-    buf.write(', ${signal.bullish ? 'bullish' : 'bearish'}');
-    if (signal.lastPrice != null) {
-      buf.write(', ${formatPrice(signal.lastPrice)}');
-    }
-    if (signal.percentChange != null) {
-      final up = signal.percentChange! >= 0;
-      buf.write(
-        ', ${up ? 'up' : 'down'} '
-        '${signal.percentChange!.abs().toStringAsFixed(2)} percent',
-      );
-    }
-
-    return Semantics(
-      button: true,
-      label: buf.toString(),
-      excludeSemantics: true,
-      child: PressableScaleRow(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpace.md,
-            vertical: AppSpace.hairlineRowPadding,
-          ),
-        child: Row(
-          children: [
-            AyreInstrumentTile(
-              symbol: signal.symbol,
-              size: 28,
-              name: signal.name,
-            ),
-            const SizedBox(width: AppSpace.xs),
-            AyreIcon(
-              signal.bullish ? AyreGlyph.trendUp : AyreGlyph.trendDown,
-              size: 17,
-              color: tone,
-            ),
-            const SizedBox(width: AppSpace.sm),
-            Expanded(
-              flex: 5,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    signal.symbol,
-                    style: AppTypo.rowLabel(t),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (signal.name != null && signal.name!.isNotEmpty)
-                    Text(
-                      signal.name!,
-                      style: AppTypo.hint(t),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  if (signal.hasEntryReached)
-                    Text(
-                      'Entry reached'
-                      '${_EntryReachedLine._clock(signal.entryReachedAt!) == null ? '' : ' at ${_EntryReachedLine._clock(signal.entryReachedAt!)}'}'
-                      '${signal.entryReachedExtended ? ' · past the level' : ''}',
-                      style: AppTypo.hint(t),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpace.sm),
-            Flexible(
-              flex: 3,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerRight,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    if (signal.lastPrice != null)
-                      Figure(
-                        formatPrice(signal.lastPrice),
-                        fontSize: AppTextScale.body,
-                      ),
-                    const SizedBox(height: AppSpace.xxs),
-                    DeltaFigure(
-                      change: signal.percentChange,
-                      fontSize: AppTextScale.hint,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-        ),
-      ),
-    );
-  }
-}
-
 class _Level extends StatelessWidget {
   const _Level({required this.label, required this.value, this.tone});
 
@@ -605,44 +473,36 @@ class _Level extends StatelessWidget {
   }
 }
 
-/// Mirrors the featured-plus-list shape, so nothing jumps when data lands.
+/// Mirrors the uniform card list, so nothing jumps when data lands.
 class _SignalsSkeleton extends StatelessWidget {
   const _SignalsSkeleton();
+
+  static const _card = AyreCard(
+    padding: EdgeInsets.all(AppSpace.lg),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SkeletonBlock(width: 160, height: 24),
+        SizedBox(height: AppSpace.xs),
+        SkeletonBlock(height: 12),
+        SizedBox(height: AppSpace.xxs),
+        SkeletonBlock(width: 220, height: 12),
+        SizedBox(height: AppSpace.md),
+        SkeletonBlock(height: 48, radius: AppRadius.inset),
+      ],
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
     return const Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        AyreCard(
-          padding: EdgeInsets.all(AppSpace.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SkeletonBlock(width: 120, height: 11),
-              SizedBox(height: AppSpace.inCardGap),
-              SkeletonBlock(width: 160, height: 24),
-              SizedBox(height: AppSpace.xs),
-              SkeletonBlock(height: 12),
-              SizedBox(height: AppSpace.xxs),
-              SkeletonBlock(width: 220, height: 12),
-              SizedBox(height: AppSpace.md),
-              SkeletonBlock(height: 48, radius: AppRadius.inset),
-            ],
-          ),
-        ),
-        SizedBox(height: AppSpace.sectionGap),
-        AyreCard(
-          padding: EdgeInsets.symmetric(vertical: AppSpace.xs),
-          child: Column(
-            children: [
-              SkeletonTickerRow(),
-              SkeletonTickerRow(),
-              SkeletonTickerRow(),
-              SkeletonTickerRow(),
-            ],
-          ),
-        ),
+        _card,
+        SizedBox(height: AppSpace.cardGap),
+        _card,
+        SizedBox(height: AppSpace.cardGap),
+        _card,
       ],
     );
   }
