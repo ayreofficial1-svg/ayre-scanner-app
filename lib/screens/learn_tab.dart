@@ -39,7 +39,7 @@ class LearnTab extends StatefulWidget {
 
   final MarketDataService marketData;
 
-  /// See [SignalsTab.active] — defers this tab's first load until it's
+  /// See [HomeTab.active] — defers this tab's first load until it's
   /// actually selected, instead of firing on shell mount alongside every
   /// other tab.
   final bool active;

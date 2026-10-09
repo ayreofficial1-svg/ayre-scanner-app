@@ -55,7 +55,8 @@ class SettingsTourStep {
 
 /// The main tutorial, in the order a person meets the app. Each line describes
 /// what the screen actually contains (Home: the three index cards, the sentiment
-/// card, the Weekly Report and desk notes; Signals: Entry/Exit/Stop cards;
+/// card, Signals with Entry/Exit/Stop levels and desk notes; Reports: the
+/// Weekly Report;
 /// Insights: the six movers and metric sections with their "i" buttons; Learn:
 /// the subject filter and lessons; Profile: account, alerts, Settings, help).
 ///
@@ -66,8 +67,8 @@ List<AppTourStep> buildAppTourSteps() => [
     target: navDestinationKey('Home'),
     title: 'Home',
     body:
-        'NIFTY 50, SENSEX and BANK NIFTY, market sentiment, the Weekly '
-        'Report and desk notes.',
+        'NIFTY 50, BANK NIFTY and SENSEX, market sentiment, Signals with '
+        'Entry, Exit and Stop levels, and desk notes.',
   ),
   const AppTourStep(
     tab: 0,
@@ -85,11 +86,11 @@ List<AppTourStep> buildAppTourSteps() => [
   ),
   AppTourStep(
     tab: 1,
-    target: navDestinationKey('Signals'),
-    title: 'Signals',
+    target: navDestinationKey('Reports'),
+    title: 'Reports',
     body:
-        'Picks worth watching, each with Entry, Exit and Stop levels. Tap one '
-        'for details.',
+        'The Weekly Report: picks from past weeks and their reported '
+        'results. Move between weeks with the arrows.',
   ),
   AppTourStep(
     tab: 2,

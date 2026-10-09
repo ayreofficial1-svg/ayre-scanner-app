@@ -55,10 +55,9 @@ enum DataSurface {
   volatility,
   momentum,
   volumeSurge,
-  // Phase 5: admin-entered historical performance, shown on the Home tab
-  // directly below the index board (`GET /api/weekly-report`). Moved from
-  // the Signals tab in Phase 2; its own surface so a failed fetch never
-  // affects the index board it sits under.
+  // Phase 5: admin-entered historical performance, shown on the Reports tab
+  // (`GET /api/weekly-report`). Its own surface so a failed fetch never
+  // affects any other tab.
   weeklyReport,
   // Phase 6: the SEBI Research Analyst registration number and disclaimer
   // (`GET /api/compliance`), shown on the Research Analyst information

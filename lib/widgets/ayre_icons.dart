@@ -33,6 +33,10 @@ enum AyreGlyph {
   learn,
   profile,
 
+  /// A report page with three ascending bars — the Reports tab's glyph.
+  /// Added with the Reports tab; [signals] stays (other surfaces use it).
+  report,
+
   // Header and chrome
   bell,
   back,
@@ -268,6 +272,40 @@ class _AyreIconPainter extends CustomPainter {
             final line = _miterStroke(s);
             c.drawPath(page, line);
             c.drawPath(crease, line);
+          }
+        }
+      case AyreGlyph.report:
+        // A plain page with three ascending bars. Outline strokes the page and
+        // the bars; filled is the same page with the bars punched through, so
+        // selecting the tab never changes the glyph's extent.
+        {
+          final page = Path()
+            ..moveTo(5, 3)
+            ..lineTo(19, 3)
+            ..lineTo(19, 21)
+            ..lineTo(5, 21)
+            ..close();
+          final bars = Path()
+            ..moveTo(9, 17)
+            ..lineTo(9, 14)
+            ..moveTo(12, 17)
+            ..lineTo(12, 11.5)
+            ..moveTo(15, 17)
+            ..lineTo(15, 8.5);
+          if (filled) {
+            c.saveLayer(page.getBounds().inflate(4), Paint());
+            c.drawPath(page, f);
+            final punch = Paint()
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = strokeWidth
+              ..strokeCap = StrokeCap.round
+              ..strokeJoin = StrokeJoin.round
+              ..blendMode = BlendMode.clear;
+            c.drawPath(bars, punch);
+            c.restore();
+          } else {
+            c.drawPath(page, _miterStroke(s));
+            c.drawPath(bars, s);
           }
         }
       case AyreGlyph.profile:

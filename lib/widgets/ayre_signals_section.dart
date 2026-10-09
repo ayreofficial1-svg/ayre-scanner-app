@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../screens/equity_detail_screen.dart';
 import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
@@ -8,50 +9,80 @@ import '../services/notification_copy.dart';
 import '../services/push_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
-import '../widgets/ayre_components.dart';
-import '../widgets/ayre_instrument_tile.dart';
-import '../widgets/figure.dart';
-import '../widgets/responsive.dart';
-import '../widgets/state_views.dart';
-import 'equity_detail_screen.dart';
+import 'ayre_components.dart';
+import 'ayre_instrument_tile.dart';
+import 'figure.dart';
+import 'responsive.dart';
+import 'state_views.dart';
 
-/// Signals — the signal board (Spec §13.2).
+/// Lets a host reload a [SignalsSection] (pull-to-refresh, retry) without
+/// owning its data. Attached by the section's state; every call is a no-op
+/// while nothing is attached (before mount, after dispose).
+class SignalsSectionController {
+  _SignalsSectionState? _state;
+
+  /// Reloads the signals. [silent] suppresses the section's own haptic, for a
+  /// host that already supplies its own feedback for the same gesture.
+  Future<void> reload({bool silent = false}) async {
+    await _state?._load(initial: silent);
+  }
+}
+
+/// The signal board as a self-contained, scroll-agnostic section (Spec §13.2).
 ///
 /// One view of every admin-curated stock pick the backend has published. All
 /// picks sit together under a single "Signals" heading and are drawn with the
 /// same card, so no stock outranks another: there is no featured pick and no
-/// "also on watch" tier. However many stocks are published (2, 5, 10 …) they
-/// all appear in one section with identical visual weight, in exactly the
-/// order `GET /api/signals` returns them. There are deliberately no filters —
-/// no All / Bullish / Bearish switch, and no per-card Bullish/Bearish tag
-/// either — an admin pick has no long/short direction of its own; that concept
-/// lives only in the separate market-sentiment system on Home.
-class SignalsTab extends StatefulWidget {
-  const SignalsTab({super.key, required this.marketData, this.active = true});
+/// "also on watch" tier, and there are deliberately no filters or per-card
+/// Bullish/Bearish tags — an admin pick has no long/short direction of its own.
+/// Order is exactly what `GET /api/signals` returns.
+///
+/// This widget **owns** the signals fetch, `keepingLastGood`, the
+/// [SeenSignalsStore] diff and the [NotificationLog] write, so that logic runs
+/// exactly once per load wherever the section is mounted. It draws a plain
+/// Column — no scrolling, refresh indicator or page title; the host supplies
+/// those.
+class SignalsSection extends StatefulWidget {
+  const SignalsSection({
+    super.key,
+    required this.marketData,
+    this.active = true,
+    this.controller,
+    this.onOpenEquity,
+    this.forceColumns,
+  });
 
   final MarketDataService marketData;
 
-  /// Whether this is the tab currently showing in the shell's
-  /// [IndexedStack]. The shell mounts all five tabs immediately (that's
-  /// what lets a tab keep its scroll position/state when you switch away
-  /// and back), so without this every tab's first load fires the instant
-  /// you land on the shell — five tabs' worth of HTTP calls landing and
-  /// getting JSON-decoded/rebuilt on the UI thread in the same short
-  /// window right after login. Deferring the load until the tab is first
-  /// actually selected spreads that burst out instead.
+  /// Whether the host is currently showing. Loading is deferred until first
+  /// active so a shell that mounts every tab doesn't fire all their requests in
+  /// the same short window.
   final bool active;
 
+  final SignalsSectionController? controller;
+
+  /// Overrides what a card tap does. Defaults to opening
+  /// [EquityDetailScreen] through [terminalRoute].
+  final ValueChanged<Signal>? onOpenEquity;
+
+  /// Pins the card grid to this many columns regardless of screen width.
+  /// Home passes 1: its content frame is a single reading column, so a
+  /// multi-column grid there would only cramp the cards. The multi-column
+  /// branch itself is kept for hosts that are wide enough.
+  final int? forceColumns;
+
   @override
-  State<SignalsTab> createState() => _SignalsTabState();
+  State<SignalsSection> createState() => _SignalsSectionState();
 }
 
-class _SignalsTabState extends State<SignalsTab> {
+class _SignalsSectionState extends State<SignalsSection> {
   DataResult<List<Signal>>? _result;
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
+    widget.controller?._state = this;
     if (widget.active) _load(initial: true);
     AppLifecycleService.instance.addListener(_onAppResumed);
     PushService.instance.refreshSignalsRequests.addListener(_onRefreshRequested);
@@ -75,6 +106,7 @@ class _SignalsTabState extends State<SignalsTab> {
 
   @override
   void dispose() {
+    if (widget.controller?._state == this) widget.controller!._state = null;
     AppLifecycleService.instance.removeListener(_onAppResumed);
     PushService.instance.refreshSignalsRequests
         .removeListener(_onRefreshRequested);
@@ -82,8 +114,14 @@ class _SignalsTabState extends State<SignalsTab> {
   }
 
   @override
-  void didUpdateWidget(SignalsTab oldWidget) {
+  void didUpdateWidget(SignalsSection oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      if (oldWidget.controller?._state == this) {
+        oldWidget.controller!._state = null;
+      }
+      widget.controller?._state = this;
+    }
     if (!oldWidget.active && widget.active && _result == null) {
       _load(initial: true);
     }
@@ -122,6 +160,11 @@ class _SignalsTabState extends State<SignalsTab> {
   }
 
   void _openEquity(Signal signal) {
+    final override = widget.onOpenEquity;
+    if (override != null) {
+      override(signal);
+      return;
+    }
     HapticFeedback.selectionClick();
     Navigator.of(context).push(
       terminalRoute(
@@ -135,51 +178,11 @@ class _SignalsTabState extends State<SignalsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
-    final columns = AppBreakpoints.columns(context);
+    final columns = widget.forceColumns ?? AppBreakpoints.columns(context);
 
-    return RefreshIndicator(
-      color: t.accentInk,
-      backgroundColor: t.surface,
-      onRefresh: _load,
-      edgeOffset: 72,
-      child: ContentWidth(
-        // Single column keeps the app's default 620pt reading measure;
-        // once the board goes multi-column (Phase 2A) it needs the wider
-        // frame `learn_tab.dart` already uses for the same reason.
-        maxWidth: columns > 1 ? 960 : null,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpace.pageHorizontal,
-            AppSpace.pageTop,
-            AppSpace.pageHorizontal,
-            120,
-          ),
-          children: [
-            SafeArea(
-              bottom: false,
-              child: Entrance(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Signal board', style: AppTypo.pageTitle(t)),
-                    const SizedBox(height: AppSpace.xxs),
-                    Text(
-                      // Phase 4: replaces "Stocks flagged as potential
-                      // opportunities." with a short, plain, four-word
-                      // phrase — no financial jargon, no outcome guarantee.
-                      'Picks worth watching.',
-                      style: AppTypo.body(t),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpace.sectionGap),
-            ..._board(columns),
-          ],
-        ),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: _board(columns),
     );
   }
 
@@ -210,7 +213,13 @@ class _SignalsTabState extends State<SignalsTab> {
     final signals = _result!.value!;
 
     return [
-      const Entrance(index: 1, child: SectionLabel(label: 'Signals')),
+      const Entrance(
+        index: 1,
+        child: SectionLabel(
+          label: 'Signals',
+          subtitle: 'Picks worth watching.',
+        ),
+      ),
       Entrance(
         index: 2,
         child: _SignalList(

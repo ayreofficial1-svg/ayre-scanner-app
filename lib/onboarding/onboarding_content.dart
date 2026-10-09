@@ -80,7 +80,7 @@ const List<OnboardingFeature> kOnboardingFeatures = [
     glyph: AyreGlyph.trendUp,
     title: 'Weekly Report',
     subtitle: 'Picks from past weeks and their reported results.',
-    location: 'On Home',
+    location: 'Reports tab',
   ),
   OnboardingFeature(
     glyph: AyreGlyph.insights,

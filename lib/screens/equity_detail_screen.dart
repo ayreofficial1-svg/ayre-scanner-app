@@ -14,7 +14,7 @@ import '../widgets/state_views.dart';
 import '../widgets/ticker_trace.dart';
 
 /// Equity Detail — reached from Index Detail's constituents, from every Insights
-/// movers row, and from a Signals card.
+/// movers row, and from a signal card on Home.
 ///
 /// This is a pushed screen with no natural pull-to-refresh at the point of
 /// failure, so its failure state carries an explicit Retry button rather than a

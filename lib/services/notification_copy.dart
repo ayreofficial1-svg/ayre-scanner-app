@@ -20,12 +20,12 @@ class NotificationCopy {
 
   static const _newPick = <(String, String)>[
     ('New Pick', 'A fresh pick is ready.'),
-    ('New Signal', 'Check the Signals tab.'),
+    ('New Signal', 'Check Signals on Home.'),
     ('Fresh Setup', 'A new setup is available.'),
-    ('New Opportunity', 'See the Signals tab.'),
+    ('New Opportunity', 'See Signals on Home.'),
     ('Buy Setup', 'A new setup is ready.'),
     ('Fresh Pick', 'Take a look in Signals.'),
-    ('Buy Signal', 'Open the Signals tab.'),
+    ('Buy Signal', 'Open Signals on Home.'),
   ];
 
   static const _revised = <(String, String)>[

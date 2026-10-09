@@ -19,7 +19,7 @@ class NavDestination {
 
 const List<NavDestination> kNavDestinations = [
   NavDestination(label: 'Home', glyph: AyreGlyph.home),
-  NavDestination(label: 'Signals', glyph: AyreGlyph.signals),
+  NavDestination(label: 'Reports', glyph: AyreGlyph.report),
   NavDestination(label: 'Insights', glyph: AyreGlyph.insights),
   NavDestination(label: 'Learn', glyph: AyreGlyph.learn),
   NavDestination(label: 'Profile', glyph: AyreGlyph.profile),
@@ -450,6 +450,8 @@ class _NavItem extends StatelessWidget {
                     Text(
                       destination.label,
                       style: AppTypo.navLabel(t, color: color),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 );

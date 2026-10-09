@@ -363,7 +363,7 @@ void main() {
           await settle(tester);
 
           // Walk every tab so each surface actually gets built.
-          for (final destination in ['Signals', 'Insights', 'Learn', 'Home']) {
+          for (final destination in ['Reports', 'Insights', 'Learn', 'Home']) {
             await tester.tap(find.byKey(navDestinationKey(destination)));
             await settle(tester);
             expect(

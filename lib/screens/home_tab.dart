@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:ui' show PointerDeviceKind;
 
 import '../main.dart' show AppThemeController;
 import '../services/auth_service.dart';
@@ -11,18 +12,16 @@ import '../services/market_models.dart';
 import '../onboarding/tour_content.dart' show TourKeys;
 import '../theme/app_theme.dart';
 import '../widgets/ayre_avatar.dart';
+import '../widgets/ayre_compact_index_card.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_hills.dart';
 import '../widgets/ayre_icons.dart';
-import '../widgets/ayre_index_art.dart';
 import '../widgets/ayre_insight_carousel.dart';
 import '../widgets/ayre_logo.dart';
-import '../widgets/ayre_weekly_report.dart';
-import '../widgets/figure.dart';
+import '../widgets/ayre_signals_section.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/responsive.dart';
 import '../widgets/state_views.dart';
-import '../widgets/ticker_trace.dart';
 import 'home_shell.dart' show initialsFor;
 import 'index_detail_screen.dart';
 import 'insight_note_screen.dart';
@@ -31,9 +30,9 @@ import 'notifications_screen.dart';
 /// Home — the market gateway (Spec §13.1).
 ///
 /// Order: greeting header (with the decorative hill ornament behind it) →
-/// **Market Sentiment card** → index board → **Weekly Report** (moved here
-/// from the Signals tab in Phase 2) → **Market Insight carousel** → closing
-/// divider.
+/// **Market Sentiment card** → compact horizontal index row → **Signals**
+/// (moved here from the former Signals tab; the Weekly Report now has its own
+/// Reports tab) → **Market Insight carousel** → closing divider.
 ///
 /// The "Market breadth" donut card that used to sit between the index board
 /// and the insight carousel has been removed; nothing replaces it, and the
@@ -43,7 +42,7 @@ import 'notifications_screen.dart';
 ///
 /// * **The ink readout panel.** v3 sat each index's live figures on a dark
 ///   "terminal feed" plate. The figures sit on the card, and what marks
-///   them as live is the LIVE chip and the trace, not a plate behind them.
+///   them as live is the pulse dot, not a plate behind them.
 /// * **The inlined direction rendering.** `DirectionBadge` carries direction
 ///   wherever a badge is what's wanted.
 /// * **The "For informational purposes only, not investment advice."
@@ -56,6 +55,7 @@ class HomeTab extends StatefulWidget {
     this.onAccountResolved,
     this.onOpenProfile,
     this.active = true,
+    this.signalsFocusToken = 0,
   });
 
   final MarketDataService marketData;
@@ -72,6 +72,10 @@ class HomeTab extends StatefulWidget {
   /// inactive and a becoming-active transition triggers one immediate catch-
   /// up refresh instead.
   final bool active;
+
+  /// Changes whenever something (a signal notification) asks Home to bring the
+  /// Signals section into view. Zero means no request.
+  final int signalsFocusToken;
 
   @override
   State<HomeTab> createState() => _HomeTabState();
@@ -100,13 +104,14 @@ class _HomeTabState extends State<HomeTab> {
   // a few times a day at most, so — like `_fullBreadth` — it loads in `_load`
   // and is left out of `_refreshLive`'s 10s tick.
   DataResult<List<InsightNote>>? _notes;
-  // Phase 5: admin-entered weekly performance (`GET /api/weekly-report`),
-  // moved in Phase 2 from the Signals tab onto Home, directly below the
-  // index board. Historical, admin-entered content that doesn't change on a
-  // live cadence, so — like `_fullBreadth` and `_notes` — it loads once in
-  // `_load` (and on pull-to-refresh) and is deliberately left out of
-  // `_refreshLive`'s 10s tick.
-  DataResult<List<WeeklyReport>>? _weeklyResult;
+  // The signals section owns its own fetch (see [SignalsSection]); Home only
+  // holds a controller so pull-to-refresh can reload it.
+  final SignalsSectionController _signalsController =
+      SignalsSectionController();
+  final GlobalKey _signalsKey = GlobalKey();
+  // True from a focus request until the page has finished loading, so a layout
+  // shift above the Signals section (sentiment card landing) re-anchors it.
+  bool _focusPending = false;
   String _accountName = '';
   bool _loading = true;
   Timer? _liveTimer;
@@ -116,6 +121,7 @@ class _HomeTabState extends State<HomeTab> {
   void initState() {
     super.initState();
     _load(initial: true);
+    if (widget.signalsFocusToken > 0) _requestSignalsFocus();
     // Board + breadth only — session is already resolved above, and this
     // fires often enough that re-checking it every tick would be wasted
     // work. Safe to poll this often: the backend serves it from Fyers'
@@ -145,6 +151,43 @@ class _HomeTabState extends State<HomeTab> {
   void didUpdateWidget(HomeTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!oldWidget.active && widget.active) _refreshLive();
+    if (oldWidget.signalsFocusToken != widget.signalsFocusToken &&
+        widget.signalsFocusToken > 0) {
+      _requestSignalsFocus();
+    }
+  }
+
+  void _requestSignalsFocus() {
+    _focusPending = true;
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _scrollToSignals(retry: true),
+    );
+  }
+
+  /// Brings the Signals section into view. Safe to call repeatedly. If the
+  /// section isn't built yet it retries once on the next frame, then gives up
+  /// silently.
+  void _scrollToSignals({bool retry = false}) {
+    if (!mounted || !_focusPending || !widget.active) return;
+    final target = _signalsKey.currentContext;
+    if (target == null) {
+      if (retry) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _scrollToSignals(),
+        );
+      }
+      return;
+    }
+    // Keep the request alive until loading has finished, then stop.
+    if (!_loading) _focusPending = false;
+    Scrollable.ensureVisible(
+      target,
+      alignment: 0.05,
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : AppMotion.pageTransition,
+      curve: AppMotion.ease,
+    );
   }
 
   @override
@@ -189,7 +232,6 @@ class _HomeTabState extends State<HomeTab> {
     final breadth = await widget.marketData.getSentiment(monthly: false);
     final fullBreadth = await widget.marketData.getFullBreadth();
     final notes = await widget.marketData.getInsightNotes();
-    final weekly = await widget.marketData.getWeeklyReports();
     if (!mounted) return;
 
     final name = AuthService.instance.currentUser?.shownName ?? '';
@@ -200,10 +242,13 @@ class _HomeTabState extends State<HomeTab> {
       _breadth = breadth.keepingLastGood(_breadth);
       _fullBreadth = fullBreadth.keepingLastGood(_fullBreadth);
       _notes = notes.keepingLastGood(_notes);
-      _weeklyResult = weekly.keepingLastGood(_weeklyResult);
       _loading = false;
     });
     widget.onAccountResolved?.call(name);
+    // The page above Signals has settled; re-anchor a pending focus request.
+    if (_focusPending) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSignals());
+    }
 
     // A refresh that lands new data confirms itself; opening the app doesn't.
     if (!initial) HapticFeedback.mediumImpact();
@@ -218,7 +263,12 @@ class _HomeTabState extends State<HomeTab> {
     return RefreshIndicator(
       color: t.accentInk,
       backgroundColor: t.surface,
-      onRefresh: _load,
+      // One haptic (from `_load`) and one network pass per surface; the
+      // signals reload is silent so the gesture doesn't buzz twice.
+      onRefresh: () => Future.wait([
+        _load(),
+        _signalsController.reload(silent: true),
+      ]),
       edgeOffset: 72,
       child: ContentWidth(
         child: ListView(
@@ -273,13 +323,25 @@ class _HomeTabState extends State<HomeTab> {
               onOpen: _openIndex,
               onRetry: _load,
             ),
-            ..._weeklyReportSection(),
+            const SizedBox(height: AppSpace.sectionGap),
+            KeyedSubtree(
+              key: _signalsKey,
+              child: Entrance(
+                index: 3,
+                child: SignalsSection(
+                  marketData: widget.marketData,
+                  active: widget.active,
+                  controller: _signalsController,
+                  forceColumns: 1,
+                ),
+              ),
+            ),
             // An empty desk omits the card *and* its gap, so Home doesn't end
             // in a hole; loading and failed still show their own states.
             if (_showsInsights) ...[
               const SizedBox(height: AppSpace.sectionGap),
               Entrance(
-                index: 3,
+                index: 4,
                 child: _InsightSection(
                   result: _loading ? null : _notes,
                   onReadMore: _openInsight,
@@ -288,61 +350,11 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ],
             const SizedBox(height: AppSpace.sectionGap),
-            const Entrance(index: 4, child: _HomeDivider()),
+            const Entrance(index: 5, child: _HomeDivider()),
           ],
         ),
       ),
     );
-  }
-
-  /// The Weekly Report section, directly below the index board — an
-  /// admin-entered, hand-verified record of one past week's outcomes (§A.3).
-  /// Moved here from the Signals tab in Phase 2; redesigned in Phase 7 as
-  /// one card per week with compact stock rows and a week switcher.
-  /// Loads and fails independently of the index board above it
-  /// (`_weeklyResult`), and renders nothing at all when there's simply no
-  /// report yet, per §A.8 ("render nothing or a minimal state rather than a
-  /// broken-looking empty section").
-  List<Widget> _weeklyReportSection() {
-    if (_loading) {
-      return const [
-        SizedBox(height: AppSpace.sectionGap),
-        WeeklyReportSkeleton(),
-      ];
-    }
-
-    final weekly = _weeklyResult;
-    if (weekly == null || weekly.isEmpty) return const [];
-
-    if (weekly.isFailed) {
-      return [
-        const SizedBox(height: AppSpace.sectionGap),
-        StatePanel.failed(
-          headline: "Weekly report didn't load",
-          message: 'The index board above is unaffected.',
-          compact: true,
-          onRetry: _load,
-        ),
-      ];
-    }
-
-    final reports = weekly.value;
-    if (reports == null || reports.isEmpty) return const [];
-
-    // The card carries its own week header (date range with year, older/
-    // newer arrows, week picker), so the section label no longer needs a
-    // date-range subtitle — it would go stale the moment the user moved to
-    // another week. Every week the backend returns is handed over, not just
-    // the newest.
-    // Phase 9: the section draws its own header (separator, title, info
-    // button, one-line description), so no SectionLabel is placed above it.
-    return [
-      const SizedBox(height: AppSpace.sectionGap),
-      Entrance(
-        index: 3,
-        child: WeeklyReportCard(reports: reports),
-      ),
-    ];
   }
 
   /// False only when the desk answered with nothing to show.
@@ -632,7 +644,14 @@ IndexId? _indexIdFor(Quote quote) {
 
 // ─── Index board ───────────────────────────────────────────────────────────
 
-/// The three instruments. The whole card is the tap target into Index Detail.
+/// The three instruments as compact cards in one horizontal row, always in the
+/// backend's order (`IndexId.values`: Nifty 50, Bank Nifty, Sensex). The whole
+/// card is the tap target into Index Detail.
+///
+/// Where all three fit at a legible width (tablet / desktop) they share the
+/// row equally and nothing scrolls. On a phone the row scrolls horizontally,
+/// bleeds to the screen edges and lets the next card peek in so it reads as
+/// scrollable.
 class _IndexBoard extends StatelessWidget {
   const _IndexBoard({
     required this.result,
@@ -644,20 +663,25 @@ class _IndexBoard extends StatelessWidget {
   final ValueChanged<Quote> onOpen;
   final Future<void> Function() onRetry;
 
+  /// Room above and below the cards so their shadows aren't clipped by the
+  /// horizontal list's viewport.
+  static const double _shadowRoom = 8;
+
+  /// How many cards a phone shows at once (the last one peeks).
+  static const double _visibleCards = 2.35;
+
   @override
   Widget build(BuildContext context) {
+    final result = this.result;
     if (result == null) {
-      return Column(
-        children: [
-          for (var i = 0; i < 3; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpace.cardGap),
-            const _IndexCardSkeleton(),
-          ],
-        ],
+      return _row(
+        context,
+        count: 3,
+        itemBuilder: (_, _) => const AyreCompactIndexCardSkeleton(),
       );
     }
 
-    if (result!.isFailed) {
+    if (result.isFailed) {
       return StatePanel.failed(
         headline: 'Index feed unavailable',
         message: "The levels below couldn't be fetched for this session.",
@@ -665,282 +689,104 @@ class _IndexBoard extends StatelessWidget {
       );
     }
 
-    if (result!.isEmpty) {
+    if (result.isEmpty) {
       return const StatePanel.empty(
         headline: 'No index data',
         message: 'The feed returned no instruments for this session.',
       );
     }
 
-    final quotes = result!.value!;
-    final columns = AppBreakpoints.columns(context);
-
-    // Home stays a linear narrative on phones; wider viewports lay the three
-    // instruments side by side rather than stretching one card across a desk.
-    if (columns == 1) {
-      return Column(
-        children: [
-          for (var i = 0; i < quotes.length; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpace.cardGap),
-            Entrance(
-              index: i + 1,
-              child: _IndexCard(
-                quote: quotes[i],
-                stale: result!.stale,
-                onTap: () => onOpen(quotes[i]),
-              ),
-            ),
-          ],
-        ],
-      );
-    }
-
-    // IntrinsicHeight so the three cards share a height. A bare stretch would
-    // ask this Row's unbounded parent for an infinite height.
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < quotes.length; i++) ...[
-            if (i > 0) const SizedBox(width: AppSpace.cardGap),
-            Expanded(
-              child: Entrance(
-                index: i + 1,
-                child: _IndexCard(
-                  quote: quotes[i],
-                  stale: result!.stale,
-                  onTap: () => onOpen(quotes[i]),
-                ),
-              ),
-            ),
-          ],
-        ],
+    final quotes = result.value!;
+    return _row(
+      context,
+      count: quotes.length,
+      itemBuilder: (context, i) => AyreCompactIndexCard(
+        quote: quotes[i],
+        indexId: _indexIdFor(quotes[i]),
+        stale: result.stale,
+        onTap: () => onOpen(quotes[i]),
       ),
     );
   }
-}
 
-/// Scoped-down sizes for the (now more compact) index cards. These are
-/// deliberately *not* changes to the shared `AppTextScale`/`AppSpace` tokens
-/// — those are also used by other surfaces (`app_theme.dart` itself and
-/// `ayre_charts.dart` among them) that this phase must not affect. Each
-/// constant here is a modest reduction from its shared counterpart
-/// (`AppTextScale.hero` 40, `AppSpace.inCardGap` 12, `AppTextScale.rowLabel`
-/// 15, `AppTextScale.hint` 12.5), scoped to `_IndexCard`/`_IndexCardSkeleton`
-/// only.
-abstract final class _IndexCardScale {
-  static const double heroFontSize = 30;
-  static const double inCardGap = 8;
-  static const double rowLabelFontSize = 13;
-  static const double hintFontSize = 11;
-  static const double captionFontSize = 10;
-}
+  Widget _row(
+    BuildContext context, {
+    required int count,
+    required Widget Function(BuildContext, int) itemBuilder,
+  }) {
+    const gap = AppSpace.cardGap;
+    const pad = AppSpace.pageHorizontal;
+    final height = AyreCompactIndexMetrics.heightFor(context);
 
-/// One index card (v5 §2.1): a circular, radial-gradient icon tile + name +
-/// exchange, the LIVE chip opposite, the hero level, the change row, and the
-/// "VIEW CONSTITUENTS" link — on the index's own identity tint (§2A).
-///
-/// **No period tabs and no Open/High/Low row.** The backend supplies neither
-/// for an index (plan §3), so the reference's sparkline slot is an ornament
-/// ([AyreIndexFlourish]) behind the figures — and only while `trace` is empty.
-/// The moment a quote carries a real trace, the flourish is not built and the
-/// sparkline draws beneath the change row as before.
-///
-/// Sized more compactly than earlier versions: a smaller hero figure,
-/// tighter internal gaps and smaller supporting type, all via
-/// [_IndexCardScale] rather than any shared, app-wide constant.
-class _IndexCard extends StatelessWidget {
-  const _IndexCard({
-    required this.quote,
-    required this.stale,
-    required this.onTap,
-  });
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final available = constraints.maxWidth;
+        final fitsAll =
+            available >= 3 * AyreCompactIndexMetrics.minWidth + 2 * gap;
 
-  final Quote quote;
-  final bool stale;
-  final VoidCallback onTap;
+        Widget item(int i, double width) => SizedBox(
+          width: width,
+          height: height,
+          child: Entrance(index: i + 1, child: itemBuilder(context, i)),
+        );
 
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final up = quote.percentChange >= 0;
-    // §12.1: the trace inherits the colour of its subject. This is the one
-    // decision that makes the sparkline informative rather than decorative.
-    final tone = up ? t.positive : t.negative;
-    final identity = AyreIndexIdentity.of(context, _indexIdFor(quote));
-    final tint = identity.tint;
-    final hasTrace = quote.trace.length >= 2;
-
-    // The level and its change row. Wrapped in the flourish backdrop below
-    // when there is no trace; otherwise laid out bare.
-    final figures = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // The level counts up (§12.3/§15.2) rather than rolling its digits.
-        // `formatPrice` keeps Indian grouping while it counts, so the string
-        // doesn't change shape as it arrives.
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: CountUpFigure(
-            value: quote.lastPrice.toDouble(),
-            // Counting a five-figure index level up from zero would be a
-            // slot machine, so it starts within sight of the target — the
-            // exact case `CountUpFigure`'s `from` exists for.
-            from: quote.lastPrice.toDouble() - quote.change.toDouble(),
-            format: (v) => formatPrice(v),
-            fontSize: _IndexCardScale.heroFontSize,
-            color: t.textPrimary,
-            semanticsLabel: '${quote.name} at ${formatPrice(quote.lastPrice)}',
-          ),
-        ),
-        const SizedBox(height: AppSpace.xs),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Row(
-            children: [
-              DeltaFigure(
-                change: quote.percentChange,
-                fontSize: _IndexCardScale.rowLabelFontSize,
-              ),
-              const SizedBox(width: AppSpace.xs),
-              Figure(
-                formatDelta(quote.change, percent: false),
-                fontSize: _IndexCardScale.hintFontSize,
-                color: t.foregroundMuted,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-
-    return AyreCard(
-      onTap: onTap,
-      color: tint.cardBackground,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              AyreIndexIconTile(glyph: identity.glyph, tint: tint),
-              const SizedBox(width: AppSpace.sm),
-              Expanded(
-                flex: 3,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      quote.name,
-                      style: AppTypo.cardTitle(t),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (identity.exchange != null)
-                      Text(
-                        identity.exchange!,
-                        style: AppTypo.hint(t, color: t.foregroundMuted),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                  ],
-                ),
-              ),
-              // A stale feed renders nothing in this slot — never a "Live"
-              // chip it hasn't earned, and never the word "Delayed" (§4).
-              // Omitted outright rather than a `SizedBox.shrink()` inside
-              // `ShrinkTrailing`: same result, without a zero-size
-              // `FittedBox` child or a dangling gap.
-              if (!stale) ...[
-                const SizedBox(width: AppSpace.sm),
-                const ShrinkTrailing(
-                  child: AyreChip(
-                    label: 'Live',
-                    tone: ChipTone.live,
-                    pulse: true,
-                  ),
-                ),
+        // Wide enough: three equal cells, left-aligned so a missing index
+        // leaves a gap at the end rather than stretching the others.
+        if (fitsAll) {
+          final width = (available - 2 * gap) / 3;
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: _shadowRoom),
+            child: Row(
+              children: [
+                for (var i = 0; i < count; i++) ...[
+                  if (i > 0) const SizedBox(width: gap),
+                  item(i, width),
+                ],
               ],
-            ],
-          ),
-          const SizedBox(height: _IndexCardScale.inCardGap),
-          if (hasTrace)
-            figures
-          else
-            AyreIndexFlourish(color: tint.trace, child: figures),
-          if (hasTrace) ...[
-            const SizedBox(height: _IndexCardScale.inCardGap),
-            // Full card width rather than §12.2's fixed 96px sparkline box:
-            // this is the card's own trend, not an inline marker beside a row.
-            TickerTrace(
-              points: normaliseTrace(quote.trace),
-              height: 36,
-              color: tone,
-              fill: true,
             ),
-          ],
-          const SizedBox(height: _IndexCardScale.inCardGap),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'VIEW CONSTITUENTS',
-                  style: AppTypo.label(
-                    t,
-                    color: t.accentInk,
-                    fontSize: _IndexCardScale.captionFontSize,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: AppSpace.xs),
-              AyreIcon(AyreGlyph.forward, size: 12, color: t.accentInk),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
+          );
+        }
 
-/// The skeleton mirrors the real card's shape, block for block (§14.4):
-/// circular tile + two label lines, the level, the change row, the link.
-class _IndexCardSkeleton extends StatelessWidget {
-  const _IndexCardSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return const AyreCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              SkeletonBlock(width: 44, height: 44, radius: AppRadius.circle),
-              SizedBox(width: AppSpace.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SkeletonBlock(width: 96, height: 15),
-                    SizedBox(height: AppSpace.xxs),
-                    SkeletonBlock(width: 36, height: 11),
-                  ],
-                ),
-              ),
-            ],
+        final width = ((available - 2 * gap) / _visibleCards).clamp(
+          AyreCompactIndexMetrics.minWidth,
+          double.infinity,
+        );
+        final list = ScrollConfiguration(
+          // Mouse and trackpad can drag on desktop, where it isn't default.
+          behavior: ScrollConfiguration.of(context).copyWith(
+            dragDevices: {
+              ...ScrollConfiguration.of(context).dragDevices,
+              if (AppBreakpoints.hasPointer(context)) ...{
+                PointerDeviceKind.mouse,
+                PointerDeviceKind.trackpad,
+              },
+            },
           ),
-          SizedBox(height: _IndexCardScale.inCardGap),
-          SkeletonBlock(width: 140, height: 26, radius: AppRadius.inset),
-          SizedBox(height: AppSpace.xs),
-          SkeletonBlock(width: 120, height: 10),
-          SizedBox(height: _IndexCardScale.inCardGap),
-          SkeletonBlock(width: 100, height: 9),
-        ],
-      ),
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(
+              horizontal: pad,
+              vertical: _shadowRoom,
+            ),
+            itemCount: count,
+            separatorBuilder: (_, _) => const SizedBox(width: gap),
+            itemBuilder: (context, i) => item(i, width),
+          ),
+        );
+
+        // Bleed into the page's side padding so cards scroll under the screen
+        // edge instead of being cut off 20pt in. Only reached on narrow
+        // screens, where the page padding *is* the screen edge.
+        return SizedBox(
+          height: height + 2 * _shadowRoom,
+          child: OverflowBox(
+            minWidth: available + 2 * pad,
+            maxWidth: available + 2 * pad,
+            alignment: Alignment.center,
+            child: list,
+          ),
+        );
+      },
     );
   }
 }

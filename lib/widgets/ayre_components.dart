@@ -844,7 +844,7 @@ class _LivePulseDotState extends State<LivePulseDot>
 
 // ─── The shared ticker row ─────────────────────────────────────────────────
 
-/// The single row component behind Signals, all three Insights movers lists,
+/// The single row component behind all three Insights movers lists,
 /// Index Detail's constituents and Equity Detail's related lists. Building it
 /// once is what makes Insights read as one integrated desk rather than three
 /// relocated cards.

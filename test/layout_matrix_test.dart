@@ -349,7 +349,9 @@ void main() {
   // width, theme and text scale. What they can't catch is behaviour that only
   // appears after an interaction, which is where §13's new structures live.
   group('tab screens', () {
-    testWidgets('Signals is a single board with no filters', (tester) async {
+    testWidgets('Signals on Home is a single board with no filters', (
+      tester,
+    ) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.reset);
@@ -364,13 +366,11 @@ void main() {
       for (var i = 0; i < 90; i++) {
         await tester.pump(const Duration(milliseconds: 16));
       }
-      await tester.tap(find.byKey(navDestinationKey('Signals')));
-      for (var i = 0; i < 90; i++) {
-        await tester.pump(const Duration(milliseconds: 16));
-      }
 
-      // Everything the backend pushes is shown as-is: no All / Bullish /
+      // Signals now live on Home, so no tab switch is needed. Everything
+      // the backend pushes is shown as-is: no All / Bullish /
       // Bearish chips, and so no filtered-to-nothing state to recover from.
+      expect(find.text('SIGNALS'), findsWidgets);
       expect(find.byType(AyreFilterChip), findsNothing);
       expect(find.text('Show all'), findsNothing);
       expect(tester.takeException(), isNull);
@@ -503,9 +503,9 @@ void main() {
         // The visible label doubles as the accessibility name.
         final handle = tester.ensureSemantics();
         final semantics = tester.getSemantics(
-          find.byKey(navDestinationKey('Signals')),
+          find.byKey(navDestinationKey('Reports')),
         );
-        expect(semantics.label, contains('Signals'));
+        expect(semantics.label, contains('Reports'));
         // Disposed inline: the framework's end-of-test check runs before
         // addTearDown callbacks would.
         handle.dispose();

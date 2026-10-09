@@ -723,12 +723,12 @@ class WeeklyReportStock {
 }
 
 /// One week's admin-entered performance record (`GET /api/weekly-report`),
-/// shown on the Signals tab directly below the Signal board. Purely
+/// shown on the Reports tab. Purely
 /// historical and hand-entered by the admin on the website — there is no
 /// automatic target/stop-loss detection anywhere in this app or the backend
 /// (§A.4). [weekStart]/[weekEnd] arrive as plain ISO dates; the "6th
 /// September to 12th September" display format is computed client-side (see
-/// `signals_tab.dart`'s date-range formatter), not sent pre-formatted by the
+/// `ayre_weekly_report.dart`'s date-range formatter), not sent pre-formatted by the
 /// backend, so it can be redisplayed differently later without a data
 /// migration.
 class WeeklyReport {

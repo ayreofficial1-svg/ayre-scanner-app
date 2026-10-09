@@ -18,7 +18,7 @@ import 'insights_tab.dart';
 import 'learn_tab.dart';
 import 'notifications_screen.dart';
 import 'profile_tab.dart';
-import 'signals_tab.dart';
+import 'weekly_reports_tab.dart';
 
 /// Tab state is preserved across switches by [IndexedStack] — expressed through
 /// the Fold's collapsed/expanded states rather than a static bar, but the
@@ -47,13 +47,21 @@ class _HomeShellState extends State<HomeShell> {
   int _index = 0;
   String _accountName = '';
 
+  /// Bumped each time a signal notification asks to see Signals; Home scrolls
+  /// the Signals section into view whenever it changes.
+  int _signalsFocusToken = 0;
+
   @override
   void initState() {
     super.initState();
     final push = PushService.instance;
     // A notification tapped while the app was closed lands here on first
     // build; one tapped while it's running arrives through the notifier.
-    if (push.consumePendingOpenSignals()) _index = 1;
+    // Signals live on Home (index 0) now, so a signal tap opens Home.
+    if (push.consumePendingOpenSignals()) {
+      _index = 0;
+      _signalsFocusToken = 1;
+    }
     push.openSignalsRequests.addListener(_onOpenSignalsRequested);
     push.openAlertsRequests.addListener(_onOpenAlertsRequested);
     // Same for an exit notification: it lands on the Alerts screen, which can
@@ -100,7 +108,13 @@ class _HomeShellState extends State<HomeShell> {
 
   void _onOpenSignalsRequested() {
     if (!mounted) return;
-    if (PushService.instance.consumePendingOpenSignals()) _select(1);
+    // Signals live on Home (index 0).
+    if (PushService.instance.consumePendingOpenSignals()) {
+      setState(() {
+        _index = 0;
+        _signalsFocusToken++;
+      });
+    }
   }
 
   void _select(int index) {
@@ -184,11 +198,12 @@ class _HomeShellState extends State<HomeShell> {
             onAccountResolved: _onAccountResolved,
             onOpenProfile: () => _select(4),
             active: _index == 0,
+            signalsFocusToken: _signalsFocusToken,
           ),
         ),
         tickered(
           1,
-          SignalsTab(marketData: widget.marketData, active: _index == 1),
+          WeeklyReportsTab(marketData: widget.marketData, active: _index == 1),
         ),
         tickered(
           2,

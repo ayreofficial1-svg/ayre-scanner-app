@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 /// widget), updated via `ApiService.onReachabilityChanged` from `main.dart`.
 /// Every successful API response calls `ApiService.notifyReachable(true)`
 /// (see `market_data_service.dart`'s `_get()`), and with four tabs each
-/// independently polling every 10s (`HomeTab`, `InsightsTab`, `SignalsTab`,
+/// independently polling every 10s (`HomeTab`, `InsightsTab`, `SignalsSection`,
 /// `LearnTab` — all kept mounted forever by `HomeShell`'s `IndexedStack`),
 /// that meant a `setState` on the root widget roughly every 1–3 seconds for
 /// the entire session, cascading a rebuild through the whole tree

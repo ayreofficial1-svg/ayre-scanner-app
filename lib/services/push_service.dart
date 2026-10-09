@@ -21,13 +21,13 @@ import 'settings_store.dart';
 ///  * **Background / terminated** — the OS shows the notification itself (the
 ///    backend sends an FCM `notification` payload). Three kinds arrive, told
 ///    apart by the `type` in the message data:
-///      - `signal`        a new pick → tap opens the Signals tab. The Alerts
+///      - `signal`        a new pick → tap opens Home, scrolled to Signals. The Alerts
 ///                        list fills in through the [SeenSignalsStore] diff
 ///                        when Signals loads, so there is no duplicate entry.
 ///      - `signal_update` an already-announced pick that changed → tap opens
-///                        the Signals tab and the change is added to Alerts.
+///                        Home (Signals) and the change is added to Alerts.
 ///      - `entry_reached` a published pick reached its entry level → tap
-///                        records it in Alerts and opens the Signals tab.
+///                        records it in Alerts and opens Home (Signals).
 ///      - `exit`          a call to exit a pick (`symbol`, `profit`,
 ///                        `exit_price`) → tap opens the Alerts screen, where
 ///                        the entry is added.
@@ -66,7 +66,7 @@ class PushService extends ChangeNotifier {
   final ValueNotifier<int> openAlertsRequests = ValueNotifier<int>(0);
 
   /// Bumps when Signals should reload now (an entry-reached message arrived
-  /// or was tapped). `SignalsTab` listens. No timer; this is event-driven.
+  /// or was tapped). `SignalsSection` listens. No timer; this is event-driven.
   final ValueNotifier<int> refreshSignalsRequests = ValueNotifier<int>(0);
 
   bool _started = false;

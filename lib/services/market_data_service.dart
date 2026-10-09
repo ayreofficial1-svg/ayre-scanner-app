@@ -109,7 +109,7 @@ abstract interface class MarketDataService {
   Future<DataResult<VolumeSurgeBoard>> getVolumeSurge({int limit = 15});
 
   /// Admin-entered weekly performance reports (`GET /api/weekly-report`),
-  /// newest week first — shown on the Signals tab below the board (Phase 5).
+  /// newest week first — shown on the Reports tab.
   Future<DataResult<List<WeeklyReport>>> getWeeklyReports();
 
   /// The SEBI Research Analyst registration number and its disclaimer, for
