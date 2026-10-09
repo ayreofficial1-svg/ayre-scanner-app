@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../services/account_session.dart';
 import '../services/auth_service.dart';
@@ -8,29 +7,35 @@ import '../services/email_verification.dart';
 import '../services/market_data_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
+import '../widgets/ayre_avatar.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_hills.dart';
 import '../widgets/ayre_icons.dart';
-import '../widgets/ayre_stat_tile.dart';
-import '../widgets/figure.dart';
-import '../widgets/verification_banner.dart' show resendVerification, checkVerification;
+import '../widgets/verification_banner.dart'
+    show resendVerification, checkVerification;
 import 'edit_profile_screen.dart';
 import 'faq_screen.dart';
 import 'grievance_screen.dart';
 import 'home_shell.dart' show initialsFor;
+import 'legal_hub_screen.dart';
 import 'notifications_screen.dart';
-import 'privacy_policy_screen.dart';
-import 'research_analyst_screen.dart';
-import 'risk_disclosure_screen.dart';
 import 'settings_screen.dart';
-import 'support_screen.dart' show SupportScreen, kAppVersion, kAppBuild;
-import 'terms_screen.dart';
+import 'support_screen.dart' show SupportScreen;
 
-/// Profile — a flat header block plus list rows, using the same row grammar as
-/// Learn and Settings rather than a distinct card treatment.
+/// Profile — who you are, what the app has told you, where to get help, and
+/// how to leave.
 ///
-/// Sign out stays here (it's a session action, not a preference) and stays
-/// isolated in its own separated section.
+/// Laid out as inset groups in the order people reach for them:
+///
+/// 1. Identity (tap to edit — the only way into Edit profile)
+/// 2. Email verification, only while the address is unconfirmed
+/// 3. Alerts and Settings
+/// 4. Help
+/// 5. Legal and disclosures
+/// 6. Sign out, alone at the bottom
+///
+/// Preferences, account security, version and credits live in Settings, so
+/// nothing is listed in both places.
 class ProfileTab extends StatefulWidget {
   const ProfileTab({
     super.key,
@@ -48,29 +53,30 @@ class ProfileTab extends StatefulWidget {
 class _ProfileTabState extends State<ProfileTab> {
   bool _signingOut = false;
 
-  /// The account email, shown where the old username was.
-  String? get _handle {
+  String? get _email {
     final email = AuthService.instance.currentUser?.email;
     return (email == null || email.isEmpty) ? null : email;
   }
 
-  String? get _sessionName => AuthService.instance.currentUser?.displayName;
-  String? get _tier => null;
-
-  /// The shell resolves the saved name over the session's, so what it hands down
-  /// wins; the session value only covers the moment before it has one.
+  /// The shell resolves the saved name over the session's, so what it hands
+  /// down wins; the session value only covers the moment before it has one.
   String get _name {
     final resolved = widget.accountName.trim().isNotEmpty
         ? widget.accountName.trim()
-        : (_sessionName?.trim() ?? '');
+        : (AuthService.instance.currentUser?.displayName.trim() ?? '');
     return resolved.isEmpty ? 'Your account' : resolved;
+  }
+
+  void _push(Widget screen) {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(terminalRoute(builder: (_) => screen));
   }
 
   Future<void> _editProfile() async {
     HapticFeedback.selectionClick();
     final updated = await Navigator.of(context).push<String>(
       terminalRoute(
-        builder: (_) => EditProfileScreen(displayName: _name, handle: _handle),
+        builder: (_) => EditProfileScreen(displayName: _name, handle: _email),
       ),
     );
     if (updated == null || !mounted) return;
@@ -112,9 +118,8 @@ class _ProfileTabState extends State<ProfileTab> {
           120,
         ),
         children: [
-          // Same "soft layered shape" header device as Home (§2A, Phase 6
-          // step 1) — bled to the top-right corner behind the identity
-          // block, not part of its layout.
+          // Same soft layered shape as Home's header, bled to the top-right
+          // corner behind the title. Decorative, not part of the layout.
           Stack(
             clipBehavior: Clip.none,
             children: [
@@ -126,312 +131,180 @@ class _ProfileTabState extends State<ProfileTab> {
               SafeArea(
                 bottom: false,
                 child: Entrance(
-                  child: _IdentityBlock(
-                    name: _name,
-                    handle: _handle,
-                    tier: _tier,
-                    onEdit: _editProfile,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Profile', style: AppTypo.pageTitle(t)),
+                      const SizedBox(height: AppSpace.xxs),
+                      Text(
+                        'Your account, alerts and help.',
+                        style: AppTypo.body(t),
+                      ),
+                    ],
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: AppSpace.sectionGap),
-          const Entrance(index: 1, child: _StatsRow()),
-          const SizedBox(height: AppSpace.sectionGap),
-          // ── Account ───────────────────────────────────────────────────────
-          Entrance(index: 2, child: const SectionLabel(label: 'Account')),
+
+          // ── Identity ─────────────────────────────────────────────────────
           Entrance(
-            index: 2,
+            index: 1,
             child: ListenableBuilder(
-              listenable: Listenable.merge([
-                AuthService.instance.user,
-                EmailVerificationService.instance,
-              ]),
-              builder: (context, _) {
-                final user = AuthService.instance.currentUser;
-                final verified = user?.emailVerified ?? false;
-                final verification = EmailVerificationService.instance;
-                return RowGroup(
-                  children: [
-                    SettingRow(
-                      glyph: AyreGlyph.edit,
-                      title: 'Edit profile',
-                      subtitle: 'Change the name shown across the app',
-                      onTap: _editProfile,
-                    ),
-                    SettingRow(
-                      glyph: AyreGlyph.account,
-                      title: 'Email',
-                      subtitle: 'Identifies the account and cannot be changed here',
-                      trailing: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 170),
-                        child: Text(
-                          _handle ?? '—',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypo.bodyStrong(t, color: t.foregroundMuted),
-                        ),
-                      ),
-                    ),
-                    if (user != null)
-                      SettingRow(
-                        glyph: AyreGlyph.check,
-                        title: 'Email verification',
-                        subtitle: verified
-                            ? 'Your email address is confirmed'
-                            : 'Not confirmed yet. Nothing is blocked meanwhile.',
-                        trailing: AyreChip(
-                          label: verified ? 'Verified' : 'Unverified',
-                          tone: verified ? ChipTone.brand : ChipTone.attention,
-                        ),
-                      ),
-                    if (user != null && !verified) ...[
-                      SettingRow(
-                        glyph: AyreGlyph.refresh,
-                        title: verification.cooldown > 0
-                            ? 'Resend in ${verification.cooldown}s'
-                            : 'Resend verification email',
-                        subtitle: 'Sends a new link to your inbox',
-                        enabled: verification.canResend,
-                        onTap: verification.canResend
-                            ? () => resendVerification(context)
-                            : null,
-                      ),
-                      SettingRow(
-                        glyph: AyreGlyph.check,
-                        title: verification.checking
-                            ? 'Checking…'
-                            : "I've verified my email",
-                        subtitle: 'Check again after opening the link',
-                        enabled: !verification.checking,
-                        onTap: verification.checking
-                            ? null
-                            : () => checkVerification(context),
-                      ),
-                    ],
-                  ],
-                );
-              },
-            ),
-          ),
-
-          // ── Preferences ───────────────────────────────────────────────────
-          const SizedBox(height: AppSpace.lg),
-          Entrance(index: 4, child: const SectionLabel(label: 'Preferences')),
-          Entrance(
-            index: 4,
-            child: RowGroup(
-              children: [
-                SettingRow(
-                  glyph: AyreGlyph.appearance,
-                  title: 'Settings',
-                  subtitle: 'Theme, text size and alerts',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(context).push(
-                      terminalRoute(builder: (_) => const SettingsScreen()),
-                    );
-                  },
-                ),
-                SettingRow(
-                  glyph: AyreGlyph.bell,
-                  title: 'Alerts',
-                  subtitle: 'What the app has recorded for you',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(context).push(
-                      terminalRoute(
-                        builder: (_) => const NotificationsScreen(),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
-
-          // ── Support ───────────────────────────────────────────────────────
-          const SizedBox(height: AppSpace.lg),
-          Entrance(index: 6, child: const SectionLabel(label: 'Support')),
-          Entrance(
-            index: 6,
-            child: RowGroup(
-              children: [
-                SettingRow(
-                  glyph: AyreGlyph.support,
-                  title: 'Help and support',
-                  subtitle: 'How to reach the team',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(context).push(
-                      terminalRoute(builder: (_) => const SupportScreen()),
-                    );
-                  },
-                ),
-                SettingRow(
-                  glyph: AyreGlyph.about,
-                  title: 'Version',
-                  trailing: Figure.static(
-                    '$kAppVersion ($kAppBuild)',
-                    fontSize: AppTextScale.hint,
-                    color: t.foregroundMuted,
-                  ),
-                ),
-                // A "Saved / Watchlist" row belongs here once there is a
-                // watchlist feature to open. There isn't, so it isn't shown.
-              ],
-            ),
-          ),
-
-          // Required attribution for the free "Ticker Logos by
-          // AllInvestView" service the bundled `assets/logos/` images (see
-          // lib/services/stock_logo_service.dart) were sourced from. Kept
-          // deliberately small/quiet — a footnote under Support rather than
-          // a full settings row — since it's a credit, not something the
-          // user needs to act on.
-          const SizedBox(height: AppSpace.sm),
-          Center(
-            child: GestureDetector(
-              onTap: () async {
-                HapticFeedback.selectionClick();
-                final uri = Uri.parse(
-                  'https://www.allinvestview.com/tools/ticker-logos/',
-                );
-                if (await canLaunchUrl(uri)) {
-                  await launchUrl(uri, mode: LaunchMode.externalApplication);
-                }
-              },
-              child: Text(
-                'Logos by AllInvestView',
-                style: AppTypo.ui(
-                  fontSize: AppTextScale.navLabel,
-                  fontWeight: FontWeight.w400,
-                  color: t.foregroundSubtle,
-                ).copyWith(
-                  decoration: TextDecoration.underline,
-                  decorationColor: t.foregroundSubtle,
-                ),
+              listenable: AuthService.instance.user,
+              builder: (context, _) => _IdentityCard(
+                name: _name,
+                email: _email,
+                verified: AuthService.instance.currentUser?.emailVerified,
+                onTap: _editProfile,
               ),
             ),
           ),
-          const SizedBox(height: AppSpace.lg),
-          Entrance(index: 7, child: const SectionLabel(label: 'Legal')),
+
+          // ── Email verification (only while it is outstanding) ────────────
+          ListenableBuilder(
+            listenable: Listenable.merge([
+              AuthService.instance.user,
+              EmailVerificationService.instance,
+            ]),
+            builder: (context, _) {
+              final user = AuthService.instance.currentUser;
+              if (user == null || user.emailVerified) {
+                return const SizedBox.shrink();
+              }
+              final verification = EmailVerificationService.instance;
+              final resendTitle = verification.sending
+                  ? 'Sending…'
+                  : (verification.cooldown > 0
+                        ? 'Resend in ${verification.cooldown}s'
+                        : 'Resend verification email');
+              return Padding(
+                padding: const EdgeInsets.only(top: AppSpace.sectionGap),
+                child: Entrance(
+                  index: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SectionLabel(
+                        label: 'Verify your email',
+                        subtitle: 'Nothing is blocked while you wait.',
+                      ),
+                      RowGroup(
+                        children: [
+                          SettingRow(
+                            glyph: AyreGlyph.refresh,
+                            title: resendTitle,
+                            subtitle: 'Sends a new link to your inbox',
+                            enabled: verification.canResend,
+                            onTap: verification.canResend
+                                ? () => resendVerification(context)
+                                : null,
+                          ),
+                          SettingRow(
+                            glyph: AyreGlyph.check,
+                            title: verification.checking
+                                ? 'Checking…'
+                                : 'I’ve verified my email',
+                            subtitle: 'Tap after opening the link',
+                            enabled: !verification.checking,
+                            onTap: verification.checking
+                                ? null
+                                : () => checkVerification(context),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+
+          // ── Alerts and Settings ──────────────────────────────────────────
+          const SizedBox(height: AppSpace.sectionGap),
           Entrance(
-            index: 7,
-            child: RowGroup(
+            index: 3,
+            child: ListenableBuilder(
+              listenable: NotificationLog.instance,
+              builder: (context, _) => RowGroup(
+                children: [
+                  SettingRow(
+                    glyph: AyreGlyph.bell,
+                    title: 'Alerts',
+                    subtitle: 'New signals, updates and exit calls',
+                    trailing: NotificationLog.instance.hasUnread
+                        ? const AyreChip(label: 'New', tone: ChipTone.brand)
+                        : null,
+                    onTap: () => _push(const NotificationsScreen()),
+                  ),
+                  SettingRow(
+                    glyph: AyreGlyph.appearance,
+                    title: 'Settings',
+                    subtitle: 'Appearance, notifications and account',
+                    onTap: () => _push(const SettingsScreen()),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // ── Help ─────────────────────────────────────────────────────────
+          const SizedBox(height: AppSpace.sectionGap),
+          Entrance(
+            index: 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SettingRow(
-                  glyph: AyreGlyph.about,
-                  title: 'Terms and Conditions',
-                  subtitle: 'The terms that govern using this app',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(
-                      context,
-                    ).push(terminalRoute(builder: (_) => const TermsScreen()));
-                  },
-                ),
-                SettingRow(
-                  glyph: AyreGlyph.alerts,
-                  title: 'Risk Disclosure',
-                  subtitle: 'The risks of investing in securities',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(context).push(
-                      terminalRoute(
-                        builder: (_) => const RiskDisclosureScreen(),
-                      ),
-                    );
-                  },
-                ),
-                SettingRow(
-                  glyph: AyreGlyph.about,
-                  title: 'Most Important Terms and Conditions',
-                  subtitle: 'MITC for research analyst services',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(
-                      context,
-                    ).push(terminalRoute(builder: (_) => const MitcScreen()));
-                  },
-                ),
-                SettingRow(
-                  glyph: AyreGlyph.check,
-                  title: 'Investor Charter',
-                  subtitle: 'Your rights and the Research Analyst’s duties',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(context).push(
-                      terminalRoute(
-                        builder: (_) => const InvestorCharterScreen(),
-                      ),
-                    );
-                  },
-                ),
-                SettingRow(
-                  glyph: AyreGlyph.account,
-                  title: 'Research Analyst information',
-                  subtitle: 'Registration, disclosures and disclaimer',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(context).push(
-                      terminalRoute(
-                        builder: (_) => ResearchAnalystScreen(
-                          marketData: widget.marketData,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                SettingRow(
-                  glyph: AyreGlyph.support,
-                  title: 'Grievance redressal',
-                  subtitle: 'How to make a complaint',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(context).push(
-                      terminalRoute(builder: (_) => const GrievanceScreen()),
-                    );
-                  },
-                ),
-                SettingRow(
-                  glyph: AyreGlyph.support,
-                  title: 'FAQ',
-                  subtitle: 'Answers to common questions',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(
-                      context,
-                    ).push(terminalRoute(builder: (_) => const FaqScreen()));
-                  },
-                ),
-                SettingRow(
-                  glyph: AyreGlyph.lock,
-                  title: 'Privacy Policy',
-                  subtitle: 'How your information is handled',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(context).push(
-                      terminalRoute(
-                        builder: (_) => const PrivacyPolicyScreen(),
-                      ),
-                    );
-                  },
+                const SectionLabel(label: 'Help'),
+                RowGroup(
+                  children: [
+                    SettingRow(
+                      glyph: AyreGlyph.support,
+                      title: 'Help and support',
+                      subtitle: 'Contact the team',
+                      onTap: () => _push(const SupportScreen()),
+                    ),
+                    SettingRow(
+                      glyph: AyreGlyph.about,
+                      title: 'FAQ',
+                      subtitle: 'Answers to common questions',
+                      onTap: () => _push(const FaqScreen()),
+                    ),
+                    SettingRow(
+                      glyph: AyreGlyph.alerts,
+                      title: 'Grievance redressal',
+                      subtitle: 'Raise a complaint or concern',
+                      onTap: () => _push(const GrievanceScreen()),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
-          const SizedBox(height: AppSpace.xxl),
-          Entrance(index: 8, child: const SectionLabel(label: 'Session')),
+
+          // ── Legal ────────────────────────────────────────────────────────
+          const SizedBox(height: AppSpace.sectionGap),
           Entrance(
-            index: 8,
+            index: 5,
             child: RowGroup(
-              // `backgroundTint` was retired in Phase 0 and has no v4
-              // equivalent: emphasis comes from the row's own danger styling
-              // and the confirmation sheet, never a tinted plate behind a
-              // group (§8.4). The group takes the ordinary surface.
-              color: null,
+              children: [
+                SettingRow(
+                  glyph: AyreGlyph.lock,
+                  title: 'Legal and disclosures',
+                  subtitle: 'Terms, privacy, risk and analyst information',
+                  onTap: () =>
+                      _push(LegalHubScreen(marketData: widget.marketData)),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Sign out ─────────────────────────────────────────────────────
+          const SizedBox(height: AppSpace.xl),
+          Entrance(
+            index: 6,
+            child: RowGroup(
               children: [
                 SettingRow(
                   glyph: AyreGlyph.signOut,
@@ -459,165 +332,79 @@ class _ProfileTabState extends State<ProfileTab> {
   }
 }
 
-/// Profile header (redesign plan §2.4 / Phase 6 step 1): circular
-/// avatar/initials in the identity-accent lavender/plum tone (never brand
-/// green — §2A's "Avatar / identity chip" row is a deliberate secondary
-/// accent reserved for personal identity, distinct from market data), name,
-/// handle, a small pill tag top-right of the header, a muted tagline, and an
-/// "Edit Profile" pill button.
-class _IdentityBlock extends StatelessWidget {
-  const _IdentityBlock({
+/// The identity row: avatar, name, email and verification state. The whole
+/// card is the "Edit profile" control, so there is no separate button.
+class _IdentityCard extends StatelessWidget {
+  const _IdentityCard({
     required this.name,
-    required this.handle,
-    required this.tier,
-    required this.onEdit,
+    required this.email,
+    required this.verified,
+    required this.onTap,
   });
 
   final String name;
-  final String? handle;
-  final String? tier;
-  final VoidCallback onEdit;
+  final String? email;
+
+  /// Null when nobody is signed in, so no verification state is shown.
+  final bool? verified;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    // A flat header block, not a bordered card.
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+
+    return Semantics(
+      button: true,
+      excludeSemantics: true,
+      label: [
+        'Edit profile',
+        name,
+        ?email,
+        if (verified != null) verified! ? 'Email verified' : 'Email not verified',
+      ].join(', '),
+      child: AyreCard(
+        onTap: onTap,
+        padding: const EdgeInsets.all(AppSpace.md),
+        child: Row(
           children: [
-            Container(
-              height: 56,
-              width: 56,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: t.avatarFill,
-                // §7 reserves circles for avatars and the toggle knob. This
-                // is an avatar — it was a rounded square in v3 because that
-                // identity had no such rule. Home's header control matches.
-                shape: BoxShape.circle,
-                border: Border.all(color: t.hairline),
-              ),
-              child: Text(
-                initialsFor(name),
-                style: AppTypo.ui(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: t.avatarInk,
-                ),
-              ),
-            ),
+            AyreAvatar(initials: initialsFor(name), size: 56, fontSize: 20),
             const SizedBox(width: AppSpace.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     name,
-                    style: AppTypo.display(
-                      fontSize: AppTextScale.featuredHeadline,
-                      fontWeight: FontWeight.w700,
-                      color: t.textPrimary,
-                    ),
+                    style: AppTypo.cardTitle(t),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: AppSpace.xxs),
-                  if (handle != null && handle!.isNotEmpty)
+                  if (email != null) ...[
+                    const SizedBox(height: AppSpace.xxs),
                     Text(
-                      handle!,
+                      email!,
                       style: AppTypo.caption(t),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                  const SizedBox(height: AppSpace.xxs),
-                  Text(
-                    'Manage your account and settings.',
-                    style: AppTypo.body(t),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  ],
+                  if (verified != null) ...[
+                    const SizedBox(height: AppSpace.xs),
+                    AyreChip(
+                      label: verified! ? 'Verified' : 'Unverified',
+                      tone: verified! ? ChipTone.brand : ChipTone.attention,
+                      glyph: verified! ? AyreGlyph.check : null,
+                    ),
+                  ],
                 ],
               ),
             ),
-            // Top-right pill tag (§2A "Profile mood/streak tag pill" /
-            // Component table: text `accentInk` on `accentSoft`). The app
-            // has no streak/mood endpoint, so this reuses the real `tier`
-            // the session already returns rather than inventing figures —
-            // same non-market identity metadata as before, restyled onto
-            // the header's corner instead of a same-line chip.
-            if (tier != null && tier!.isNotEmpty)
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpace.sm,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: t.accentSoft,
-                  borderRadius: BorderRadius.circular(AppRadius.chip),
-                ),
-                child: Text(
-                  tier!.toUpperCase(),
-                  style: AppTypo.label(t, color: t.accentInk),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: AppSpace.md),
-        AyreButton(
-          label: 'Edit Profile',
-          glyph: AyreGlyph.edit,
-          kind: AyreButtonKind.outline,
-          expand: false,
-          onPressed: onEdit,
-        ),
-      ],
-    );
-  }
-}
-
-/// §13.5's stats row, rebuilt (Phase 6 step 2) onto the shared
-/// [AyreStatTile] from Phase 5 instead of a bespoke card — "one component
-/// for two screens", per that component's own doc comment.
-///
-/// Built only from figures the app genuinely holds locally — alerts logged on
-/// this device, and whether the notification log has anything unread. There is
-/// no account-statistics endpoint, so the obvious candidates (signals acted
-/// on, lessons completed, member-since) have no source. Per plan §8 that is a
-/// backend request to flag, not a reason to invent a number that looks
-/// authoritative; the row shows what is real and no more.
-class _StatsRow extends StatelessWidget {
-  const _StatsRow();
-
-  @override
-  Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: NotificationLog.instance,
-      builder: (context, _) {
-        final entries = NotificationLog.instance.entries;
-        final unread = NotificationLog.instance.hasUnread;
-        return Row(
-          children: [
-            Expanded(
-              child: AyreStatTile(
-                glyph: AyreGlyph.bell,
-                value: '${entries.length}',
-                label: 'Alerts logged',
-              ),
-            ),
             const SizedBox(width: AppSpace.sm),
-            Expanded(
-              child: AyreStatTile(
-                glyph: AyreGlyph.alerts,
-                value: unread ? 'Yes' : 'No',
-                label: 'Unread insights',
-              ),
-            ),
+            AyreIcon(AyreGlyph.forward, size: 16, color: t.foregroundSubtle),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 }

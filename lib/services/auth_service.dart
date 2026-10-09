@@ -111,6 +111,17 @@ abstract class AuthService {
 
   Future<void> signOut({String? notice});
 
+  /// Confirms the signed-in account's password again before a sensitive
+  /// action. Throws [AuthFailure] when the password is wrong or the check
+  /// cannot be made.
+  Future<void> reauthenticate({required String password});
+
+  /// Ends the local session after the server has deleted the account, with a
+  /// notice on Sign in saying so. The deletion itself happens on the backend
+  /// (`POST /api/account/delete`), which also clears the account's push
+  /// devices; see `AccountSession.deleteAccount`.
+  Future<void> endSessionAfterDeletion();
+
   void clearNotice();
 }
 
@@ -337,6 +348,51 @@ class FirebaseAuthService implements AuthService {
       await auth.signOut();
     } catch (e) {
       debugPrint('Sign out failed: $e');
+      _explicitSignOut = false;
+    }
+  }
+
+  @override
+  Future<void> reauthenticate({required String password}) async {
+    final user = _auth?.currentUser;
+    final email = user?.email;
+    if (user == null || email == null || email.isEmpty) {
+      throw const AuthFailure(
+        AuthFailureKind.unknown,
+        'You need to be signed in to do this.',
+      );
+    }
+    try {
+      await user.reauthenticateWithCredential(
+        fb.EmailAuthProvider.credential(email: email, password: password),
+      );
+    } on fb.FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'wrong-password':
+        case 'invalid-credential':
+        case 'invalid-login-credentials':
+          throw const AuthFailure(
+            AuthFailureKind.invalidCredentials,
+            'That password is incorrect.',
+          );
+        default:
+          throw _translate(e);
+      }
+    }
+  }
+
+  @override
+  Future<void> endSessionAfterDeletion() async {
+    final auth = _auth;
+    if (auth == null) return;
+    // A deliberate exit, so Sign in says the account was deleted rather than
+    // that a session ended unexpectedly.
+    _explicitSignOut = true;
+    _notice.value = 'Your account has been deleted.';
+    try {
+      await auth.signOut();
+    } catch (e) {
+      debugPrint('Sign out after deletion failed: $e');
       _explicitSignOut = false;
     }
   }

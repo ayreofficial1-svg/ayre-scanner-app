@@ -241,6 +241,28 @@ class ApiService {
     }
   }
 
+  /// Asks the server to permanently delete the signed-in account: the login
+  /// itself and every push device registered to it. Returns null on success,
+  /// or a plain-words reason. Safe to retry.
+  static Future<String?> deleteAccount() async {
+    try {
+      final response = await authedPost(
+        Uri.parse('$baseUrl/api/account/delete'),
+        const <String, dynamic>{},
+      );
+      if (response.statusCode == 200) {
+        notifyReachable(true);
+        return null;
+      }
+      notifyReachable(true);
+      return 'We couldn’t delete your account right now. Please try again '
+          'in a moment.';
+    } catch (_) {
+      notifyReachable(false);
+      return 'No connection. Check your internet and try again.';
+    }
+  }
+
   /// Fetches the current placeholder market-sentiment value (0-100 scale)
   /// for the Insights tab gauge.
   static Future<Map<String, dynamic>?> getSentiment() async {

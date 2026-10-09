@@ -11,13 +11,20 @@ import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
 import '../widgets/figure.dart';
 import '../widgets/pressable_scale.dart';
-import 'support_screen.dart';
+import 'delete_account_screen.dart';
+import 'support_screen.dart' show kAppVersion, kAppBuild;
 
-/// Settings — grouped by what the user is actually trying to change, with the
-/// most-adjusted groups first and the account/session facts last.
+/// Settings — what you can change, grouped by what you are trying to change:
 ///
-/// Every row is backed by working behaviour. Where a plausible setting has no
-/// backing capability it is absent rather than shipped inert.
+/// 1. Appearance — theme and text size
+/// 2. Notifications — where alerts reach you, and which ones
+/// 3. Account — password and deletion (only while signed in)
+/// 4. About — version and credits
+///
+/// Identity, email verification, help, legal and sign out live on Profile, so
+/// nothing is listed in both places. Every row is backed by working behaviour;
+/// a plausible setting with nothing behind it is left out rather than shipped
+/// inert.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -26,7 +33,63 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  static final Uri _logoCreditUrl = Uri.parse(
+    'https://www.allinvestview.com/tools/ticker-logos/',
+  );
+
+  bool _sendingReset = false;
+
   AuthUser? get _user => AuthService.instance.currentUser;
+
+  void _toast(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _changePassword() async {
+    final email = _user?.email ?? '';
+    if (email.isEmpty || _sendingReset) return;
+    HapticFeedback.selectionClick();
+    setState(() => _sendingReset = true);
+    String message;
+    try {
+      await AuthService.instance.sendPasswordReset(email);
+      message = 'We sent a password reset link to $email.';
+    } on AuthFailure catch (e) {
+      message = e.message;
+    }
+    if (!mounted) return;
+    setState(() => _sendingReset = false);
+    _toast(message);
+  }
+
+  Future<void> _clearAlertHistory() async {
+    HapticFeedback.selectionClick();
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      useSafeArea: true,
+      builder: (_) => const _ConfirmSheet(
+        title: 'Clear alert history?',
+        message:
+            'This removes the alerts saved on this device. New alerts will '
+            'still appear as they arrive.',
+        confirmLabel: 'Clear history',
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    HapticFeedback.mediumImpact();
+    await NotificationLog.instance.clear();
+    if (!mounted) return;
+    _toast('Alert history cleared');
+  }
+
+  Future<void> _openLogoCredit() async {
+    HapticFeedback.selectionClick();
+    if (await canLaunchUrl(_logoCreditUrl)) {
+      await launchUrl(_logoCreditUrl, mode: LaunchMode.externalApplication);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,25 +112,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
           listenable: settings,
           builder: (context, _) => ListView(
             padding: const EdgeInsets.fromLTRB(
-              AppSpace.md,
+              AppSpace.pageHorizontal,
               AppSpace.sm,
-              AppSpace.md,
+              AppSpace.pageHorizontal,
               AppSpace.xxl,
             ),
             children: [
-              // ── Appearance ─────────────────────────────────────────────────
+              // ── Appearance ───────────────────────────────────────────────
               const SectionLabel(label: 'Appearance'),
               AyreCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('THEME', style: AppTypo.label(t)),
+                    Text('Theme', style: AppTypo.rowLabel(t)),
                     const SizedBox(height: AppSpace.sm),
-                    // Phase 1A (HIG alignment): System restored as a third
-                    // tile alongside Light/Dark. Big tappable tiles (redesign
-                    // plan §2.4 / Phase 6 step 4), not the thin segmented bar
-                    // — the underlying selection logic is untouched, just
-                    // widened to a third value.
                     _AppearanceTiles(
                       value: theme.themeMode,
                       onChanged: (mode) {
@@ -75,169 +133,180 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         theme.setThemeMode(mode);
                       },
                     ),
-                    const SizedBox(height: AppSpace.md),
+                    const SizedBox(height: AppSpace.sm),
                     Text(
-                      'Each theme is tuned separately.',
+                      switch (theme.themeMode) {
+                        ThemeMode.system =>
+                          'Follows your device’s light or dark setting.',
+                        ThemeMode.light => 'Ayre always uses the light theme.',
+                        ThemeMode.dark => 'Ayre always uses the dark theme.',
+                      },
+                      style: AppTypo.caption(t),
+                    ),
+                    const SizedBox(height: AppSpace.md),
+                    const HairlineDivider(),
+                    const SizedBox(height: AppSpace.md),
+                    Text('Text size', style: AppTypo.rowLabel(t)),
+                    const SizedBox(height: AppSpace.sm),
+                    _TextSizeTiles(
+                      value: settings.textSize,
+                      onChanged: (size) {
+                        HapticFeedback.selectionClick();
+                        settings.setTextSize(size);
+                      },
+                    ),
+                    const SizedBox(height: AppSpace.sm),
+                    Text(
+                      'Applies everywhere in the app straight away.',
                       style: AppTypo.caption(t),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: AppSpace.md),
-              _TextSizeCard(
-                value: settings.textSize,
-                onChanged: (size) {
-                  HapticFeedback.selectionClick();
-                  settings.setTextSize(size);
-                },
-              ),
 
-              // ── Alerts ─────────────────────────────────────────────────────
-              const SizedBox(height: AppSpace.lg),
-              const SectionLabel(label: 'Alerts'),
+              // ── Notifications ────────────────────────────────────────────
+              const SizedBox(height: AppSpace.sectionGap),
+              const SectionLabel(label: 'Notifications'),
               ListenableBuilder(
                 // Push availability and permission can change after this
-                // screen opens (the OS prompt resolves asynchronously).
-                listenable: PushService.instance,
+                // screen opens (the OS prompt resolves asynchronously), and
+                // the saved-alert count changes as alerts arrive.
+                listenable: Listenable.merge([
+                  PushService.instance,
+                  NotificationLog.instance,
+                ]),
                 builder: (context, _) {
                   final push = PushService.instance;
-                  return RowGroup(
+                  final saved = NotificationLog.instance.entries.length;
+                  final anyChannel =
+                      settings.inAppAlerts ||
+                      (push.available && settings.pushEnabled);
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _SwitchRow(
-                        glyph: AyreGlyph.bell,
-                        title: 'In-app alerts',
-                        subtitle: 'See what changed while away.',
-                        value: settings.inAppAlerts,
-                        onChanged: settings.setInAppAlerts,
+                      RowGroup(
+                        children: [
+                          // Only offered on builds that can actually receive
+                          // push (Android/iOS with Firebase configured) — a
+                          // switch that changes nothing is worse than none.
+                          if (push.available)
+                            _SwitchRow(
+                              glyph: AyreGlyph.bell,
+                              title: 'Push notifications',
+                              subtitle:
+                                  push.permissionDenied && settings.pushEnabled
+                                  ? 'Blocked by your device. Allow notifications '
+                                        'for Ayre in your device settings.'
+                                  : 'Get alerts on this device, even when the '
+                                        'app is closed.',
+                              value: settings.pushEnabled,
+                              onChanged: settings.setPushEnabled,
+                            ),
+                          _SwitchRow(
+                            glyph: AyreGlyph.alerts,
+                            title: 'In-app alerts',
+                            subtitle: 'Keep a list of alerts in the app.',
+                            value: settings.inAppAlerts,
+                            onChanged: settings.setInAppAlerts,
+                          ),
+                          _SwitchRow(
+                            glyph: AyreGlyph.trendUp,
+                            title: 'Signal alerts',
+                            subtitle:
+                                'New signals, changes to them, and when a '
+                                'price reaches its entry level.',
+                            value: settings.newSignalAlerts,
+                            // Governs both the in-app list and push, so it
+                            // stays usable while either of them is on.
+                            enabled: anyChannel,
+                            onChanged: settings.setNewSignalAlerts,
+                          ),
+                          SettingRow(
+                            glyph: AyreGlyph.close,
+                            title: 'Clear alert history',
+                            subtitle: saved == 0
+                                ? 'No alerts saved on this device.'
+                                : 'Remove $saved saved '
+                                      '${saved == 1 ? 'alert' : 'alerts'} '
+                                      'from this device.',
+                            enabled: saved > 0,
+                            onTap: saved > 0 ? _clearAlertHistory : null,
+                          ),
+                        ],
                       ),
-                      // Only offered on builds that can actually receive push
-                      // (Android/iOS with Firebase configured) — a switch that
-                      // changes nothing is worse than no switch.
-                      if (push.available)
-                        _SwitchRow(
-                          glyph: AyreGlyph.bell,
-                          title: 'Push notifications',
-                          subtitle: push.permissionDenied && settings.pushEnabled
-                              ? 'Blocked in system settings — allow notifications '
-                                    'for Ayre there.'
-                              : 'Get alerts on your phone, even when the app is '
-                                    'closed.',
-                          value: settings.pushEnabled,
-                          onChanged: settings.setPushEnabled,
-                        ),
-                      _SwitchRow(
-                        glyph: AyreGlyph.alerts,
-                        title: 'New signal alerts',
-                        subtitle: 'New picks and changes to existing ones.',
-                        value: settings.newSignalAlerts,
-                        // Governs both the in-app list and push, so it stays
-                        // usable while either of them is on.
-                        enabled:
-                            settings.inAppAlerts ||
-                            (push.available && settings.pushEnabled),
-                        onChanged: settings.setNewSignalAlerts,
+                      const _GroupNote(
+                        'Exit calls and messages from the team are not '
+                        'affected by Signal alerts.',
                       ),
                     ],
                   );
                 },
               ),
 
-              // ── Account & session ──────────────────────────────────────────
-              const SizedBox(height: AppSpace.lg),
-              const SectionLabel(label: 'Account and session'),
-              RowGroup(
-                children: [
-                  SettingRow(
-                    glyph: AyreGlyph.account,
-                    title: 'Signed in as',
-                    subtitle: 'The email your account uses',
-                    trailing: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 170),
-                      child: Text(
-                        _user?.email ?? 'Not signed in',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypo.bodyStrong(t, color: t.foregroundMuted),
-                      ),
+              // ── Account ──────────────────────────────────────────────────
+              if (_user != null) ...[
+                const SizedBox(height: AppSpace.sectionGap),
+                const SectionLabel(label: 'Account'),
+                RowGroup(
+                  children: [
+                    SettingRow(
+                      glyph: AyreGlyph.lock,
+                      title: 'Change password',
+                      subtitle: 'We’ll email you a link to set a new one.',
+                      enabled: !_sendingReset,
+                      trailing: _sendingReset
+                          ? SizedBox(
+                              height: 15,
+                              width: 15,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.6,
+                                color: t.foregroundMuted,
+                              ),
+                            )
+                          : null,
+                      onTap: _sendingReset ? null : _changePassword,
                     ),
-                  ),
-                  SettingRow(
-                    glyph: AyreGlyph.lock,
-                    title: 'Session',
-                    subtitle: _user == null
-                        ? 'No active session found.'
-                        : 'Active on this device.',
-                    trailing: AyreChip(
-                      label: _user == null ? 'Inactive' : 'Active',
-                      tone: _user == null
-                          ? ChipTone.neutral
-                          : ChipTone.brand,
+                    SettingRow(
+                      glyph: AyreGlyph.signOut,
+                      title: 'Delete account',
+                      subtitle: 'Permanently remove your account.',
+                      danger: true,
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        Navigator.of(context).push(
+                          terminalRoute(
+                            builder: (_) => const DeleteAccountScreen(),
+                          ),
+                        );
+                      },
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+                _GroupNote('Signed in as ${_user!.email}.'),
+              ],
 
-              // ── About ──────────────────────────────────────────────────────
-              const SizedBox(height: AppSpace.lg),
+              // ── About ────────────────────────────────────────────────────
+              const SizedBox(height: AppSpace.sectionGap),
               const SectionLabel(label: 'About'),
               RowGroup(
                 children: [
                   SettingRow(
-                    glyph: AyreGlyph.support,
-                    title: 'Help and support',
-                    subtitle: 'How to reach the team',
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      Navigator.of(context).push(
-                        terminalRoute(
-                          builder: (_) => const SupportScreen(),
-                        ),
-                      );
-                    },
-                  ),
-                  SettingRow(
                     glyph: AyreGlyph.about,
                     title: 'Version',
-                    subtitle: 'Include this when reporting issues.',
+                    subtitle: 'Include this when you contact support.',
                     trailing: Figure.static(
                       '$kAppVersion ($kAppBuild)',
                       fontSize: AppTextScale.hint,
                       color: t.foregroundMuted,
                     ),
                   ),
-                ],
-              ),
-
-              // Required attribution for the free "Ticker Logos by
-              // AllInvestView" service the bundled `assets/logos/` images
-              // (see lib/services/stock_logo_service.dart) were sourced
-              // from. Kept deliberately small/quiet — a footnote under the
-              // About group rather than a full settings row — since it's a
-              // credit, not something the user needs to act on.
-              const SizedBox(height: AppSpace.sm),
-              Center(
-                child: GestureDetector(
-                  onTap: () async {
-                    HapticFeedback.selectionClick();
-                    final uri = Uri.parse(
-                      'https://www.allinvestview.com/tools/ticker-logos/',
-                    );
-                    if (await canLaunchUrl(uri)) {
-                      await launchUrl(uri, mode: LaunchMode.externalApplication);
-                    }
-                  },
-                  child: Text(
-                    'Logos by AllInvestView',
-                    style: AppTypo.ui(
-                      fontSize: AppTextScale.navLabel,
-                      fontWeight: FontWeight.w400,
-                      color: t.foregroundSubtle,
-                    ).copyWith(
-                      decoration: TextDecoration.underline,
-                      decorationColor: t.foregroundSubtle,
-                    ),
+                  SettingRow(
+                    glyph: AyreGlyph.equity,
+                    title: 'Logo credits',
+                    subtitle: 'Ticker logos by AllInvestView.',
+                    onTap: _openLogoCredit,
                   ),
-                ),
+                ],
               ),
             ],
           ),
@@ -247,32 +316,66 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 }
 
-/// The font-size control: just the three size options.
-class _TextSizeCard extends StatelessWidget {
-  const _TextSizeCard({required this.value, required this.onChanged});
+/// A short explanation under a group — the iOS "group footer".
+class _GroupNote extends StatelessWidget {
+  const _GroupNote(this.text);
 
-  final AppTextSize value;
-  final ValueChanged<AppTextSize> onChanged;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpace.md,
+        AppSpace.xs,
+        AppSpace.md,
+        0,
+      ),
+      child: Text(text, style: AppTypo.caption(context.tokens)),
+    );
+  }
+}
+
+/// Bottom-sheet confirmation for an action the person may not want. Cancel is
+/// the primary button; the confirming action is outlined in the danger tone.
+class _ConfirmSheet extends StatelessWidget {
+  const _ConfirmSheet({
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
+  });
+
+  final String title;
+  final String message;
+  final String confirmLabel;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-
-    return AyreCard(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpace.lg,
+        AppSpace.xl,
+        AppSpace.lg,
+        AppSpace.xxl,
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('TEXT SIZE', style: AppTypo.label(t)),
+          Text(title, style: AppTypo.sectionTitle(t)),
           const SizedBox(height: AppSpace.sm),
-          // Three-up "big tappable tile" selector (redesign plan §2.4 /
-          // Phase 6 step 4): each tile shows "Aa" at its own scale plus a
-          // checkmark on the selected tile, replacing the thinner segmented
-          // bar. `onChanged` wiring is unchanged.
-          _TextSizeTiles(value: value, onChanged: onChanged),
+          Text(message, style: AppTypo.body(t)),
+          const SizedBox(height: AppSpace.xl),
+          AyreButton(
+            label: 'Cancel',
+            onPressed: () => Navigator.of(context).pop(false),
+          ),
           const SizedBox(height: AppSpace.sm),
-          Text(
-            'Changes text size everywhere instantly.',
-            style: AppTypo.caption(t),
+          AyreButton(
+            label: confirmLabel,
+            kind: AyreButtonKind.danger,
+            onPressed: () => Navigator.of(context).pop(true),
           ),
         ],
       ),
@@ -281,11 +384,9 @@ class _TextSizeCard extends StatelessWidget {
 }
 
 // ─── Appearance & text-size tile selectors ─────────────────────────────────
-// Phase 6 step 4: both selectors render as a row of big tappable tiles
-// (glyph/sample + label + checkmark on the selected tile) rather than
-// `AyreSegmented`'s thinner bar. `AyreSegmented` itself is left untouched —
-// it's shared with the Insights time-window toggle, which keeps the bar
-// style. These two widgets are local to this screen.
+// Both selectors render as a row of big tappable tiles (glyph/sample + label +
+// checkmark on the selected tile). `AyreSegmented` is left untouched — it is
+// shared with the Insights time-window toggle, which keeps the bar style.
 
 class _AppearanceTiles extends StatelessWidget {
   const _AppearanceTiles({required this.value, required this.onChanged});
@@ -297,6 +398,20 @@ class _AppearanceTiles extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
+        Expanded(
+          child: _BigTile(
+            selected: value == ThemeMode.system,
+            label: 'System',
+            onTap: () => onChanged(ThemeMode.system),
+            // The half-filled contrast disc: a sun/moon composite is exactly
+            // what "follows the device" should look like.
+            child: _TileGlyph(
+              glyph: AyreGlyph.appearance,
+              selected: value == ThemeMode.system,
+            ),
+          ),
+        ),
+        const SizedBox(width: AppSpace.sm),
         Expanded(
           child: _BigTile(
             selected: value == ThemeMode.light,
@@ -317,21 +432,6 @@ class _AppearanceTiles extends StatelessWidget {
             child: _TileGlyph(
               glyph: AyreGlyph.moon,
               selected: value == ThemeMode.dark,
-            ),
-          ),
-        ),
-        const SizedBox(width: AppSpace.sm),
-        Expanded(
-          child: _BigTile(
-            selected: value == ThemeMode.system,
-            label: 'System',
-            onTap: () => onChanged(ThemeMode.system),
-            // Reuses the half-filled contrast disc already drawn for the
-            // Profile "Appearance" row glyph — a sun/moon composite is
-            // exactly what "follows the device" should look like here.
-            child: _TileGlyph(
-              glyph: AyreGlyph.appearance,
-              selected: value == ThemeMode.system,
             ),
           ),
         ),
@@ -367,11 +467,10 @@ class _TextSizeTiles extends StatelessWidget {
   }
 }
 
-/// One tile shared by both selectors: a sample/glyph, a label, and a
-/// checkmark badge in the corner when selected. Fill/content colors follow
-/// §2A's "Theme/text-size selector tiles" component-table row exactly:
-/// selected tiles fill `accent` with `onAccent` content; unselected tiles
-/// stay on `surfaceRaised` with `foregroundMuted` content.
+/// One tile shared by both selectors: a sample/glyph, a label, and a checkmark
+/// badge in the corner when selected. Selected tiles fill `accent` with
+/// `onAccent` content; unselected tiles stay on `surfaceRaised` with
+/// `foregroundMuted` content.
 class _BigTile extends StatelessWidget {
   const _BigTile({
     required this.selected,
@@ -407,30 +506,31 @@ class _BigTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected ? t.accent : t.surfaceRaised,
             borderRadius: BorderRadius.circular(AppRadius.control),
-            border: Border.all(
-              color: selected ? t.accent : t.hairline,
-            ),
+            border: Border.all(color: selected ? t.accent : t.hairline),
           ),
           child: Stack(
             children: [
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  child,
-                  const SizedBox(height: AppSpace.xs),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      label,
-                      style: AppTypo.ui(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: fg,
+              SizedBox(
+                width: double.infinity,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    child,
+                    const SizedBox(height: AppSpace.xs),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        label,
+                        style: AppTypo.ui(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: fg,
+                        ),
+                        maxLines: 1,
                       ),
-                      maxLines: 1,
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
               if (selected)
                 Positioned(
@@ -447,8 +547,7 @@ class _BigTile extends StatelessWidget {
 }
 
 /// Theme tile's sample — the sun/moon glyph, sized up from the row-icon
-/// default since this is the tile's whole visual identity, not a leading
-/// icon beside text.
+/// default since this is the tile's whole visual identity.
 class _TileGlyph extends StatelessWidget {
   const _TileGlyph({required this.glyph, required this.selected});
 
@@ -467,8 +566,8 @@ class _TileGlyph extends StatelessWidget {
   }
 }
 
-/// Text-size tile's sample — "Aa" rendered at the size's own scale so the
-/// tile previews that option, compact enough to sit inside a tile.
+/// Text-size tile's sample — "Aa" rendered at the size's own scale so the tile
+/// previews that option, compact enough to sit inside a tile.
 class _TileAa extends StatelessWidget {
   const _TileAa({required this.scale, required this.selected});
 
@@ -510,8 +609,8 @@ class _SwitchRow extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
 
-  /// A dependent switch reads as inactive when its master is off, rather than
-  /// vanishing.
+  /// A dependent switch reads as inactive when nothing can deliver it, rather
+  /// than vanishing.
   final bool enabled;
 
   @override

@@ -30,6 +30,24 @@ class AccountSession {
     await AuthService.instance.signOut();
   }
 
+  /// Permanently deletes the signed-in account.
+  ///
+  /// The password is checked first, so a wrong one changes nothing. The
+  /// backend then deletes the login and every push device registered to the
+  /// account (all of its phones), and only after that is the local session
+  /// ended. Local clean-up runs when the signed-out state arrives, as for sign
+  /// out.
+  ///
+  /// Throws [AuthFailure] with a reader-ready message.
+  static Future<void> deleteAccount({required String password}) async {
+    await AuthService.instance.reauthenticate(password: password);
+    final problem = await ApiService.deleteAccount();
+    if (problem != null) {
+      throw AuthFailure(AuthFailureKind.unknown, problem);
+    }
+    await AuthService.instance.endSessionAfterDeletion();
+  }
+
   /// Called whenever someone is signed in. If the data on this device was left
   /// by a different account — or by no known account, such as an older build,
   /// or a sign-out that was cut short — it is cleared before use.
