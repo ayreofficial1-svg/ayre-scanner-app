@@ -31,7 +31,7 @@ class SignalsSectionController {
 /// The signal board as a self-contained, scroll-agnostic section (Spec §13.2).
 ///
 /// One view of every admin-curated stock pick the backend has published. All
-/// picks sit together under a single "Signals" heading and are drawn with the
+/// picks sit together under a single "Recommendations" heading and are drawn with the
 /// same card, so no stock outranks another: there is no featured pick and no
 /// "also on watch" tier, and there are deliberately no filters or per-card
 /// Bullish/Bearish tags — an admin pick has no long/short direction of its own.
@@ -216,8 +216,8 @@ class _SignalsSectionState extends State<SignalsSection> {
       const Entrance(
         index: 1,
         child: SectionLabel(
-          label: 'Signals',
-          subtitle: 'Picks worth watching.',
+          label: 'Recommendations',
+          subtitle: 'Stock ideas with entry, exit and stop levels.',
         ),
       ),
       Entrance(
@@ -340,19 +340,22 @@ class _SignalCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
+                    // Neither the symbol nor the company name is ever cut
+                    // off: each shrinks (down to a floor) to fit, and only
+                    // then wraps.
+                    _FitText(
                       signal.symbol,
                       style: AppTypo.featuredHeadline(t),
                       maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      minFontSize: 13,
                     ),
                     if (hasName) ...[
                       const SizedBox(height: 2),
-                      // No maxLines/ellipsis — the full company name must
-                      // stay visible even when it runs to two lines.
-                      Text(
+                      _FitText(
                         signal.name!,
                         style: AppTypo.body(t),
+                        maxLines: 2,
+                        minFontSize: 11,
                       ),
                     ],
                   ],
@@ -442,6 +445,73 @@ class _SignalCard extends StatelessWidget {
         ],
       ),
       ),
+    );
+  }
+}
+
+/// Text that is always shown in full. It starts at [style]'s own size and steps
+/// down in half-point increments until it fits [maxLines] in the width it is
+/// given, never going below [minFontSize]. Text that already fits keeps its
+/// normal size. If even the floor doesn't fit, it wraps onto more lines rather
+/// than being clipped or ellipsised.
+///
+/// Measurement uses the ambient text scaler, so large accessibility text sizes
+/// are handled the same way.
+class _FitText extends StatelessWidget {
+  const _FitText(
+    this.text, {
+    required this.style,
+    required this.maxLines,
+    required this.minFontSize,
+  });
+
+  final String text;
+  final TextStyle style;
+  final int maxLines;
+  final double minFontSize;
+
+  static const double _step = 0.5;
+
+  @override
+  Widget build(BuildContext context) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final direction = Directionality.of(context);
+    final base = style.fontSize ?? 14;
+    final floor = minFontSize < base ? minFontSize : base;
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+
+        bool fits(double size) {
+          final painter = TextPainter(
+            text: TextSpan(text: text, style: style.copyWith(fontSize: size)),
+            textDirection: direction,
+            textScaler: scaler,
+            maxLines: maxLines,
+          )..layout(maxWidth: width);
+          final ok = !painter.didExceedMaxLines;
+          painter.dispose();
+          return ok;
+        }
+
+        var size = base;
+        if (width.isFinite) {
+          while (size > floor && !fits(size)) {
+            size -= _step;
+          }
+          if (size < floor) size = floor;
+        }
+
+        final atFloor = size <= floor && width.isFinite && !fits(size);
+        return Text(
+          text,
+          style: style.copyWith(fontSize: size),
+          // Past the floor, wrap fully instead of clipping.
+          maxLines: atFloor ? null : maxLines,
+          softWrap: true,
+        );
+      },
     );
   }
 }

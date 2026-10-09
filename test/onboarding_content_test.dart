@@ -98,7 +98,7 @@ void main() {
 
   group('settings tutorial', () {
     test('has one step per group with unique targets', () {
-      expect(kSettingsTourSteps, hasLength(5));
+      expect(kSettingsTourSteps, hasLength(3));
       expect(
         kSettingsTourSteps.map((s) => s.target).toSet(),
         hasLength(kSettingsTourSteps.length),
@@ -115,6 +115,30 @@ void main() {
     test('copy is brief', () {
       for (final s in kSettingsTourSteps) {
         expect(_words(s.body), lessThanOrEqualTo(24), reason: s.title);
+      }
+    });
+  });
+
+  group('profile tutorial', () {
+    test('has unique targets and one step per Profile option', () {
+      expect(kProfileTourSteps, hasLength(9));
+      expect(
+        kProfileTourSteps.map((s) => s.target).toSet(),
+        hasLength(kProfileTourSteps.length),
+      );
+    });
+
+    test('only the verification step depends on an unverified email', () {
+      expect(
+        kProfileTourSteps.where((s) => s.onlyWhenUnverified).map((s) => s.title),
+        ['Verify your email'],
+      );
+    });
+
+    test('copy is brief and makes no performance claims', () {
+      for (final s in kProfileTourSteps) {
+        expect(_words(s.body), lessThanOrEqualTo(26), reason: s.title);
+        expect(_banned.hasMatch('${s.title} ${s.body}'), isFalse);
       }
     });
   });

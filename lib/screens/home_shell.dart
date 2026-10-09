@@ -72,6 +72,9 @@ class _HomeShellState extends State<HomeShell> {
     // The spotlight tutorial: once automatically after the welcome pages, and
     // whenever Settings asks for a replay.
     TourService.instance.appTourRequests.addListener(_onAppTourRequested);
+    TourService.instance.profileTourRequests.addListener(
+      _onProfileTourRequested,
+    );
     unawaited(_startPendingTour());
   }
 
@@ -80,6 +83,9 @@ class _HomeShellState extends State<HomeShell> {
     // A tutorial must not outlive the shell (sign-out swaps this screen for
     // Login while the overlay would still be on top of it).
     TourService.instance.appTourRequests.removeListener(_onAppTourRequested);
+    TourService.instance.profileTourRequests.removeListener(
+      _onProfileTourRequested,
+    );
     SpotlightTour.dismiss();
     PushService.instance.openSignalsRequests.removeListener(
       _onOpenSignalsRequested,
@@ -127,6 +133,37 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _onAppTourRequested() => unawaited(_startAppTour());
+
+  void _onProfileTourRequested() => unawaited(_startProfileTour());
+
+  /// Switches to Profile and walks every option on it, then returns to the tab
+  /// the person was on. The verification step is left out once the email is
+  /// confirmed, because those rows are not on screen then.
+  Future<void> _startProfileTour() async {
+    await Future<void>.delayed(
+      AppMotion.pageTransition + const Duration(milliseconds: 150),
+    );
+    if (!mounted || SpotlightTour.isActive) return;
+    if (ModalRoute.of(context)?.isCurrent == false) return;
+    final origin = _index;
+    final verified = AuthService.instance.currentUser?.emailVerified ?? true;
+    SpotlightTour.show(
+      context,
+      steps: [
+        for (final s in kProfileTourSteps)
+          if (!s.onlyWhenUnverified || !verified)
+            SpotlightStep(
+              target: s.target,
+              title: s.title,
+              body: s.body,
+              onEnter: () => _select(4),
+            ),
+      ],
+      onClosed: (_) {
+        if (mounted) _select(origin);
+      },
+    );
+  }
 
   /// Walks the five tabs, switching to each so its nav item (and, on Home, the
   /// header controls) can be highlighted, then returns to the tab the person

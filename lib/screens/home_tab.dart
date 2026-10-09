@@ -31,7 +31,7 @@ import 'notifications_screen.dart';
 ///
 /// Order: greeting header (with the decorative hill ornament behind it) →
 /// **Market Sentiment card** → compact horizontal index row → **Signals**
-/// (moved here from the former Signals tab; the Weekly Report now has its own
+/// (the Weekly Report now has its own
 /// Reports tab) → **Market Insight carousel** → closing divider.
 ///
 /// The "Market breadth" donut card that used to sit between the index board

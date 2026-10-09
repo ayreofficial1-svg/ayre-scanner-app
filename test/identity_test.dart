@@ -325,6 +325,7 @@ void main() {
       for (final required in [
         AyreGlyph.home,
         AyreGlyph.signals,
+        AyreGlyph.report,
         AyreGlyph.insights,
         AyreGlyph.learn,
         AyreGlyph.profile,

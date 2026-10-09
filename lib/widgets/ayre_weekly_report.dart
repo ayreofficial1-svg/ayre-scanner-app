@@ -15,12 +15,9 @@ import 'pressable_scale.dart';
 // Presentation-only. Same data, same week navigation, same picker, same
 // "See all". Nothing is added to the model.
 //
-//   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━   black / white section rule
-//   ┌──────────────────────────────────────┐
-//   │ Weekly Report                    ‹ ›  │   teal gradient header (light wash / dark):
-//   │ 1 – 8 Sep 2026 ⌄                      │   heading first, date second
-//   │ Latest week · 1 of 3                  │
-//   └──────────────────────────────────────┘
+//   Weekly Report                           ‹ ›     standard page-title heading,
+//   1 – 8 Sep 2026 ⌄                                 date second, no gradient/rule
+//   Latest week · 1 of 3
 //
 //   ┌──────────────────────────────────────┐
 //   │ [logo]  RELIANCE                +896.40%│     one card per stock,
@@ -35,8 +32,7 @@ import 'pressable_scale.dart';
 //   │ PROFIT / SHARE             +₹3,980    │
 //   └──────────────────────────────────────┘
 //
-// Cards are separated by space, not dividers. The gradient header is what
-// sets this section apart from the other Home cards; the stock cards stay
+// Cards are separated by space, not dividers. The stock cards stay
 // quiet — a faint corner of hills, no fills behind the results. Outcome
 // colour sits on text only (green target / red stop-loss), and direction is
 // also in the sign and the written outcome, never colour alone.
@@ -44,7 +40,7 @@ import 'pressable_scale.dart';
 // Every colour is an `AppThemeTokens` value, so Light and Dark follow the
 // theme with no per-mode code.
 
-/// The full Weekly Report section: separator, week header and stock cards.
+/// The full Weekly Report section: week header and stock cards.
 ///
 /// [reports] is the backend's list, newest week first (`GET
 /// /api/weekly-report`). The first entry is selected initially.
@@ -117,8 +113,6 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _SectionRule(),
-        const SizedBox(height: AppSpace.md),
         _WeekHeader(
           report: report,
           index: index,
@@ -171,38 +165,12 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
   }
 }
 
-// ─── Section rule ──────────────────────────────────────────────────────────
-
-/// A subtle line marking where the Weekly Report starts.
-class _SectionRule extends StatelessWidget {
-  const _SectionRule();
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return ExcludeSemantics(
-      child: Container(
-        height: 1,
-        decoration: BoxDecoration(
-          color: (dark ? const Color(0xFFFFFFFF) : const Color(0xFF000000))
-              .withValues(alpha: 0.55),
-          borderRadius: BorderRadius.circular(0.5),
-        ),
-      ),
-    );
-  }
-}
-
 // ─── Week header ───────────────────────────────────────────────────────────
 
-/// The section's title card: the heading, the week under it, and where it
-/// sits in the list — on a teal gradient that follows the theme, with round older /
-/// newer buttons on the right. Tapping the date opens the week list.
-///
-/// The gradient is a fixed pair per brightness rather than a token: it is
-/// the one strongly coloured block in the section, and white text on it must
-/// hold contrast in both themes. Dark runs a darker petrol so it sits in the
-/// dark canvas instead of glowing on it.
+/// The section's heading: "Weekly Report" in the same page-title style the
+/// other tabs use, the week under it, and where it sits in the list — with
+/// round older / newer buttons on the right. Tapping the date opens the week
+/// list. No gradient, glow or divider: it sits directly on the page.
 class _WeekHeader extends StatelessWidget {
   const _WeekHeader({
     required this.report,
@@ -220,37 +188,9 @@ class _WeekHeader extends StatelessWidget {
   final VoidCallback? onNewer;
   final VoidCallback? onPick;
 
-  // Teal-blue with a warm amber glow. Every other gradient on Home is a
-  // green (sentiment card, insight carousel, index art); this one sits at the
-  // cool teal end of the Ayre palette so the Weekly Report is unmistakable
-  // at a glance. It follows the theme: a soft, light wash with petrol text in
-  // Light mode; a deep petrol with white text in Dark mode.
-  static const List<Color> _lightGradient = [
-    Color(0xFFE4F3F5),
-    Color(0xFFC9E8EB),
-    Color(0xFFABDCDD),
-  ];
-  static const List<Color> _darkGradient = [
-    Color(0xFF061821),
-    Color(0xFF0A2C38),
-    Color(0xFF0E4850),
-  ];
-  static const Color _glow = Color(0xFFF2C46D);
-
-  // Ink on the light wash.
-  static const Color _lightHeading = Color(0xFF0B2E3D);
-  static const Color _lightDate = Color(0xFF0E6A70);
-  static const Color _lightCaption = Color(0xFF4A6B74);
-
-  // Ink on the dark gradient.
-  static const Color _darkHeading = Color(0xFFFFFFFF);
-  static const Color _darkDate = Color(0xFFA6EBCB);
-  static const Color _darkCaption = Color(0xFFBCD3D6);
-
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final dark = Theme.of(context).brightness == Brightness.dark;
     final range = formatWeekRange(report.weekStart, report.weekEnd);
     final spoken = _spokenWeekRange(report.weekStart, report.weekEnd);
     final multiple = total > 1;
@@ -260,180 +200,78 @@ class _WeekHeader extends StatelessWidget {
               ? 'Latest week · 1 of $total'
               : 'Earlier week · ${index + 1} of $total');
 
-    final headingColor = dark ? _darkHeading : _lightHeading;
-    final dateColor = dark ? _darkDate : _lightDate;
-    final captionColor = dark ? _darkCaption : _lightCaption;
-    // Arrow buttons and the faint ring take the heading's ink, so they work
-    // on both washes.
-    final arrowFill = headingColor.withValues(alpha: dark ? 0.16 : 0.09);
-
     // Hierarchy, in order: the heading (what this is), the date (which
     // week), the position caption (where it sits in the list).
     final titleBlock = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            'Weekly Report',
-            maxLines: 1,
-            style: AppTypo.ui(
-              fontSize: 32,
-              fontWeight: FontWeight.w800,
-              color: headingColor,
-              height: 1.08,
-              letterSpacing: -1.0,
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
+        Text('Weekly Report', style: AppTypo.pageTitle(t)),
+        const SizedBox(height: AppSpace.xxs),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Flexible(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  range,
-                  maxLines: 1,
-                  style: AppTypo.ui(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: dateColor,
-                    height: 1.2,
-                    letterSpacing: -0.1,
-                  ),
-                ),
+              child: Text(
+                range,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypo.rowLabel(t, color: t.accentInk),
               ),
             ),
             if (multiple) ...[
               const SizedBox(width: 2),
-              Icon(Icons.expand_more_rounded, size: 18, color: dateColor),
+              Icon(Icons.expand_more_rounded, size: 18, color: t.accentInk),
             ],
           ],
         ),
         const SizedBox(height: 2),
         Text(
           sub,
-          style: AppTypo.hint(t, color: captionColor),
+          style: AppTypo.hint(t),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
       ],
     );
 
-    return AyreCard(
-      padding: EdgeInsets.zero,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: dark ? _darkGradient : _lightGradient,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Semantics(
+            header: true,
+            button: onPick != null,
+            label: 'Weekly report, $spoken. $sub.',
+            hint: onPick != null ? 'Opens a list of weeks' : null,
+            excludeSemantics: true,
+            child: onPick == null
+                ? titleBlock
+                : GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: onPick,
+                    child: titleBlock,
+                  ),
           ),
         ),
-        child: Stack(
-          children: [
-            // A warm amber glow in the top-right corner and one faint ring.
-            // Decorative only.
-            Positioned(
-              top: -90,
-              right: -70,
-              child: IgnorePointer(
-                child: ExcludeSemantics(
-                  child: Container(
-                    width: 260,
-                    height: 260,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          _glow.withValues(alpha: dark ? 0.20 : 0.50),
-                          _glow.withValues(alpha: 0),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -80,
-              right: -30,
-              child: _Disc(size: 170, color: headingColor.withValues(alpha: 0.05)),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpace.lg,
-                AppSpace.lg,
-                AppSpace.sm,
-                AppSpace.lg,
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Expanded(
-                    child: Semantics(
-                      header: true,
-                      button: onPick != null,
-                      label: 'Weekly report, $spoken. $sub.',
-                      hint: onPick != null ? 'Opens a list of weeks' : null,
-                      excludeSemantics: true,
-                      child: onPick == null
-                          ? titleBlock
-                          : GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: onPick,
-                              child: titleBlock,
-                            ),
-                    ),
-                  ),
-                  if (multiple) ...[
-                    const SizedBox(width: AppSpace.xs),
-                    _WeekArrow(
-                      glyph: AyreGlyph.back,
-                      label: 'Older week',
-                      onTap: onOlder,
-                      fill: arrowFill,
-                      ink: headingColor,
-                    ),
-                    _WeekArrow(
-                      glyph: AyreGlyph.forward,
-                      label: 'Newer week',
-                      onTap: onNewer,
-                      fill: arrowFill,
-                      ink: headingColor,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Disc extends StatelessWidget {
-  const _Disc({required this.size, required this.color});
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: ExcludeSemantics(
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-        ),
-      ),
+        if (multiple) ...[
+          const SizedBox(width: AppSpace.xs),
+          _WeekArrow(
+            glyph: AyreGlyph.back,
+            label: 'Older week',
+            onTap: onOlder,
+            fill: t.textPrimary.withValues(alpha: 0.08),
+            ink: t.textPrimary,
+          ),
+          _WeekArrow(
+            glyph: AyreGlyph.forward,
+            label: 'Newer week',
+            onTap: onNewer,
+            fill: t.textPrimary.withValues(alpha: 0.08),
+            ink: t.textPrimary,
+          ),
+        ],
+      ],
     );
   }
 }

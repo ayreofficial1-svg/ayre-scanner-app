@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///   one-shot "tour pending" flag; the first `HomeShell` that builds takes it
 ///   and starts the tutorial. Skipping the welcome pages leaves no flag, so a
 ///   person who skipped is never nagged.
-/// * **Replay.** Settings asks for the app tutorial through [appTourRequests]
+/// * **Replay.** Help and support asks for the app tutorial through [appTourRequests]
 ///   (it cannot start it itself: the tutorial switches tabs, which only the
 ///   shell can do).
 ///
@@ -25,6 +25,12 @@ class TourService {
   final ValueNotifier<int> appTourRequests = ValueNotifier<int>(0);
 
   void requestAppTour() => appTourRequests.value++;
+
+  /// Bumped to ask the shell to start the Profile tutorial (it must switch to
+  /// the Profile tab first, which only the shell can do).
+  final ValueNotifier<int> profileTourRequests = ValueNotifier<int>(0);
+
+  void requestProfileTour() => profileTourRequests.value++;
 
   /// Remembers that the app tutorial should start at the next opportunity.
   Future<void> markPending() async {

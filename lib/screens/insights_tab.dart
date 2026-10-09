@@ -265,7 +265,7 @@ class _InsightsTabState extends State<InsightsTab> {
       onRefresh: _load,
       edgeOffset: 72,
       child: ContentWidth(
-        // Widened the same way `learn_tab.dart`/`signals_tab.dart` widen
+        // Widened the same way `learn_tab.dart` widens
         // once their lists go multi-column (Phase 2A) — the default 620pt
         // reading measure otherwise starves a 2-/3-column movers grid.
         maxWidth: columns > 1 ? 960 : null,

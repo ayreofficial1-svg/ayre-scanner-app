@@ -5,6 +5,7 @@ import '../services/account_session.dart';
 import '../services/auth_service.dart';
 import '../services/email_verification.dart';
 import '../services/market_data_service.dart';
+import '../onboarding/tour_content.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_avatar.dart';
@@ -110,13 +111,18 @@ class _ProfileTabState extends State<ProfileTab> {
     final t = context.tokens;
 
     return ContentWidth(
-      child: ListView(
+      // A scroll view with a plain Column (not a lazy ListView) so every row
+      // exists at once and the Profile tutorial can find and scroll to any of
+      // them. The list is short, so nothing is gained from laziness.
+      child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(
           AppSpace.pageHorizontal,
           AppSpace.pageTop,
           AppSpace.pageHorizontal,
           120,
         ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Same soft layered shape as Home's header, bled to the top-right
           // corner behind the title. Decorative, not part of the layout.
@@ -153,12 +159,15 @@ class _ProfileTabState extends State<ProfileTab> {
             index: 1,
             child: ListenableBuilder(
               listenable: AuthService.instance.user,
-              builder: (context, _) => _IdentityCard(
+              builder: (context, _) => KeyedSubtree(
+ key: TourKeys.profileIdentity,
+ child: _IdentityCard(
                 name: _name,
                 email: _email,
                 verified: AuthService.instance.currentUser?.emailVerified,
                 onTap: _editProfile,
               ),
+ ),
             ),
           ),
 
@@ -190,7 +199,9 @@ class _ProfileTabState extends State<ProfileTab> {
                         label: 'Verify your email',
                         subtitle: 'Nothing is blocked while you wait.',
                       ),
-                      RowGroup(
+                      KeyedSubtree(
+ key: TourKeys.profileVerify,
+ child: RowGroup(
                         children: [
                           SettingRow(
                             glyph: AyreGlyph.refresh,
@@ -214,6 +225,7 @@ class _ProfileTabState extends State<ProfileTab> {
                           ),
                         ],
                       ),
+ ),
                     ],
                   ),
                 ),
@@ -229,7 +241,9 @@ class _ProfileTabState extends State<ProfileTab> {
               listenable: NotificationLog.instance,
               builder: (context, _) => RowGroup(
                 children: [
-                  SettingRow(
+                  KeyedSubtree(
+ key: TourKeys.profileAlerts,
+ child: SettingRow(
                     glyph: AyreGlyph.bell,
                     title: 'Alerts',
                     subtitle: 'New signals, updates and exit calls',
@@ -238,12 +252,16 @@ class _ProfileTabState extends State<ProfileTab> {
                         : null,
                     onTap: () => _push(const NotificationsScreen()),
                   ),
-                  SettingRow(
+ ),
+                  KeyedSubtree(
+ key: TourKeys.profileSettings,
+ child: SettingRow(
                     glyph: AyreGlyph.appearance,
                     title: 'Settings',
                     subtitle: 'Appearance, notifications and account',
                     onTap: () => _push(const SettingsScreen()),
                   ),
+ ),
                 ],
               ),
             ),
@@ -259,24 +277,33 @@ class _ProfileTabState extends State<ProfileTab> {
                 const SectionLabel(label: 'Help'),
                 RowGroup(
                   children: [
-                    SettingRow(
+                    KeyedSubtree(
+ key: TourKeys.profileSupport,
+ child: SettingRow(
                       glyph: AyreGlyph.support,
                       title: 'Help and support',
-                      subtitle: 'Contact the team',
+                      subtitle: 'Contact the team and replay tutorials',
                       onTap: () => _push(const SupportScreen()),
                     ),
-                    SettingRow(
+ ),
+                    KeyedSubtree(
+ key: TourKeys.profileFaq,
+ child: SettingRow(
                       glyph: AyreGlyph.about,
                       title: 'FAQ',
                       subtitle: 'Answers to common questions',
                       onTap: () => _push(const FaqScreen()),
                     ),
-                    SettingRow(
+ ),
+                    KeyedSubtree(
+ key: TourKeys.profileGrievance,
+ child: SettingRow(
                       glyph: AyreGlyph.alerts,
                       title: 'Grievance redressal',
                       subtitle: 'Raise a complaint or concern',
                       onTap: () => _push(const GrievanceScreen()),
                     ),
+ ),
                   ],
                 ),
               ],
@@ -289,13 +316,16 @@ class _ProfileTabState extends State<ProfileTab> {
             index: 5,
             child: RowGroup(
               children: [
-                SettingRow(
+                KeyedSubtree(
+ key: TourKeys.profileLegal,
+ child: SettingRow(
                   glyph: AyreGlyph.lock,
                   title: 'Legal and disclosures',
                   subtitle: 'Terms, privacy, risk and analyst information',
                   onTap: () =>
                       _push(LegalHubScreen(marketData: widget.marketData)),
                 ),
+ ),
               ],
             ),
           ),
@@ -306,7 +336,9 @@ class _ProfileTabState extends State<ProfileTab> {
             index: 6,
             child: RowGroup(
               children: [
-                SettingRow(
+                KeyedSubtree(
+ key: TourKeys.profileSignOut,
+ child: SettingRow(
                   glyph: AyreGlyph.signOut,
                   title: 'Sign out',
                   subtitle: 'End this session on this device',
@@ -323,10 +355,12 @@ class _ProfileTabState extends State<ProfileTab> {
                       : null,
                   onTap: _signingOut ? null : _confirmSignOut,
                 ),
+ ),
               ],
             ),
           ),
         ],
+        ),
       ),
     );
   }

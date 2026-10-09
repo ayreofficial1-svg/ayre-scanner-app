@@ -7,7 +7,6 @@ import '../onboarding/tour_content.dart';
 import '../services/auth_service.dart';
 import '../services/push_service.dart';
 import '../services/settings_store.dart';
-import '../services/tour_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
@@ -22,15 +21,19 @@ import 'support_screen.dart' show kAppVersion, kAppBuild;
 /// 1. Appearance — theme and text size
 /// 2. Notifications — where alerts reach you, and which ones
 /// 3. Account — password and deletion (only while signed in)
-/// 4. Help and tutorials — replay the app tutorial or the Settings tutorial
-/// 5. About — version and credits
+/// 4. About — version and credits (not part of the Settings tutorial)
 ///
-/// Identity, email verification, help, legal and sign out live on Profile, so
+/// Identity, email verification, help (including the tutorials), legal and
+/// sign out live on Profile, so
 /// nothing is listed in both places. Every row is backed by working behaviour;
 /// a plausible setting with nothing behind it is left out rather than shipped
 /// inert.
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  const SettingsScreen({super.key, this.startTour = false});
+
+  /// Start the Settings tutorial as soon as the screen has arrived (used by
+  /// Help and support).
+  final bool startTour;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -46,6 +49,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// True while this screen's own tutorial is showing, so only that one is
   /// dismissed when the screen goes away.
   bool _ownsTour = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.startTour) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        // Let the push transition finish so targets are laid out.
+        await Future<void>.delayed(AppMotion.pageTransition);
+        if (mounted) _startSettingsTour();
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -66,14 +81,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ],
       onClosed: (_) => _ownsTour = false,
     );
-  }
-
-  /// The app tutorial switches tabs, which only the shell can do, so go back
-  /// to it and ask.
-  void _replayAppTour() {
-    HapticFeedback.selectionClick();
-    Navigator.of(context).popUntil((route) => route.isFirst);
-    TourService.instance.requestAppTour();
   }
 
   AuthUser? get _user => AuthService.instance.currentUser;
@@ -331,35 +338,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _GroupNote('Signed in as ${_user!.email}.'),
               ],
 
-              // ── Help and tutorials ───────────────────────────────────────
-              const SizedBox(height: AppSpace.sectionGap),
-              const SectionLabel(label: 'Help and tutorials'),
-              KeyedSubtree(
-                key: TourKeys.settingsHelp,
-                child: RowGroup(
-                  children: [
-                    SettingRow(
-                      glyph: AyreGlyph.course,
-                      title: 'App tutorial',
-                      subtitle: 'The five tabs and the Home controls.',
-                      onTap: _replayAppTour,
-                    ),
-                    SettingRow(
-                      glyph: AyreGlyph.appearance,
-                      title: 'Settings tutorial',
-                      subtitle: 'Where to find each option here.',
-                      onTap: _startSettingsTour,
-                    ),
-                  ],
-                ),
-              ),
-
               // ── About ────────────────────────────────────────────────────
               const SizedBox(height: AppSpace.sectionGap),
               const SectionLabel(label: 'About'),
-              KeyedSubtree(
-                key: TourKeys.settingsAbout,
-                child: RowGroup(
+              RowGroup(
                 children: [
                   SettingRow(
                     glyph: AyreGlyph.about,
@@ -378,7 +360,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: _openLogoCredit,
                   ),
                 ],
-              ),
               ),
             ],
           ),

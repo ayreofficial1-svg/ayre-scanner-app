@@ -11,7 +11,7 @@ import 'auth_service.dart';
 /// Device-level on purpose, like the theme and alert switches. It is **not**
 /// cleared by `AccountSession.clearLocalData()`, so signing out or deleting an
 /// account never brings the tour back. A different person on the same device
-/// can open it from Profile → Help → App tour.
+/// can open it from Profile → Help and support → App tutorial.
 class OnboardingStore extends ChangeNotifier {
   OnboardingStore._();
 

@@ -58,6 +58,7 @@ void main() {
         DataSurface.indexConstituents,
         DataSurface.equityDetail,
         DataSurface.signals,
+        DataSurface.weeklyReport,
         DataSurface.sentiment,
         DataSurface.gainers,
         DataSurface.losers,
@@ -347,6 +348,7 @@ void main() {
       'losers': DataSurface.losers,
       'most active': DataSurface.mostActive,
       'signals': DataSurface.signals,
+      'weekly report': DataSurface.weeklyReport,
       'courses': DataSurface.courses,
     };
 

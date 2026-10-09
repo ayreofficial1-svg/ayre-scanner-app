@@ -370,10 +370,20 @@ void main() {
       // Signals now live on Home, so no tab switch is needed. Everything
       // the backend pushes is shown as-is: no All / Bullish /
       // Bearish chips, and so no filtered-to-nothing state to recover from.
-      expect(find.text('SIGNALS'), findsWidgets);
+      expect(find.text('RECOMMENDATIONS'), findsWidgets);
       expect(find.byType(AyreFilterChip), findsNothing);
       expect(find.text('Show all'), findsNothing);
       expect(tester.takeException(), isNull);
+    });
+
+    test('nav destinations are Home, Reports, Insights, Learn, Profile', () {
+      expect(kNavDestinations.map((d) => d.label).toList(), [
+        'Home',
+        'Reports',
+        'Insights',
+        'Learn',
+        'Profile',
+      ]);
     });
 
     testWidgets('Home theme toggle drives the same setter Settings does', (
