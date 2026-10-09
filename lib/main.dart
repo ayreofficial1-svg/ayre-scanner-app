@@ -5,15 +5,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/home_shell.dart';
 import 'screens/login_screen.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/account_session.dart';
 import 'services/api_service.dart';
 import 'services/app_lifecycle.dart';
 import 'services/auth_service.dart';
 import 'services/email_verification.dart';
+import 'services/onboarding_store.dart';
 import 'services/push_service.dart';
 import 'services/reachability.dart';
 import 'services/settings_store.dart';
+import 'services/tour_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/ayre_components.dart';
 import 'widgets/ayre_icons.dart';
@@ -79,6 +82,12 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
     if (phase == AuthPhase.signedOut && previous == AuthPhase.signedIn) {
       unawaited(AccountSession.clearLocalData());
     }
+    // Anyone who reaches the app signed in has no use for the first-run tour.
+    // This also covers an updated install whose user was already signed in, so
+    // a later sign-out lands on Login rather than the tour.
+    if (phase == AuthPhase.signedIn) {
+      unawaited(OnboardingStore.instance.markCompleted());
+    }
     // Whenever someone signs in, make sure nothing left on this device by a
     // different account (or a cut-short sign-out) is shown to them.
     final uid = AuthService.instance.currentUser?.uid;
@@ -95,6 +104,7 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
     await Future.wait([
       _loadThemeMode(),
       SettingsStore.instance.load(),
+      OnboardingStore.instance.load(),
       NotificationLog.instance.load(),
       ApiService.purgeLegacyCookie(),
     ]);
@@ -275,7 +285,8 @@ class AuthUnavailableScreen extends StatelessWidget {
 }
 
 /// Runs the splash, then shows whichever screen the auth state calls for:
-/// initialising → splash, unavailable → blocking error, signed out → sign in,
+/// initialising → splash, unavailable → blocking error, signed out → the
+/// first-run tour, then sign in,
 /// signed in → the app. A cached signed-in user enters the app even offline.
 class _StartupGate extends StatelessWidget {
   const _StartupGate({
@@ -288,23 +299,46 @@ class _StartupGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<AuthPhase>(
-      valueListenable: AuthService.instance.phase,
-      builder: (context, phase, _) {
-        if (!splashComplete) {
-          return AyreSplashScreen(onFinished: onSplashComplete);
-        }
-        return switch (phase) {
-          AuthPhase.initializing => AyreSplashScreen(
-            onFinished: onSplashComplete,
-          ),
-          AuthPhase.unavailable => AuthUnavailableScreen(
-            onRetry: () => unawaited(AuthService.instance.init()),
-          ),
-          AuthPhase.signedOut => const LoginScreen(),
-          AuthPhase.signedIn => HomeShell(),
-        };
-      },
+    return ListenableBuilder(
+      listenable: OnboardingStore.instance,
+      builder: (context, _) => ValueListenableBuilder<AuthPhase>(
+        valueListenable: AuthService.instance.phase,
+        builder: (context, phase, _) {
+          if (!splashComplete) {
+            return AyreSplashScreen(onFinished: onSplashComplete);
+          }
+          final store = OnboardingStore.instance;
+          return switch (phase) {
+            AuthPhase.initializing => AyreSplashScreen(
+              onFinished: onSplashComplete,
+            ),
+            AuthPhase.unavailable => AuthUnavailableScreen(
+              onRetry: () => unawaited(AuthService.instance.init()),
+            ),
+            // The flag is read during bootstrap, so this wait is normally
+            // imperceptible; the plain canvas matches where the splash fades.
+            AuthPhase.signedOut when !store.loaded => Scaffold(
+              backgroundColor: context.tokens.background,
+            ),
+            AuthPhase.signedOut
+                when shouldShowOnboarding(
+                  phase: phase,
+                  loaded: store.loaded,
+                  completed: store.completed,
+                ) =>
+              OnboardingScreen(
+                onFinished: ({required bool startTour}) {
+                  // Only "Get started" offers the spotlight tutorial after
+                  // sign-in; Skip leaves nothing pending.
+                  if (startTour) unawaited(TourService.instance.markPending());
+                  unawaited(store.markCompleted());
+                },
+              ),
+            AuthPhase.signedOut => const LoginScreen(),
+            AuthPhase.signedIn => HomeShell(),
+          };
+        },
+      ),
     );
   }
 }

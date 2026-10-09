@@ -8,6 +8,7 @@ import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/settings_store.dart';
 import '../services/market_models.dart';
+import '../onboarding/tour_content.dart' show TourKeys;
 import '../theme/app_theme.dart';
 import '../widgets/ayre_avatar.dart';
 import '../widgets/ayre_components.dart';
@@ -424,20 +425,25 @@ class _Header extends StatelessWidget {
               ),
             ),
             const SizedBox(width: AppSpace.sm),
-            const _ThemeToggle(),
+            const KeyedSubtree(key: TourKeys.homeTheme, child: _ThemeToggle()),
             const SizedBox(width: AppSpace.xs),
-            ListenableBuilder(
-              listenable: NotificationLog.instance,
-              builder: (context, _) => _HeaderControl(
-                glyph: AyreGlyph.bell,
-                label: 'Alerts',
-                badge: NotificationLog.instance.hasUnread,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  Navigator.of(context).push(
-                    terminalRoute(builder: (_) => const NotificationsScreen()),
-                  );
-                },
+            KeyedSubtree(
+              key: TourKeys.homeAlerts,
+              child: ListenableBuilder(
+                listenable: NotificationLog.instance,
+                builder: (context, _) => _HeaderControl(
+                  glyph: AyreGlyph.bell,
+                  label: 'Alerts',
+                  badge: NotificationLog.instance.hasUnread,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).push(
+                      terminalRoute(
+                        builder: (_) => const NotificationsScreen(),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
             const SizedBox(width: AppSpace.xs),

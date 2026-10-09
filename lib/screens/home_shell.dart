@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
 import '../services/market_data_service.dart';
 import '../services/persistent_market_data_service.dart';
 import '../services/push_service.dart';
+import '../services/tour_service.dart';
+import '../onboarding/tour_content.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_bottom_nav.dart';
 import '../widgets/responsive.dart';
+import '../widgets/spotlight_tour.dart';
 import '../widgets/verification_banner.dart';
 import 'home_tab.dart';
 import 'insights_tab.dart';
@@ -56,10 +61,18 @@ class _HomeShellState extends State<HomeShell> {
     if (push.consumePendingOpenAlerts()) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _openAlerts());
     }
+    // The spotlight tutorial: once automatically after the welcome pages, and
+    // whenever Settings asks for a replay.
+    TourService.instance.appTourRequests.addListener(_onAppTourRequested);
+    unawaited(_startPendingTour());
   }
 
   @override
   void dispose() {
+    // A tutorial must not outlive the shell (sign-out swaps this screen for
+    // Login while the overlay would still be on top of it).
+    TourService.instance.appTourRequests.removeListener(_onAppTourRequested);
+    SpotlightTour.dismiss();
     PushService.instance.openSignalsRequests.removeListener(
       _onOpenSignalsRequested,
     );
@@ -93,6 +106,40 @@ class _HomeShellState extends State<HomeShell> {
   void _select(int index) {
     if (index == _index) return;
     setState(() => _index = index);
+  }
+
+  Future<void> _startPendingTour() async {
+    if (await TourService.instance.takePending()) await _startAppTour();
+  }
+
+  void _onAppTourRequested() => unawaited(_startAppTour());
+
+  /// Walks the five tabs, switching to each so its nav item (and, on Home, the
+  /// header controls) can be highlighted, then returns to the tab the person
+  /// was on.
+  Future<void> _startAppTour() async {
+    // Let first paint, or a pop back from Settings, settle before measuring.
+    await Future<void>.delayed(
+      AppMotion.pageTransition + const Duration(milliseconds: 150),
+    );
+    if (!mounted || SpotlightTour.isActive) return;
+    if (ModalRoute.of(context)?.isCurrent == false) return;
+    final origin = _index;
+    SpotlightTour.show(
+      context,
+      steps: [
+        for (final s in buildAppTourSteps())
+          SpotlightStep(
+            target: s.target,
+            title: s.title,
+            body: s.body,
+            onEnter: () => _select(s.tab),
+          ),
+      ],
+      onClosed: (_) {
+        if (mounted) _select(origin);
+      },
+    );
   }
 
   void _onAccountResolved(String name) {

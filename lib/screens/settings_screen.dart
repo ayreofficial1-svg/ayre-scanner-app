@@ -3,14 +3,17 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../main.dart';
+import '../onboarding/tour_content.dart';
 import '../services/auth_service.dart';
 import '../services/push_service.dart';
 import '../services/settings_store.dart';
+import '../services/tour_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
 import '../widgets/figure.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/spotlight_tour.dart';
 import 'delete_account_screen.dart';
 import 'support_screen.dart' show kAppVersion, kAppBuild;
 
@@ -19,7 +22,8 @@ import 'support_screen.dart' show kAppVersion, kAppBuild;
 /// 1. Appearance — theme and text size
 /// 2. Notifications — where alerts reach you, and which ones
 /// 3. Account — password and deletion (only while signed in)
-/// 4. About — version and credits
+/// 4. Help and tutorials — replay the app tutorial or the Settings tutorial
+/// 5. About — version and credits
 ///
 /// Identity, email verification, help, legal and sign out live on Profile, so
 /// nothing is listed in both places. Every row is backed by working behaviour;
@@ -38,6 +42,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
   );
 
   bool _sendingReset = false;
+
+  /// True while this screen's own tutorial is showing, so only that one is
+  /// dismissed when the screen goes away.
+  bool _ownsTour = false;
+
+  @override
+  void dispose() {
+    if (_ownsTour) SpotlightTour.dismiss();
+    super.dispose();
+  }
+
+  void _startSettingsTour() {
+    if (SpotlightTour.isActive) return;
+    HapticFeedback.selectionClick();
+    _ownsTour = true;
+    SpotlightTour.show(
+      context,
+      steps: [
+        for (final s in kSettingsTourSteps)
+          if (!s.needsAccount || _user != null)
+            SpotlightStep(target: s.target, title: s.title, body: s.body),
+      ],
+      onClosed: (_) => _ownsTour = false,
+    );
+  }
+
+  /// The app tutorial switches tabs, which only the shell can do, so go back
+  /// to it and ask.
+  void _replayAppTour() {
+    HapticFeedback.selectionClick();
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    TourService.instance.requestAppTour();
+  }
 
   AuthUser? get _user => AuthService.instance.currentUser;
 
@@ -120,7 +157,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               // ── Appearance ───────────────────────────────────────────────
               const SectionLabel(label: 'Appearance'),
-              AyreCard(
+              KeyedSubtree(
+                key: TourKeys.settingsAppearance,
+                child: AyreCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -163,11 +202,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
               ),
+              ),
 
               // ── Notifications ────────────────────────────────────────────
               const SizedBox(height: AppSpace.sectionGap),
               const SectionLabel(label: 'Notifications'),
-              ListenableBuilder(
+              KeyedSubtree(
+                key: TourKeys.settingsNotifications,
+                child: ListenableBuilder(
                 // Push availability and permission can change after this
                 // screen opens (the OS prompt resolves asynchronously), and
                 // the saved-alert count changes as alerts arrive.
@@ -242,12 +284,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   );
                 },
               ),
+              ),
 
               // ── Account ──────────────────────────────────────────────────
               if (_user != null) ...[
                 const SizedBox(height: AppSpace.sectionGap),
                 const SectionLabel(label: 'Account'),
-                RowGroup(
+                KeyedSubtree(
+                  key: TourKeys.settingsAccount,
+                  child: RowGroup(
                   children: [
                     SettingRow(
                       glyph: AyreGlyph.lock,
@@ -282,13 +327,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ],
                 ),
+                ),
                 _GroupNote('Signed in as ${_user!.email}.'),
               ],
+
+              // ── Help and tutorials ───────────────────────────────────────
+              const SizedBox(height: AppSpace.sectionGap),
+              const SectionLabel(label: 'Help and tutorials'),
+              KeyedSubtree(
+                key: TourKeys.settingsHelp,
+                child: RowGroup(
+                  children: [
+                    SettingRow(
+                      glyph: AyreGlyph.course,
+                      title: 'App tutorial',
+                      subtitle: 'The five tabs and the Home controls.',
+                      onTap: _replayAppTour,
+                    ),
+                    SettingRow(
+                      glyph: AyreGlyph.appearance,
+                      title: 'Settings tutorial',
+                      subtitle: 'Where to find each option here.',
+                      onTap: _startSettingsTour,
+                    ),
+                  ],
+                ),
+              ),
 
               // ── About ────────────────────────────────────────────────────
               const SizedBox(height: AppSpace.sectionGap),
               const SectionLabel(label: 'About'),
-              RowGroup(
+              KeyedSubtree(
+                key: TourKeys.settingsAbout,
+                child: RowGroup(
                 children: [
                   SettingRow(
                     glyph: AyreGlyph.about,
@@ -307,6 +378,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: _openLogoCredit,
                   ),
                 ],
+              ),
               ),
             ],
           ),
