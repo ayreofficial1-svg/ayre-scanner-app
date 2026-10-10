@@ -118,6 +118,24 @@ class AyreIcon extends StatelessWidget {
   /// The grid every glyph is drawn against.
   static const double grid = 24;
 
+  /// The five navigation glyphs keep one outline weight in both states (the
+  /// selected form is the same silhouette made solid); every other glyph keeps
+  /// the 1.7 / 2.1 rule.
+  static const double navStroke = 1.75;
+
+  static const Set<AyreGlyph> _navGlyphs = {
+    AyreGlyph.home,
+    AyreGlyph.report,
+    AyreGlyph.insights,
+    AyreGlyph.learn,
+    AyreGlyph.profile,
+  };
+
+  static double _defaultStroke(AyreGlyph glyph, bool filled) {
+    if (_navGlyphs.contains(glyph)) return navStroke;
+    return filled ? 2.1 : 1.7;
+  }
+
   @override
   Widget build(BuildContext context) {
     final resolved =
@@ -130,7 +148,7 @@ class AyreIcon extends StatelessWidget {
           glyph: glyph,
           color: resolved,
           filled: filled,
-          strokeWidth: strokeWidth ?? (filled ? 2.1 : 1.7),
+          strokeWidth: strokeWidth ?? _defaultStroke(glyph, filled),
         ),
       ),
     );
@@ -176,23 +194,43 @@ class _AyreIconPainter extends CustomPainter {
     switch (glyph) {
       // ── Navigation ─────────────────────────────────────────────────────────
       case AyreGlyph.home:
-        // v8 rework: dropped the eaved roofline for a plain five-point house
-        // — apex, two roof/wall shoulders, two base corners — closer to the
-        // reference bar's plain, blocky house than the overhanging roof this
-        // used to be. Fewer corners, one closed path, stroked with a miter
-        // join so outline and fill trace exactly the same silhouette.
+        // Rounded house with a door; selected = the same silhouette, solid,
+        // door knocked out. Live area 20pt (2pt padding on the 24pt grid).
         {
-          final house = Path()
-            ..moveTo(12, 4) // apex
-            ..lineTo(19, 10.5) // right shoulder — roof meets wall
-            ..lineTo(19, 20) // base, right
-            ..lineTo(5, 20) // base, left
-            ..lineTo(5, 10.5) // left shoulder
-            ..close();
+          final house = _roundedPolygon(const [
+            Offset(12, 3.6),
+            Offset(20.4, 10.4),
+            Offset(20.4, 20.4),
+            Offset(3.6, 20.4),
+            Offset(3.6, 10.4),
+          ], 2.2);
           if (filled) {
-            c.drawPath(house, f);
+            _solidWithKnockout(
+              c,
+              s,
+              f,
+              house,
+              fills: [
+                Path()..addRRect(
+                  RRect.fromRectAndRadius(
+                    const Rect.fromLTRB(9.4, 14.8, 14.6, 23),
+                    const Radius.circular(1.6),
+                  ),
+                ),
+              ],
+            );
           } else {
-            c.drawPath(house, _miterStroke(s));
+            c.drawPath(house, s);
+            c.drawPath(
+              Path()
+                ..moveTo(9.4, 20.4)
+                ..lineTo(9.4, 16.4)
+                ..quadraticBezierTo(9.4, 14.8, 11, 14.8)
+                ..lineTo(13, 14.8)
+                ..quadraticBezierTo(14.6, 14.8, 14.6, 16.4)
+                ..lineTo(14.6, 20.4),
+              s,
+            );
           }
         }
       case AyreGlyph.signals:
@@ -218,115 +256,104 @@ class _AyreIconPainter extends CustomPainter {
           }
         }
       case AyreGlyph.insights:
-        // v8 rework: dropped the small companion spark that used to sit
-        // bottom-right of the main one — a single, larger four-point
-        // sparkle reads cleaner at nav size and keeps this set to the
-        // reference bar's one-shape-per-icon simplicity. Cusps stay stroked
-        // with a miter join so the points stay sharp outline or filled.
+        // Line chart: L-axes, a rising polyline ending in a node. Selected =
+        // solid rounded square with the polyline and node knocked out.
         {
-          Path sparkPath(Offset center, double r) => Path()
-            ..moveTo(center.dx, center.dy - r)
-            ..quadraticBezierTo(center.dx, center.dy, center.dx + r, center.dy)
-            ..quadraticBezierTo(center.dx, center.dy, center.dx, center.dy + r)
-            ..quadraticBezierTo(center.dx, center.dy, center.dx - r, center.dy)
-            ..quadraticBezierTo(center.dx, center.dy, center.dx, center.dy - r)
-            ..close();
-          final star = sparkPath(const Offset(12, 12), 8.5);
+          final line = Path()
+            ..moveTo(7.6, 16)
+            ..lineTo(11.4, 11.6)
+            ..lineTo(14.4, 14.2)
+            ..lineTo(18.4, 8.2);
           if (filled) {
-            c.drawPath(star, f);
+            _solidWithKnockout(
+              c,
+              s,
+              f,
+              Path()..addRRect(
+                RRect.fromRectAndRadius(
+                  const Rect.fromLTRB(3.6, 3.6, 20.4, 20.4),
+                  const Radius.circular(3.2),
+                ),
+              ),
+              strokes: [line],
+              fills: [Path()..addOval(Rect.fromCircle(center: const Offset(18.4, 8.2), radius: 1.9))],
+            );
           } else {
-            c.drawPath(star, _miterStroke(s));
+            c.drawPath(
+              Path()
+                ..moveTo(3.6, 3.6)
+                ..lineTo(3.6, 18.4)
+                ..quadraticBezierTo(3.6, 20.4, 5.6, 20.4)
+                ..lineTo(20.4, 20.4),
+              s,
+            );
+            c.drawPath(line, s);
+            c.drawCircle(const Offset(18.4, 8.2), 1.9, f);
           }
         }
       case AyreGlyph.learn:
-        // v8 rework: replaced the ruled document (a rect plus three content
-        // lines) with a plain folded-corner page — the universal "document"
-        // mark, one dog-eared rectangle rather than a rect-plus-lines
-        // composite. Bolder and simpler, and it removes the one glyph most
-        // exposed to a stray misalignment between stroked lines and their
-        // punched-through filled counterparts.
+        // Open book: two pages and a spine. Selected = solid book, spine
+        // knocked out.
         {
-          final page = Path()
-            ..moveTo(6, 3)
-            ..lineTo(15, 3)
-            ..lineTo(19, 7)
-            ..lineTo(19, 21)
-            ..lineTo(6, 21)
+          final book = Path()
+            ..moveTo(12, 6.6)
+            ..cubicTo(9.6, 4.6, 6.6, 4.2, 3.6, 4.8)
+            ..lineTo(3.6, 18.6)
+            ..cubicTo(6.6, 18.1, 9.6, 18.5, 12, 20.4)
+            ..cubicTo(14.4, 18.5, 17.4, 18.1, 20.4, 18.6)
+            ..lineTo(20.4, 4.8)
+            ..cubicTo(17.4, 4.2, 14.4, 4.6, 12, 6.6)
             ..close();
-          final crease = Path()
-            ..moveTo(15, 3)
-            ..lineTo(15, 7)
-            ..lineTo(19, 7);
+          final spine = Path()
+            ..moveTo(12, 6.6)
+            ..lineTo(12, 20.4);
           if (filled) {
-            c.saveLayer(page.getBounds().inflate(4), Paint());
-            c.drawPath(page, f);
-            final punch = Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = strokeWidth
-              ..strokeCap = StrokeCap.round
-              ..strokeJoin = StrokeJoin.miter
-              ..blendMode = BlendMode.clear;
-            c.drawPath(crease, punch);
-            c.restore();
+            _solidWithKnockout(c, s, f, book, strokes: [spine]);
           } else {
-            final line = _miterStroke(s);
-            c.drawPath(page, line);
-            c.drawPath(crease, line);
+            c.drawPath(book, s);
+            c.drawPath(spine, s);
           }
         }
       case AyreGlyph.report:
-        // A plain page with three ascending bars. Outline strokes the page and
-        // the bars; filled is the same page with the bars punched through, so
-        // selecting the tab never changes the glyph's extent.
+        // Portrait sheet with three ascending bars. Selected = solid sheet,
+        // bars knocked out.
         {
-          final page = Path()
-            ..moveTo(5, 3)
-            ..lineTo(19, 3)
-            ..lineTo(19, 21)
-            ..lineTo(5, 21)
-            ..close();
+          final sheet = Path()..addRRect(
+            RRect.fromRectAndRadius(
+              const Rect.fromLTRB(4.6, 3.6, 19.4, 20.4),
+              const Radius.circular(2.6),
+            ),
+          );
           final bars = Path()
-            ..moveTo(9, 17)
-            ..lineTo(9, 14)
-            ..moveTo(12, 17)
-            ..lineTo(12, 11.5)
-            ..moveTo(15, 17)
-            ..lineTo(15, 8.5);
+            ..moveTo(9, 16.4)
+            ..lineTo(9, 13.4)
+            ..moveTo(12, 16.4)
+            ..lineTo(12, 10.8)
+            ..moveTo(15, 16.4)
+            ..lineTo(15, 8);
           if (filled) {
-            c.saveLayer(page.getBounds().inflate(4), Paint());
-            c.drawPath(page, f);
-            final punch = Paint()
-              ..style = PaintingStyle.stroke
-              ..strokeWidth = strokeWidth
-              ..strokeCap = StrokeCap.round
-              ..strokeJoin = StrokeJoin.round
-              ..blendMode = BlendMode.clear;
-            c.drawPath(bars, punch);
-            c.restore();
+            _solidWithKnockout(c, s, f, sheet, strokes: [bars]);
           } else {
-            c.drawPath(page, _miterStroke(s));
+            c.drawPath(sheet, s);
             c.drawPath(bars, s);
           }
         }
       case AyreGlyph.profile:
-        // v8 rework: bumped the head and shoulder proportions up (bigger
-        // head, wider shoulders) for a bolder mark closer to the reference
-        // bar's person icon. Keeps v7's fix of sharing one path's footprint
-        // between outline and filled — the outline strokes it open (no
-        // floor edge), the filled state is the same path with one closing
-        // edge added — so selecting the tab still never changes its extent.
+        // Head and shoulders, fully inside the grid (base at y = 20). Selected
+        // = solid head and solid shoulders with a flat base.
         {
-          const headCenter = Offset(12, 8.6);
-          const headRadius = 3.9;
+          const headCenter = Offset(12, 8);
+          const headRadius = 3.8;
           final shoulders = Path()
-            ..moveTo(4.8, 24)
-            ..lineTo(4.8, 19.8)
-            ..cubicTo(6, 15.6, 8.8, 14.4, 12, 14.4)
-            ..cubicTo(15.2, 14.4, 18, 15.6, 19.2, 19.8)
-            ..lineTo(19.2, 24);
+            ..moveTo(4.6, 20)
+            ..cubicTo(4.6, 16, 7.8, 14, 12, 14)
+            ..cubicTo(16.2, 14, 19.4, 16, 19.4, 20);
           if (filled) {
             c.drawCircle(headCenter, headRadius, f);
-            c.drawPath(Path.from(shoulders)..close(), f);
+            c.drawCircle(headCenter, headRadius, s);
+            final body = Path.from(shoulders)..close();
+            c.drawPath(body, f);
+            c.drawPath(body, s);
           } else {
             c.drawCircle(headCenter, headRadius, s);
             c.drawPath(shoulders, s);
@@ -657,6 +684,61 @@ class _AyreIconPainter extends CustomPainter {
     } else {
       c.drawRRect(rect, s);
     }
+  }
+
+  /// A closed polygon with every corner rounded by [radius] (quadratic
+  /// corners), used by the nav glyphs so corners match across the set.
+  Path _roundedPolygon(List<Offset> points, double radius) {
+    final path = Path();
+    final n = points.length;
+    for (var i = 0; i < n; i++) {
+      final prev = points[(i - 1 + n) % n];
+      final cur = points[i];
+      final next = points[(i + 1) % n];
+      final toPrev = prev - cur;
+      final toNext = next - cur;
+      final r1 = math.min(radius, toPrev.distance / 2);
+      final r2 = math.min(radius, toNext.distance / 2);
+      final start = cur + toPrev / toPrev.distance * r1;
+      final end = cur + toNext / toNext.distance * r2;
+      if (i == 0) {
+        path.moveTo(start.dx, start.dy);
+      } else {
+        path.lineTo(start.dx, start.dy);
+      }
+      path.quadraticBezierTo(cur.dx, cur.dy, end.dx, end.dy);
+    }
+    return path..close();
+  }
+
+  /// The selected form of a nav glyph: the outline's own silhouette made solid
+  /// (fill + the same stroke, so the optical size is identical to the line
+  /// form), with detail [strokes] and [fills] cleared out of it.
+  void _solidWithKnockout(
+    Canvas c,
+    Paint s,
+    Paint f,
+    Path body, {
+    List<Path> strokes = const [],
+    List<Path> fills = const [],
+  }) {
+    c.saveLayer(body.getBounds().inflate(4), Paint());
+    c.drawPath(body, f);
+    c.drawPath(body, s);
+    final clearStroke = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..blendMode = BlendMode.clear;
+    final clearFill = Paint()..blendMode = BlendMode.clear;
+    for (final path in strokes) {
+      c.drawPath(path, clearStroke);
+    }
+    for (final path in fills) {
+      c.drawPath(path, clearFill);
+    }
+    c.restore();
   }
 
   /// A copy of the given stroke paint with a miter join instead of this

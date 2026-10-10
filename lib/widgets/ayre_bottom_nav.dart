@@ -1,15 +1,16 @@
-import 'dart:ui';
+import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
 import 'ayre_icons.dart';
+import 'ayre_nav_metrics.dart';
 import 'spring.dart';
 
 /// A navigation destination. The label is rendered on screen (icon + label on
-/// every item) and is also the accessibility name, so nothing changes for
-/// screen-reader users.
+/// every item) and is also the accessibility name.
 class NavDestination {
   const NavDestination({required this.label, required this.glyph});
 
@@ -25,127 +26,128 @@ const List<NavDestination> kNavDestinations = [
   NavDestination(label: 'Profile', glyph: AyreGlyph.profile),
 ];
 
-/// A stable handle on a destination, used by tests and by the tooltip/
-/// semantics wiring.
+/// A stable handle on a destination, used by tests, the spotlight tour and the
+/// tooltip/semantics wiring.
 Key navDestinationKey(String label) => ValueKey('nav-destination-$label');
 
-/// The always-visible bottom navigation — v5's floating glass pill.
+/// Selected-state indicator: a soft capsule (`accentSoft`) behind the glyph,
+/// with the glyph and label in `accentInk`.
 ///
-/// The bar is a fully rounded pill that floats above the bottom edge with a
-/// margin on every side (never flush to the screen edges), carrying a soft
-/// [AppThemeTokens.shadowColor] shadow beneath it. Every destination shows an
-/// icon **and** a label at all times; the active destination is never
-/// enlarged — a solid pill (deep ink in light, brand emerald in dark) slides in
-/// behind it and its glyph switches from line to filled.
+/// This is the single place to change if the soft capsule feels too quiet on
+/// device (plan §3.5): return `(fill: t.accent, glyph: t.onAccent)` for the
+/// solid fallback. Geometry, labels, semantics and motion do not change.
+({Color fill, Color glyph}) _indicatorColors(AppThemeTokens t) =>
+    (fill: t.accentSoft, glyph: t.accentInk);
+
+/// Unselected glyph and label. `foregroundMuted` in light (the translucent bar
+/// sits over dark content there), `foregroundSubtle` in dark.
+Color _unselectedColor(AppThemeTokens t, bool dark) =>
+    dark ? t.foregroundSubtle : t.foregroundMuted;
+
+/// The always-visible bottom navigation: a floating dock (plan §3.3).
 ///
-/// **Glass effect:** [BackdropFilter] blurs whatever scrolls beneath the bar
-/// (Flutter's direct equivalent of CSS `backdrop-filter: blur()`), composed
-/// with a saturation boost so the blurred content doesn't wash out — CSS's
-/// `saturate(150%)` has no built-in Flutter filter, so it is reproduced here
-/// as the literal RGB saturation matrix (`ColorFilter.matrix`, composed
-/// after the blur via `ImageFilter.compose`). [AppThemeTokens.navBg] sits on
-/// top of the filtered content for the tint, at ~90% alpha in light and ~85%
-/// in dark (the dark canvas needs slightly more see-through to still read as
-/// glass rather than a solid slab).
+/// Five equal slots, each an indicator capsule holding a 24-pt glyph with the
+/// destination's label beneath it. The selected capsule glides between slots on
+/// [AppSpring.navPill]; the glyph crossfades outline to filled and colours lerp
+/// on the same value. Nothing pops, lifts or enlarges.
 ///
-/// **Motion:** the pill's position is driven by [SpringValue] on
-/// [AppSpring.navPill] (numerically verified: ζ≈0.87, settle≈0.21s, ~0.4%
-/// overshoot — "glides smoothly, no bounce"), re-targeting mid-flight from
-/// wherever it currently sits rather than restarting, so a fast second tap
-/// doesn't cause a visible snap-back. Reduced motion is honored by
-/// [SpringValue] itself.
+/// Surface: iOS/macOS get a light blur, everything else a plain tonal surface.
+/// With high-contrast on, the dock is opaque with a visible border.
+///
+/// [onSelected] fires only for a *new* index (with the selection haptic).
+/// [onReselected] fires when the already-selected item is tapped (A2); it never
+/// plays a haptic.
 class AyreBottomNav extends StatelessWidget {
   const AyreBottomNav({
     super.key,
     required this.selectedIndex,
     required this.onSelected,
+    this.onReselected,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onSelected;
-
-  /// Height of the bar's content, excluding the safe-area inset added below
-  /// it. Generous enough that icon (22) + gap + label (10, per
-  /// [AppTextScale.navLabel]) clear the 48pt touch-target floor vertically
-  /// once padding is added.
-  static const double barHeight = 64;
-
-  /// Gap between the floating pill and the screen's left/right/bottom edges.
-  static const double edgeMargin = 12;
-
-  /// Total vertical space the nav occupies (pill + its bottom margin), for
-  /// screens that need to pad their scroll content clear of it. The safe-area
-  /// inset is added separately by the caller, as before.
-  static const double occupiedHeight = barHeight + edgeMargin;
+  final ValueChanged<int>? onReselected;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final media = MediaQuery.of(context);
+    final theme = Theme.of(context);
+    final dark = theme.brightness == Brightness.dark;
+    final platform = theme.platform;
+    final apple =
+        platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
+    final highContrast = MediaQuery.highContrastOf(context);
+
+    final scale = media.textScaler.scale(100) / 100;
+    final labelSize = AyreNavMetrics.labelSizeFor(platform);
+    final barHeight = AyreNavMetrics.barHeightFor(
+      textScale: scale,
+      labelSize: labelSize,
+    );
+    final margin = AyreNavMetrics.marginFor(media.size.width);
+    final inset = media.viewPadding.bottom;
     final radius = BorderRadius.circular(AppRadius.pill);
 
-    // The outer padding is what makes the bar float: transparent margin on
-    // the left, right and bottom, with the safe-area inset added beneath it.
+    final alpha = highContrast
+        ? 1.0
+        : apple
+        ? (dark ? 0.82 : 0.88)
+        : (dark ? 0.90 : 0.94);
+
+    Widget surface = DecoratedBox(
+      decoration: BoxDecoration(
+        color: t.navBg.withValues(alpha: alpha),
+        borderRadius: radius,
+        border: Border.all(
+          color: highContrast ? t.foregroundSubtle : t.navHairline,
+        ),
+      ),
+      child: SizedBox(
+        height: barHeight,
+        child: _DockItems(
+          selectedIndex: selectedIndex,
+          onSelected: onSelected,
+          onReselected: onReselected,
+          barHeight: barHeight,
+          labelSize: labelSize,
+          textScale: scale,
+        ),
+      ),
+    );
+    if (apple && !highContrast) {
+      surface = BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: surface,
+      );
+    }
+
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        edgeMargin,
+        margin,
         0,
-        edgeMargin,
-        edgeMargin + bottomInset,
+        margin,
+        AyreNavMetrics.bottomGap + inset,
       ),
-      child: DecoratedBox(
-        // The shadow lives on a DecoratedBox *outside* the ClipRRect: a clip
-        // would otherwise cut it off at the pill's own edge. `shadowColor` is
-        // a muted sage-gray in light and pure black in dark (per the token's
-        // docs).
-        decoration: BoxDecoration(
-          borderRadius: radius,
-          boxShadow: [
-            BoxShadow(
-              color: t.shadowColor.withValues(alpha: isDark ? 0.45 : 0.30),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-            ),
-            BoxShadow(
-              color: t.shadowColor.withValues(alpha: isDark ? 0.30 : 0.16),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: radius,
-          child: BackdropFilter(
-            filter: ImageFilter.compose(
-              outer: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
-              // saturate(150%) — the standard CSS saturation matrix at
-              // s = 1.5, applied after the blur so the effect reads like
-              // "frosted, slightly vivid" glass rather than a flat gray smear.
-              inner: const ColorFilter.matrix(<double>[
-                1.3935, -0.3575, -0.036, 0, 0,
-                -0.1065, 1.1425, -0.036, 0, 0,
-                -0.1065, -0.3575, 1.464, 0, 0,
-                0, 0, 0, 1, 0,
-              ]),
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                color: t.navBg.withValues(alpha: isDark ? 0.85 : 0.90),
-                borderRadius: radius,
-                // A full-perimeter hairline, not a top-edge-only rule: a
-                // floating pill has no "top edge" to underline, it needs its
-                // whole silhouette defined against the page behind it.
-                border: Border.all(color: t.navHairline),
-              ),
-              child: SizedBox(
-                height: barHeight,
-                child: _NavPillLayer(
-                  selectedIndex: selectedIndex,
-                  onSelected: onSelected,
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        heightFactor: 1,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AyreNavMetrics.maxWidth),
+          child: DecoratedBox(
+            // One ambient layer; the shadow sits outside the clip.
+            decoration: BoxDecoration(
+              borderRadius: radius,
+              boxShadow: [
+                BoxShadow(
+                  color: t.shadowColor.withValues(alpha: dark ? 0.40 : 0.18),
+                  blurRadius: 20,
+                  offset: const Offset(0, 6),
                 ),
-              ),
+              ],
             ),
+            child: ClipRRect(borderRadius: radius, child: surface),
           ),
         ),
       ),
@@ -153,137 +155,148 @@ class AyreBottomNav extends StatelessWidget {
   }
 }
 
-/// Active-pill fill (§2A "Bottom nav" rows): the deep ink `textPrimary` in
-/// light, the brand `accent` in dark. Resolved here from the ambient
-/// brightness rather than as a new [AppThemeTokens] field — the token set is
-/// fixed (Phase 0), and this pairing is specific to this one component.
-Color _activePillColor(AppThemeTokens t, BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark ? t.accent : t.textPrimary;
-
-/// Active tab icon + label: white on the light theme's ink pill, `onAccent`
-/// on the dark theme's emerald pill.
-Color _activeContentColor(AppThemeTokens t, BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark
-    ? t.onAccent
-    : const Color(0xFFFFFFFF);
-
-/// Inactive tab icon + label. Light uses a muted gray (`#77837B`, a touch
-/// lighter than `foregroundSubtle` so inactive items still recede against the
-/// white bar while staying legible); dark reuses `foregroundMuted`.
-Color _inactiveContentColor(AppThemeTokens t, BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark
-    ? t.foregroundMuted
-    : const Color(0xFF77837B);
-
-/// The sliding solid pill and the row of items, layered together so the pill
-/// paints once beneath the (non-animating) item row.
-class _NavPillLayer extends StatelessWidget {
-  const _NavPillLayer({required this.selectedIndex, required this.onSelected});
+class _DockItems extends StatelessWidget {
+  const _DockItems({
+    required this.selectedIndex,
+    required this.onSelected,
+    required this.onReselected,
+    required this.barHeight,
+    required this.labelSize,
+    required this.textScale,
+  });
 
   final int selectedIndex;
   final ValueChanged<int> onSelected;
-
-  static const double _pillHorizontalInset = 6;
-  static const double _pillVerticalInset = 8;
+  final ValueChanged<int>? onReselected;
+  final double barHeight;
+  final double labelSize;
+  final double textScale;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final count = kNavDestinations.length;
+    final indicator = _indicatorColors(t);
+
+    final labelLine = _labelLineHeight(labelSize, textScale);
+    final contentHeight =
+        AyreNavMetrics.verticalPadding +
+        AyreNavMetrics.capsuleHeight +
+        AyreNavMetrics.labelGap +
+        labelLine +
+        AyreNavMetrics.verticalPadding;
+    final top =
+        AyreNavMetrics.verticalPadding +
+        math.max(0.0, (barHeight - contentHeight) / 2);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final slotWidth = constraints.maxWidth / count;
-        return Stack(
-          children: [
-            Positioned.fill(
-              child: SpringValue(
-                value: selectedIndex.toDouble(),
-                spring: AppSpring.navPill,
-                builder: (context, position, _) {
-                  return Padding(
-                    padding: EdgeInsets.symmetric(
-                      vertical: _pillVerticalInset,
-                    ),
-                    child: Align(
-                      alignment: Alignment.topLeft,
-                      child: Transform.translate(
-                        offset: Offset(slotWidth * position, 0),
-                        child: SizedBox(
-                          width: slotWidth,
-                          height:
-                              AyreBottomNav.barHeight - _pillVerticalInset * 2,
-                          child: Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: _pillHorizontalInset,
-                            ),
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                // A solid pill, never a wash: the deep
-                                // forest-green ink (= `textPrimary`) in
-                                // light, the brand emerald (`accent`) in
-                                // dark — the one place the nav carries the
-                                // brand at full strength.
-                                color: _activePillColor(t, context),
-                                borderRadius: BorderRadius.circular(
-                                  AppRadius.pill,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+        final capsuleWidth = math.min(
+          AyreNavMetrics.capsuleWidth,
+          slotWidth - 4,
+        );
+        return FocusTraversalGroup(
+          policy: ReadingOrderTraversalPolicy(),
+          child: SpringValue(
+            value: selectedIndex.toDouble(),
+            spring: AppSpring.navPill,
+            builder: (context, position, _) {
+              return Stack(
+                children: [
+                  Positioned(
+                    left: slotWidth * position + (slotWidth - capsuleWidth) / 2,
+                    top: top,
+                    width: capsuleWidth,
+                    height: AyreNavMetrics.capsuleHeight,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: indicator.fill,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
                       ),
                     ),
-                  );
-                },
-              ),
-            ),
-            Row(
-              children: [
-                for (var i = 0; i < count; i++)
-                  Expanded(
-                    child: _NavItem(
-                      key: navDestinationKey(kNavDestinations[i].label),
-                      destination: kNavDestinations[i],
-                      selected: i == selectedIndex,
-                      onTap: () {
-                        if (i == selectedIndex) return;
-                        HapticFeedback.selectionClick();
-                        onSelected(i);
-                      },
-                    ),
                   ),
-              ],
-            ),
-          ],
+                  Row(
+                    children: [
+                      for (var i = 0; i < count; i++)
+                        Expanded(
+                          child: _NavItem(
+                            key: navDestinationKey(kNavDestinations[i].label),
+                            index: i,
+                            destination: kNavDestinations[i],
+                            progress: (1 - (position - i).abs()).clamp(
+                              0.0,
+                              1.0,
+                            ),
+                            selected: i == selectedIndex,
+                            onTap: () => _handleTap(
+                              i,
+                              selectedIndex,
+                              onSelected,
+                              onReselected,
+                            ),
+                            capsuleWidth: capsuleWidth,
+                            topPadding: top,
+                            height: barHeight,
+                            labelSize: labelSize,
+                            textScale: textScale,
+                            ownCapsule: false,
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
         );
       },
     );
   }
 }
 
-/// Large-screen (≥[AppBreakpoints.twoColumn]) counterpart to [AyreBottomNav]
-/// (Phase 2B). Same [kNavDestinations]/[NavDestination]/[navDestinationKey]
-/// data, same [AppThemeTokens] palette, so a tablet/desktop window reads as
-/// the same product rather than falling back to stock Material
-/// `NavigationRail` colors. `HomeShell` swaps this in for the floating pill
-/// above the pivot width; nothing about tab state (`IndexedStack`,
-/// `TickerMode`) changes — only the nav chrome.
+double _labelLineHeight(double labelSize, double textScale) =>
+    labelSize * math.min(textScale, AyreNavMetrics.labelScaleCap) * 1.15;
+
+void _handleTap(
+  int index,
+  int selectedIndex,
+  ValueChanged<int> onSelected,
+  ValueChanged<int>? onReselected,
+) {
+  if (index == selectedIndex) {
+    // A2: a re-tap never plays the selection haptic.
+    onReselected?.call(index);
+    return;
+  }
+  HapticFeedback.selectionClick();
+  onSelected(index);
+}
+
+/// Large-window (at/above [AppBreakpoints.twoColumn]) counterpart to
+/// [AyreBottomNav]: the same item, colours, states and semantics, stacked
+/// vertically in a scrollable column so landscape phones and large text cannot
+/// overflow.
 class AyreNavRail extends StatelessWidget {
   const AyreNavRail({
     super.key,
     required this.selectedIndex,
     required this.onSelected,
+    this.onReselected,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onSelected;
+  final ValueChanged<int>? onReselected;
 
-  static const double width = 88;
+  static const double width = AyreNavMetrics.railWidth;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final media = MediaQuery.of(context);
+    final labelSize = AyreNavMetrics.labelSizeFor(Theme.of(context).platform);
+    final scale = media.textScaler.scale(100) / 100;
 
     return Container(
       width: width,
@@ -292,102 +305,40 @@ class AyreNavRail extends StatelessWidget {
         border: Border(right: BorderSide(color: t.hairline)),
       ),
       child: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: AppSpace.lg),
-            for (var i = 0; i < kNavDestinations.length; i++)
-              _RailItem(
-                key: navDestinationKey(kNavDestinations[i].label),
-                destination: kNavDestinations[i],
-                selected: i == selectedIndex,
-                onTap: () {
-                  if (i == selectedIndex) return;
-                  HapticFeedback.selectionClick();
-                  onSelected(i);
-                },
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// One [AyreNavRail] destination: icon above label, stacked, at least
-/// [AppSpace.minTarget] tall — the same touch-target floor every other
-/// interactive row in the app enforces. The selected item takes the same
-/// pill treatment as the bottom nav's active item, just laid out vertically,
-/// and the same [_NavTransition] emphasis motion as [_NavItem] so the rail
-/// and the floating bar read as one animation language.
-class _RailItem extends StatelessWidget {
-  const _RailItem({
-    super.key,
-    required this.destination,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final NavDestination destination;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final activeColor = _activeContentColor(t, context);
-    final inactiveColor = _inactiveContentColor(t, context);
-    final pill = _activePillColor(t, context);
-
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: destination.label,
-      child: Tooltip(
-        message: destination.label,
-        child: _NavPressScale(
-          onTap: onTap,
-          child: Container(
-            constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
-            margin: const EdgeInsets.symmetric(
-              horizontal: AppSpace.sm,
-              vertical: AppSpace.xxs,
-            ),
-            padding: const EdgeInsets.symmetric(vertical: AppSpace.sm),
-            child: _NavTransition(
-              selected: selected,
-              builder: (context, p, bump, color) {
-                return DecoratedBox(
-                  decoration: BoxDecoration(
-                    // The pill itself fades in/out with `p` too, rather than
-                    // snapping — the rail's one departure from the bottom
-                    // bar's *sliding* pill, since a vertical rail has no
-                    // shared track for it to glide along.
-                    color: Color.lerp(Colors.transparent, pill, p),
-                    borderRadius: BorderRadius.circular(AppRadius.card),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _NavIconMorph(
-                        glyph: destination.glyph,
-                        p: p,
-                        bump: bump,
-                        color: color,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: AppSpace.md),
+          child: FocusTraversalGroup(
+            policy: ReadingOrderTraversalPolicy(),
+            child: Column(
+              children: [
+                for (var i = 0; i < kNavDestinations.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: AppSpace.xxs),
+                    child: SpringValue(
+                      value: i == selectedIndex ? 1.0 : 0.0,
+                      spring: AppSpring.navPill,
+                      builder: (context, value, _) => _NavItem(
+                        key: navDestinationKey(kNavDestinations[i].label),
+                        index: i,
+                        destination: kNavDestinations[i],
+                        progress: value.clamp(0.0, 1.0),
+                        selected: i == selectedIndex,
+                        onTap: () => _handleTap(
+                          i,
+                          selectedIndex,
+                          onSelected,
+                          onReselected,
+                        ),
+                        capsuleWidth: AyreNavMetrics.capsuleWidth,
+                        topPadding: AyreNavMetrics.verticalPadding,
+                        height: null,
+                        labelSize: labelSize,
+                        textScale: scale,
+                        ownCapsule: true,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        destination.label,
-                        style: AppTypo.navLabel(t, color: color),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                    ),
                   ),
-                );
-              },
-              activeColor: activeColor,
-              inactiveColor: inactiveColor,
+              ],
             ),
           ),
         ),
@@ -396,205 +347,51 @@ class _RailItem extends StatelessWidget {
   }
 }
 
-/// One destination's icon, label and tap target. The item's own box never
-/// enlarges or shifts on selection — that stays the fixed backdrop the
-/// sliding pill in [_NavPillLayer] moves against — but the icon and label
-/// *within* it now carry [_NavTransition]'s emphasis motion: a brief pop and
-/// lift as the glyph crosses from outline to filled, mirrored on the way
-/// back down when another tab takes over. See [_NavTransition] for the
-/// motion's shape and rationale.
-class _NavItem extends StatelessWidget {
+/// One destination, shared by the dock and the rail so states, semantics and
+/// focus cannot drift. The whole slot is the hit target.
+class _NavItem extends StatefulWidget {
   const _NavItem({
     super.key,
+    required this.index,
     required this.destination,
+    required this.progress,
     required this.selected,
     required this.onTap,
+    required this.capsuleWidth,
+    required this.topPadding,
+    required this.height,
+    required this.labelSize,
+    required this.textScale,
+    required this.ownCapsule,
   });
 
+  final int index;
   final NavDestination destination;
+
+  /// Selection progress 0..1, driven by the parent's spring.
+  final double progress;
   final bool selected;
   final VoidCallback onTap;
+  final double capsuleWidth;
+  final double topPadding;
+
+  /// Fixed height in the dock; `null` in the rail (min height applies).
+  final double? height;
+  final double labelSize;
+  final double textScale;
+
+  /// True where the item draws its own selected capsule (the rail); the dock
+  /// draws one sliding capsule behind all items instead.
+  final bool ownCapsule;
 
   @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final activeColor = _activeContentColor(t, context);
-    final inactiveColor = _inactiveContentColor(t, context);
-
-    return Semantics(
-      button: true,
-      selected: selected,
-      label: destination.label,
-      child: Tooltip(
-        message: destination.label,
-        preferBelow: false,
-        child: _NavPressScale(
-          onTap: onTap,
-          child: SizedBox(
-            height: AyreBottomNav.barHeight,
-            child: _NavTransition(
-              selected: selected,
-              activeColor: activeColor,
-              inactiveColor: inactiveColor,
-              builder: (context, p, bump, color) {
-                return Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _NavIconMorph(
-                      glyph: destination.glyph,
-                      p: p,
-                      bump: bump,
-                      color: color,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      destination.label,
-                      style: AppTypo.navLabel(t, color: color),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+  State<_NavItem> createState() => _NavItemState();
 }
 
-/// Drives one nav item's selection emphasis on [AppSpring.navPill] — the
-/// same spring [_NavPillLayer] slides the background pill on, so an icon's
-/// pop and the pill's glide arrive together rather than reading as two
-/// unrelated animations.
-///
-/// [builder] receives:
-///  - `p`: selection progress, clamped to 0–1 (0 = fully inactive, 1 = fully
-///    active). Drives color and the icon's line↔fill crossfade.
-///  - `bump`: a parabola of `p` (`4·p·(1-p)`) that is *zero at both rest
-///    states* and peaks mid-transition. This is what gives the icon a
-///    transient pop/lift exactly while it is changing state, in either
-///    direction, without ever leaving it visually enlarged at rest — keeping
-///    faith with the "never enlarge the item" rule while still giving the
-///    change itself some weight, per the reference's "how it becomes active
-///    ... and how it returns to normal" brief.
-///  - `color`: inactive→active color already interpolated by `p`, so callers
-///    never lerp it themselves.
-class _NavTransition extends StatelessWidget {
-  const _NavTransition({
-    required this.selected,
-    required this.activeColor,
-    required this.inactiveColor,
-    required this.builder,
-  });
-
-  final bool selected;
-  final Color activeColor;
-  final Color inactiveColor;
-  final Widget Function(
-    BuildContext context,
-    double p,
-    double bump,
-    Color color,
-  )
-  builder;
-
-  @override
-  Widget build(BuildContext context) {
-    return SpringValue(
-      value: selected ? 1.0 : 0.0,
-      spring: AppSpring.navPill,
-      builder: (context, raw, _) {
-        final p = raw.clamp(0.0, 1.0);
-        final bump = 4 * p * (1 - p);
-        final color = Color.lerp(inactiveColor, activeColor, p)!;
-        return builder(context, p, bump, color);
-      },
-    );
-  }
-}
-
-/// The glyph itself: crossfades outline→filled as `p` runs 0→1 (a soft
-/// weight change rather than a hard swap) and rides [bump] into a small pop
-/// (scale) and lift (translateY), both zero at rest. Two stacked [AyreIcon]s
-/// rather than one continuously-morphing painter — [AyreIcon]'s glyphs are
-/// hand-drawn per state, not parameterized by fill fraction, so a dissolve
-/// between the two fixed drawings is the low-risk way to get a soft
-/// transition out of the existing icon set.
-class _NavIconMorph extends StatelessWidget {
-  const _NavIconMorph({
-    required this.glyph,
-    required this.p,
-    required this.bump,
-    required this.color,
-  });
-
-  final AyreGlyph glyph;
-  final double p;
-  final double bump;
-  final Color color;
-
-  /// Fixed at the one size every nav item actually uses — [AyreBottomNav]
-  /// and [AyreNavRail] both call this without overriding it, so a
-  /// configurable `size` parameter was dead weight the analyzer flagged
-  /// (`unused_element_parameter`). Reintroduce it as a constructor field if
-  /// a second call site ever needs a different size.
-  static const double _size = 22;
-
-  @override
-  Widget build(BuildContext context) {
-    return Transform.translate(
-      offset: Offset(0, -bump * 1.6),
-      child: Transform.scale(
-        scale: 1 + bump * 0.12,
-        child: SizedBox(
-          width: _size,
-          height: _size,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Opacity(
-                opacity: 1 - p,
-                child: AyreIcon(glyph, size: _size, filled: false, color: color),
-              ),
-              Opacity(
-                opacity: p,
-                child: AyreIcon(glyph, size: _size, filled: true, color: color),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Wraps a nav tap target with a small press-down scale — the tactile cue
-/// that the row itself responds to touch, independent of (and a beat ahead
-/// of) the selection change [_NavTransition] plays once the tap commits.
-/// Snaps instead of animating under reduced motion, matching [SpringValue]'s
-/// own reduced-motion behavior elsewhere in this file.
-///
-/// Deliberately not the shared `PressableScale` (widgets/pressable_scale.dart):
-/// that one clips to a rounded card and shows an ink splash, which reads fine
-/// on a standalone card but would visibly bleed across neighboring items
-/// inside the nav's single shared glass pill, which has no per-item clip
-/// boundary of its own. This is scale-only, no splash, so it stays this
-/// component's private helper rather than a variant bolted onto the shared
-/// one.
-class _NavPressScale extends StatefulWidget {
-  const _NavPressScale({required this.onTap, required this.child});
-
-  final VoidCallback onTap;
-  final Widget child;
-
-  @override
-  State<_NavPressScale> createState() => _NavPressScaleState();
-}
-
-class _NavPressScaleState extends State<_NavPressScale> {
+class _NavItemState extends State<_NavItem> {
   bool _pressed = false;
+  bool _hovered = false;
+  bool _focused = false;
 
   void _setPressed(bool value) {
     if (_pressed != value) setState(() => _pressed = value);
@@ -602,18 +399,178 @@ class _NavPressScaleState extends State<_NavPressScale> {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.tokens;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final indicator = _indicatorColors(t);
+    final p = widget.progress;
+    final color = Color.lerp(_unselectedColor(t, dark), indicator.glyph, p)!;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    final label = widget.destination.label;
+    final radius = BorderRadius.circular(AppRadius.pill);
+
+    // Capsule background: the rail's own selected fill, then press/hover tint
+    // for items that are not selected.
+    var background = widget.ownCapsule
+        ? Color.lerp(const Color(0x00000000), indicator.fill, p)!
+        : const Color(0x00000000);
+    if (_pressed && p < 0.5) {
+      background = Color.alphaBlend(
+        indicator.fill.withValues(alpha: 0.5),
+        background,
+      );
+    } else if (_hovered && p < 0.5) {
+      background = Color.alphaBlend(
+        t.foregroundSubtle.withValues(alpha: 0.08),
+        background,
+      );
+    }
+
+    final labelStyle = AppTypo.navLabel(
+      t,
+      color: color,
+    ).copyWith(fontSize: widget.labelSize, height: 1.15);
+    final labelLine = _labelLineHeight(widget.labelSize, widget.textScale);
+
+    final capsule = SizedBox(
+      width: widget.capsuleWidth,
+      height: AyreNavMetrics.capsuleHeight,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          if (_focused)
+            Positioned(
+              left: -3,
+              right: -3,
+              top: -3,
+              bottom: -3,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: radius,
+                  border: Border.all(color: t.accentInk, width: 2),
+                ),
+              ),
+            ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: background, borderRadius: radius),
+            ),
+          ),
+          AnimatedScale(
+            scale: _pressed ? 0.94 : 1.0,
+            duration: reduceMotion ? Duration.zero : AppMotion.buttonPress,
+            curve: AppMotion.ease,
+            child: SizedBox(
+              width: AyreNavMetrics.glyphSize,
+              height: AyreNavMetrics.glyphSize,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Opacity(
+                    opacity: 1 - p,
+                    child: AyreIcon(
+                      widget.destination.glyph,
+                      size: AyreNavMetrics.glyphSize,
+                      color: color,
+                    ),
+                  ),
+                  Opacity(
+                    opacity: p,
+                    child: AyreIcon(
+                      widget.destination.glyph,
+                      size: AyreNavMetrics.glyphSize,
+                      filled: true,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    Widget content = Padding(
+      padding: EdgeInsets.only(
+        top: widget.topPadding,
+        bottom: AyreNavMetrics.verticalPadding,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          capsule,
+          const SizedBox(height: AyreNavMetrics.labelGap),
+          // Never ellipsised: the label's scale is capped, then scaled down
+          // as a last resort (documented exception to D-9).
+          SizedBox(
+            height: labelLine,
+            width: double.infinity,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  softWrap: false,
+                  textScaler: TextScaler.linear(
+                    math.min(widget.textScale, AyreNavMetrics.labelScaleCap),
+                  ),
+                  style: labelStyle,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    content = widget.height != null
+        ? SizedBox(
+            height: widget.height,
+            child: Align(alignment: Alignment.topCenter, child: content),
+          )
+        : ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: AyreNavMetrics.railItemMinHeight,
+            ),
+            child: content,
+          );
+
+    return Semantics(
+      container: true,
+      button: true,
+      selected: widget.selected,
+      label: label,
+      hint: 'Tab ${widget.index + 1} of ${kNavDestinations.length}',
       onTap: widget.onTap,
-      onTapDown: (_) => _setPressed(true),
-      onTapCancel: () => _setPressed(false),
-      onTapUp: (_) => _setPressed(false),
-      child: AnimatedScale(
-        scale: _pressed ? 0.92 : 1.0,
-        duration: reduceMotion ? Duration.zero : AppMotion.buttonPress,
-        curve: AppMotion.ease,
-        child: widget.child,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: label,
+        preferBelow: false,
+        excludeFromSemantics: true,
+        child: FocusableActionDetector(
+          mouseCursor: SystemMouseCursors.click,
+          onShowFocusHighlight: (v) => setState(() => _focused = v),
+          onShowHoverHighlight: (v) => setState(() => _hovered = v),
+          actions: <Type, Action<Intent>>{
+            ActivateIntent: CallbackAction<ActivateIntent>(
+              onInvoke: (_) {
+                widget.onTap();
+                return null;
+              },
+            ),
+          },
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onTap,
+            onTapDown: (_) => _setPressed(true),
+            onTapUp: (_) => _setPressed(false),
+            onTapCancel: () => _setPressed(false),
+            child: content,
+          ),
+        ),
       ),
     );
   }

@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
-import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_tab_scroll.dart';
 import '../widgets/ayre_weekly_report.dart';

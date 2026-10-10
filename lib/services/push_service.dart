@@ -367,14 +367,16 @@ class PushService extends ChangeNotifier {
   void _requestOpenSignals() {
     _pendingOpenSignals = true;
     openSignalsRequests.value++;
-    // Anything pushed over the shell (Alerts, a detail page) would hide the
-    // tab switch, so return to the shell first.
+    // Clears whatever sits on the *root* navigator (sheets, dialogs). Details
+    // pushed inside a tab live on that tab's own navigator; `HomeShell`
+    // selects Home and pops its stack when it handles the request (A3).
     navigatorKey.currentState?.popUntil((route) => route.isFirst);
   }
 
   void _requestOpenAlerts() {
     _pendingOpenAlerts = true;
     openAlertsRequests.value++;
+    // Root-level overlays only; `HomeShell` opens Alerts on Home's navigator.
     navigatorKey.currentState?.popUntil((route) => route.isFirst);
   }
 

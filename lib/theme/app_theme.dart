@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../widgets/ayre_tab_host.dart';
+
 // ─── "v5" — forest-green, emerald, mint-paper ──────────────────────────────
 //
 // v5 retires v4's warm clay/terracotta identity for a cool, deep
@@ -417,6 +419,9 @@ abstract final class AppMotion {
 
   static const Duration buttonPress = Duration(milliseconds: 150);
   static const Duration pageTransition = Duration(milliseconds: 280);
+
+  /// Tab-to-tab fade in the shell (D-8: routine motion <= 200 ms).
+  static const Duration tabFade = Duration(milliseconds: 200);
   static const Duration overlaySlide = Duration(milliseconds: 340);
   static const Duration cardEntrance = Duration(milliseconds: 450);
   static const Duration entranceStagger = Duration(milliseconds: 55);
@@ -1237,12 +1242,16 @@ Route<T> terminalRoute<T>({
   required WidgetBuilder builder,
   RouteSettings? settings,
 }) {
+  // Inside a tab navigator (A3) the page ends above the floating dock;
+  // anywhere else `AyreDockClearance` does nothing.
+  Widget wrapped(BuildContext context) =>
+      AyreDockClearance(child: builder(context));
   return switch (defaultTargetPlatform) {
     TargetPlatform.iOS ||
     TargetPlatform.macOS => CupertinoPageRoute<T>(
-      builder: builder,
+      builder: wrapped,
       settings: settings,
     ),
-    _ => MaterialPageRoute<T>(builder: builder, settings: settings),
+    _ => MaterialPageRoute<T>(builder: wrapped, settings: settings),
   };
 }

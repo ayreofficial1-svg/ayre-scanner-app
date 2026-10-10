@@ -170,7 +170,7 @@ void main() {
     test('copyWith and lerp carry the new fields', () {
       final c = light.copyWith(positiveText: const Color(0xFF000000));
       expect(c.positiveText, const Color(0xFF000000));
-      final mid = light.lerp(dark, 1) as AppThemeTokens;
+      final mid = light.lerp(dark, 1);
       expect(mid.negativeText, dark.negativeText);
     });
   });

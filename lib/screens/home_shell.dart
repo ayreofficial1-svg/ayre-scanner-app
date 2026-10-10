@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
@@ -10,7 +11,8 @@ import '../services/tour_service.dart';
 import '../onboarding/tour_content.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_bottom_nav.dart';
-import '../widgets/responsive.dart';
+import '../widgets/ayre_nav_metrics.dart';
+import '../widgets/ayre_tab_host.dart';
 import '../widgets/spotlight_tour.dart';
 import '../widgets/verification_banner.dart';
 import 'home_tab.dart';
@@ -20,9 +22,20 @@ import 'notifications_screen.dart';
 import 'profile_tab.dart';
 import 'weekly_reports_tab.dart';
 
-/// Tab state is preserved across switches by [IndexedStack] — expressed through
-/// the Fold's collapsed/expanded states rather than a static bar, but the
-/// mechanism is unchanged.
+/// The signed-in shell: five destinations, each hosting **its own
+/// [Navigator]** inside an [IndexedStack] (plan A3), so the dock (or rail)
+/// stays visible on in-tab detail screens and every tab keeps its own back
+/// stack while another tab is shown.
+///
+/// Stays on the **root** navigator (full screen, covers the dock): splash,
+/// onboarding, the auth screens, sheets/dialogs and the spotlight tour.
+///
+/// Behaviour owned here:
+///  * A1 — Android Back: sheets/dialogs/tour first, then the active tab's
+///    stack, then Home, then the app exits.
+///  * A2 — re-tapping the active tab pops it to its root, else scrolls to top.
+///  * Deep links — a signal tap selects Home and its root; an exit/alert tap
+///    opens Alerts on Home's navigator.
 class HomeShell extends StatefulWidget {
   // Not const: the remote service holds a short-lived constituents cache, which
   // it needs because movers and breadth are derived from that data rather than
@@ -50,6 +63,26 @@ class _HomeShellState extends State<HomeShell> {
   /// Bumped each time a signal notification asks to see Signals; Home scrolls
   /// the Signals section into view whenever it changes.
   int _signalsFocusToken = 0;
+
+  /// One navigator per tab (A3) and the observers that tell the shell when a
+  /// stack changed (Back handling depends on `canPop`).
+  final List<GlobalKey<NavigatorState>> _navKeys = [
+    for (final d in kNavDestinations)
+      GlobalKey<NavigatorState>(debugLabel: 'tab-${d.label}'),
+  ];
+  late final List<_StackObserver> _observers = [
+    for (var i = 0; i < kNavDestinations.length; i++)
+      _StackObserver(_onStackChanged),
+  ];
+
+  /// One scroll controller per tab (A2), handed to the tab's list.
+  final List<ScrollController> _scrollControllers = [
+    for (var i = 0; i < kNavDestinations.length; i++) ScrollController(),
+  ];
+
+  bool get _androidBackRules => defaultTargetPlatform == TargetPlatform.android;
+
+  bool get _activeTabCanPop => _navKeys[_index].currentState?.canPop() ?? false;
 
   @override
   void initState() {
@@ -93,29 +126,54 @@ class _HomeShellState extends State<HomeShell> {
     PushService.instance.openAlertsRequests.removeListener(
       _onOpenAlertsRequested,
     );
+    for (final c in _scrollControllers) {
+      c.dispose();
+    }
     super.dispose();
+  }
+
+  void _onStackChanged() {
+    // Observers fire during navigation (possibly mid-build): refresh the Back
+    // handling once the frame is done.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _onOpenAlertsRequested() {
     if (!mounted) return;
-    if (PushService.instance.consumePendingOpenAlerts()) {
-      // PushService has just popped back to this shell; push on the next
-      // frame so the pop has finished.
-      WidgetsBinding.instance.addPostFrameCallback((_) => _openAlerts());
-    }
+    if (PushService.instance.consumePendingOpenAlerts()) _openAlerts();
   }
 
-  void _openAlerts() {
+  /// Alerts open on Home's navigator (A3), so the dock stays visible. Home is
+  /// selected and returned to its root first so the push is what the person
+  /// sees, whatever tab or depth they were at.
+  void _openAlerts({bool retried = false}) {
     if (!mounted) return;
-    Navigator.of(context).push(
-      terminalRoute(builder: (_) => const NotificationsScreen()),
-    );
+    final nav = _navKeys[0].currentState;
+    if (nav == null) {
+      if (!retried) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => _openAlerts(retried: true),
+        );
+      }
+      return;
+    }
+    if (_index != 0) setState(() => _index = 0);
+    nav.popUntil((route) => route.isFirst);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _navKeys[0].currentState?.push(
+        terminalRoute(builder: (_) => const NotificationsScreen()),
+      );
+    });
   }
 
   void _onOpenSignalsRequested() {
     if (!mounted) return;
     // Signals live on Home (index 0).
     if (PushService.instance.consumePendingOpenSignals()) {
+      _navKeys[0].currentState?.popUntil((route) => route.isFirst);
       setState(() {
         _index = 0;
         _signalsFocusToken++;
@@ -126,6 +184,56 @@ class _HomeShellState extends State<HomeShell> {
   void _select(int index) {
     if (index == _index) return;
     setState(() => _index = index);
+  }
+
+  /// A2: a tap on the already-selected destination. Pops that tab to its root;
+  /// if it is already there, scrolls it to the top; if it is already at the
+  /// top, does nothing. User taps only: tours and notifications use [_select].
+  void _onReselected(int index) {
+    final nav = _navKeys[index].currentState;
+    if (nav != null && nav.canPop()) {
+      nav.popUntil((route) => route.isFirst);
+      return;
+    }
+    final controller = _scrollControllers[index];
+    if (!controller.hasClients) return;
+    final position = controller.positions.first;
+    if (position.pixels <= 0.5) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      controller.jumpTo(0);
+    } else {
+      controller.animateTo(
+        0,
+        duration: AppMotion.pageTransition,
+        curve: AppMotion.ease,
+      );
+    }
+  }
+
+  /// A1 (Android only): reached when system Back is not consumed by anything
+  /// above the shell. Unwinds the active tab's stack, then goes Home. (When on
+  /// Home with nothing to pop, [PopScope] lets the app exit.)
+  void _onBack() {
+    final nav = _navKeys[_index].currentState;
+    if (nav != null && nav.canPop()) {
+      unawaited(nav.maybePop());
+      return;
+    }
+    if (_index != 0) _select(0);
+  }
+
+  /// Returns every tab to its root. True when something was popped, so the
+  /// caller can wait for the transitions before measuring anything.
+  bool _returnTabsToRoot() {
+    var popped = false;
+    for (final key in _navKeys) {
+      final nav = key.currentState;
+      if (nav != null && nav.canPop()) {
+        nav.popUntil((route) => route.isFirst);
+        popped = true;
+      }
+    }
+    return popped;
   }
 
   Future<void> _startPendingTour() async {
@@ -145,6 +253,14 @@ class _HomeShellState extends State<HomeShell> {
     );
     if (!mounted || SpotlightTour.isActive) return;
     if (ModalRoute.of(context)?.isCurrent == false) return;
+    // A tab can have a detail open now (A3), so return every tab to its root
+    // before anything is measured.
+    if (_returnTabsToRoot()) {
+      await Future<void>.delayed(
+        AppMotion.pageTransition + const Duration(milliseconds: 150),
+      );
+      if (!mounted || SpotlightTour.isActive) return;
+    }
     final origin = _index;
     final verified = AuthService.instance.currentUser?.emailVerified ?? true;
     SpotlightTour.show(
@@ -175,6 +291,12 @@ class _HomeShellState extends State<HomeShell> {
     );
     if (!mounted || SpotlightTour.isActive) return;
     if (ModalRoute.of(context)?.isCurrent == false) return;
+    if (_returnTabsToRoot()) {
+      await Future<void>.delayed(
+        AppMotion.pageTransition + const Duration(milliseconds: 150),
+      );
+      if (!mounted || SpotlightTour.isActive) return;
+    }
     final origin = _index;
     SpotlightTour.show(
       context,
@@ -209,86 +331,186 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  /// The root page of one tab. Reads the shell's live values from
+  /// [_ShellScope], because a route's page is built once and would otherwise
+  /// never see later changes to the active tab or the account name.
+  Widget _tabRoot(int index) {
+    return Builder(
+      builder: (context) {
+        final scope = _ShellScope.of(context);
+        final controller = _scrollControllers[index];
+        return switch (index) {
+          0 => HomeTab(
+            marketData: widget.marketData,
+            onAccountResolved: _onAccountResolved,
+            onOpenProfile: () => _select(4),
+            active: scope.index == 0,
+            signalsFocusToken: scope.signalsFocusToken,
+            scrollController: controller,
+          ),
+          1 => WeeklyReportsTab(
+            marketData: widget.marketData,
+            active: scope.index == 1,
+            scrollController: controller,
+          ),
+          2 => InsightsTab(
+            marketData: widget.marketData,
+            active: scope.index == 2,
+            scrollController: controller,
+          ),
+          3 => LearnTab(
+            marketData: widget.marketData,
+            active: scope.index == 3,
+            scrollController: controller,
+          ),
+          _ => ProfileTab(
+            accountName: scope.accountName,
+            marketData: widget.marketData,
+            scrollController: controller,
+          ),
+        };
+      },
+    );
+  }
+
+  Widget _tabNavigator(int index) {
+    return Navigator(
+      key: _navKeys[index],
+      observers: [_observers[index]],
+      onGenerateRoute: (settings) => PageRouteBuilder<void>(
+        settings: settings,
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+        pageBuilder: (context, _, _) => _tabRoot(index),
+      ),
+    );
+  }
+
   Widget _build(BuildContext context, String name) {
     final t = context.tokens;
+    final media = MediaQuery.of(context);
+
+    // Below the pivot the floating dock; at/above it a side rail. The dock is
+    // hidden while the keyboard is open so it never rides above it.
+    final wide = AyreNavMetrics.usesRail(media.size.width);
+    final keyboardOpen = media.viewInsets.bottom > 0;
+    final showDock = !wide && !keyboardOpen;
+    final clearance = showDock ? AyreNavMetrics.clearanceOf(context) : 0.0;
 
     // Every visible live quote carries its own repeating AnimationController
-    // (LivePulseDot's breathing dot). IndexedStack keeps all five tabs
-    // mounted for the life of the app, and none of those controllers stop
-    // ticking on their own just because their tab is out of view — so the
-    // number of animations silently running in the background only grows
-    // the longer a session goes on and the more screens get visited.
-    // TickerMode mutes every ticker in a subtree without touching the
-    // widgets that own them, so wrapping each inactive tab in one is enough
-    // to stop its animations from consuming frame callbacks while hidden;
-    // they resume automatically the moment that tab becomes active again.
+    // (LivePulseDot's breathing dot). IndexedStack keeps all five tabs mounted
+    // for the life of the app, and TickerMode mutes every ticker in an
+    // inactive tab's subtree (detail screens included) without touching the
+    // widgets that own them.
     Widget tickered(int index, Widget child) =>
         TickerMode(enabled: index == _index, child: child);
 
     final tabs = IndexedStack(
       index: _index,
       children: [
-        tickered(
-          0,
-          HomeTab(
-            marketData: widget.marketData,
-            onAccountResolved: _onAccountResolved,
-            onOpenProfile: () => _select(4),
-            active: _index == 0,
-            signalsFocusToken: _signalsFocusToken,
-          ),
-        ),
-        tickered(
-          1,
-          WeeklyReportsTab(marketData: widget.marketData, active: _index == 1),
-        ),
-        tickered(
-          2,
-          InsightsTab(marketData: widget.marketData, active: _index == 2),
-        ),
-        tickered(
-          3,
-          LearnTab(marketData: widget.marketData, active: _index == 3),
-        ),
-        tickered(
-          4,
-          ProfileTab(accountName: name, marketData: widget.marketData),
-        ),
+        for (var i = 0; i < kNavDestinations.length; i++)
+          tickered(i, _tabNavigator(i)),
       ],
     );
 
-    // Phase 2B: below the pivot, the floating pill — the app's signature nav
-    // element — is untouched. At/above it, a fixed side rail replaces the
-    // bottom bar rather than floating over content that now has the width to
-    // spare. Only the nav chrome swaps; IndexedStack/TickerMode above is
-    // unchanged either way.
-    final wide = MediaQuery.sizeOf(context).width >= AppBreakpoints.twoColumn;
-
-    return Scaffold(
-      backgroundColor: t.background,
-      extendBody: !wide,
-      body: wide
-          ? Row(
-              children: [
-                AyreNavRail(selectedIndex: _index, onSelected: _select),
-                Expanded(
-                  child: VerificationBannerHost(
-                    child: _TabFade(index: _index, child: tabs),
+    final body = _ShellScope(
+      index: _index,
+      accountName: name,
+      signalsFocusToken: _signalsFocusToken,
+      child: AyreTabHost(
+        clearance: clearance,
+        child: wide
+            ? Row(
+                children: [
+                  AyreNavRail(
+                    selectedIndex: _index,
+                    onSelected: _select,
+                    onReselected: _onReselected,
                   ),
-                ),
-              ],
-            )
-          : VerificationBannerHost(
-              child: _TabFade(index: _index, child: tabs),
-            ),
-      // Always visible: no scroll listener, no idle timer, no collapsed
-      // state. Only shown below the rail pivot — the rail is its own
-      // permanent chrome and the two must never both be on screen.
-      bottomNavigationBar: wide
-          ? null
-          : AyreBottomNav(selectedIndex: _index, onSelected: _select),
+                  Expanded(
+                    child: VerificationBannerHost(
+                      child: _TabFade(index: _index, child: tabs),
+                    ),
+                  ),
+                ],
+              )
+            : VerificationBannerHost(
+                child: _TabFade(index: _index, child: tabs),
+              ),
+      ),
+    );
+
+    return PopScope(
+      // Android only: Back may leave the app only from Home with nothing to
+      // pop; otherwise `_onBack` unwinds the tab, then goes Home.
+      canPop: !_androidBackRules || (_index == 0 && !_activeTabCanPop),
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _onBack();
+      },
+      child: Scaffold(
+        backgroundColor: t.background,
+        extendBody: !wide,
+        // Pushed screens own their keyboard handling; the shell must not also
+        // lift the dock.
+        resizeToAvoidBottomInset: false,
+        body: body,
+        bottomNavigationBar: showDock
+            ? AyreBottomNav(
+                selectedIndex: _index,
+                onSelected: _select,
+                onReselected: _onReselected,
+              )
+            : null,
+      ),
     );
   }
+}
+
+/// Live shell values for the tab root pages (see [_HomeShellState._tabRoot]).
+class _ShellScope extends InheritedWidget {
+  const _ShellScope({
+    required this.index,
+    required this.accountName,
+    required this.signalsFocusToken,
+    required super.child,
+  });
+
+  final int index;
+  final String accountName;
+  final int signalsFocusToken;
+
+  static _ShellScope of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_ShellScope>()!;
+
+  @override
+  bool updateShouldNotify(_ShellScope old) =>
+      old.index != index ||
+      old.accountName != accountName ||
+      old.signalsFocusToken != signalsFocusToken;
+}
+
+/// Reports every change to a tab navigator's stack.
+class _StackObserver extends NavigatorObserver {
+  _StackObserver(this._onChanged);
+
+  final VoidCallback _onChanged;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _onChanged();
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _onChanged();
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) =>
+      _onChanged();
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) =>
+      _onChanged();
 }
 
 /// The incoming tab's already-built content fades **and shifts** in — per
@@ -318,7 +540,7 @@ class _TabFadeState extends State<_TabFade>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: AppMotion.pageTransition,
+      duration: AppMotion.tabFade,
     )..value = 1.0;
     _curved = CurvedAnimation(parent: _controller, curve: AppMotion.ease);
   }

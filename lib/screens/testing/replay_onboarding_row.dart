@@ -28,7 +28,9 @@ class _ReplayOnboardingRowState extends State<ReplayOnboardingRow> {
     if (_open) return;
     _open = true;
     HapticFeedback.selectionClick();
-    final navigator = Navigator.of(context);
+    // Onboarding is a full-screen, root-level flow: it must cover the dock,
+    // so it goes on the root navigator, not the tab's (A3).
+    final navigator = Navigator.of(context, rootNavigator: true);
     await navigator.push<void>(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
