@@ -19,10 +19,10 @@ import 'pressable_scale.dart';
 //   1 – 8 Sep 2026 ⌄                                 date second, no gradient/rule
 //   Latest week · 1 of 3
 //
-//   Stock card: spacious, flat, single-level. Header (logo, symbol,
-//   outcome | return), then Entry · Exit · Profit per share as even columns,
-//   each label / price / date with clear gaps. No hills, no nested tiles, no
-//   dividers.
+//   Stock card: flat, one inset surface. Header (logo, symbol and company |
+//   signed return over the outcome in words), then Entry · Exit in a single
+//   inset panel, then Profit per share under a hairline. No hills, no nested
+//   cards.
 //
 // Cards are separated by space, not dividers. The stock cards stay
 // quiet — flat, single-level, no decoration behind the results. Outcome
@@ -413,17 +413,58 @@ class _WeekPickerSheet extends StatelessWidget {
 
 // ─── Stock card ────────────────────────────────────────────────────────────
 
-/// One stock's result: a flat, single-level card with room to breathe.
+/// Sizes and text styles shared by the real stock card and its skeleton, so
+/// the placeholder is built from the same measurements and cannot drift.
+abstract final class _CardSpec {
+  /// Logo tile edge. 44 keeps a bundled logo legible and sits on the 4 pt
+  /// grid.
+  static const double tile = 44;
+
+  /// Gap between the card's three bands (header · prices · profit).
+  static const double band = AppSpace.sm;
+
+  /// Padding inside the Entry / Exit panel.
+  static const EdgeInsets panelPadding = EdgeInsets.all(AppSpace.sm);
+
+  /// Inner width the header needs to put the result beside the identity,
+  /// per text-scale unit.
+  static const double headerSideBySide = 300;
+
+  /// Panel width needed to set Entry and Exit side by side, per text-scale
+  /// unit. Below it they stack as label / value lines.
+  static const double panelColumns = 2 * 128 + AppSpace.md;
+
+  static TextStyle symbol(AppThemeTokens t) => AppTypo.ui(
+    fontSize: 16,
+    fontWeight: FontWeight.w700,
+    color: t.textPrimary,
+    letterSpacing: -0.2,
+  );
+
+  static TextStyle outcome(Color tone) =>
+      AppTypo.ui(fontSize: 12, fontWeight: FontWeight.w700, color: tone);
+
+  static const double returnSize = 22;
+  static const double priceSize = 16;
+}
+
+/// One stock's result as a flat card with three clear bands:
 ///
-///   Header: [tile 40] · symbol (company) · outcome in words on the left;
-///   the signed return alone on the right.
-///   Metrics: Entry · Exit · Profit per share as three even columns, each
-///   label / price / date with clear gaps. No dividers, no nested tiles.
+///   1. **Header** — logo, symbol and company on the left; the signed return
+///      with the outcome in words beneath it on the right. Identity and
+///      result are each one block, so the eye reads "who" then "how it did".
+///   2. **Prices** — Entry and Exit side by side in a single inset panel,
+///      each label / price / date.
+///   3. **Profit / share** — a hairline, then the label left and the figure
+///      right in the outcome colour.
 ///
-/// Spacing (Spec §4.1, §4.2): 16 pt card padding, 16 pt between header and
-/// metrics, 4 pt inside a label/value pair, 12 pt between cards. With less
-/// room (a 320 pt phone, or larger text) the return drops under the identity
-/// and the metrics become label/value lines. Text is never shrunk.
+/// One inset surface inside the card and nothing nested deeper. Direction is
+/// carried by the sign, the written outcome and the dot, never colour alone.
+///
+/// Spacing (Spec §4.1): 16 pt card padding, 12 pt between bands, 4 pt inside
+/// a label/value pair, 12 pt between cards. With less room (a 320 pt phone,
+/// or larger text) the result drops under the identity and Entry / Exit
+/// become label/value lines. Text is never shrunk.
 ///
 /// [fallbackStart]/[fallbackEnd] are the report's own week range, used only
 /// when this stock doesn't carry its own dates — real data, not a guess.
@@ -437,10 +478,6 @@ class _StockCard extends StatelessWidget {
   final WeeklyReportStock stock;
   final DateTime? fallbackStart;
   final DateTime? fallbackEnd;
-
-  // Inner-width needs per text-scale unit.
-  static const double _headerSideBySide = 250;
-  static const double _threeColumns = 3 * 104;
 
   @override
   Widget build(BuildContext context) {
@@ -476,15 +513,21 @@ class _StockCard extends StatelessWidget {
     final scale = MediaQuery.textScalerOf(context).scale(100) / 100;
     final k = scale < 1 ? 1.0 : scale;
 
-    final metrics = <_MetricData>[
+    final prices = <_MetricData>[
       if (stock.entryPrice != null)
-        _MetricData('Entry', '₹${formatPrice(stock.entryPrice)}', recDate,
-            t.textPrimary),
+        _MetricData(
+          'Entry',
+          '₹${formatPrice(stock.entryPrice)}',
+          recDate,
+          t.textPrimary,
+        ),
       if (stock.exitPrice != null)
-        _MetricData('Exit', '₹${formatPrice(stock.exitPrice)}', exitDate,
-            t.textPrimary),
-      if (pnl != null)
-        _MetricData('Profit / share', _formatSignedRupees(pnl), null, tone),
+        _MetricData(
+          'Exit',
+          '₹${formatPrice(stock.exitPrice)}',
+          exitDate,
+          t.textPrimary,
+        ),
     ];
 
     final identity = Row(
@@ -492,42 +535,38 @@ class _StockCard extends StatelessWidget {
       children: [
         AyreInstrumentTile(
           symbol: stock.symbol,
-          size: 40,
+          size: _CardSpec.tile,
           name: hasName ? stock.name : null,
         ),
-        const SizedBox(width: AppSpace.md),
+        const SizedBox(width: AppSpace.sm),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                stock.symbol,
-                style: AppTypo.ui(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: t.textPrimary,
-                  letterSpacing: -0.2,
-                ),
-              ),
+              Text(stock.symbol, style: _CardSpec.symbol(t)),
               if (hasName) ...[
                 const SizedBox(height: 2),
-                Text(stock.name!, style: AppTypo.meta(t)),
+                Text(
+                  stock.name!,
+                  style: AppTypo.meta(t),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
-              const SizedBox(height: AppSpace.xs),
-              _OutcomeChip(label: outcomeLabel, tone: tone, dot: dot),
             ],
           ),
         ),
       ],
     );
 
-    final result = Figure.static(
+    final returnFigure = Figure.static(
       formatDelta(stock.profitPct),
-      fontSize: 22,
+      fontSize: _CardSpec.returnSize,
       fontWeight: FontWeight.w700,
       color: tone,
     );
+    final outcomeChip = _OutcomeChip(label: outcomeLabel, tone: tone, dot: dot);
 
     return Semantics(
       container: true,
@@ -538,13 +577,21 @@ class _StockCard extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, c) {
             final width = c.maxWidth;
-            final header = width >= _headerSideBySide * k
+            final header = width >= _CardSpec.headerSideBySide * k
                 ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(child: identity),
                       const SizedBox(width: AppSpace.md),
-                      result,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          returnFigure,
+                          const SizedBox(height: AppSpace.xxs),
+                          outcomeChip,
+                        ],
+                      ),
                     ],
                   )
                 : Column(
@@ -552,20 +599,34 @@ class _StockCard extends StatelessWidget {
                     children: [
                       identity,
                       const SizedBox(height: AppSpace.sm),
-                      result,
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: AppSpace.md,
+                        runSpacing: AppSpace.xxs,
+                        children: [returnFigure, outcomeChip],
+                      ),
                     ],
                   );
 
+            final panelWidth =
+                width - _CardSpec.panelPadding.horizontal;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 header,
-                if (metrics.isNotEmpty) ...[
-                  const SizedBox(height: AppSpace.md),
-                  _MetricsRow(
-                    items: metrics,
-                    columns: width >= _threeColumns * k,
+                if (prices.isNotEmpty) ...[
+                  const SizedBox(height: _CardSpec.band),
+                  _PricePanel(
+                    items: prices,
+                    columns: panelWidth >= _CardSpec.panelColumns * k,
                   ),
+                ],
+                if (pnl != null) ...[
+                  const SizedBox(height: _CardSpec.band),
+                  const HairlineDivider(),
+                  const SizedBox(height: _CardSpec.band),
+                  _ProfitRow(value: _formatSignedRupees(pnl), tone: tone),
                 ],
               ],
             );
@@ -599,16 +660,7 @@ class _OutcomeChip extends StatelessWidget {
           decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
-        Flexible(
-          child: Text(
-            label,
-            style: AppTypo.ui(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: tone,
-            ),
-          ),
-        ),
+        Flexible(child: Text(label, style: _CardSpec.outcome(tone))),
       ],
     );
   }
@@ -623,18 +675,30 @@ class _MetricData {
   final Color valueColor;
 }
 
-/// Entry · Exit · Profit per share as even columns with a 16 pt gutter; with
-/// less room, label/value lines separated by space and a hairline.
-class _MetricsRow extends StatelessWidget {
-  const _MetricsRow({required this.items, required this.columns});
+/// Entry and Exit in one inset panel: two even columns, or — with less room —
+/// label/value lines separated by a hairline.
+class _PricePanel extends StatelessWidget {
+  const _PricePanel({required this.items, required this.columns});
 
   final List<_MetricData> items;
   final bool columns;
 
   @override
   Widget build(BuildContext context) {
-    if (!columns) {
-      return Column(
+    final t = context.tokens;
+    final Widget body;
+    if (columns) {
+      body = Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0) const SizedBox(width: AppSpace.md),
+            Expanded(child: _MetricStack(data: items[i])),
+          ],
+        ],
+      );
+    } else {
+      body = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           for (var i = 0; i < items.length; i++) ...[
@@ -648,14 +712,12 @@ class _MetricsRow extends StatelessWidget {
         ],
       );
     }
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (var i = 0; i < items.length; i++) ...[
-          if (i > 0) const SizedBox(width: AppSpace.md),
-          Expanded(child: _MetricStack(data: items[i])),
-        ],
-      ],
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: t.surfaceSunken,
+        borderRadius: BorderRadius.circular(AppRadius.inset),
+      ),
+      child: Padding(padding: _CardSpec.panelPadding, child: body),
     );
   }
 }
@@ -674,10 +736,10 @@ class _MetricStack extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(data.label, style: AppTypo.meta(t)),
-        const SizedBox(height: AppSpace.xs),
+        const SizedBox(height: AppSpace.xxs),
         Figure.static(
           data.value,
-          fontSize: 16,
+          fontSize: _CardSpec.priceSize,
           fontWeight: FontWeight.w600,
           color: data.valueColor,
         ),
@@ -693,7 +755,8 @@ class _MetricStack extends StatelessWidget {
   }
 }
 
-/// Label (and date) left, value right — the reflow form.
+/// Label (and date) left, value right — the reflow form. A [Wrap], so a very
+/// long figure drops under its label instead of overflowing.
 class _MetricLine extends StatelessWidget {
   const _MetricLine({required this.data});
 
@@ -702,31 +765,60 @@ class _MetricLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: AppSpace.md,
+      runSpacing: AppSpace.xxs,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(data.label, style: AppTypo.meta(t)),
-              if (data.date != null) ...[
-                const SizedBox(height: AppSpace.xxs),
-                Text(
-                  _shortDate(data.date!),
-                  style: AppTypo.meta(t, color: t.foregroundSubtle),
-                ),
-              ],
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(data.label, style: AppTypo.meta(t)),
+            if (data.date != null) ...[
+              const SizedBox(height: AppSpace.xxs),
+              Text(
+                _shortDate(data.date!),
+                style: AppTypo.meta(t, color: t.foregroundSubtle),
+              ),
             ],
-          ),
+          ],
         ),
-        const SizedBox(width: AppSpace.md),
         Figure.static(
           data.value,
-          fontSize: 16,
+          fontSize: _CardSpec.priceSize,
           fontWeight: FontWeight.w600,
           color: data.valueColor,
+        ),
+      ],
+    );
+  }
+}
+
+/// `Profit / share ············ +₹80` — label left, figure right in the
+/// outcome colour. Wraps rather than overflows at large text sizes.
+class _ProfitRow extends StatelessWidget {
+  const _ProfitRow({required this.value, required this.tone});
+
+  final String value;
+  final Color tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: AppSpace.md,
+      runSpacing: AppSpace.xxs,
+      children: [
+        Text('Profit / share', style: AppTypo.meta(t)),
+        Figure.static(
+          value,
+          fontSize: _CardSpec.priceSize,
+          fontWeight: FontWeight.w700,
+          color: tone,
         ),
       ],
     );
@@ -805,50 +897,145 @@ class WeeklyReportSkeleton extends StatelessWidget {
   }
 }
 
-/// Same footprint as the compact stock card (12 pt padding, 40 pt header,
-/// 8 pt gap, ~51 pt metrics row) so loading to loaded does not jump.
+/// Same bands, spacing and text styles as the real stock card (it reads them
+/// from [_CardSpec]), with each line of text replaced by a bar of that line's
+/// height. Because the height comes from the real styles, the placeholder
+/// grows with the text size exactly as the card will, so loading to loaded
+/// does not jump.
 class _StockCardSkeleton extends StatelessWidget {
   const _StockCardSkeleton();
 
   @override
   Widget build(BuildContext context) {
-    return const AyreCard(
-      padding: EdgeInsets.all(AppSpace.md),
+    final t = context.tokens;
+    final symbol = _CardSpec.symbol(t);
+    final meta = AppTypo.meta(t);
+    final ret = AppTypo.ticker(
+      fontSize: _CardSpec.returnSize,
+      fontWeight: FontWeight.w700,
+      height: 1.15,
+    );
+    final price = AppTypo.ticker(
+      fontSize: _CardSpec.priceSize,
+      fontWeight: FontWeight.w600,
+      height: 1.15,
+    );
+    final outcome = _CardSpec.outcome(t.foregroundMuted);
+
+    Widget priceStack(double labelW) => Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _GhostLine(style: meta, width: labelW),
+          const SizedBox(height: AppSpace.xxs),
+          _GhostLine(style: price, width: 80),
+          const SizedBox(height: AppSpace.xxs),
+          _GhostLine(style: meta, width: 64),
+        ],
+      ),
+    );
+
+    return AyreCard(
+      padding: const EdgeInsets.all(AppSpace.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            height: 62,
-            child: Row(
-              children: [
-                SkeletonBlock(width: 40, height: 40, radius: AppRadius.iconTile),
-                SizedBox(width: AppSpace.md),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SkeletonBlock(width: 88, height: 14),
-                      SizedBox(height: 8),
-                      SkeletonBlock(width: 72, height: 12),
-                    ],
-                  ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    const SkeletonBlock(
+                      width: _CardSpec.tile,
+                      height: _CardSpec.tile,
+                      radius: AppRadius.iconTile,
+                    ),
+                    const SizedBox(width: AppSpace.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _GhostLine(style: symbol, width: 88),
+                          const SizedBox(height: 2),
+                          _GhostLine(style: meta, width: 120),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                SkeletonBlock(width: 72, height: 22),
-              ],
+              ),
+              const SizedBox(width: AppSpace.md),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _GhostLine(style: ret, width: 72),
+                  const SizedBox(height: AppSpace.xxs),
+                  _GhostLine(style: outcome, width: 72),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: _CardSpec.band),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: t.surfaceSunken,
+              borderRadius: BorderRadius.circular(AppRadius.inset),
+            ),
+            child: Padding(
+              padding: _CardSpec.panelPadding,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  priceStack(36),
+                  const SizedBox(width: AppSpace.md),
+                  priceStack(32),
+                ],
+              ),
             ),
           ),
-          SizedBox(height: AppSpace.md),
-          SizedBox(
-            height: 65,
-            child: Row(
-              children: [
-                Expanded(child: SkeletonBlock(height: 65)),
-                SizedBox(width: AppSpace.md),
-                Expanded(child: SkeletonBlock(height: 65)),
-                SizedBox(width: AppSpace.md),
-                Expanded(child: SkeletonBlock(height: 65)),
-              ],
+          const SizedBox(height: _CardSpec.band),
+          const HairlineDivider(),
+          const SizedBox(height: _CardSpec.band),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _GhostLine(style: meta, width: 84),
+              _GhostLine(style: price, width: 64),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A shimmer bar as tall as one line of [style]. An invisible, semantics-free
+/// line of real text gives it that height at the current text scale.
+class _GhostLine extends StatelessWidget {
+  const _GhostLine({required this.style, required this.width});
+
+  final TextStyle style;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final bar = (style.fontSize ?? 14) * 0.7;
+    return SizedBox(
+      width: width,
+      child: Stack(
+        children: [
+          ExcludeSemantics(
+            child: Opacity(
+              opacity: 0,
+              child: Text(' ', style: style, maxLines: 1),
+            ),
+          ),
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: SkeletonBlock(width: width, height: bar),
             ),
           ),
         ],

@@ -67,6 +67,13 @@ class AyreInstrumentTile extends StatefulWidget {
 }
 
 class _AyreInstrumentTileState extends State<AyreInstrumentTile> {
+  /// Backing for transparent logos. Logos are drawn for a white page, so the
+  /// plate is white in both light and dark mode; the few light-on-transparent
+  /// marks get a dark plate instead. These are image backings, not UI
+  /// surfaces, so they deliberately do not follow the theme.
+  static const Color _lightPlate = Color(0xFFFFFFFF);
+  static const Color _darkPlate = Color(0xFF111614);
+
   /// `null` = not yet resolved this session (monogram shown meanwhile), `''`
   /// = confidently no logo, anything else = a display URL.
   String? _logoUrl;
@@ -119,40 +126,73 @@ class _AyreInstrumentTileState extends State<AyreInstrumentTile> {
 
     // Decorative: the ticker is spelled out in text beside the tile, so a
     // screen reader gains nothing from hearing the monogram/logo as well.
+    if (!showLogo) {
+      return ExcludeSemantics(
+        child: Container(
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: t.surfaceRaised,
+            borderRadius: BorderRadius.circular(AppRadius.iconTile),
+          ),
+          child: _Monogram(symbol: widget.symbol, size: size, t: t),
+        ),
+      );
+    }
+
+    // The logo *is* the tile. Every bundled file is a square artboard, and
+    // many are full-bleed (a coloured or black background running to the
+    // edge), so the image fills the frame exactly: no inner padding and no
+    // second surface behind it, which is what used to leave a visible ring
+    // of tile colour around the artwork. The plate behind it is only what
+    // shows through a transparent logo, and is chosen so the artwork stays
+    // legible (see [StockLogoService.needsDarkPlate]).
+    final dark = StockLogoService.needsDarkPlate(widget.symbol);
+    final radius = BorderRadius.circular(AppRadius.iconTile);
     return ExcludeSemantics(
-      child: Container(
+      child: SizedBox(
         width: size,
         height: size,
-        alignment: Alignment.center,
-        clipBehavior: showLogo ? Clip.antiAlias : Clip.none,
-        decoration: BoxDecoration(
-          color: t.surfaceRaised,
-          borderRadius: BorderRadius.circular(AppRadius.iconTile),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            // Hairline edge so a white logo plate doesn't dissolve into a
+            // light card, and so every logo shares one outline.
+            border: Border.all(color: t.hairline),
+          ),
+          child: ClipRRect(
+            // Clip to the radius minus the 1 px edge so the artwork meets
+            // the hairline with no gap.
+            borderRadius: BorderRadius.circular(AppRadius.iconTile - 1),
+            child: ColoredBox(
+              color: dark ? _darkPlate : _lightPlate,
+              child: Image.asset(
+                logoUrl,
+                key: ValueKey(logoUrl),
+                width: double.infinity,
+                height: double.infinity,
+                // Aspect ratio is always preserved. For the square artwork
+                // shipped today `contain` fills the frame exactly; a future
+                // wide or tall logo is letterboxed on the plate instead of
+                // being stretched or cropped.
+                fit: BoxFit.contain,
+                alignment: Alignment.center,
+                filterQuality: FilterQuality.medium,
+                isAntiAlias: true,
+                // A bundled logo that somehow fails to decode reports
+                // itself broken and this build falls through to the
+                // monogram on the next frame — never a broken-image icon.
+                errorBuilder: (_, _, _) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _onLoadFailed();
+                  });
+                  return _Monogram(symbol: widget.symbol, size: size, t: t);
+                },
+              ),
+            ),
+          ),
         ),
-        child: showLogo
-            ? Padding(
-                // Logos are bundled at arbitrary aspect ratios and
-                // edge-to-edge crops; a little breathing room keeps them
-                // from looking cramped against the tile's rounded corners.
-                padding: EdgeInsets.all(size * 0.08),
-                child: Image.asset(
-                  logoUrl,
-                  key: ValueKey(logoUrl),
-                  fit: BoxFit.contain,
-                  // A bundled logo that somehow fails to decode reports
-                  // itself broken and this build falls through to the
-                  // monogram on the next frame — never a broken-image icon.
-                  // Shouldn't normally trigger since every path here points
-                  // at a real, bundled asset.
-                  errorBuilder: (_, _, _) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      _onLoadFailed();
-                    });
-                    return _Monogram(symbol: widget.symbol, size: size, t: t);
-                  },
-                ),
-              )
-            : _Monogram(symbol: widget.symbol, size: size, t: t),
       ),
     );
   }

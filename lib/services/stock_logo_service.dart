@@ -110,6 +110,20 @@ class StockLogoService {
     'YESBANK', 'ZEEL', 'ZENSARTECH', 'ZENTEC', 'ZYDUSLIFE', 'ZYDUSWELL',
   };
 
+  /// Bundled logos that are white (or near-white) artwork on a transparent
+  /// background. On the default white plate they would vanish, so the tile
+  /// backs them with a dark plate. Found by scanning `assets/logos/`; every
+  /// other transparent logo is dark or coloured, and every opaque one brings
+  /// its own background.
+  static const Set<String> _lightArtwork = {
+    'ASTRAL', 'AXISBANK', 'EMBASSY', 'INDHOTEL', 'JSWCEMENT', 'LEMONTREE',
+    'TATASTEEL',
+  };
+
+  /// Whether [symbol]'s logo needs a dark plate behind it to stay legible.
+  static bool needsDarkPlate(String symbol) =>
+      _lightArtwork.contains(_key(symbol));
+
   /// Resolved answers, keyed by upper-cased symbol: an `assets/logos/...`
   /// path, or `''` for "no bundled logo". Since [_bundledSymbols] never
   /// changes at runtime, this is really just a memo of string concatenation

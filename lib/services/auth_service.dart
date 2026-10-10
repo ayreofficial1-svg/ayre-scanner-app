@@ -97,6 +97,17 @@ abstract class AuthService {
   /// Sends a reset email. Succeeds quietly when the address has no account.
   Future<void> sendPasswordReset(String email);
 
+  /// Changes the signed-in account's password. The current password is
+  /// confirmed first, so a wrong one changes nothing. The caller is
+  /// responsible for having the reader type [newPassword] twice and checking
+  /// the entries match before calling this.
+  ///
+  /// Throws [AuthFailure] with a reader-ready message.
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  });
+
   Future<void> sendEmailVerification();
 
   /// Reloads the account from the server (verification flag, name).
@@ -353,6 +364,26 @@ class FirebaseAuthService implements AuthService {
   }
 
   @override
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await reauthenticate(password: currentPassword);
+    final user = _auth?.currentUser;
+    if (user == null) {
+      throw const AuthFailure(
+        AuthFailureKind.unknown,
+        'You need to be signed in to do this.',
+      );
+    }
+    try {
+      await user.updatePassword(newPassword);
+    } on fb.FirebaseAuthException catch (e) {
+      throw _translate(e);
+    }
+  }
+
+  @override
   Future<void> reauthenticate({required String password}) async {
     final user = _auth?.currentUser;
     final email = user?.email;
@@ -440,6 +471,11 @@ class FirebaseAuthService implements AuthService {
         return const AuthFailure(
           AuthFailureKind.network,
           'No connection. Check your internet and try again.',
+        );
+      case 'requires-recent-login':
+        return const AuthFailure(
+          AuthFailureKind.invalidCredentials,
+          'For your security, please sign in again and retry.',
         );
       case 'operation-not-allowed':
         debugPrint(

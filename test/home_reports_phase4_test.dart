@@ -227,12 +227,12 @@ void main() {
   });
 
   group('Weekly report stock card (R-2)', () {
-    testWidgets('full-data card is at most 140 pt at 390 x 1.0', (
+    testWidgets('full-data card stays within 260 pt at 390 x 1.0', (
       tester,
     ) async {
       await _pumpCard(tester, _full);
       final h = tester.getSize(_cards.first).height;
-      expect(h, lessThanOrEqualTo(190));
+      expect(h, lessThanOrEqualTo(260));
       expect(h, greaterThan(100));
     });
 

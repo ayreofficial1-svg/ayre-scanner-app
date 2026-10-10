@@ -20,7 +20,6 @@ import '../widgets/ayre_insight_carousel.dart';
 import '../widgets/ayre_logo.dart';
 import '../widgets/ayre_signals_section.dart';
 import '../widgets/ayre_tab_scroll.dart';
-import '../widgets/figure.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/responsive.dart';
 import '../widgets/state_views.dart';
@@ -871,7 +870,8 @@ abstract final class _SentimentCardColors {
 }
 
 /// The top-of-page Market Sentiment card (§2.1): a small icon + label and the
-/// bucketed reading set large and bold with a directional glyph.
+/// bucketed reading set large and bold with a directional glyph. The numeric
+/// score is deliberately not shown — the bucket word is the whole reading.
 ///
 /// **Everything on it is real.** The bucket comes from the `/api/sentiment`
 /// 0–100 score alone. The card no longer carries a one-line description
@@ -956,8 +956,7 @@ class _SentimentCard extends StatelessWidget {
               Semantics(
                 container: true,
                 excludeSemantics: true,
-                label: 'Market sentiment: $word, score ${sentiment.score} out '
-                    'of 100.',
+                label: 'Market sentiment: $word.',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -1005,22 +1004,6 @@ class _SentimentCard extends StatelessWidget {
                         ],
                       ],
                     ),
-                    const SizedBox(height: AppSpace.xs),
-                    // The score is the card's one supporting figure.
-                    Row(
-                      children: [
-                        Figure.static(
-                          '${sentiment.score}',
-                          fontSize: AppTextScale.body,
-                          fontWeight: FontWeight.w700,
-                          color: t.textPrimary,
-                        ),
-                        Text(
-                          ' out of 100',
-                          style: AppTypo.meta(t, color: labelColor),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
@@ -1033,7 +1016,7 @@ class _SentimentCard extends StatelessWidget {
 
 }
 
-/// Mirrors the real card's blocks — label, bucket word, score — so the
+/// Mirrors the real card's blocks — label, bucket word — so the
 /// loaded card doesn't reflow the page (§14.4).
 class _SentimentSkeleton extends StatelessWidget {
   const _SentimentSkeleton();
@@ -1048,8 +1031,6 @@ class _SentimentSkeleton extends StatelessWidget {
           SkeletonBlock(width: 120, height: 12),
           SizedBox(height: AppSpace.sm),
           SkeletonBlock(width: 150, height: 30, radius: AppRadius.inset),
-          SizedBox(height: AppSpace.xs),
-          SkeletonBlock(width: 96, height: 14),
         ],
       ),
     );

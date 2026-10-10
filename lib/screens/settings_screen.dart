@@ -13,6 +13,7 @@ import '../widgets/ayre_icons.dart';
 import '../widgets/figure.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/spotlight_tour.dart';
+import 'change_password_screen.dart';
 import 'delete_account_screen.dart';
 import 'support_screen.dart' show kAppVersion, kAppBuild;
 
@@ -43,8 +44,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   static final Uri _logoCreditUrl = Uri.parse(
     'https://www.allinvestview.com/tools/ticker-logos/',
   );
-
-  bool _sendingReset = false;
 
   /// True while this screen's own tutorial is showing, so only that one is
   /// dismissed when the screen goes away.
@@ -92,20 +91,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _changePassword() async {
-    final email = _user?.email ?? '';
-    if (email.isEmpty || _sendingReset) return;
     HapticFeedback.selectionClick();
-    setState(() => _sendingReset = true);
-    String message;
-    try {
-      await AuthService.instance.sendPasswordReset(email);
-      message = 'We sent a password reset link to $email.';
-    } on AuthFailure catch (e) {
-      message = e.message;
-    }
-    if (!mounted) return;
-    setState(() => _sendingReset = false);
-    _toast(message);
+    final changed = await Navigator.of(
+      context,
+    ).push<bool>(terminalRoute(builder: (_) => const ChangePasswordScreen()));
+    if (changed == true && mounted) _toast('Password updated');
   }
 
   Future<void> _clearAlertHistory() async {
@@ -304,19 +294,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     SettingRow(
                       glyph: AyreGlyph.lock,
                       title: 'Change password',
-                      subtitle: 'We’ll email you a link to set a new one.',
-                      enabled: !_sendingReset,
-                      trailing: _sendingReset
-                          ? SizedBox(
-                              height: 15,
-                              width: 15,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 1.6,
-                                color: t.foregroundMuted,
-                              ),
-                            )
-                          : null,
-                      onTap: _sendingReset ? null : _changePassword,
+                      subtitle: 'Enter your current password and a new one.',
+                      onTap: _changePassword,
                     ),
                     SettingRow(
                       glyph: AyreGlyph.signOut,
