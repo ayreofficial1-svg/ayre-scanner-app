@@ -20,6 +20,7 @@ import '../widgets/ayre_insight_carousel.dart';
 import '../widgets/ayre_logo.dart';
 import '../widgets/ayre_signals_section.dart';
 import '../widgets/ayre_tab_scroll.dart';
+import '../widgets/figure.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/responsive.dart';
 import '../widgets/state_views.dart';
@@ -31,9 +32,10 @@ import 'notifications_screen.dart';
 /// Home — the market gateway (Spec §13.1).
 ///
 /// Order: greeting header (with the decorative hill ornament behind it) →
-/// **Market Sentiment card** → compact horizontal index row → **Signals**
+/// **Market Sentiment card** → compact index board → **Signals**
 /// (the Weekly Report now has its own
-/// Reports tab) → **Market Insight carousel** → closing divider.
+/// Reports tab) → **Market Insight carousel**. Sections are separated by
+/// `sectionGap` alone (the closing divider duplicated that spacing).
 ///
 /// The "Market breadth" donut card that used to sit between the index board
 /// and the insight carousel has been removed; nothing replaces it, and the
@@ -126,7 +128,7 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void initState() {
     super.initState();
-    _load(initial: true);
+    _load();
     if (widget.signalsFocusToken > 0) _requestSignalsFocus();
     // Board + breadth only — session is already resolved above, and this
     // fires often enough that re-checking it every tick would be wasted
@@ -147,7 +149,7 @@ class _HomeTabState extends State<HomeTab> {
     _liveRefreshInFlight = false;
     if (AppLifecycleService.instance.lastAway > const Duration(minutes: 5)) {
       // Away long enough that the hourly/editorial surfaces are stale too.
-      _load(initial: true);
+      _load();
     } else {
       _refreshLive();
     }
@@ -233,7 +235,7 @@ class _HomeTabState extends State<HomeTab> {
     }
   }
 
-  Future<void> _load({bool initial = false}) async {
+  Future<void> _load() async {
     final board = await widget.marketData.getIndexBoard();
     final breadth = await widget.marketData.getSentiment(monthly: false);
     final fullBreadth = await widget.marketData.getFullBreadth();
@@ -255,9 +257,7 @@ class _HomeTabState extends State<HomeTab> {
     if (_focusPending) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSignals());
     }
-
-    // A refresh that lands new data confirms itself; opening the app doesn't.
-    if (!initial) HapticFeedback.mediumImpact();
+    // A5: no completion haptic after a refresh.
   }
 
   @override
@@ -341,8 +341,6 @@ class _HomeTabState extends State<HomeTab> {
                 ),
               ),
             ],
-            const SizedBox(height: AppSpace.sectionGap),
-            const Entrance(index: 5, child: _HomeDivider()),
       ],
     );
   }
@@ -400,10 +398,10 @@ class _Header extends StatelessWidget {
     final resolved = name.trim();
     final greeting = _greetingFor(DateTime.now());
 
-    // Two stacked bands. The wordmark and the three circular controls share
-    // the top band, so the salutation below gets the page's full width: at
-    // its larger size "Good afternoon" would otherwise be squeezed into the
-    // ~160px left over beside the controls and scaled straight back down.
+    // Two stacked bands. The wordmark and the three controls share the top
+    // band, so the salutation below gets the page's full width. Nothing here
+    // shrinks to fit: the wordmark wraps, the greeting and name wrap to two
+    // lines (G-2).
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -414,19 +412,19 @@ class _Header extends StatelessWidget {
             Expanded(
               // The only in-app brand placement: a small wordmark, sized to
               // sit beneath the live content rather than compete with it.
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerLeft,
-                child: Row(
-                  children: [
-                    const LogoWordmark(fontSize: 15),
-                    const SizedBox(width: AppSpace.xs),
-                    Text('SCANNER', style: AppTypo.label(t)),
-                  ],
-                ),
+              child: Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: AppSpace.xs,
+                children: [
+                  const LogoWordmark(fontSize: 15),
+                  Text(
+                    'SCANNER',
+                    style: AppTypo.label(t, color: t.foregroundMuted),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(width: AppSpace.sm),
+            const SizedBox(width: AppSpace.xs),
             const KeyedSubtree(key: TourKeys.homeTheme, child: _ThemeToggle()),
             const SizedBox(width: AppSpace.xs),
             KeyedSubtree(
@@ -452,44 +450,37 @@ class _Header extends StatelessWidget {
             _AccountControl(name: resolved, onTap: onOpenProfile),
           ],
         ),
-        const SizedBox(height: AppSpace.md),
+        const SizedBox(height: AppSpace.sm),
         // The salutation is the header's largest text; the name sits on its
         // own line directly beneath it, a step down and heavier-set so the
-        // pair still reads as one greeting. Each is wrapped in its own
-        // scale-down FittedBox so a long name or a large text-size setting
-        // shrinks the line rather than overflowing it.
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Text(
-            greeting,
-            maxLines: 1,
-            style: AppTypo.display(
-              fontSize: AppTextScale.greeting,
-              fontWeight: FontWeight.w700,
-              color: t.textPrimary,
-              height: 1.1,
-              letterSpacing: -1.0,
-            ),
+        // pair still reads as one greeting. Both wrap (up to two lines)
+        // instead of scaling down.
+        Text(
+          greeting,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: AppTypo.display(
+            fontSize: AppTextScale.greeting,
+            fontWeight: FontWeight.w700,
+            color: t.textPrimary,
+            height: 1.1,
+            letterSpacing: -1.0,
           ),
         ),
         // With no name yet the salutation stands alone — no empty line, no
         // dangling gap under it.
         if (resolved.isNotEmpty) ...[
           const SizedBox(height: AppSpace.xxs),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(
-              resolved,
-              maxLines: 1,
-              style: AppTypo.display(
-                fontSize: AppTextScale.greetingName,
-                fontWeight: FontWeight.w600,
-                color: t.textPrimary,
-                height: 1.2,
-                letterSpacing: -0.5,
-              ),
+          Text(
+            resolved,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: AppTypo.display(
+              fontSize: AppTextScale.greetingName,
+              fontWeight: FontWeight.w600,
+              color: t.textPrimary,
+              height: 1.2,
+              letterSpacing: -0.5,
             ),
           ),
         ],
@@ -531,8 +522,8 @@ class _ThemeToggle extends StatelessWidget {
   }
 }
 
-/// Header controls (v5 §2A, "Circular header icon buttons"): flat 44pt
-/// circles — `surface` (white) in light, `surfaceRaised` in dark — with a
+/// Header controls (v5 §2A, "Circular header icon buttons"): flat 40pt
+/// circles inside a 48pt hit area — `surface` (white) in light, `surfaceRaised` in dark — with a
 /// `textPrimary` glyph and, for the bell, a `negative` unread dot. A circle
 /// is the spec'd exception to the rounded-square icon-tile rule here;
 /// no gradient, no shadow.
@@ -560,9 +551,13 @@ class _HeaderControl extends StatelessWidget {
       child: PressableScale(
         onTap: onTap,
         borderRadius: AppRadius.circle,
-        child: Container(
-          height: 44,
-          width: 44,
+        child: SizedBox(
+          height: AppSpace.minTarget,
+          width: AppSpace.minTarget,
+          child: Center(
+            child: Container(
+          height: 40,
+          width: 40,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: fill,
@@ -593,6 +588,8 @@ class _HeaderControl extends StatelessWidget {
                 ),
             ],
           ),
+            ),
+          ),
         ),
       ),
     );
@@ -613,8 +610,15 @@ class _AccountControl extends StatelessWidget {
       child: PressableScale(
         onTap: onTap,
         borderRadius: AppRadius.circle,
-        // The identity-accent chip (lavender/plum), never brand green.
-        child: AyreAvatar(initials: initialsFor(name)),
+        // The identity-accent chip (lavender/plum), never brand green; 40pt
+        // visual in a 48pt hit area.
+        child: SizedBox(
+          height: AppSpace.minTarget,
+          width: AppSpace.minTarget,
+          child: Center(
+            child: AyreAvatar(initials: initialsFor(name), size: 40),
+          ),
+        ),
       ),
     );
   }
@@ -707,6 +711,23 @@ class _IndexBoard extends StatelessWidget {
     const gap = AppSpace.cardGap;
     const pad = AppSpace.pageHorizontal;
     final height = AyreCompactIndexMetrics.heightFor(context);
+
+    // Large text: reflow into a vertical list of content-height, full-width
+    // cards rather than shrinking or capping the text (D-9).
+    if (AyreCompactIndexMetrics.stacksFor(context)) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: _shadowRoom),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < count; i++) ...[
+              if (i > 0) const SizedBox(height: gap),
+              Entrance(index: i + 1, child: itemBuilder(context, i)),
+            ],
+          ],
+        ),
+      );
+    }
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -905,9 +926,9 @@ class _SentimentCard extends StatelessWidget {
     final (String word, Color tone, AyreGlyph? glyph) = switch (_moodFor(
       sentiment.score,
     )) {
-      _Mood.bullish => ('Bullish', t.positive, AyreGlyph.trendUp),
-      _Mood.neutral => ('Neutral', t.neutral, null),
-      _Mood.bearish => ('Bearish', t.negative, AyreGlyph.trendDown),
+      _Mood.bullish => ('Bullish', t.positiveText, AyreGlyph.trendUp),
+      _Mood.neutral => ('Neutral', t.neutralText, null),
+      _Mood.bearish => ('Bearish', t.negativeText, AyreGlyph.trendDown),
     };
     final labelColor = dark
         ? _SentimentCardColors.labelDark
@@ -969,13 +990,9 @@ class _SentimentCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         Flexible(
-                          child: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              word,
-                              style: AppTypo.pageTitle(t, color: tone),
-                            ),
+                          child: Text(
+                            word,
+                            style: AppTypo.pageTitle(t, color: tone),
                           ),
                         ),
                         if (glyph != null) ...[
@@ -987,6 +1004,22 @@ class _SentimentCard extends StatelessWidget {
                             strokeWidth: 2.4,
                           ),
                         ],
+                      ],
+                    ),
+                    const SizedBox(height: AppSpace.xs),
+                    // The score is the card's one supporting figure.
+                    Row(
+                      children: [
+                        Figure.static(
+                          '${sentiment.score}',
+                          fontSize: AppTextScale.body,
+                          fontWeight: FontWeight.w700,
+                          color: t.textPrimary,
+                        ),
+                        Text(
+                          ' out of 100',
+                          style: AppTypo.meta(t, color: labelColor),
+                        ),
                       ],
                     ),
                   ],
@@ -1001,7 +1034,7 @@ class _SentimentCard extends StatelessWidget {
 
 }
 
-/// Mirrors the real card's blocks — label, bucket word, description — so the
+/// Mirrors the real card's blocks — label, bucket word, score — so the
 /// loaded card doesn't reflow the page (§14.4).
 class _SentimentSkeleton extends StatelessWidget {
   const _SentimentSkeleton();
@@ -1017,22 +1050,9 @@ class _SentimentSkeleton extends StatelessWidget {
           SizedBox(height: AppSpace.sm),
           SkeletonBlock(width: 150, height: 30, radius: AppRadius.inset),
           SizedBox(height: AppSpace.xs),
-          SkeletonBlock(height: 12),
+          SkeletonBlock(width: 96, height: 14),
         ],
       ),
     );
-  }
-}
-
-/// The divider that used to sit above the "not investment advice" footer
-/// text (§13.1). The text is gone; this divider is kept, in exactly its
-/// former position and spacing, as the boundary Phase 2 uses to place the
-/// Weekly Report section immediately beneath it.
-class _HomeDivider extends StatelessWidget {
-  const _HomeDivider();
-
-  @override
-  Widget build(BuildContext context) {
-    return const HairlineDivider();
   }
 }

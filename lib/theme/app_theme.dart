@@ -424,7 +424,7 @@ abstract final class AppMotion {
   static const Duration tabFade = Duration(milliseconds: 200);
   static const Duration overlaySlide = Duration(milliseconds: 340);
   static const Duration cardEntrance = Duration(milliseconds: 450);
-  static const Duration entranceStagger = Duration(milliseconds: 55);
+  static const Duration entranceStagger = Duration(milliseconds: 40);
   static const Duration entranceDelay = Duration(milliseconds: 30);
   static const Duration countUp = Duration(milliseconds: 900);
   static const Duration refreshRotation = Duration(milliseconds: 900);
@@ -461,7 +461,9 @@ abstract final class AppMotion {
   /// their own phase rather than relying on these.
   static const Duration fast = buttonPress;
   static const Duration medium = pageTransition;
-  static const Duration entrance = cardEntrance;
+  /// D-8: entrance <= 280 ms; with the 4-step stagger the total stays
+  /// within ~250 ms of delay.
+  static const Duration entrance = Duration(milliseconds: 280);
   static const Duration stagger = entranceStagger;
 
   // Plan §7 open decision #9: Phase 0 put a literal carry-over of the Spec's

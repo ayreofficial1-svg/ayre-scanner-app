@@ -34,7 +34,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('RECOMMENDATIONS'), findsWidgets);
+    expect(find.text('Recommendations'), findsWidgets);
     final signals = (await FakeMarketData().getSignals()).value!;
     for (final s in signals) {
       expect(find.text(s.symbol), findsOneWidget);

@@ -21,8 +21,8 @@ import 'state_views.dart';
 class SignalsSectionController {
   _SignalsSectionState? _state;
 
-  /// Reloads the signals. [silent] suppresses the section's own haptic, for a
-  /// host that already supplies its own feedback for the same gesture.
+  /// Reloads the signals. [silent] is kept for source compatibility; the
+  /// section no longer fires a completion haptic (A5).
   Future<void> reload({bool silent = false}) async {
     await _state?._load(initial: silent);
   }
@@ -136,7 +136,7 @@ class _SignalsSectionState extends State<SignalsSection> {
       _result = result;
       _loading = false;
     });
-    if (!initial) HapticFeedback.mediumImpact();
+    // A5: no completion haptic after a refresh.
 
     if (!result.isReady) return;
     final fresh = await SeenSignalsStore.diffAndRecord(
@@ -296,232 +296,248 @@ class _SignalList extends StatelessWidget {
 
 /// One published signal. Every signal uses this same card — no accent edge,
 /// no "featured" label — so all picks carry equal visual importance.
+///
+/// Reflow, never shrink (D-9): the price/change block sits beside the symbol
+/// when there is room and drops below it at narrow widths or large text; the
+/// Entry / Exit / Stop levels are three columns when they fit and labelled
+/// lines when they do not.
 class _SignalCard extends StatelessWidget {
   const _SignalCard({required this.signal, required this.onTap});
 
   final Signal signal;
   final VoidCallback onTap;
 
+  static const double _sideBySide = 300;
+
+  String _spoken() {
+    final parts = <String>[
+      signal.symbol,
+      if (signal.name != null && signal.name!.isNotEmpty) signal.name!,
+      if (signal.lastPrice != null) formatPrice(signal.lastPrice),
+      if (signal.percentChange != null)
+        '${signal.percentChange! >= 0 ? 'up' : 'down'} '
+            '${signal.percentChange!.abs().toStringAsFixed(2)} percent',
+      if (signal.entry != null) 'Entry ${formatPrice(signal.entry)}',
+      if (signal.exitPrice != null) 'Exit ${formatPrice(signal.exitPrice)}',
+      if (signal.stop != null) 'Stop ${formatPrice(signal.stop)}',
+      if (signal.rationale.isNotEmpty) signal.rationale,
+      'opens details',
+    ];
+    return parts.join(', ');
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final hasName = signal.name != null && signal.name!.isNotEmpty;
+    final scale = MediaQuery.textScalerOf(context).scale(100) / 100;
+    final k = scale < 1 ? 1.0 : scale;
 
-    // Phase 5: content-dense card — mark tappable without collapsing the
-    // rationale/levels detail children carry (unlike TickerRow's terse
-    // grouped-label treatment).
-    //
     // No Bullish/Bearish badge here — an admin-curated pick has no
     // long/short direction of its own; that concept lives only in the
     // separate market-sentiment system on Home.
     return Semantics(
       button: true,
+      label: _spoken(),
+      excludeSemantics: true,
       child: AyreCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(AppSpace.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            // Top-aligned when there's a two-line symbol+name block, so it
-            // starts level with the tile's top edge; centered for a bare
-            // symbol, matching the Weekly Report card header's convention.
-            crossAxisAlignment:
-                hasName ? CrossAxisAlignment.start : CrossAxisAlignment.center,
-            children: [
-              AyreInstrumentTile(
-                symbol: signal.symbol,
-                size: 40,
-                name: signal.name,
-              ),
-              const SizedBox(width: AppSpace.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        onTap: onTap,
+        padding: const EdgeInsets.all(AppSpace.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            LayoutBuilder(
+              builder: (context, c) {
+                final identity = Row(
+                  crossAxisAlignment: hasName
+                      ? CrossAxisAlignment.start
+                      : CrossAxisAlignment.center,
+                  children: [
+                    AyreInstrumentTile(
+                      symbol: signal.symbol,
+                      size: 40,
+                      name: signal.name,
+                    ),
+                    const SizedBox(width: AppSpace.sm),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            signal.symbol,
+                            style: AppTypo.featuredHeadline(t),
+                          ),
+                          if (hasName) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              signal.name!,
+                              style: AppTypo.body(t),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+
+                Widget priceBlock(CrossAxisAlignment align) => Column(
+                  crossAxisAlignment: align,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Neither the symbol nor the company name is ever cut
-                    // off: each shrinks (down to a floor) to fit, and only
-                    // then wraps.
-                    _FitText(
-                      signal.symbol,
-                      style: AppTypo.featuredHeadline(t),
-                      maxLines: 1,
-                      minFontSize: 13,
+                    if (signal.lastPrice != null)
+                      Figure(
+                        formatPrice(signal.lastPrice),
+                        fontSize: AppTextScale.cardTitle,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    const SizedBox(height: AppSpace.xxs),
+                    DeltaFigure(
+                      change: signal.percentChange,
+                      fontSize: AppTextScale.body,
                     ),
-                    if (hasName) ...[
-                      const SizedBox(height: 2),
-                      _FitText(
-                        signal.name!,
-                        style: AppTypo.body(t),
-                        maxLines: 2,
-                        minFontSize: 11,
-                      ),
-                    ],
                   ],
-                ),
-              ),
-              const SizedBox(width: AppSpace.sm),
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerRight,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                );
+
+                if (c.maxWidth >= _sideBySide * k) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (signal.lastPrice != null)
-                        Figure(
-                          formatPrice(signal.lastPrice),
-                          fontSize: AppTextScale.cardTitle,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      const SizedBox(height: AppSpace.xxs),
-                      DeltaFigure(
-                        change: signal.percentChange,
-                        fontSize: AppTextScale.body,
-                      ),
+                      Expanded(child: identity),
+                      const SizedBox(width: AppSpace.sm),
+                      priceBlock(CrossAxisAlignment.end),
                     ],
-                  ),
-                ),
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    identity,
+                    const SizedBox(height: AppSpace.sm),
+                    priceBlock(CrossAxisAlignment.start),
+                  ],
+                );
+              },
+            ),
+            if (signal.rationale.isNotEmpty) ...[
+              const SizedBox(height: AppSpace.inCardGap),
+              Text(
+                signal.rationale,
+                style: AppTypo.body(t),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
-          ),
-          if (signal.rationale.isNotEmpty) ...[
-            const SizedBox(height: AppSpace.inCardGap),
-            Text(
-              signal.rationale,
-              style: AppTypo.body(t),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-          if (signal.entry != null ||
-              signal.exitPrice != null ||
-              signal.stop != null) ...[
-            const SizedBox(height: AppSpace.md),
-            // A sunken inset, not a nested card (§8.3) — the levels are a
-            // sub-region of this card, and v4 forbids a card inside a card.
-            InkPanel(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpace.md,
-                vertical: AppSpace.sm,
+            if (signal.entry != null ||
+                signal.exitPrice != null ||
+                signal.stop != null) ...[
+              const SizedBox(height: AppSpace.md),
+              // A sunken inset, not a nested card (§8.3) — the levels are a
+              // sub-region of this card, and v4 forbids a card inside a card.
+              InkPanel(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpace.md,
+                  vertical: AppSpace.sm,
+                ),
+                child: _Levels(signal: signal),
               ),
-              child: Row(
-                children: [
-                  if (signal.entry != null)
-                    Expanded(child: _Level(label: 'Entry', value: signal.entry)),
-                  if (signal.exitPrice != null)
-                    Expanded(
-                      child: _Level(
-                        label: 'Exit',
-                        value: signal.exitPrice,
-                        tone: t.positive,
-                      ),
-                    ),
-                  if (signal.stop != null)
-                    Expanded(
-                      child: _Level(
-                        label: 'Stop',
-                        value: signal.stop,
-                        tone: t.negative,
-                      ),
-                    ),
-                ],
+            ],
+            if (signal.hasEntryReached) ...[
+              const SizedBox(height: AppSpace.sm),
+              _EntryReachedLine(signal: signal),
+            ],
+            if (!(signal.entry != null ||
+                    signal.exitPrice != null ||
+                    signal.stop != null) &&
+                signal.addedOn != null) ...[
+              const SizedBox(height: AppSpace.sm),
+              Text(
+                'ADDED ${signal.addedOn!.toUpperCase()}',
+                style: AppTypo.label(t, color: t.foregroundMuted),
               ),
-            ),
+            ],
           ],
-          if (signal.hasEntryReached) ...[
-            const SizedBox(height: AppSpace.sm),
-            _EntryReachedLine(signal: signal),
-          ],
-          if (!(signal.entry != null ||
-                  signal.exitPrice != null ||
-                  signal.stop != null) &&
-              signal.addedOn != null) ...[
-            const SizedBox(height: AppSpace.sm),
-            Text('ADDED ${signal.addedOn!.toUpperCase()}',
-                style: AppTypo.label(t)),
-          ],
-        ],
-      ),
+        ),
       ),
     );
   }
 }
 
-/// Text that is always shown in full. It starts at [style]'s own size and steps
-/// down in half-point increments until it fits [maxLines] in the width it is
-/// given, never going below [minFontSize]. Text that already fits keeps its
-/// normal size. If even the floor doesn't fit, it wraps onto more lines rather
-/// than being clipped or ellipsised.
-///
-/// Measurement uses the ambient text scaler, so large accessibility text sizes
-/// are handled the same way.
-class _FitText extends StatelessWidget {
-  const _FitText(
-    this.text, {
-    required this.style,
-    required this.maxLines,
-    required this.minFontSize,
-  });
+/// Entry / Exit / Stop: three columns when they fit, otherwise labelled
+/// lines (label left, value right). Labels stay at 12 sp.
+class _Levels extends StatelessWidget {
+  const _Levels({required this.signal});
 
-  final String text;
-  final TextStyle style;
-  final int maxLines;
-  final double minFontSize;
+  final Signal signal;
 
-  static const double _step = 0.5;
+  static const double _perColumn = 96;
 
   @override
   Widget build(BuildContext context) {
-    final scaler = MediaQuery.textScalerOf(context);
-    final direction = Directionality.of(context);
-    final base = style.fontSize ?? 14;
-    final floor = minFontSize < base ? minFontSize : base;
+    final t = context.tokens;
+    final items = <_LevelData>[
+      if (signal.entry != null) _LevelData('Entry', signal.entry, null),
+      if (signal.exitPrice != null)
+        _LevelData('Exit', signal.exitPrice, t.positiveText),
+      if (signal.stop != null) _LevelData('Stop', signal.stop, t.negativeText),
+    ];
+    final scale = MediaQuery.textScalerOf(context).scale(100) / 100;
+    final k = scale < 1 ? 1.0 : scale;
 
     return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-
-        bool fits(double size) {
-          final painter = TextPainter(
-            text: TextSpan(text: text, style: style.copyWith(fontSize: size)),
-            textDirection: direction,
-            textScaler: scaler,
-            maxLines: maxLines,
-          )..layout(maxWidth: width);
-          final ok = !painter.didExceedMaxLines;
-          painter.dispose();
-          return ok;
+      builder: (context, c) {
+        if (c.maxWidth >= items.length * _perColumn * k) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final i in items) Expanded(child: _Level(data: i)),
+            ],
+          );
         }
-
-        var size = base;
-        if (width.isFinite) {
-          while (size > floor && !fits(size)) {
-            size -= _step;
-          }
-          if (size < floor) size = floor;
-        }
-
-        final atFloor = size <= floor && width.isFinite && !fits(size);
-        return Text(
-          text,
-          style: style.copyWith(fontSize: size),
-          // Past the floor, wrap fully instead of clipping.
-          maxLines: atFloor ? null : maxLines,
-          softWrap: true,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var n = 0; n < items.length; n++) ...[
+              if (n > 0) const SizedBox(height: AppSpace.xs),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      items[n].label,
+                      style: AppTypo.label(t, color: t.foregroundMuted),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpace.sm),
+                  Figure(
+                    formatPrice(items[n].value),
+                    fontSize: AppTextScale.body,
+                    fontWeight: FontWeight.w600,
+                    color: items[n].tone,
+                  ),
+                ],
+              ),
+            ],
+          ],
         );
       },
     );
   }
 }
 
-class _Level extends StatelessWidget {
-  const _Level({required this.label, required this.value, this.tone});
+class _LevelData {
+  const _LevelData(this.label, this.value, this.tone);
 
   final String label;
   final num? value;
   final Color? tone;
+}
+
+class _Level extends StatelessWidget {
+  const _Level({required this.data});
+
+  final _LevelData data;
 
   @override
   Widget build(BuildContext context) {
@@ -531,21 +547,15 @@ class _Level extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          label.toUpperCase(),
-          style: AppTypo.label(t),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+          data.label.toUpperCase(),
+          style: AppTypo.label(t, color: t.foregroundMuted),
         ),
         const SizedBox(height: AppSpace.xxs),
-        FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.centerLeft,
-          child: Figure(
-            formatPrice(value),
-            fontSize: AppTextScale.body,
-            fontWeight: FontWeight.w600,
-            color: tone,
-          ),
+        Figure(
+          formatPrice(data.value),
+          fontSize: AppTextScale.body,
+          fontWeight: FontWeight.w600,
+          color: data.tone,
         ),
       ],
     );
@@ -622,7 +632,7 @@ class _EntryReachedLine extends StatelessWidget {
           const SizedBox(height: AppSpace.xxs),
           Text(
             'ALREADY PAST THE ENTRY LEVEL WHEN NOTICED',
-            style: AppTypo.label(t).copyWith(color: t.negative),
+            style: AppTypo.label(t).copyWith(color: t.negativeText),
           ),
         ],
       ],

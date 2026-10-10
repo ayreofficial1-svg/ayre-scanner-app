@@ -350,7 +350,9 @@ class DeltaFigure extends StatelessWidget {
     }
 
     final up = change! >= 0;
-    final tone = color ?? (up ? t.positive : t.negative);
+    // Text and glyph use the A4 status-text tokens (>= 4.5:1 in light);
+    // fills and chart marks elsewhere keep positive/negative.
+    final tone = color ?? (up ? t.positiveText : t.negativeText);
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -401,7 +403,7 @@ class LabelledFigure extends StatelessWidget {
       children: [
         Text(
           label.toUpperCase(),
-          style: AppTypo.label(t),
+          style: AppTypo.label(t, color: t.foregroundMuted),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),

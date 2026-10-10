@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
@@ -43,7 +42,7 @@ class _WeeklyReportsTabState extends State<WeeklyReportsTab> {
   @override
   void initState() {
     super.initState();
-    if (widget.active) _load(initial: true);
+    if (widget.active) _load();
     AppLifecycleService.instance.addListener(_onAppResumed);
   }
 
@@ -54,7 +53,7 @@ class _WeeklyReportsTabState extends State<WeeklyReportsTab> {
     if (AppLifecycleService.instance.lastAway < const Duration(seconds: 30)) {
       return;
     }
-    _load(initial: true);
+    _load();
   }
 
   @override
@@ -67,11 +66,11 @@ class _WeeklyReportsTabState extends State<WeeklyReportsTab> {
   void didUpdateWidget(WeeklyReportsTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!oldWidget.active && widget.active && _result == null) {
-      _load(initial: true);
+      _load();
     }
   }
 
-  Future<void> _load({bool initial = false}) async {
+  Future<void> _load() async {
     final result = (await widget.marketData.getWeeklyReports())
         .keepingLastGood(_result);
     if (!mounted) return;
@@ -79,8 +78,7 @@ class _WeeklyReportsTabState extends State<WeeklyReportsTab> {
       _result = result;
       _loading = false;
     });
-    // A refresh that lands new data confirms itself; opening the tab doesn't.
-    if (!initial) HapticFeedback.mediumImpact();
+    // A5: no completion haptic after a refresh.
   }
 
   @override

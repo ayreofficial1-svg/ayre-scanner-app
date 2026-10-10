@@ -74,7 +74,17 @@ enum StatePreset {
   offline,
 
   /// Authenticated call rejected. No status code, no crash, one clear action.
-  sessionExpired;
+  sessionExpired,
+
+  /// The data on screen is real but behind (Spec §10.5 "stale, still
+  /// useful"). Amber plate, "Refresh now"; never blocks the content it sits
+  /// beside.
+  stale,
+
+  /// Failed in a way retrying will not fix (Spec §10.5 "permanent error").
+  /// Calm like every fault, but offers no retry button unless the caller
+  /// supplies a handler.
+  permanent;
 
   AyreGlyph get glyph => switch (this) {
     StatePreset.empty => AyreGlyph.empty,
@@ -82,6 +92,8 @@ enum StatePreset {
     StatePreset.failed => AyreGlyph.disconnected,
     StatePreset.offline => AyreGlyph.offline,
     StatePreset.sessionExpired => AyreGlyph.lock,
+    StatePreset.stale => AyreGlyph.delayed,
+    StatePreset.permanent => AyreGlyph.about,
   };
 
   StateAction get action => switch (this) {
@@ -93,16 +105,33 @@ enum StatePreset {
     StatePreset.failed => StateAction.tryAgain,
     StatePreset.offline => StateAction.retry,
     StatePreset.sessionExpired => StateAction.signInAgain,
+    StatePreset.stale => StateAction.refreshNow,
+    StatePreset.permanent => StateAction.tryAgain,
   };
 
   /// True where the state is the app's to recover from, which drives the
   /// weight of the glyph tone — a calm empty section shouldn't read as
   /// urgently as a broken one.
   bool get isFault => switch (this) {
-    StatePreset.empty || StatePreset.noResults => false,
+    StatePreset.empty || StatePreset.noResults || StatePreset.stale => false,
     StatePreset.failed ||
     StatePreset.offline ||
-    StatePreset.sessionExpired => true,
+    StatePreset.sessionExpired ||
+    StatePreset.permanent => true,
+  };
+
+  /// Glyph colour. Faults read muted ink (never red — red means "the market
+  /// went down"); calm states are subtler; stale is the amber text tone so
+  /// "behind" is distinguishable from "broken" without reading.
+  Color toneOf(AppThemeTokens t) => switch (this) {
+    StatePreset.stale => t.neutralText,
+    _ => isFault ? t.foregroundMuted : t.foregroundSubtle,
+  };
+
+  /// The plate behind the glyph.
+  Color plateOf(AppThemeTokens t) => switch (this) {
+    StatePreset.stale => t.neutralSoft,
+    _ => t.surfaceRaised,
   };
 }
 
@@ -196,6 +225,32 @@ class StatePanel extends StatelessWidget {
     this.pullToRefreshHint = false,
   }) : preset = StatePreset.sessionExpired;
 
+  /// The data shown is behind. Pair with the stale content, not instead of it.
+  const StatePanel.stale({
+    super.key,
+    this.headline = 'Showing earlier data',
+    this.message = 'These readings are behind. Refresh to fetch the latest.',
+    this.glyph,
+    this.compact = true,
+    this.onRetry,
+    this.action,
+    this.retryLabel,
+    this.pullToRefreshHint = false,
+  }) : preset = StatePreset.stale;
+
+  /// A failure retrying will not fix. No retry button unless [onRetry] is set.
+  const StatePanel.permanent({
+    super.key,
+    required this.headline,
+    required this.message,
+    this.glyph,
+    this.compact = false,
+    this.onRetry,
+    this.action,
+    this.retryLabel,
+    this.pullToRefreshHint = false,
+  }) : preset = StatePreset.permanent;
+
   final String headline;
   final String message;
 
@@ -234,13 +289,14 @@ class StatePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final fault = preset.isFault;
-    // Ink-toned, not red. The soft plate behind the glyph is a plain raised
-    // fill — weight comes from the glyph's own tone, not from a coloured
-    // plate behind it.
-    final tone = fault ? t.foregroundMuted : t.foregroundSubtle;
+    // Ink-toned, not red. Faults use the muted ink; the stale state is the one
+    // amber plate. Each state differs by glyph as well as tone (never colour
+    // alone).
+    final tone = preset.toneOf(t);
 
-    return AyreCard(
+    return Semantics(
+      container: true,
+      child: AyreCard(
       padding: EdgeInsets.symmetric(
         horizontal: compact ? AppSpace.md : AppSpace.lg,
         vertical: compact ? AppSpace.lg : AppSpace.xl,
@@ -251,7 +307,7 @@ class StatePanel extends StatelessWidget {
           Container(
             padding: EdgeInsets.all(compact ? 11 : 15),
             decoration: BoxDecoration(
-              color: t.surfaceRaised,
+              color: preset.plateOf(t),
               // A rounded square, not the card's own 18px radius and not a
               // circle — §7 reserves circles for avatars and the toggle knob.
               borderRadius: BorderRadius.circular(AppRadius.iconTile),
@@ -292,11 +348,12 @@ class StatePanel extends StatelessWidget {
             Text(
               'Pull to refresh',
               textAlign: TextAlign.center,
-              style: AppTypo.label(t),
+              style: AppTypo.meta(t),
             ),
           ],
         ],
       ),
+    ),
     );
   }
 }
@@ -349,9 +406,11 @@ class CalmStatePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final tone = preset.isFault ? t.foregroundMuted : t.foregroundSubtle;
+    final tone = preset.toneOf(t);
 
-    return Padding(
+    return Semantics(
+      container: true,
+      child: Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpace.lg,
         vertical: AppSpace.xxl,
@@ -363,7 +422,7 @@ class CalmStatePanel extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
-              color: t.surfaceRaised,
+              color: preset.plateOf(t),
               borderRadius: BorderRadius.circular(AppRadius.iconTile),
             ),
             child: AyreIcon(preset.glyph, size: 24, color: tone),
@@ -382,12 +441,13 @@ class CalmStatePanel extends StatelessWidget {
           ],
         ],
       ),
+    ),
     );
   }
 }
 
-/// The small circular refresh control behind [CalmStatePanel]. 44pt — the HIG
-/// floor the rest of the app's controls already hold to.
+/// The small circular refresh control behind [CalmStatePanel]. 48 pt — the
+/// app's minimum target.
 class _RefreshDot extends StatelessWidget {
   const _RefreshDot({required this.label, required this.onTap});
 
@@ -404,8 +464,8 @@ class _RefreshDot extends StatelessWidget {
         onTap: onTap,
         borderRadius: AppRadius.circle,
         child: Container(
-          width: 44,
-          height: 44,
+          width: AppSpace.minTarget,
+          height: AppSpace.minTarget,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: t.surface,
@@ -441,44 +501,32 @@ class OfflineBanner extends StatelessWidget {
           ),
           child: Row(
             children: [
-              AyreIcon(AyreGlyph.offline, size: 16, color: t.neutral),
+              AyreIcon(AyreGlyph.offline, size: 18, color: t.neutralText),
               const SizedBox(width: AppSpace.sm),
               Expanded(
                 child: Text(
                   "You're offline — showing the last saved data",
-                  // Body copy sits in `textPrimary`, not the gold. Muted gold
-                  // on a 14%-alpha gold wash measures around 4.3:1 in light
-                  // theme — under AA for body text. The gold still carries the
-                  // state via the glyph and the wash; adding a darker
-                  // `neutralInk` token to make gold text legible would be
-                  // inventing a token the Spec doesn't define (§19), so the
-                  // text simply doesn't use it. Flagged in the plan.
+                  // Body copy stays in `textPrimary`: the amber carries the
+                  // state via the glyph (`neutralText`) and the wash.
                   style: AppTypo.bodyStrong(t),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(width: AppSpace.sm),
               Semantics(
                 button: true,
                 label: 'Dismiss offline notice',
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
+                child: PressableScale(
                   onTap: onDismiss,
-                  // Phase 7: was an 8px pad around a 15px glyph (~31px,
-                  // under the 44pt floor). A fixed 44x44 hit box, glyph
-                  // centred, closes the gap without changing the glyph's
-                  // visual size — the banner grows slightly taller to
-                  // accommodate it, which is the correct trade (a
-                  // dismiss control earns the room a decorative element
-                  // wouldn't).
+                  borderRadius: AppRadius.pill,
+                  // 48x48 hit box, glyph centred, so the dismiss target meets
+                  // the app's minimum without growing the glyph.
                   child: SizedBox(
                     width: AppSpace.minTarget,
                     height: AppSpace.minTarget,
                     child: Center(
                       child: AyreIcon(
                         AyreGlyph.close,
-                        size: 15,
+                        size: 16,
                         color: t.foregroundMuted,
                       ),
                     ),
@@ -493,8 +541,10 @@ class OfflineBanner extends StatelessWidget {
   }
 }
 
-/// A freshness stamp — "AS OF hh:mm". The clock is a figure, so it takes the
-/// numeric face.
+/// A freshness stamp — "AS OF hh:mm", always the time the data is from, fresh
+/// or stale. The clock is a figure, so it takes the numeric face. It keeps a
+/// [FittedBox] (a D-9 exception): it sits in a narrow trailing slot and its
+/// truncation would hide the data's age.
 ///
 /// It always draws the clock, fresh or stale. A stale feed is signalled by
 /// the LIVE chip being omitted — never by the word "Delayed" on the stamp
@@ -520,7 +570,7 @@ class FreshnessStamp extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('AS OF', style: AppTypo.label(t)),
+          Text('AS OF', style: AppTypo.label(t, color: t.foregroundMuted)),
           const SizedBox(width: AppSpace.xs),
           Text(_clock(asOf!), style: AppTypo.valueSmall(t)),
         ],

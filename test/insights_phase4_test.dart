@@ -67,7 +67,7 @@ void main() {
       expect(find.text('MARKET SENTIMENT'), findsNothing);
       expect(find.text('How the market feels'), findsNothing);
       // The desk now opens straight on the first movers list.
-      expect(find.text('TOP GAINERS'), findsOneWidget);
+      expect(find.text('Top gainers'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
 

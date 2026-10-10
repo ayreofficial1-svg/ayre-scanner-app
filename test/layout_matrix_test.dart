@@ -370,7 +370,7 @@ void main() {
       // Signals now live on Home, so no tab switch is needed. Everything
       // the backend pushes is shown as-is: no All / Bullish /
       // Bearish chips, and so no filtered-to-nothing state to recover from.
-      expect(find.text('RECOMMENDATIONS'), findsWidgets);
+      expect(find.text('Recommendations'), findsWidgets);
       expect(find.byType(AyreFilterChip), findsNothing);
       expect(find.text('Show all'), findsNothing);
       expect(tester.takeException(), isNull);

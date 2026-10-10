@@ -5,16 +5,20 @@ import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
 import 'ayre_icons.dart';
+import 'ayre_sheet.dart';
 import 'figure.dart';
 import 'pressable_scale.dart';
 import 'responsive.dart';
 import 'spring.dart';
 
-/// The app's card material: `surface` fill, 18px radius, 1px hairline, and a
-/// soft two-layer shadow (§8 of the Spec — shadows are part of the identity,
-/// flat/no-shadow is not a rule). Never nested — a card inside a card is
-/// always a hairline-divided row group ([RowGroup]) or a sunken/raised tonal
-/// fill ([InkPanel]) instead.
+/// The app's card material: `surface` fill, 18px radius, 1px hairline.
+///
+/// Elevation follows the ladder in `AppElevation` (D-3): a card is **flat**
+/// (hairline only) by default and gains one soft shadow — light theme only;
+/// dark uses tone, not shadow — when it is tappable ([onTap] set) or marked
+/// [featured]. Never nested — a card inside a card is always a
+/// hairline-divided row group ([RowGroup]) or a sunken/raised tonal fill
+/// ([InkPanel]) instead.
 class AyreCard extends StatelessWidget {
   const AyreCard({
     super.key,
@@ -26,6 +30,8 @@ class AyreCard extends StatelessWidget {
     this.onTap,
     this.accentEdge = false,
     this.accentColor,
+    this.featured = false,
+    this.clip,
   });
 
   final Widget child;
@@ -42,11 +48,24 @@ class AyreCard extends StatelessWidget {
   final bool accentEdge;
   final Color? accentColor;
 
+  /// Opts a non-tappable card into the `raised` elevation step.
+  final bool featured;
+
+  /// Whether the content is clipped to the card's rounded corners. Null (the
+  /// default) clips only when [padding] is zero — i.e. when content can reach
+  /// the corners (row groups, art, gradients). Padded cards cannot overflow
+  /// the radius, so they skip the extra clip layer.
+  final bool? clip;
+
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final borderRadius = BorderRadius.circular(radius);
     final edgeColor = accentColor ?? t.accent;
+    final raised = onTap != null || featured;
+    final shouldClip = clip ?? (padding == EdgeInsets.zero);
+
+    final padded = Padding(padding: padding, child: child);
 
     final card = DecoratedBox(
       decoration: BoxDecoration(
@@ -58,23 +77,16 @@ class AyreCard extends StatelessWidget {
               : (borderColor ?? t.hairline),
           width: accentEdge ? 1.5 : 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: t.shadowColor.withValues(alpha: 0.10),
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-          BoxShadow(
-            color: t.shadowColor.withValues(alpha: 0.06),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        boxShadow: raised
+            ? AppElevation.raised(t, Theme.of(context).brightness)
+            : AppElevation.flat,
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius - 1),
-        child: Padding(padding: padding, child: child),
-      ),
+      child: shouldClip
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(radius - 1),
+              child: padded,
+            )
+          : padded,
     );
 
     if (onTap == null) return card;
@@ -127,8 +139,9 @@ class InkPanel extends StatelessWidget {
   }
 }
 
-/// A section header in the terminal-label convention, with room for a trailing
-/// control (a freshness stamp, a sort affordance).
+/// A section header (D-2): sentence-case, 17 sp, primary text — the real third
+/// level between the page title and content. Has room for a trailing control
+/// (a freshness stamp, a sort affordance).
 ///
 /// [subtitle] is an optional one-line description shown directly under the
 /// heading. Left null, the header looks exactly as it always has.
@@ -156,11 +169,14 @@ class SectionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
 
-    final heading = Text(
-      label.toUpperCase(),
-      style: AppTypo.label(t, fontSize: 11),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
+    final heading = Semantics(
+      header: true,
+      child: Text(
+        label,
+        style: AppTypo.sectionHeading(t),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
     );
 
     // The heading and (when present) its description share one left column,
@@ -188,8 +204,8 @@ class SectionLabel extends StatelessWidget {
           const SizedBox(height: AppSpace.xxs),
           Text(
             subtitle!,
-            style: AppTypo.hint(t, color: t.foregroundMuted),
-            maxLines: 2,
+            style: AppTypo.meta(t),
+            maxLines: 3,
             overflow: TextOverflow.ellipsis,
           ),
         ],
@@ -220,12 +236,10 @@ class SectionLabel extends StatelessWidget {
 
 /// The small "i in a circle" beside a section heading.
 ///
-/// Deliberately quiet: a 13pt outline in the subtle foreground tone, no fill,
-/// no shadow. Its tap area is only a little larger than the glyph (24×20) and
-/// sits right against the heading text, well away from any row or "See all"
-/// control, so it is unlikely to be hit by accident. Tapping it opens a bottom
-/// sheet with [message] — a short, everyday-language explanation of what the
-/// section shows.
+/// Deliberately quiet: a 16pt outline in the muted foreground tone, no fill,
+/// no shadow. The visual stays small but the hit area is the full 48×48
+/// minimum target. Tapping it opens a bottom sheet with [message] — a short,
+/// everyday-language explanation of what the section shows.
 class SectionInfoButton extends StatelessWidget {
   const SectionInfoButton({
     super.key,
@@ -240,13 +254,12 @@ class SectionInfoButton extends StatelessWidget {
   /// The explanation shown in the sheet.
   final String message;
 
-  static const double _glyphSize = 13;
+  static const double _glyphSize = 16;
 
   void _open(BuildContext context) {
     HapticFeedback.selectionClick();
-    showModalBottomSheet<void>(
+    showAyreSheet<void>(
       context: context,
-      useSafeArea: true,
       builder: (_) => _SectionInfoSheet(title: title, message: message),
     );
   }
@@ -258,18 +271,17 @@ class SectionInfoButton extends StatelessWidget {
       button: true,
       label: 'About $title',
       excludeSemantics: true,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
+      child: PressableScale(
         onTap: () => _open(context),
+        borderRadius: AppRadius.pill,
+        scale: 0.92,
         child: SizedBox(
-          width: 24,
-          height: 20,
+          width: AppSpace.minTarget,
+          height: AppSpace.minTarget,
           child: Center(
             child: CustomPaint(
               size: const Size.square(_glyphSize),
-              painter: _InfoGlyphPainter(
-                color: t.foregroundSubtle.withValues(alpha: 0.75),
-              ),
+              painter: _InfoGlyphPainter(color: t.foregroundMuted),
             ),
           ),
         ),
@@ -289,7 +301,7 @@ class _InfoGlyphPainter extends CustomPainter {
     final stroke = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.1
+      ..strokeWidth = 1.3
       ..strokeCap = StrokeCap.round;
     final fill = Paint()
       ..color = color
@@ -310,9 +322,8 @@ class _InfoGlyphPainter extends CustomPainter {
       oldDelegate.color != color;
 }
 
-/// The sheet opened by [SectionInfoButton]: a heading, the explanation, and a
-/// single "Got it" button. Scrolls if a large text size makes it taller than
-/// the sheet allows.
+/// The sheet opened by [SectionInfoButton]: an [AyreSheet] with the
+/// explanation and a single "Got it" button.
 class _SectionInfoSheet extends StatelessWidget {
   const _SectionInfoSheet({required this.title, required this.message});
 
@@ -321,29 +332,19 @@ class _SectionInfoSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpace.lg,
-          AppSpace.xl,
-          AppSpace.lg,
-          AppSpace.xl,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(title, style: AppTypo.sectionTitle(t)),
-            const SizedBox(height: AppSpace.sm),
-            Text(message, style: AppTypo.body(t)),
-            const SizedBox(height: AppSpace.xl),
-            AyreButton(
-              label: 'Got it',
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        ),
+    return AyreSheet(
+      title: title,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(message, style: AppTypo.body(context.tokens)),
+          const SizedBox(height: AppSpace.xl),
+          AyreButton(
+            label: 'Got it',
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
       ),
     );
   }
@@ -434,7 +435,7 @@ class AyreButton extends StatelessWidget {
       ),
       AyreButtonKind.danger => (
         AppTheme.transparent,
-        t.negative,
+        t.negativeText,
         t.negative.withValues(alpha: 0.5),
       ),
     };
@@ -509,7 +510,7 @@ class AyreButton extends StatelessWidget {
 /// [SpringValue] rather than a plain eased tween — this is the one place in
 /// this file a spring actually drives motion, per plan §7 open decision #2's
 /// sibling guidance that springs are reserved for nav/segmented/toggle only.
-class AyreSwitch extends StatelessWidget {
+class AyreSwitch extends StatefulWidget {
   const AyreSwitch({
     super.key,
     required this.value,
@@ -527,49 +528,93 @@ class AyreSwitch extends StatelessWidget {
   static const double _travel = _w - _knob - 2 * 3; // track minus padding
 
   @override
+  State<AyreSwitch> createState() => _AyreSwitchState();
+}
+
+class _AyreSwitchState extends State<AyreSwitch> {
+  bool _focused = false;
+
+  @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final enabled = onChanged != null;
+    final enabled = widget.onChanged != null;
+    final value = widget.value;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
+    // The visual track stays 44x24; the interactive area is the full 48x48
+    // minimum target, with a keyboard focus ring around the track.
     return Semantics(
-      label: semanticLabel,
+      label: widget.semanticLabel,
       toggled: value,
       enabled: enabled,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: enabled ? () => onChanged!(!value) : null,
-        child: Opacity(
-          opacity: enabled ? 1 : 0.45,
-          child: AnimatedContainer(
-            duration: AppMotion.buttonPress,
-            curve: AppMotion.ease,
-            width: _w,
-            height: _h,
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              color: value ? t.accent : t.surfaceSunken,
-              borderRadius: BorderRadius.circular(AppRadius.chip),
-              border: Border.all(
-                color: value ? t.accent.withValues(alpha: 0.9) : t.hairline,
-              ),
-            ),
-            child: SpringValue(
-              value: value ? _travel : 0,
-              spring: AppSpring.toggleKnob,
-              builder: (context, dx, child) =>
-                  Transform.translate(offset: Offset(dx, 0), child: child),
-              child: Align(
-                alignment: Alignment.centerLeft,
+      child: FocusableActionDetector(
+        enabled: enabled,
+        onShowFocusHighlight: (v) => setState(() => _focused = v),
+        actions: <Type, Action<Intent>>{
+          ActivateIntent: CallbackAction<ActivateIntent>(
+            onInvoke: (_) {
+              widget.onChanged?.call(!value);
+              return null;
+            },
+          ),
+        },
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: enabled ? () => widget.onChanged!(!value) : null,
+          child: SizedBox(
+            width: AppSpace.minTarget + 4,
+            height: AppSpace.minTarget,
+            child: Center(
+              child: Opacity(
+                opacity: enabled ? 1 : 0.45,
                 child: Container(
-                  width: _knob,
-                  height: _knob,
-                  decoration: BoxDecoration(
-                    // Off-knob is `foregroundMuted`, not `foregroundSubtle`:
-                    // on the spec'd `surfaceSunken` off-track the subtle tone
-                    // measures 2.54:1 in light (under the 3:1 non-text floor);
-                    // muted measures 4.68:1 light / 8.6:1 dark.
-                    color: value ? t.onAccent : t.foregroundMuted,
-                    shape: BoxShape.circle,
+                  foregroundDecoration: _focused
+                      ? BoxDecoration(
+                          borderRadius: BorderRadius.circular(
+                            AppRadius.chip + 3,
+                          ),
+                          border: Border.all(color: t.accentInk, width: 2),
+                        )
+                      : null,
+                  child: AnimatedContainer(
+                    duration: reduceMotion ? Duration.zero : AppMotion.buttonPress,
+                    curve: AppMotion.ease,
+                    width: AyreSwitch._w,
+                    height: AyreSwitch._h,
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: value ? t.accent : t.surfaceSunken,
+                      borderRadius: BorderRadius.circular(AppRadius.chip),
+                      border: Border.all(
+                        color: value
+                            ? t.accent.withValues(alpha: 0.9)
+                            : t.hairline,
+                      ),
+                    ),
+                    child: SpringValue(
+                      value: value ? AyreSwitch._travel : 0,
+                      spring: AppSpring.toggleKnob,
+                      builder: (context, dx, child) => Transform.translate(
+                        offset: Offset(dx, 0),
+                        child: child,
+                      ),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          width: AyreSwitch._knob,
+                          height: AyreSwitch._knob,
+                          decoration: BoxDecoration(
+                            // Off-knob is `foregroundMuted`, not
+                            // `foregroundSubtle`: on the `surfaceSunken`
+                            // off-track the subtle tone measures 2.54:1 in
+                            // light (under the 3:1 non-text floor); muted
+                            // measures 4.68:1 light / 8.6:1 dark.
+                            color: value ? t.onAccent : t.foregroundMuted,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -669,11 +714,17 @@ class _Segment<T> extends StatelessWidget {
         onTap: onTap,
         borderRadius: AppRadius.control,
         child: AnimatedContainer(
-          duration: AppMotion.buttonPress,
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : AppMotion.buttonPress,
           curve: AppMotion.ease,
+          // 48 pt hit height in both sizes (Spec §9.5); the label wraps
+          // rather than shrinking (D-9).
+          constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
+          alignment: Alignment.center,
           padding: EdgeInsets.symmetric(
-            vertical: compact ? AppSpace.sm : AppSpace.md,
-            horizontal: AppSpace.xs,
+            vertical: compact ? AppSpace.xs : AppSpace.sm,
+            horizontal: AppSpace.sm,
           ),
           decoration: BoxDecoration(
             color: selected ? t.accent : AppTheme.transparent,
@@ -686,14 +737,17 @@ class _Segment<T> extends StatelessWidget {
                 AyreIcon(segment.glyph!, size: 16, color: fg, filled: selected),
                 const SizedBox(height: AppSpace.xs),
               ],
-              FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  segment.label.toUpperCase(),
-                  style: AppTypo.label(t, color: fg, fontSize: 10),
-                  maxLines: 1,
-                  textAlign: TextAlign.center,
+              Text(
+                segment.label,
+                style: AppTypo.ui(
+                  fontSize: AppTextScale.hint,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  color: fg,
+                  height: 1.2,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -714,7 +768,7 @@ class _Segment<T> extends StatelessWidget {
 enum ChipTone { neutral, live, attention, brand }
 
 /// Small, flat, caps chip for states like LIVE, CLOSED, NEW. LIVE is
-/// [AppThemeTokens.positive] on `positiveSoft`; neutral/attention (muted gold)
+/// [AppThemeTokens.positiveText] on `positiveSoft` (its dot keeps `positive`); neutral/attention (muted gold)
 /// carries warnings; the brand accent carries non-market identity tags only
 /// (tiers, badges) — never a market-direction signal.
 class AyreChip extends StatelessWidget {
@@ -737,16 +791,16 @@ class AyreChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final (Color fg, Color bg) = switch (tone) {
-      ChipTone.neutral => (t.foregroundSubtle, t.surfaceRaised),
+      ChipTone.neutral => (t.foregroundMuted, t.surfaceRaised),
       // LIVE is a market-liveness signal: `positive` on `positiveSoft` in
       // both themes, regardless of any per-card identity tint around it.
-      ChipTone.live => (t.positive, t.positiveSoft),
-      ChipTone.attention => (t.neutral, t.neutralSoft),
+      ChipTone.live => (t.positiveText, t.positiveSoft),
+      ChipTone.attention => (t.neutralText, t.neutralSoft),
       ChipTone.brand => (t.accentInk, t.accent.withValues(alpha: 0.16)),
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(AppRadius.chip),
@@ -755,12 +809,19 @@ class AyreChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (tone == ChipTone.live)
-            LivePulseDot(color: fg, animate: pulse)
+            // The dot is a mark, not text: it keeps the fill token.
+            LivePulseDot(color: t.positive, animate: pulse)
           else if (glyph != null)
-            AyreIcon(glyph!, size: 11, color: fg),
+            AyreIcon(glyph!, size: 12, color: fg),
           if (tone == ChipTone.live || glyph != null)
             const SizedBox(width: AppSpace.xs),
-          Text(label.toUpperCase(), style: AppTypo.label(t, color: fg)),
+          // Status words wrap, never truncate (D-1 floor: chips are 11 sp).
+          Flexible(
+            child: Text(
+              label.toUpperCase(),
+              style: AppTypo.label(t, color: fg, fontSize: 11),
+            ),
+          ),
         ],
       ),
     );
@@ -849,9 +910,11 @@ class _LivePulseDotState extends State<LivePulseDot>
 /// once is what makes Insights read as one integrated desk rather than three
 /// relocated cards.
 ///
-/// The figures column uses [FittedBox] so a large accessibility text scale
-/// shrinks the numbers instead of overflowing the row — the failure mode the
-/// layout matrix caught in the previous build.
+/// The figures column keeps a [FittedBox] (a D-9 exception, documented here):
+/// price and change are numerals whose truncation would hide data, so at a
+/// large accessibility text scale they shrink instead of overflowing the
+/// row — the failure mode the layout matrix caught in an earlier build. The
+/// name column wraps/ellipsises normally. Rows keep a 48 pt minimum height.
 class TickerRow extends StatelessWidget {
   const TickerRow({
     super.key,
@@ -886,7 +949,11 @@ class TickerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
 
-    final row = Padding(
+    final row = ConstrainedBox(
+      constraints: BoxConstraints(
+        minHeight: onTap != null ? AppSpace.minTarget : 0,
+      ),
+      child: Padding(
       padding: EdgeInsets.symmetric(
         horizontal: AppSpace.md,
         vertical: dense ? AppSpace.sm : AppSpace.row,
@@ -895,11 +962,11 @@ class TickerRow extends StatelessWidget {
         children: [
           if (rank != null) ...[
             SizedBox(
-              width: 22,
+              width: 24,
               child: Figure.static(
                 '$rank',
-                fontSize: 11,
-                color: t.foregroundSubtle,
+                fontSize: 12,
+                color: t.foregroundMuted,
               ),
             ),
             const SizedBox(width: AppSpace.xs),
@@ -953,15 +1020,15 @@ class TickerRow extends StatelessWidget {
                       if (volume != null && price != null) ...[
                         Figure(
                           formatVolume(volume),
-                          fontSize: 11,
-                          color: t.foregroundSubtle,
+                          fontSize: 12,
+                          color: t.foregroundMuted,
                         ),
                         const SizedBox(width: AppSpace.sm),
                       ] else if (changeAbsolute != null) ...[
                         Figure(
                           formatDelta(changeAbsolute!, percent: false),
-                          fontSize: 11,
-                          color: t.foregroundSubtle,
+                          fontSize: 12,
+                          color: t.foregroundMuted,
                         ),
                         const SizedBox(width: AppSpace.sm),
                       ],
@@ -979,6 +1046,7 @@ class TickerRow extends StatelessWidget {
           ],
         ],
       ),
+    ),
     );
 
     if (onTap == null) return row;
@@ -1033,11 +1101,13 @@ class SettingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final tone = danger ? t.negative : t.foregroundMuted;
+    final tone = danger ? t.negativeText : t.foregroundMuted;
 
     final row = Opacity(
       opacity: enabled ? 1 : 0.5,
-      child: Padding(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
+        child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpace.md,
           vertical: AppSpace.md,
@@ -1055,12 +1125,12 @@ class SettingRow extends StatelessWidget {
                     title,
                     style: AppTypo.rowLabel(
                       t,
-                      color: danger ? t.negative : null,
+                      color: danger ? t.negativeText : null,
                     ),
                   ),
                   if (subtitle != null) ...[
-                    const SizedBox(height: 1),
-                    Text(subtitle!, style: AppTypo.caption(t)),
+                    const SizedBox(height: 2),
+                    Text(subtitle!, style: AppTypo.meta(t)),
                   ],
                 ],
               ),
@@ -1072,10 +1142,11 @@ class SettingRow extends StatelessWidget {
                     : AyreIcon(
                         AyreGlyph.forward,
                         size: 16,
-                        color: t.foregroundSubtle,
+                        color: t.foregroundMuted,
                       )),
           ],
         ),
+      ),
       ),
     );
 
@@ -1397,7 +1468,8 @@ class SkeletonTickerRow extends StatelessWidget {
 
 // ─── Entrance ──────────────────────────────────────────────────────────────
 
-/// A restrained, single-play, index-delayed staggered entrance. Plays once per
+/// A restrained, single-play, index-delayed staggered entrance (D-8: at most
+/// four stagger steps, ~160 ms of delay, 280 ms duration). Plays once per
 /// screen visit and does not replay on tab re-visit or a minor rebuild.
 class Entrance extends StatefulWidget {
   const Entrance({
@@ -1429,7 +1501,7 @@ class _EntranceState extends State<Entrance>
     );
     // Cap the stagger budget so the last element in a long list still starts
     // promptly instead of trickling in.
-    final delay = AppMotion.stagger * widget.index.clamp(0, 6);
+    final delay = AppMotion.stagger * widget.index.clamp(0, 4);
     if (delay == Duration.zero) {
       _controller.forward();
     } else {
@@ -1527,10 +1599,10 @@ class DirectionBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final (Color fg, Color bg) = neutral
-        ? (t.neutral, t.neutralSoft)
+        ? (t.neutralText, t.neutralSoft)
         : up
-        ? (t.positive, t.positiveSoft)
-        : (t.negative, t.negativeSoft);
+        ? (t.positiveText, t.positiveSoft)
+        : (t.negativeText, t.negativeSoft);
 
     return Semantics(
       label: '${neutral ? 'unchanged' : (up ? 'up' : 'down')} $label',
@@ -1545,10 +1617,15 @@ class DirectionBadge extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (!neutral) ...[
-              DirectionGlyph(up: up, color: fg, size: 11),
+              DirectionGlyph(up: up, color: fg, size: 12),
               const SizedBox(width: 4),
             ],
-            Text(label.toUpperCase(), style: AppTypo.label(t, color: fg)),
+            Flexible(
+              child: Text(
+                label.toUpperCase(),
+                style: AppTypo.label(t, color: fg, fontSize: 11),
+              ),
+            ),
           ],
         ),
       ),
@@ -1571,8 +1648,8 @@ class DirectionBadge extends StatelessWidget {
 /// * This carries a **choice the user makes**, so it is the only one of the
 ///   three that is tappable, has a selected state, and needs a 44pt target.
 ///
-/// Selection is not colour-only: the selected chip also gains a filled border
-/// and heavier text weight, so the active filter survives with colour removed.
+/// Selection is not colour-only: the selected chip also gains a filled border,
+/// a check mark and heavier text weight, so the active filter survives with colour removed.
 class AyreFilterChip extends StatelessWidget {
   const AyreFilterChip({
     super.key,
@@ -1603,12 +1680,12 @@ class AyreFilterChip extends StatelessWidget {
         onTap: onTap,
         borderRadius: AppRadius.pill,
         child: AnimatedContainer(
-          duration: AppMotion.buttonPress,
+          duration: MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : AppMotion.buttonPress,
           curve: AppMotion.ease,
-          // 44pt tall, not §17's 32px chip minimum — plan §8 resolved that
-          // conflict in favour of the HIG floor, since an accessibility
-          // minimum isn't a place to split the difference.
-          height: 44,
+          // 48 pt minimum hit height (Phase 3); grows with text scale.
+          constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
           alignment: Alignment.center,
           decoration: BoxDecoration(
@@ -1622,6 +1699,10 @@ class AyreFilterChip extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (selected) ...[
+                AyreIcon(AyreGlyph.check, size: 14, color: fg),
+                const SizedBox(width: AppSpace.xs),
+              ],
               Text(
                 label,
                 style: AppTypo.ui(
@@ -1636,7 +1717,7 @@ class AyreFilterChip extends StatelessWidget {
                   '$count',
                   fontSize: AppTextScale.hint,
                   fontWeight: FontWeight.w600,
-                  color: selected ? fg : t.foregroundSubtle,
+                  color: selected ? fg : t.foregroundMuted,
                 ),
               ],
             ],
@@ -1674,9 +1755,7 @@ class TagPill extends StatelessWidget {
       ),
       child: Text(
         label.toUpperCase(),
-        style: AppTypo.label(t, color: t.foregroundMuted),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+        style: AppTypo.label(t, color: t.foregroundMuted, fontSize: 11),
       ),
     );
   }

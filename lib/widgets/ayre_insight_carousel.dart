@@ -257,7 +257,7 @@ class _ReadMoreButton extends StatelessWidget {
         onTap: onTap,
         borderRadius: AppRadius.pill,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 44),
+          constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
           decoration: BoxDecoration(
             color: palette.pill,
@@ -281,7 +281,7 @@ class _ReadMoreButton extends StatelessWidget {
 }
 
 /// ‹ 01/04 › — two circular arrow buttons around a zero-padded count. Each
-/// button is drawn 32pt but hits 44pt.
+/// button is drawn 36pt but hits 48pt.
 class _Pager extends StatelessWidget {
   const _Pager({
     required this.index,
@@ -319,7 +319,7 @@ class _Pager extends StatelessWidget {
             child: Text(
               '${_two(index + 1)}/${_two(count)}',
               style: AppTypo.num(
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: FontWeight.w500,
                 color: palette.pager,
                 letterSpacing: 0,
@@ -364,12 +364,12 @@ class _PagerButton extends StatelessWidget {
         borderRadius: AppRadius.circle,
         scale: 0.9,
         child: SizedBox(
-          height: 44,
-          width: 44,
+          height: AppSpace.minTarget,
+          width: AppSpace.minTarget,
           child: Center(
             child: Container(
-              height: 32,
-              width: 32,
+              height: 36,
+              width: 36,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: palette.arrowFill,

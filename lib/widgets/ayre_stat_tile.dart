@@ -48,14 +48,14 @@ class AyreStatTile extends StatelessWidget {
           children: [
             if (glyph != null) ...[
               Container(
-                width: 36,
-                height: 36,
+                width: 40,
+                height: 40,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: t.surfaceRaised,
                   borderRadius: BorderRadius.circular(AppRadius.iconTile),
                 ),
-                child: AyreIcon(glyph!, size: 18, color: t.foregroundMuted),
+                child: AyreIcon(glyph!, size: 20, color: t.foregroundMuted),
               ),
               const SizedBox(width: AppSpace.sm),
             ],
@@ -64,6 +64,8 @@ class AyreStatTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Hero-style numeral: truncating it would hide data, so it
+                  // keeps a FittedBox (documented D-9 exception).
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
@@ -77,8 +79,8 @@ class AyreStatTile extends StatelessWidget {
                   const SizedBox(height: AppSpace.xxs),
                   Text(
                     label,
-                    style: AppTypo.hint(t, color: t.foregroundMuted),
-                    maxLines: 1,
+                    style: AppTypo.meta(t),
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],

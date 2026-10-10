@@ -18,7 +18,7 @@ class AyreAvatar extends StatelessWidget {
     super.key,
     required this.initials,
     this.size = 44,
-    this.fontSize = 13,
+    this.fontSize = 14,
   });
 
   final String initials;

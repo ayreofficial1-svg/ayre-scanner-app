@@ -74,10 +74,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('TOP GAINERS'), findsOneWidget);
+      expect(find.text('Top gainers'), findsOneWidget);
       expect(find.text('Stocks rising the most'), findsOneWidget);
 
-      final heading = tester.getBottomLeft(find.text('TOP GAINERS')).dy;
+      final heading = tester.getBottomLeft(find.text('Top gainers')).dy;
       final description = tester.getTopLeft(
         find.text('Stocks rising the most'),
       ).dy;
@@ -90,7 +90,7 @@ void main() {
       await tester.pumpWidget(host(const SectionLabel(label: 'Library')));
       await tester.pumpAndSettle();
 
-      expect(find.text('LIBRARY'), findsOneWidget);
+      expect(find.text('Library'), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
   });

@@ -4,9 +4,9 @@ import 'package:flutter/services.dart';
 import '../services/market_models.dart';
 import '../theme/app_theme.dart';
 import 'ayre_components.dart';
-import 'ayre_hills.dart';
 import 'ayre_icons.dart';
 import 'ayre_instrument_tile.dart';
+import 'ayre_sheet.dart';
 import 'figure.dart';
 import 'pressable_scale.dart';
 
@@ -20,6 +20,9 @@ import 'pressable_scale.dart';
 //   Latest week · 1 of 3
 //
 //   ┌──────────────────────────────────────┐
+//   (R-2) Compact stock card — one header row, one metrics row, no hills,
+//   no nested tiles:  [logo] RELIANCE  +896.40% / Target hit, then
+//   Entry · Exit · Profit / share.
 //   │ [logo]  RELIANCE                +896.40%│     one card per stock,
 //   │         ● Target hit                   │     always fully visible:
 //   │                                        │     who → how it ended → how
@@ -33,7 +36,7 @@ import 'pressable_scale.dart';
 //   └──────────────────────────────────────┘
 //
 // Cards are separated by space, not dividers. The stock cards stay
-// quiet — a faint corner of hills, no fills behind the results. Outcome
+// quiet — flat, single-level, no decoration behind the results. Outcome
 // colour sits on text only (green target / red stop-loss), and direction is
 // also in the sign and the written outcome, never colour alone.
 //
@@ -85,9 +88,8 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
 
   void _openPicker() {
     HapticFeedback.selectionClick();
-    showModalBottomSheet<void>(
+    showAyreSheet<void>(
       context: context,
-      useSafeArea: true,
       builder: (_) => _WeekPickerSheet(
         reports: widget.reports,
         selectedIndex: _index,
@@ -138,7 +140,7 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (var i = 0; i < visible.length; i++) ...[
-                  if (i > 0) const SizedBox(height: AppSpace.cardGap),
+                  if (i > 0) const SizedBox(height: AppSpace.xs),
                   _StockCard(
                     stock: visible[i],
                     fallbackStart: report.weekStart,
@@ -214,7 +216,7 @@ class _WeekHeader extends StatelessWidget {
             Flexible(
               child: Text(
                 range,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: AppTypo.rowLabel(t, color: t.accentInk),
               ),
@@ -228,9 +230,7 @@ class _WeekHeader extends StatelessWidget {
         const SizedBox(height: 2),
         Text(
           sub,
-          style: AppTypo.hint(t),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+          style: AppTypo.meta(t),
         ),
       ],
     );
@@ -276,7 +276,7 @@ class _WeekHeader extends StatelessWidget {
   }
 }
 
-/// A 44pt tap target holding a 34pt tinted circle and a chevron, coloured
+/// A 48pt tap target holding a 34pt tinted circle and a chevron, coloured
 /// from the header's ink so it reads on both the light and dark wash. The
 /// disabled end fades rather than disappears, so the pair never shifts.
 class _WeekArrow extends StatelessWidget {
@@ -288,7 +288,7 @@ class _WeekArrow extends StatelessWidget {
     required this.ink,
   });
 
-  static const double size = 44;
+  static const double size = AppSpace.minTarget;
 
   final AyreGlyph glyph;
   final String label;
@@ -315,8 +315,8 @@ class _WeekArrow extends StatelessWidget {
             child: Opacity(
               opacity: enabled ? 1 : 0.4,
               child: Container(
-                width: 34,
-                height: 34,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(shape: BoxShape.circle, color: fill),
                 child: Center(child: AyreIcon(glyph, size: 16, color: ink)),
               ),
@@ -344,95 +344,96 @@ class _WeekPickerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpace.lg,
-            AppSpace.xl,
-            AppSpace.lg,
-            AppSpace.sm,
-          ),
-          child: Text('Choose a week', style: AppTypo.sectionTitle(t)),
-        ),
-        Flexible(
-          child: ListView.separated(
-            shrinkWrap: true,
-            padding: const EdgeInsets.only(bottom: AppSpace.lg),
-            itemCount: reports.length,
-            separatorBuilder: (_, _) =>
-                const HairlineDivider(indent: AppSpace.lg),
-            itemBuilder: (context, i) {
-              final r = reports[i];
-              final selected = i == selectedIndex;
-              final count = r.stocks.length;
-              return Semantics(
-                button: true,
-                selected: selected,
-                child: PressableScaleRow(
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    onSelected(i);
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpace.lg,
-                      vertical: AppSpace.md,
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                formatWeekRange(r.weekStart, r.weekEnd),
-                                style: selected
-                                    ? AppTypo.rowLabel(t, color: t.accentInk)
-                                    : AppTypo.rowLabel(t),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '$count ${count == 1 ? 'stock' : 'stocks'}'
-                                '${i == 0 ? ' · Latest' : ''}',
-                                style: AppTypo.hint(
-                                  t,
-                                  color: t.foregroundMuted,
-                                ),
-                              ),
-                            ],
-                          ),
+    return AyreSheet(
+      title: 'Choose a week',
+      padding: const EdgeInsets.only(bottom: AppSpace.lg),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < reports.length; i++) ...[
+            if (i > 0) const HairlineDivider(indent: AppSpace.lg),
+            Builder(
+              builder: (context) {
+                final r = reports[i];
+                final selected = i == selectedIndex;
+                final count = r.stocks.length;
+                return Semantics(
+                  button: true,
+                  selected: selected,
+                  child: PressableScaleRow(
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      onSelected(i);
+                    },
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minHeight: AppSpace.minTarget,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpace.lg,
+                          vertical: AppSpace.md,
                         ),
-                        if (selected)
-                          AyreIcon(
-                            AyreGlyph.check,
-                            size: 18,
-                            color: t.accentInk,
-                          ),
-                      ],
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    formatWeekRange(r.weekStart, r.weekEnd),
+                                    style: selected
+                                        ? AppTypo.rowLabel(
+                                            t,
+                                            color: t.accentInk,
+                                          ).copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          )
+                                        : AppTypo.rowLabel(t),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '$count ${count == 1 ? 'stock' : 'stocks'}'
+                                    '${i == 0 ? ' · Latest' : ''}',
+                                    style: AppTypo.meta(t),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (selected)
+                              AyreIcon(
+                                AyreGlyph.check,
+                                size: 20,
+                                color: t.accentInk,
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
+                );
+              },
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
 
 // ─── Stock card ────────────────────────────────────────────────────────────
 
-/// One stock's result, fully visible — three tiers, top to bottom:
+/// One stock's result (R-2, D-13): a flat, single-level card with one header
+/// row and one metrics row.
 ///
-///   1. Who and how it ended: logo, symbol, company (when present), a
-///      written outcome chip, and the return in a tinted pill.
-///   2. The trade: Entry and Exit tiles, each with its date (Entry carries
-///      the date of recommendation, Exit the exit date).
-///   3. Profit / share, a slim single-line tile — supporting, not a headline.
+///   Header: [tile 40] symbol / company (left) · signed return with the
+///   written outcome beneath it (right). Hierarchy: return → symbol →
+///   outcome → name.
+///   Metrics: Entry · Exit · Profit / share, three flat columns split by
+///   hairlines; with less room (320 pt, or larger text) they reflow into two
+///   columns plus a profit line, then into label/value lines — text is never
+///   shrunk.
 ///
 /// [fallbackStart]/[fallbackEnd] are the report's own week range, used only
 /// when this stock doesn't carry its own dates — real data, not a guess.
@@ -447,11 +448,18 @@ class _StockCard extends StatelessWidget {
   final DateTime? fallbackStart;
   final DateTime? fallbackEnd;
 
+  // Inner-width needs per text-scale unit (see the layout rules in §7.2).
+  static const double _headerSideBySide = 260;
+  static const double _threeColumns = 3 * 96;
+  static const double _twoColumns = 2 * 110;
+
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final hit = stock.targetHit;
-    final tone = hit ? t.positive : t.negative;
+    // Text and glyphs use the A4 status-text tokens; the dot is a mark.
+    final tone = hit ? t.positiveText : t.negativeText;
+    final dot = hit ? t.positive : t.negative;
     final outcomeLabel = hit ? 'Target hit' : 'Stop-loss hit';
 
     final recDate = stock.dateOfRecommendation ?? fallbackStart;
@@ -476,12 +484,26 @@ class _StockCard extends StatelessWidget {
       if (pnl != null) 'Profit per share ${_formatSignedRupees(pnl)}',
     ].join(', ');
 
+    final scale = MediaQuery.textScalerOf(context).scale(100) / 100;
+    final k = scale < 1 ? 1.0 : scale;
+
+    final metrics = <_MetricData>[
+      if (stock.entryPrice != null)
+        _MetricData('Entry', '₹${formatPrice(stock.entryPrice)}', recDate,
+            t.textPrimary),
+      if (stock.exitPrice != null)
+        _MetricData('Exit', '₹${formatPrice(stock.exitPrice)}', exitDate,
+            t.textPrimary),
+      if (pnl != null)
+        _MetricData('Profit / share', _formatSignedRupees(pnl), null, tone),
+    ];
+
     final identity = Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         AyreInstrumentTile(
           symbol: stock.symbol,
-          size: 52,
+          size: 40,
           name: hasName ? stock.name : null,
         ),
         const SizedBox(width: AppSpace.sm),
@@ -493,98 +515,81 @@ class _StockCard extends StatelessWidget {
               Text(
                 stock.symbol,
                 style: AppTypo.ui(
-                  fontSize: 17,
+                  fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: t.textPrimary,
                   letterSpacing: -0.2,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
-              if (hasName) ...[
-                const SizedBox(height: 1),
-                Text(
-                  stock.name!,
-                  style: AppTypo.hint(t, color: t.foregroundMuted),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-              const SizedBox(height: 6),
-              _OutcomeChip(label: outcomeLabel, tone: tone),
+              if (hasName)
+                Text(stock.name!, style: AppTypo.meta(t), maxLines: 2),
             ],
           ),
-        ),
-        const SizedBox(width: AppSpace.sm),
-        Figure.static(
-          formatDelta(stock.profitPct),
-          fontSize: 21,
-          fontWeight: FontWeight.w700,
-          color: tone,
         ),
       ],
     );
 
-    final trade = <Widget>[
-      if (stock.entryPrice != null)
-        Expanded(
-          child: _PriceTile(
-            label: 'Entry',
-            price: stock.entryPrice!,
-            date: recDate,
-          ),
+    Widget outcomeBlock(CrossAxisAlignment align) => Column(
+      crossAxisAlignment: align,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Figure.static(
+          formatDelta(stock.profitPct),
+          fontSize: 20,
+          fontWeight: FontWeight.w700,
+          color: tone,
         ),
-      if (stock.entryPrice != null && stock.exitPrice != null)
-        const SizedBox(width: AppSpace.xs),
-      if (stock.exitPrice != null)
-        Expanded(
-          child: _PriceTile(
-            label: 'Exit',
-            price: stock.exitPrice!,
-            date: exitDate,
-          ),
-        ),
-    ];
+        const SizedBox(height: 2),
+        _OutcomeChip(label: outcomeLabel, tone: tone, dot: dot),
+      ],
+    );
 
     return Semantics(
       container: true,
       label: spoken,
       excludeSemantics: true,
       child: AyreCard(
-        padding: EdgeInsets.zero,
-        child: Stack(
-          children: [
-            // A small, faint touch of the Ayre hills in the corner — kept
-            // quiet so the header above is the one place the section is loud.
-            const Positioned(
-              top: 0,
-              right: 0,
-              child: AyreHills(width: 110, height: 70),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(AppSpace.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  identity,
-                  if (trade.isNotEmpty) ...[
-                    const SizedBox(height: AppSpace.md),
-                    IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: trade,
-                      ),
-                    ),
-                  ],
-                  if (pnl != null) ...[
-                    const SizedBox(height: AppSpace.sm),
-                    const HairlineDivider(),
-                    _ProfitRow(value: pnl, tone: tone),
-                  ],
+        padding: const EdgeInsets.all(AppSpace.sm),
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final width = c.maxWidth;
+            final sideBySide = width >= _headerSideBySide * k;
+            final header = sideBySide
+                ? Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(child: identity),
+                      const SizedBox(width: AppSpace.sm),
+                      outcomeBlock(CrossAxisAlignment.end),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      identity,
+                      const SizedBox(height: AppSpace.xs),
+                      outcomeBlock(CrossAxisAlignment.start),
+                    ],
+                  );
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                header,
+                if (metrics.isNotEmpty) ...[
+                  const SizedBox(height: AppSpace.xs),
+                  _MetricsBlock(
+                    metrics: metrics,
+                    mode: width >= _threeColumns * k
+                        ? _MetricsMode.columns
+                        : (width >= _twoColumns * k
+                              ? _MetricsMode.twoRows
+                              : _MetricsMode.lines),
+                  ),
                 ],
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         ),
       ),
     );
@@ -593,33 +598,35 @@ class _StockCard extends StatelessWidget {
 
 /// `● Target hit` — a dot and the outcome in words, no fill.
 class _OutcomeChip extends StatelessWidget {
-  const _OutcomeChip({required this.label, required this.tone});
+  const _OutcomeChip({
+    required this.label,
+    required this.tone,
+    required this.dot,
+  });
 
   final String label;
   final Color tone;
+  final Color dot;
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           width: 7,
           height: 7,
-          decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
+          decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
         Flexible(
           child: Text(
             label,
             style: AppTypo.ui(
-              fontSize: AppTextScale.hint,
-              fontWeight: FontWeight.w600,
-              color: t.foregroundMuted,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: tone,
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -627,90 +634,147 @@ class _OutcomeChip extends StatelessWidget {
   }
 }
 
-/// ENTRY / EXIT: eyebrow, the price, and its date underneath.
-class _PriceTile extends StatelessWidget {
-  const _PriceTile({
-    required this.label,
-    required this.price,
-    required this.date,
-  });
+class _MetricData {
+  const _MetricData(this.label, this.value, this.date, this.valueColor);
 
   final String label;
-  final num price;
+  final String value;
   final DateTime? date;
+  final Color valueColor;
+}
+
+enum _MetricsMode { columns, twoRows, lines }
+
+/// Entry · Exit · Profit / share. Flat, no tiles: columns split by hairlines
+/// when they fit, otherwise two columns plus a profit line, otherwise lines.
+class _MetricsBlock extends StatelessWidget {
+  const _MetricsBlock({required this.metrics, required this.mode});
+
+  final List<_MetricData> metrics;
+  final _MetricsMode mode;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: t.surfaceSunken,
-        borderRadius: BorderRadius.circular(AppRadius.inset + 2),
+
+    Widget column(_MetricData m, {required bool first}) => Expanded(
+      child: Container(
+        padding: EdgeInsetsDirectional.only(start: first ? 0 : AppSpace.sm),
+        decoration: first
+            ? null
+            : BoxDecoration(
+                border: BorderDirectional(
+                  start: BorderSide(color: t.hairline),
+                ),
+              ),
+        child: _MetricStack(data: m),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpace.sm),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+    );
+
+    Widget row(List<_MetricData> items) => Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var i = 0; i < items.length; i++) column(items[i], first: i == 0),
+      ],
+    );
+
+    switch (mode) {
+      case _MetricsMode.columns:
+        return row(metrics);
+      case _MetricsMode.twoRows:
+        final pairs = metrics.where((m) => m.label != 'Profit / share').toList();
+        final profit = metrics.where((m) => m.label == 'Profit / share');
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(label.toUpperCase(), style: AppTypo.label(t, fontSize: 10.5)),
-            const SizedBox(height: 6),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Figure.static(
-                '₹${formatPrice(price)}',
-                fontSize: 19,
-                fontWeight: FontWeight.w700,
-                color: t.textPrimary,
-              ),
-            ),
-            if (date != null) ...[
-              const SizedBox(height: 2),
-              Text(
-                _shortDate(date!),
-                style: AppTypo.hint(t, color: t.foregroundMuted),
-                maxLines: 1,
-              ),
+            if (pairs.isNotEmpty) row(pairs),
+            for (final m in profit) ...[
+              if (pairs.isNotEmpty) ...[
+                const SizedBox(height: AppSpace.xs),
+                const HairlineDivider(),
+                const SizedBox(height: AppSpace.xs),
+              ],
+              _MetricLine(data: m),
             ],
           ],
+        );
+      case _MetricsMode.lines:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var i = 0; i < metrics.length; i++) ...[
+              if (i > 0) ...[
+                const SizedBox(height: AppSpace.xs),
+                const HairlineDivider(),
+                const SizedBox(height: AppSpace.xs),
+              ],
+              _MetricLine(data: metrics[i]),
+            ],
+          ],
+        );
+    }
+  }
+}
+
+/// Label over value over date — a column cell.
+class _MetricStack extends StatelessWidget {
+  const _MetricStack({required this.data});
+
+  final _MetricData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(data.label, style: AppTypo.meta(t)),
+        const SizedBox(height: 2),
+        Figure.static(
+          data.value,
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: data.valueColor,
         ),
-      ),
+        if (data.date != null)
+          Text(_shortDate(data.date!), style: AppTypo.meta(t)),
+      ],
     );
   }
 }
 
-/// PROFIT / SHARE as one slim line — label left, value right, no fill —
-/// under a hairline, so it supports the return above rather than competing.
-class _ProfitRow extends StatelessWidget {
-  const _ProfitRow({required this.value, required this.tone});
+/// Label (and date) left, value right — the reflow form.
+class _MetricLine extends StatelessWidget {
+  const _MetricLine({required this.data});
 
-  final num value;
-  final Color tone;
+  final _MetricData data;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpace.sm),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              'PROFIT / SHARE',
-              style: AppTypo.label(t, fontSize: 10.5),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(data.label, style: AppTypo.meta(t)),
+              if (data.date != null)
+                Text(_shortDate(data.date!), style: AppTypo.meta(t)),
+            ],
           ),
-          Figure.static(
-            _formatSignedRupees(value),
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: tone,
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(width: AppSpace.sm),
+        Figure.static(
+          data.value,
+          fontSize: 15,
+          fontWeight: FontWeight.w600,
+          color: data.valueColor,
+        ),
+      ],
     );
   }
 }
@@ -718,7 +782,7 @@ class _ProfitRow extends StatelessWidget {
 // ─── See all ───────────────────────────────────────────────────────────────
 
 /// "See all N stocks" / "Show less" — an in-place expand of the same week.
-/// 48pt tall, above the 44pt floor.
+/// 48pt tall target.
 class _ExpandToggle extends StatelessWidget {
   const _ExpandToggle({
     required this.expanded,
@@ -746,11 +810,10 @@ class _ExpandToggle extends StatelessWidget {
               child: Text(
                 expanded ? 'Show less' : 'See all $count stocks',
                 style: AppTypo.ui(
-                  fontSize: AppTextScale.hint,
+                  fontSize: AppTextScale.body,
                   fontWeight: FontWeight.w700,
                   color: t.accentInk,
                 ),
-                maxLines: 1,
               ),
             ),
           ),
@@ -781,49 +844,67 @@ class WeeklyReportSkeleton extends StatelessWidget {
         SkeletonBlock(width: 90, height: 11),
         SizedBox(height: AppSpace.md),
         _StockCardSkeleton(),
-        SizedBox(height: AppSpace.cardGap),
+        SizedBox(height: AppSpace.xs),
         _StockCardSkeleton(),
       ],
     );
   }
 }
 
+/// Same footprint as the compact stock card (12 pt padding, 40 pt header,
+/// 8 pt gap, ~51 pt metrics row) so loading to loaded does not jump.
 class _StockCardSkeleton extends StatelessWidget {
   const _StockCardSkeleton();
 
   @override
   Widget build(BuildContext context) {
     return const AyreCard(
+      padding: EdgeInsets.all(AppSpace.sm),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              SkeletonBlock(width: 52, height: 52, radius: AppRadius.iconTile),
-              SizedBox(width: AppSpace.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+          SizedBox(
+            height: 40,
+            child: Row(
+              children: [
+                SkeletonBlock(width: 40, height: 40, radius: AppRadius.iconTile),
+                SizedBox(width: AppSpace.sm),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonBlock(width: 88, height: 14),
+                      SizedBox(height: 6),
+                      SkeletonBlock(width: 120, height: 11),
+                    ],
+                  ),
+                ),
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    SkeletonBlock(width: 96, height: 16),
-                    SizedBox(height: 8),
-                    SkeletonBlock(width: 80, height: 22, radius: 11),
+                    SkeletonBlock(width: 72, height: 20),
+                    SizedBox(height: 6),
+                    SkeletonBlock(width: 64, height: 12),
                   ],
                 ),
-              ),
-              SkeletonBlock(width: 88, height: 40, radius: AppRadius.iconTile),
-            ],
-          ),
-          SizedBox(height: AppSpace.md),
-          Row(
-            children: [
-              Expanded(child: SkeletonBlock(height: 76)),
-              SizedBox(width: AppSpace.xs),
-              Expanded(child: SkeletonBlock(height: 76)),
-            ],
+              ],
+            ),
           ),
           SizedBox(height: AppSpace.xs),
-          SkeletonBlock(height: 40),
+          SizedBox(
+            height: 51,
+            child: Row(
+              children: [
+                Expanded(child: SkeletonBlock(height: 51)),
+                SizedBox(width: AppSpace.xs),
+                Expanded(child: SkeletonBlock(height: 51)),
+                SizedBox(width: AppSpace.xs),
+                Expanded(child: SkeletonBlock(height: 51)),
+              ],
+            ),
+          ),
         ],
       ),
     );
