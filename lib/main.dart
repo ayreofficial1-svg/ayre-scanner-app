@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/home_shell.dart';
@@ -186,7 +187,17 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
                     0.8,
                     2.2,
                   );
-              return MediaQuery(
+              // The *effective* brightness: the in-app choice, or the phone's
+              // when the mode is System. System bars follow it, not the phone
+              // theme alone (N-14).
+              final brightness = switch (_themeMode) {
+                ThemeMode.light => Brightness.light,
+                ThemeMode.dark => Brightness.dark,
+                ThemeMode.system => media.platformBrightness,
+              };
+              return AnnotatedRegion<SystemUiOverlayStyle>(
+                value: AppTheme.overlayStyle(brightness),
+                child: MediaQuery(
                 data: media.copyWith(textScaler: TextScaler.linear(effective)),
                 child: Column(
                   children: [
@@ -206,6 +217,7 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
                     ),
                     Expanded(child: child ?? const SizedBox.shrink()),
                   ],
+                ),
                 ),
               );
             },

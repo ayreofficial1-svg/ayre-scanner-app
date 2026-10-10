@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../widgets/ayre_charts.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_instrument_tile.dart';
+import '../widgets/ayre_tab_scroll.dart';
 import '../widgets/responsive.dart';
 import '../widgets/state_views.dart';
 import 'equity_detail_screen.dart';
@@ -33,7 +34,12 @@ import 'equity_detail_screen.dart';
 /// plain-language explanation of what the section shows (see [SectionLabel]).
 /// The wording lives in [_InsightInfo] below so it can be edited in one place.
 class InsightsTab extends StatefulWidget {
-  const InsightsTab({super.key, required this.marketData, this.active = true});
+  const InsightsTab({
+    super.key,
+    required this.marketData,
+    this.active = true,
+    this.scrollController,
+  });
 
   final MarketDataService marketData;
 
@@ -42,6 +48,10 @@ class InsightsTab extends StatefulWidget {
   /// [_refreshLive] from fetching and rebuilding this screen's live
   /// sections every 10s while another tab is on screen.
   final bool active;
+
+  /// Optional controller for the tab's scroll view (A2: re-tap scrolls to
+  /// top). Null keeps the previous behaviour.
+  final ScrollController? scrollController;
 
   @override
   State<InsightsTab> createState() => _InsightsTabState();
@@ -259,24 +269,11 @@ class _InsightsTabState extends State<InsightsTab> {
     final t = context.tokens;
     final columns = AppBreakpoints.columns(context);
 
-    return RefreshIndicator(
-      color: t.accentInk,
-      backgroundColor: t.surface,
+    return AyreTabScroll(
+      controller: widget.scrollController,
       onRefresh: _load,
-      edgeOffset: 72,
-      child: ContentWidth(
-        // Widened the same way `learn_tab.dart` widens
-        // once their lists go multi-column (Phase 2A) — the default 620pt
-        // reading measure otherwise starves a 2-/3-column movers grid.
-        maxWidth: columns > 1 ? 960 : null,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpace.pageHorizontal,
-            AppSpace.pageTop,
-            AppSpace.pageHorizontal,
-            120,
-          ),
-          children: [
+      maxWidth: columns > 1 ? 960 : null,
+      children: [
             SafeArea(
               bottom: false,
               child: Entrance(
@@ -365,9 +362,7 @@ class _InsightsTabState extends State<InsightsTab> {
               ),
               ..._deskNotes(),
             ],
-          ],
-        ),
-      ),
+      ],
     );
   }
 }

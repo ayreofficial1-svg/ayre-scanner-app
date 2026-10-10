@@ -47,6 +47,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     required this.skeleton,
     required this.avatarFill,
     required this.avatarInk,
+    required this.positiveText,
+    required this.negativeText,
+    required this.neutralText,
   });
 
   /// App canvas: pale, cool mint-white paper in light; near-black with a
@@ -155,6 +158,18 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   /// Initials text on [avatarFill].
   final Color avatarInk;
 
+  /// Gain text and glyphs (A4, D-12). Light: [accentInk]'s hex. Dark: the
+  /// existing [positive]. Fills, bars, dots and chart marks keep [positive].
+  final Color positiveText;
+
+  /// Loss text and glyphs. Light: a darker red that clears 4.5:1 on every
+  /// light surface; dark: the existing [negative].
+  final Color negativeText;
+
+  /// Neutral/flat text and chip text. Light: a darker amber that clears
+  /// 4.5:1; dark: the existing [neutral].
+  final Color neutralText;
+
   @override
   AppThemeTokens copyWith({
     Color? background,
@@ -182,6 +197,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     Color? skeleton,
     Color? avatarFill,
     Color? avatarInk,
+    Color? positiveText,
+    Color? negativeText,
+    Color? neutralText,
   }) {
     return AppThemeTokens(
       background: background ?? this.background,
@@ -209,6 +227,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       skeleton: skeleton ?? this.skeleton,
       avatarFill: avatarFill ?? this.avatarFill,
       avatarInk: avatarInk ?? this.avatarInk,
+      positiveText: positiveText ?? this.positiveText,
+      negativeText: negativeText ?? this.negativeText,
+      neutralText: neutralText ?? this.neutralText,
     );
   }
 
@@ -242,6 +263,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       skeleton: c(skeleton, other.skeleton),
       avatarFill: c(avatarFill, other.avatarFill),
       avatarInk: c(avatarInk, other.avatarInk),
+      positiveText: c(positiveText, other.positiveText),
+      negativeText: c(negativeText, other.negativeText),
+      neutralText: c(neutralText, other.neutralText),
     );
   }
 }
@@ -457,16 +481,19 @@ abstract final class AppMotion {
 /// within the range deliberately rather than treating the pick as fixed.
 abstract final class AppTextScale {
   /// Nav label. New in v4 — the previous nav had no labels.
-  static const double navLabel = 10;
+  static const double navLabel = 12;
+
+  /// Apple's minimum; used for the nav label on iOS/macOS only.
+  static const double navLabelApple = 11;
 
   /// Eyebrow/label — uppercase micro-heading.
-  static const double eyebrow = 11;
+  static const double eyebrow = 12;
 
   /// List-row hint / secondary micro-copy.
-  static const double hint = 12.5;
+  static const double hint = 13;
 
   /// Body / subtitle. Spec range 13.5–15.5; this is the base body size.
-  static const double body = 13.5;
+  static const double body = 14;
 
   /// List row label.
   static const double rowLabel = 15;
@@ -481,6 +508,9 @@ abstract final class AppTextScale {
 
   /// Page title. Spec range 26–28.
   static const double page = 28;
+
+  /// Section heading (D-2): sits between page title and content.
+  static const double sectionHeading = 17;
 
   /// Home's time-of-day salutation ("Good morning"). Deliberately larger than
   /// [page]: it is the first thing on the app's first screen.
@@ -517,6 +547,11 @@ abstract final class AppSpace {
 
   /// Page top padding.
   static const double pageTop = 12;
+
+  /// Horizontal page gutter by viewport width (D-10): 20 from 360 pt up,
+  /// 16 below.
+  static double gutterOf(BuildContext context) =>
+      MediaQuery.sizeOf(context).width < 360 ? 16 : pageHorizontal;
 
   /// Gap between major sections on a screen. Spec range 16–24; this is the
   /// default.
@@ -677,7 +712,7 @@ abstract final class AppTypo {
   }) => num(fontSize: fontSize, fontWeight: FontWeight.w500, color: color ?? t.textPrimary);
 
   static TextStyle valueSmall(AppThemeTokens t, {Color? color}) => num(
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: FontWeight.w400,
     color: color ?? t.foregroundSubtle,
     letterSpacing: 0,
@@ -718,7 +753,9 @@ abstract final class AppTypo {
   static TextStyle caption(AppThemeTokens t, {Color? color}) =>
       hint(t, color: color);
 
-  /// Eyebrow: small, uppercase, wide-tracked, subtle. Sits above every data
+  /// Eyebrow / chip / badge overline: small, uppercase, subtle (D-1: 12 sp,
+  /// 0.04 em tracking; no longer used for section headers — see
+  /// [sectionHeading]). Sits above every data
   /// value and heads every section. Tracking is the Spec's "+0.08em"
   /// converted via [tracking] at this role's own font size, not a raw number
   /// carried over from a different size.
@@ -730,16 +767,41 @@ abstract final class AppTypo {
     fontSize: fontSize,
     fontWeight: FontWeight.w700,
     color: color ?? t.foregroundSubtle,
-    letterSpacing: tracking(fontSize, 0.08),
+    letterSpacing: tracking(fontSize, 0.04),
   );
 
-  /// Bottom-nav label. New in v4. Tracking is the Spec's "+0.01em" at 10px.
-  static TextStyle navLabel(AppThemeTokens t, {Color? color}) => ui(
-    fontSize: AppTextScale.navLabel,
-    fontWeight: FontWeight.w600,
-    color: color,
-    letterSpacing: tracking(AppTextScale.navLabel, 0.01),
+  /// Section heading (D-2): sentence case, 17 sp, w700, primary text.
+  static TextStyle sectionHeading(AppThemeTokens t, {Color? color}) => ui(
+    fontSize: AppTextScale.sectionHeading,
+    fontWeight: FontWeight.w700,
+    color: color ?? t.textPrimary,
+    height: 1.25,
+    letterSpacing: -0.2,
   );
+
+  /// Supporting metadata: 12 sp, muted.
+  static TextStyle meta(AppThemeTokens t, {Color? color}) => ui(
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    color: color ?? t.foregroundMuted,
+    height: 1.35,
+  );
+
+  /// Bottom-nav label: 12 sp (11 on iOS/macOS), constant w600 so selection
+  /// never changes the width.
+  static TextStyle navLabel(AppThemeTokens t, {Color? color}) {
+    final size = switch (defaultTargetPlatform) {
+      TargetPlatform.iOS ||
+      TargetPlatform.macOS => AppTextScale.navLabelApple,
+      _ => AppTextScale.navLabel,
+    };
+    return ui(
+      fontSize: size,
+      fontWeight: FontWeight.w600,
+      color: color,
+      letterSpacing: tracking(size, 0.01),
+    );
+  }
 
   static TextStyle button(AppThemeTokens t, {Color? color}) => ui(
     fontSize: 14,
@@ -749,9 +811,55 @@ abstract final class AppTypo {
   );
 }
 
+// ─── Elevation ladder (D-3) ────────────────────────────────────────────────
+/// `flat` = hairline only; `raised` = hairline + one soft shadow, light theme
+/// only (dark uses tone, not shadow); `overlay` = nav, sheets.
+abstract final class AppElevation {
+  static const List<BoxShadow> flat = <BoxShadow>[];
+
+  static List<BoxShadow> raised(AppThemeTokens t, Brightness brightness) {
+    if (brightness == Brightness.dark) return flat;
+    return [
+      BoxShadow(
+        color: t.shadowColor.withValues(alpha: 0.06),
+        blurRadius: 12,
+        offset: const Offset(0, 4),
+      ),
+    ];
+  }
+
+  static List<BoxShadow> overlay(AppThemeTokens t, Brightness brightness) => [
+    BoxShadow(
+      color: t.shadowColor.withValues(
+        alpha: brightness == Brightness.dark ? 0.40 : 0.18,
+      ),
+      blurRadius: 20,
+      offset: const Offset(0, 6),
+    ),
+  ];
+}
+
 // ─── Theme builder ─────────────────────────────────────────────────────────
 abstract final class AppTheme {
   static const Color transparent = Color(0x00000000);
+
+  /// System-bar style for [brightness] (the *effective* theme brightness).
+  /// Bars are transparent, icons contrast with the canvas, and the nav-bar
+  /// contrast scrim is off so the floating dock never sits on a scrim.
+  static SystemUiOverlayStyle overlayStyle(Brightness brightness) {
+    final dark = brightness == Brightness.dark;
+    return SystemUiOverlayStyle(
+      statusBarColor: transparent,
+      statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+      statusBarBrightness: dark ? Brightness.dark : Brightness.light,
+      systemNavigationBarColor: transparent,
+      systemNavigationBarDividerColor: transparent,
+      systemNavigationBarIconBrightness:
+          dark ? Brightness.light : Brightness.dark,
+      systemNavigationBarContrastEnforced: false,
+      systemStatusBarContrastEnforced: false,
+    );
+  }
 
   // Dark — near-black-green canvas (`#0B120D`), soft off-white text with a
   // faint green cast. Not a re-tint of v4's warm `#100F14` dark theme; every
@@ -798,6 +906,10 @@ abstract final class AppTheme {
     // avatar/identity chip only; never brand green, never market data.
     avatarFill: Color(0xFF241F38),
     avatarInk: Color(0xFFC9BFEA),
+    // A4 status-text tokens: dark reuses the existing values.
+    positiveText: Color(0xFF4ED892),
+    negativeText: Color(0xFFF0685F),
+    neutralText: Color(0xFFE0B563),
   );
 
   // Light — pale, cool mint-white paper canvas (`#F1F7F1`), deep
@@ -853,6 +965,10 @@ abstract final class AppTheme {
     // avatar/identity chip only; never brand green, never market data.
     avatarFill: Color(0xFFE1DDF5),
     avatarInk: Color(0xFF4B3F73),
+    // A4 status-text tokens (>= 4.5:1 on surface/background/sunken/soft).
+    positiveText: Color(0xFF166B3A),
+    negativeText: Color(0xFFB83232),
+    neutralText: Color(0xFF855A10),
   );
 
   static AppThemeTokens get lightTokens => _light;
@@ -973,9 +1089,7 @@ abstract final class AppTheme {
         titleSpacing: AppSpace.sm,
         titleTextStyle: AppTypo.sectionTitle(t),
         surfaceTintColor: transparent,
-        systemOverlayStyle: isDark
-            ? SystemUiOverlayStyle.light
-            : SystemUiOverlayStyle.dark,
+        systemOverlayStyle: overlayStyle(brightness),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: t.surface,
@@ -1038,7 +1152,7 @@ abstract final class AppTheme {
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
-          TargetPlatform.android: TerminalPageTransitions(),
+          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
           TargetPlatform.iOS: TerminalPageTransitions(),
           TargetPlatform.macOS: TerminalPageTransitions(),
           TargetPlatform.windows: TerminalPageTransitions(),

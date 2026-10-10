@@ -12,6 +12,7 @@ import '../widgets/ayre_avatar.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_hills.dart';
 import '../widgets/ayre_icons.dart';
+import '../widgets/ayre_tab_scroll.dart';
 import '../widgets/verification_banner.dart'
     show resendVerification, checkVerification;
 import 'edit_profile_screen.dart';
@@ -42,10 +43,15 @@ class ProfileTab extends StatefulWidget {
     super.key,
     required this.accountName,
     required this.marketData,
+    this.scrollController,
   });
 
   final String accountName;
   final MarketDataService marketData;
+
+  /// Optional controller for the tab's scroll view (A2: re-tap scrolls to
+  /// top). Null keeps the previous behaviour.
+  final ScrollController? scrollController;
 
   @override
   State<ProfileTab> createState() => _ProfileTabState();
@@ -110,28 +116,20 @@ class _ProfileTabState extends State<ProfileTab> {
   Widget build(BuildContext context) {
     final t = context.tokens;
 
-    return ContentWidth(
-      // A scroll view with a plain Column (not a lazy ListView) so every row
-      // exists at once and the Profile tutorial can find and scroll to any of
-      // them. The list is short, so nothing is gained from laziness.
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpace.pageHorizontal,
-          AppSpace.pageTop,
-          AppSpace.pageHorizontal,
-          120,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
+    // `eager`: a plain Column so every row exists at once and the Profile
+    // tutorial can find and scroll to any of them. The list is short.
+    return AyreTabScroll(
+      controller: widget.scrollController,
+      eager: true,
+      children: [
           // Same soft layered shape as Home's header, bled to the top-right
           // corner behind the title. Decorative, not part of the layout.
           Stack(
             clipBehavior: Clip.none,
             children: [
-              const Positioned(
+              Positioned(
                 top: -AppSpace.pageTop,
-                right: -AppSpace.pageHorizontal,
+                right: -AppSpace.gutterOf(context),
                 child: AyreHills(),
               ),
               SafeArea(
@@ -359,9 +357,7 @@ class _ProfileTabState extends State<ProfileTab> {
               ],
             ),
           ),
-        ],
-        ),
-      ),
+      ],
     );
   }
 }

@@ -11,6 +11,7 @@ import '../widgets/ayre_icons.dart';
 import '../widgets/ayre_stat_tile.dart';
 import '../widgets/figure.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/ayre_tab_scroll.dart';
 import '../widgets/responsive.dart';
 import '../widgets/state_views.dart';
 import 'lesson_screen.dart';
@@ -35,7 +36,12 @@ import 'lesson_screen.dart';
 /// articles), so the row is built from whatever categories the loaded courses
 /// actually carry, and hidden while there is nothing to choose between.
 class LearnTab extends StatefulWidget {
-  const LearnTab({super.key, required this.marketData, this.active = true});
+  const LearnTab({
+    super.key,
+    required this.marketData,
+    this.active = true,
+    this.scrollController,
+  });
 
   final MarketDataService marketData;
 
@@ -43,6 +49,10 @@ class LearnTab extends StatefulWidget {
   /// actually selected, instead of firing on shell mount alongside every
   /// other tab.
   final bool active;
+
+  /// Optional controller for the tab's scroll view (A2: re-tap scrolls to
+  /// top). Null keeps the previous behaviour.
+  final ScrollController? scrollController;
 
   @override
   State<LearnTab> createState() => _LearnTabState();
@@ -148,21 +158,11 @@ class _LearnTabState extends State<LearnTab> {
         ? courses
         : courses.where((c) => c.category == _category).toList();
 
-    return RefreshIndicator(
-      color: t.accentInk,
-      backgroundColor: t.surface,
+    return AyreTabScroll(
+      controller: widget.scrollController,
       onRefresh: _load,
-      edgeOffset: 72,
-      child: ContentWidth(
-        maxWidth: columns > 1 ? 960 : null,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpace.pageHorizontal,
-            AppSpace.pageTop,
-            AppSpace.pageHorizontal,
-            120,
-          ),
-          children: [
+      maxWidth: columns > 1 ? 960 : null,
+      children: [
             SafeArea(
               bottom: false,
               child: Entrance(
@@ -236,9 +236,7 @@ class _LearnTabState extends State<LearnTab> {
             _list(columns, visible),
             const SizedBox(height: AppSpace.sectionGap),
             const Entrance(index: 4, child: _LearnFooter()),
-          ],
-        ),
-      ),
+      ],
     );
   }
 

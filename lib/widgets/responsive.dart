@@ -1,10 +1,27 @@
 import 'package:flutter/material.dart';
 
+/// Material window size classes (Spec §13.2). Additive: the 720/1120 pivots
+/// below are test-locked and unchanged.
+enum AppWindowClass { compact, medium, expanded }
+
 /// The only breakpoints in the system — everything adaptive keys off these so
 /// behaviour stays predictable across screens.
 abstract final class AppBreakpoints {
-  /// At and above this, list-shaped screens go two-column.
+  /// At and above this, list-shaped screens go two-column and the bottom dock
+  /// is replaced by the navigation rail. 600–719 pt is served by the
+  /// max-width ([dockMaxWidth]) dock.
   static const double twoColumn = 720;
+
+  /// Window class boundaries (compact < 600, medium 600–839, expanded ≥ 840).
+  static const double mediumStart = 600;
+  static const double expandedStart = 840;
+
+  static AppWindowClass windowClassOf(BuildContext context) {
+    final w = _width(context);
+    if (w >= expandedStart) return AppWindowClass.expanded;
+    if (w >= mediumStart) return AppWindowClass.medium;
+    return AppWindowClass.compact;
+  }
 
   /// At and above this, three-column is worth it for card grids.
   static const double threeColumn = 1120;

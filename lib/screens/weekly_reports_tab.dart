@@ -6,6 +6,7 @@ import '../services/market_data_service.dart';
 import '../services/market_models.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
+import '../widgets/ayre_tab_scroll.dart';
 import '../widgets/ayre_weekly_report.dart';
 import '../widgets/state_views.dart';
 
@@ -19,6 +20,7 @@ class WeeklyReportsTab extends StatefulWidget {
     super.key,
     required this.marketData,
     this.active = true,
+    this.scrollController,
   });
 
   final MarketDataService marketData;
@@ -26,6 +28,10 @@ class WeeklyReportsTab extends StatefulWidget {
   /// Whether this is the tab currently showing in the shell's
   /// [IndexedStack]; loading is deferred until it is first selected.
   final bool active;
+
+  /// Optional controller for the tab's scroll view (A2: re-tap scrolls to
+  /// top). Null keeps the previous behaviour.
+  final ScrollController? scrollController;
 
   @override
   State<WeeklyReportsTab> createState() => _WeeklyReportsTabState();
@@ -80,26 +86,12 @@ class _WeeklyReportsTabState extends State<WeeklyReportsTab> {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
-
-    return RefreshIndicator(
-      color: t.accentInk,
-      backgroundColor: t.surface,
+    return AyreTabScroll(
+      controller: widget.scrollController,
       onRefresh: _load,
-      edgeOffset: 72,
-      child: ContentWidth(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpace.pageHorizontal,
-            AppSpace.pageTop,
-            AppSpace.pageHorizontal,
-            120,
-          ),
-          children: [
+      children: [
             SafeArea(bottom: false, child: _body()),
-          ],
-        ),
-      ),
+      ],
     );
   }
 

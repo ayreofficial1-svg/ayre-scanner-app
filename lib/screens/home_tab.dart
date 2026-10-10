@@ -19,6 +19,7 @@ import '../widgets/ayre_icons.dart';
 import '../widgets/ayre_insight_carousel.dart';
 import '../widgets/ayre_logo.dart';
 import '../widgets/ayre_signals_section.dart';
+import '../widgets/ayre_tab_scroll.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/responsive.dart';
 import '../widgets/state_views.dart';
@@ -56,6 +57,7 @@ class HomeTab extends StatefulWidget {
     this.onOpenProfile,
     this.active = true,
     this.signalsFocusToken = 0,
+    this.scrollController,
   });
 
   final MarketDataService marketData;
@@ -76,6 +78,10 @@ class HomeTab extends StatefulWidget {
   /// Changes whenever something (a signal notification) asks Home to bring the
   /// Signals section into view. Zero means no request.
   final int signalsFocusToken;
+
+  /// Optional controller for the tab's scroll view (A2: re-tap scrolls to
+  /// top). Null keeps the previous behaviour.
+  final ScrollController? scrollController;
 
   @override
   State<HomeTab> createState() => _HomeTabState();
@@ -256,31 +262,17 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
     final displayName =
         AuthService.instance.currentUser?.shownName ?? _accountName;
 
-    return RefreshIndicator(
-      color: t.accentInk,
-      backgroundColor: t.surface,
-      // One haptic (from `_load`) and one network pass per surface; the
-      // signals reload is silent so the gesture doesn't buzz twice.
+    return AyreTabScroll(
+      controller: widget.scrollController,
+      // One network pass per surface; the signals reload is silent.
       onRefresh: () => Future.wait([
         _load(),
         _signalsController.reload(silent: true),
       ]),
-      edgeOffset: 72,
-      child: ContentWidth(
-        child: ListView(
-          // §6.1's page padding: 20 horizontal, 12 top. The bottom leaves room
-          // for the glass nav bar, which the shell draws over the body.
-          padding: const EdgeInsets.fromLTRB(
-            AppSpace.pageHorizontal,
-            AppSpace.pageTop,
-            AppSpace.pageHorizontal,
-            120,
-          ),
-          children: [
+      children: [
             // The hills are the header's backdrop, not part of its layout:
             // positioned to the page's top-right corner (past the list
             // padding, so they bleed to the viewport edge) and painted first.
@@ -288,9 +280,9 @@ class _HomeTabState extends State<HomeTab> {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                const Positioned(
+                Positioned(
                   top: -AppSpace.pageTop,
-                  right: -AppSpace.pageHorizontal,
+                  right: -AppSpace.gutterOf(context),
                   child: AyreHills(),
                 ),
                 SafeArea(
@@ -351,9 +343,7 @@ class _HomeTabState extends State<HomeTab> {
             ],
             const SizedBox(height: AppSpace.sectionGap),
             const Entrance(index: 5, child: _HomeDivider()),
-          ],
-        ),
-      ),
+      ],
     );
   }
 
