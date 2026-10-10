@@ -19,21 +19,10 @@ import 'pressable_scale.dart';
 //   1 – 8 Sep 2026 ⌄                                 date second, no gradient/rule
 //   Latest week · 1 of 3
 //
-//   ┌──────────────────────────────────────┐
-//   (R-2) Compact stock card — one header row, one metrics row, no hills,
-//   no nested tiles:  [logo] RELIANCE  +896.40% / Target hit, then
-//   Entry · Exit · Profit / share.
-//   │ [logo]  RELIANCE                +896.40%│     one card per stock,
-//   │         ● Target hit                   │     always fully visible:
-//   │                                        │     who → how it ended → how
-//   │ ┌─────────────┐ ┌─────────────┐       │     much → the trade
-//   │ │ ENTRY       │ │ EXIT        │       │
-//   │ │ ₹444.00     │ │ ₹4,424.00   │       │     Entry carries the date of
-//   │ │ 1 Sep 2026  │ │ 8 Sep 2026  │       │     recommendation, Exit
-//   │ └─────────────┘ └─────────────┘       │     carries the exit date.
-//   │ ─────────────────────────────────────  │
-//   │ PROFIT / SHARE             +₹3,980    │
-//   └──────────────────────────────────────┘
+//   Stock card: spacious, flat, single-level. Header (logo, symbol,
+//   outcome | return), then Entry · Exit · Profit per share as even columns,
+//   each label / price / date with clear gaps. No hills, no nested tiles, no
+//   dividers.
 //
 // Cards are separated by space, not dividers. The stock cards stay
 // quiet — flat, single-level, no decoration behind the results. Outcome
@@ -140,7 +129,7 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 for (var i = 0; i < visible.length; i++) ...[
-                  if (i > 0) const SizedBox(height: AppSpace.xs),
+                  if (i > 0) const SizedBox(height: AppSpace.sm),
                   _StockCard(
                     stock: visible[i],
                     fallbackStart: report.weekStart,
@@ -316,7 +305,7 @@ class _WeekArrow extends StatelessWidget {
               opacity: enabled ? 1 : 0.4,
               child: Container(
                 width: 36,
-                height: 36,
+                height: 38,
                 decoration: BoxDecoration(shape: BoxShape.circle, color: fill),
                 child: Center(child: AyreIcon(glyph, size: 16, color: ink)),
               ),
@@ -424,16 +413,17 @@ class _WeekPickerSheet extends StatelessWidget {
 
 // ─── Stock card ────────────────────────────────────────────────────────────
 
-/// One stock's result (R-2, D-13): a flat, single-level card with one header
-/// row and one metrics row.
+/// One stock's result: a flat, single-level card with room to breathe.
 ///
-///   Header: [tile 40] symbol / company (left) · signed return with the
-///   written outcome beneath it (right). Hierarchy: return → symbol →
-///   outcome → name.
-///   Metrics: Entry · Exit · Profit / share, three flat columns split by
-///   hairlines; with less room (320 pt, or larger text) they reflow into two
-///   columns plus a profit line, then into label/value lines — text is never
-///   shrunk.
+///   Header: [tile 40] · symbol (company) · outcome in words on the left;
+///   the signed return alone on the right.
+///   Metrics: Entry · Exit · Profit per share as three even columns, each
+///   label / price / date with clear gaps. No dividers, no nested tiles.
+///
+/// Spacing (Spec §4.1, §4.2): 16 pt card padding, 16 pt between header and
+/// metrics, 4 pt inside a label/value pair, 12 pt between cards. With less
+/// room (a 320 pt phone, or larger text) the return drops under the identity
+/// and the metrics become label/value lines. Text is never shrunk.
 ///
 /// [fallbackStart]/[fallbackEnd] are the report's own week range, used only
 /// when this stock doesn't carry its own dates — real data, not a guess.
@@ -448,10 +438,9 @@ class _StockCard extends StatelessWidget {
   final DateTime? fallbackStart;
   final DateTime? fallbackEnd;
 
-  // Inner-width needs per text-scale unit (see the layout rules in §7.2).
-  static const double _headerSideBySide = 260;
-  static const double _threeColumns = 3 * 96;
-  static const double _twoColumns = 2 * 110;
+  // Inner-width needs per text-scale unit.
+  static const double _headerSideBySide = 250;
+  static const double _threeColumns = 3 * 104;
 
   @override
   Widget build(BuildContext context) {
@@ -506,7 +495,7 @@ class _StockCard extends StatelessWidget {
           size: 40,
           name: hasName ? stock.name : null,
         ),
-        const SizedBox(width: AppSpace.sm),
+        const SizedBox(width: AppSpace.md),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -521,27 +510,23 @@ class _StockCard extends StatelessWidget {
                   letterSpacing: -0.2,
                 ),
               ),
-              if (hasName)
-                Text(stock.name!, style: AppTypo.meta(t), maxLines: 2),
+              if (hasName) ...[
+                const SizedBox(height: 2),
+                Text(stock.name!, style: AppTypo.meta(t)),
+              ],
+              const SizedBox(height: AppSpace.xs),
+              _OutcomeChip(label: outcomeLabel, tone: tone, dot: dot),
             ],
           ),
         ),
       ],
     );
 
-    Widget outcomeBlock(CrossAxisAlignment align) => Column(
-      crossAxisAlignment: align,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Figure.static(
-          formatDelta(stock.profitPct),
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          color: tone,
-        ),
-        const SizedBox(height: 2),
-        _OutcomeChip(label: outcomeLabel, tone: tone, dot: dot),
-      ],
+    final result = Figure.static(
+      formatDelta(stock.profitPct),
+      fontSize: 22,
+      fontWeight: FontWeight.w700,
+      color: tone,
     );
 
     return Semantics(
@@ -549,26 +534,25 @@ class _StockCard extends StatelessWidget {
       label: spoken,
       excludeSemantics: true,
       child: AyreCard(
-        padding: const EdgeInsets.all(AppSpace.sm),
+        padding: const EdgeInsets.all(AppSpace.md),
         child: LayoutBuilder(
           builder: (context, c) {
             final width = c.maxWidth;
-            final sideBySide = width >= _headerSideBySide * k;
-            final header = sideBySide
+            final header = width >= _headerSideBySide * k
                 ? Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(child: identity),
-                      const SizedBox(width: AppSpace.sm),
-                      outcomeBlock(CrossAxisAlignment.end),
+                      const SizedBox(width: AppSpace.md),
+                      result,
                     ],
                   )
                 : Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       identity,
-                      const SizedBox(height: AppSpace.xs),
-                      outcomeBlock(CrossAxisAlignment.start),
+                      const SizedBox(height: AppSpace.sm),
+                      result,
                     ],
                   );
 
@@ -577,14 +561,10 @@ class _StockCard extends StatelessWidget {
               children: [
                 header,
                 if (metrics.isNotEmpty) ...[
-                  const SizedBox(height: AppSpace.xs),
-                  _MetricsBlock(
-                    metrics: metrics,
-                    mode: width >= _threeColumns * k
-                        ? _MetricsMode.columns
-                        : (width >= _twoColumns * k
-                              ? _MetricsMode.twoRows
-                              : _MetricsMode.lines),
+                  const SizedBox(height: AppSpace.md),
+                  _MetricsRow(
+                    items: metrics,
+                    columns: width >= _threeColumns * k,
                   ),
                 ],
               ],
@@ -643,80 +623,44 @@ class _MetricData {
   final Color valueColor;
 }
 
-enum _MetricsMode { columns, twoRows, lines }
+/// Entry · Exit · Profit per share as even columns with a 16 pt gutter; with
+/// less room, label/value lines separated by space and a hairline.
+class _MetricsRow extends StatelessWidget {
+  const _MetricsRow({required this.items, required this.columns});
 
-/// Entry · Exit · Profit / share. Flat, no tiles: columns split by hairlines
-/// when they fit, otherwise two columns plus a profit line, otherwise lines.
-class _MetricsBlock extends StatelessWidget {
-  const _MetricsBlock({required this.metrics, required this.mode});
-
-  final List<_MetricData> metrics;
-  final _MetricsMode mode;
+  final List<_MetricData> items;
+  final bool columns;
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
-
-    Widget column(_MetricData m, {required bool first}) => Expanded(
-      child: Container(
-        padding: EdgeInsetsDirectional.only(start: first ? 0 : AppSpace.sm),
-        decoration: first
-            ? null
-            : BoxDecoration(
-                border: BorderDirectional(
-                  start: BorderSide(color: t.hairline),
-                ),
-              ),
-        child: _MetricStack(data: m),
-      ),
-    );
-
-    Widget row(List<_MetricData> items) => Row(
+    if (!columns) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0) ...[
+              const SizedBox(height: AppSpace.sm),
+              const HairlineDivider(),
+              const SizedBox(height: AppSpace.sm),
+            ],
+            _MetricLine(data: items[i]),
+          ],
+        ],
+      );
+    }
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (var i = 0; i < items.length; i++) column(items[i], first: i == 0),
+        for (var i = 0; i < items.length; i++) ...[
+          if (i > 0) const SizedBox(width: AppSpace.md),
+          Expanded(child: _MetricStack(data: items[i])),
+        ],
       ],
     );
-
-    switch (mode) {
-      case _MetricsMode.columns:
-        return row(metrics);
-      case _MetricsMode.twoRows:
-        final pairs = metrics.where((m) => m.label != 'Profit / share').toList();
-        final profit = metrics.where((m) => m.label == 'Profit / share');
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (pairs.isNotEmpty) row(pairs),
-            for (final m in profit) ...[
-              if (pairs.isNotEmpty) ...[
-                const SizedBox(height: AppSpace.xs),
-                const HairlineDivider(),
-                const SizedBox(height: AppSpace.xs),
-              ],
-              _MetricLine(data: m),
-            ],
-          ],
-        );
-      case _MetricsMode.lines:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var i = 0; i < metrics.length; i++) ...[
-              if (i > 0) ...[
-                const SizedBox(height: AppSpace.xs),
-                const HairlineDivider(),
-                const SizedBox(height: AppSpace.xs),
-              ],
-              _MetricLine(data: metrics[i]),
-            ],
-          ],
-        );
-    }
   }
 }
 
-/// Label over value over date — a column cell.
+/// Label, price, date — each on its own line with a clear gap.
 class _MetricStack extends StatelessWidget {
   const _MetricStack({required this.data});
 
@@ -730,15 +674,20 @@ class _MetricStack extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(data.label, style: AppTypo.meta(t)),
-        const SizedBox(height: 2),
+        const SizedBox(height: AppSpace.xs),
         Figure.static(
           data.value,
-          fontSize: 15,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
           color: data.valueColor,
         ),
-        if (data.date != null)
-          Text(_shortDate(data.date!), style: AppTypo.meta(t)),
+        if (data.date != null) ...[
+          const SizedBox(height: AppSpace.xxs),
+          Text(
+            _shortDate(data.date!),
+            style: AppTypo.meta(t, color: t.foregroundSubtle),
+          ),
+        ],
       ],
     );
   }
@@ -762,15 +711,20 @@ class _MetricLine extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(data.label, style: AppTypo.meta(t)),
-              if (data.date != null)
-                Text(_shortDate(data.date!), style: AppTypo.meta(t)),
+              if (data.date != null) ...[
+                const SizedBox(height: AppSpace.xxs),
+                Text(
+                  _shortDate(data.date!),
+                  style: AppTypo.meta(t, color: t.foregroundSubtle),
+                ),
+              ],
             ],
           ),
         ),
-        const SizedBox(width: AppSpace.sm),
+        const SizedBox(width: AppSpace.md),
         Figure.static(
           data.value,
-          fontSize: 15,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
           color: data.valueColor,
         ),
@@ -859,49 +813,41 @@ class _StockCardSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const AyreCard(
-      padding: EdgeInsets.all(AppSpace.sm),
+      padding: EdgeInsets.all(AppSpace.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
-            height: 40,
+            height: 62,
             child: Row(
               children: [
                 SkeletonBlock(width: 40, height: 40, radius: AppRadius.iconTile),
-                SizedBox(width: AppSpace.sm),
+                SizedBox(width: AppSpace.md),
                 Expanded(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       SkeletonBlock(width: 88, height: 14),
-                      SizedBox(height: 6),
-                      SkeletonBlock(width: 120, height: 11),
+                      SizedBox(height: 8),
+                      SkeletonBlock(width: 72, height: 12),
                     ],
                   ),
                 ),
-                Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    SkeletonBlock(width: 72, height: 20),
-                    SizedBox(height: 6),
-                    SkeletonBlock(width: 64, height: 12),
-                  ],
-                ),
+                SkeletonBlock(width: 72, height: 22),
               ],
             ),
           ),
-          SizedBox(height: AppSpace.xs),
+          SizedBox(height: AppSpace.md),
           SizedBox(
-            height: 51,
+            height: 65,
             child: Row(
               children: [
-                Expanded(child: SkeletonBlock(height: 51)),
-                SizedBox(width: AppSpace.xs),
-                Expanded(child: SkeletonBlock(height: 51)),
-                SizedBox(width: AppSpace.xs),
-                Expanded(child: SkeletonBlock(height: 51)),
+                Expanded(child: SkeletonBlock(height: 65)),
+                SizedBox(width: AppSpace.md),
+                Expanded(child: SkeletonBlock(height: 65)),
+                SizedBox(width: AppSpace.md),
+                Expanded(child: SkeletonBlock(height: 65)),
               ],
             ),
           ),

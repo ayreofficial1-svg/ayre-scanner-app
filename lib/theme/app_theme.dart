@@ -426,12 +426,11 @@ abstract final class AppMotion {
   static const Duration cardEntrance = Duration(milliseconds: 450);
   static const Duration entranceStagger = Duration(milliseconds: 40);
   static const Duration entranceDelay = Duration(milliseconds: 30);
-  static const Duration countUp = Duration(milliseconds: 900);
+  static const Duration countUp = Duration(milliseconds: 400);
   static const Duration refreshRotation = Duration(milliseconds: 900);
 
-  /// Chart draw-on. The Spec gives a 1.1–1.4s range; this is the midpoint —
-  /// individual charts may pick within the range deliberately (Phase 3).
-  static const Duration chartDraw = Duration(milliseconds: 1200);
+  /// Chart draw-on (D-8): 700 ms, first reveal only. Reduce-motion snaps.
+  static const Duration chartDraw = Duration(milliseconds: 700);
 
   /// One cycle of the LIVE dot's pulse. Unchanged by v4 — nothing in the Spec
   /// retires this concept.

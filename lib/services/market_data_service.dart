@@ -99,15 +99,6 @@ abstract interface class MarketDataService {
   /// [getSentiment]'s ~140-stock live-tick count.
   Future<DataResult<FullBreadth>> getFullBreadth();
 
-  /// ATR% distribution across the tracked universe, for Insights.
-  Future<DataResult<VolatilityHistogram>> getVolatility();
-
-  /// Bullish/bearish MACD tilt across the tracked universe, for Insights.
-  Future<DataResult<MomentumTilt>> getMomentum();
-
-  /// Top stocks by today's-volume ÷ 20-day-average, descending, for Insights.
-  Future<DataResult<VolumeSurgeBoard>> getVolumeSurge({int limit = 15});
-
   /// Admin-entered weekly performance reports (`GET /api/weekly-report`),
   /// newest week first — shown on the Reports tab.
   Future<DataResult<List<WeeklyReport>>> getWeeklyReports();
@@ -172,20 +163,16 @@ class RemoteMarketDataService implements MarketDataService {
   static String _constituents(IndexId i) =>
       '/api/market/${i.apiKey}/constituents';
 
-  /// Cache-only reads — the backend never touches Fyers on these requests
-  /// (see main.py's docstrings for `/api/breadth/full` and the three
-  /// `/api/insights/*` routes). Safe to poll at the same cadence as anything
-  /// else on these screens; there's no per-request cost on the other end.
+  /// Cache-only read — the backend never touches Fyers on this request
+  /// (see main.py's docstring for `/api/breadth/full`). Safe to poll at the
+  /// same cadence as anything else on these screens.
   static const _breadthFull = '/api/breadth/full';
-  static const _insightsVolatility = '/api/insights/volatility';
-  static const _insightsMomentum = '/api/insights/momentum';
-  static const _insightsVolumeSurge = '/api/insights/volume-surge';
 
   /// Admin-entered, read-only from this app's point of view — the website
   /// writes it via POST/DELETE (Phase 4); the app only ever GETs it.
   static const _weeklyReport = '/api/weekly-report';
 
-  /// Cache-only, same shape as `_breadthFull`/`_insightsVolatility` above —
+  /// Cache-only, same shape as `_breadthFull` above —
   /// two already-in-memory config strings, nothing computed per request.
   static const _compliance = '/api/compliance';
 
@@ -494,61 +481,6 @@ class RemoteMarketDataService implements MarketDataService {
             _isStale(parsed.asOf!, DataSurface.fullBreadth),
       );
     }, onEmpty: () => const DataResult<FullBreadth>.empty());
-  }
-
-  @override
-  Future<DataResult<VolatilityHistogram>> getVolatility() {
-    return _run(DataSurface.volatility, () async {
-      final decoded = jsonDecode(await _get(_insightsVolatility));
-      if (decoded is! Map<String, dynamic>) throw const DataFailure.malformed();
-      final parsed = VolatilityHistogram.tryParse(decoded);
-      if (parsed == null || parsed.total == 0) {
-        return const DataResult<VolatilityHistogram>.empty();
-      }
-      return DataResult.ready(
-        parsed,
-        stale:
-            parsed.asOf != null &&
-            _isStale(parsed.asOf!, DataSurface.volatility),
-      );
-    }, onEmpty: () => const DataResult<VolatilityHistogram>.empty());
-  }
-
-  @override
-  Future<DataResult<MomentumTilt>> getMomentum() {
-    return _run(DataSurface.momentum, () async {
-      final decoded = jsonDecode(await _get(_insightsMomentum));
-      if (decoded is! Map<String, dynamic>) throw const DataFailure.malformed();
-      final parsed = MomentumTilt.tryParse(decoded);
-      if (parsed == null || parsed.total == 0) {
-        return const DataResult<MomentumTilt>.empty();
-      }
-      return DataResult.ready(
-        parsed,
-        stale:
-            parsed.asOf != null && _isStale(parsed.asOf!, DataSurface.momentum),
-      );
-    }, onEmpty: () => const DataResult<MomentumTilt>.empty());
-  }
-
-  @override
-  Future<DataResult<VolumeSurgeBoard>> getVolumeSurge({int limit = 15}) {
-    return _run(DataSurface.volumeSurge, () async {
-      final decoded = jsonDecode(
-        await _get('$_insightsVolumeSurge?limit=$limit'),
-      );
-      if (decoded is! Map<String, dynamic>) throw const DataFailure.malformed();
-      final parsed = VolumeSurgeBoard.tryParse(decoded);
-      if (parsed == null || parsed.rows.isEmpty) {
-        return const DataResult<VolumeSurgeBoard>.empty();
-      }
-      return DataResult.ready(
-        parsed,
-        stale:
-            parsed.asOf != null &&
-            _isStale(parsed.asOf!, DataSurface.volumeSurge),
-      );
-    }, onEmpty: () => const DataResult<VolumeSurgeBoard>.empty());
   }
 
   // ── Plumbing ─────────────────────────────────────────────────────────────

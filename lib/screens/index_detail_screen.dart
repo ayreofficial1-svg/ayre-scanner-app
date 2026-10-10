@@ -128,7 +128,6 @@ class _IndexDetailScreenState extends State<IndexDetailScreen> {
 
   Future<void> _refresh() async {
     await Future.wait([_loadQuote(), _loadConstituents()]);
-    if (mounted) HapticFeedback.mediumImpact();
   }
 
   List<Quote> get _sorted {
@@ -332,15 +331,13 @@ class _IndexHeader extends StatelessWidget {
                       Text(
                         quote.name,
                         style: AppTypo.cardTitle(t),
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                       if (identity.exchange != null)
                         Text(
                           identity.exchange!,
-                          style: AppTypo.hint(t, color: t.foregroundMuted),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          style: AppTypo.meta(t),
                         ),
                     ],
                   ),
@@ -364,41 +361,51 @@ class _IndexHeader extends StatelessWidget {
             // The figures sit straight on the tinted card. The sunken
             // `InkPanel` this header used before would read as a green-grey
             // box on the coral and blue identities.
+            // The level is the screen's one hero numeral: a documented D-9
+            // FittedBox exception, because truncating it would hide data.
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,
               child: Figure(
                 formatPrice(quote.lastPrice),
-                fontSize: 34,
+                fontSize: AppTextScale.hero,
                 fontWeight: FontWeight.w600,
                 color: t.textPrimary,
               ),
             ),
             const SizedBox(height: AppSpace.xs),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Row(
-                children: [
-                  Figure(
-                    formatDelta(quote.change, percent: false),
-                    fontSize: 13,
-                    color: t.foregroundMuted,
-                  ),
-                  const SizedBox(width: AppSpace.sm),
-                  DeltaFigure(change: quote.percentChange, fontSize: 14),
-                ],
-              ),
+            Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: AppSpace.sm,
+              runSpacing: AppSpace.xxs,
+              children: [
+                Figure(
+                  formatDelta(quote.change, percent: false),
+                  fontSize: 14,
+                  color: t.foregroundMuted,
+                ),
+                DeltaFigure(change: quote.percentChange, fontSize: 14),
+              ],
+            ),
+            const SizedBox(height: AppSpace.xxs),
+            Text(
+              'As of ${formatClockShort(quote.asOf)}',
+              style: AppTypo.meta(t),
             ),
             if (quote.trace.length >= 2) ...[
               const SizedBox(height: AppSpace.md),
               // §12.1: a chart inherits the colour of its subject — no
               // fixed neutral chart-line token in v5.
-              TickerTrace(
-                points: normaliseTrace(quote.trace),
-                height: 76,
-                color: quote.isUp ? t.positive : t.negative,
-                fill: true,
+              Semantics(
+                label:
+                    "Today's trend, ${quote.isUp ? 'up' : 'down'} on the day",
+                excludeSemantics: true,
+                child: TickerTrace(
+                  points: normaliseTrace(quote.trace),
+                  height: 76,
+                  color: quote.isUp ? t.positive : t.negative,
+                  fill: true,
+                ),
               ),
             ],
             if (quote.dayLow != null ||
@@ -447,14 +454,9 @@ class _StatsGrid extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                label.toUpperCase(),
-                style: AppTypo.label(t, color: t.foregroundMuted),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+              Text(label, style: AppTypo.meta(t)),
               const SizedBox(height: AppSpace.xxs),
-              Figure(value, fontSize: 13),
+              Figure(value, fontSize: 14),
             ],
           ),
       ],
@@ -467,6 +469,12 @@ class _SortControl extends StatelessWidget {
 
   final _ConstituentSort sort;
   final ValueChanged<_ConstituentSort> onChanged;
+
+  static const _options = [
+    (_ConstituentSort.changeDesc, 'Gainers first'),
+    (_ConstituentSort.changeAsc, 'Losers first'),
+    (_ConstituentSort.name, 'Symbol A–Z'),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -482,25 +490,45 @@ class _SortControl extends StatelessWidget {
         side: BorderSide(color: t.hairline),
       ),
       itemBuilder: (context) => [
-        for (final entry in const [
-          (_ConstituentSort.changeDesc, 'Gainers first'),
-          (_ConstituentSort.changeAsc, 'Losers first'),
-          (_ConstituentSort.name, 'Symbol A–Z'),
-        ])
+        for (final entry in _options)
           PopupMenuItem(
             value: entry.$1,
-            child: Text(entry.$2, style: AppTypo.bodyStrong(t)),
+            // The active sort is shown by a check and weight, not tint alone.
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 24,
+                  child: entry.$1 == sort
+                      ? Icon(Icons.check_rounded, size: 18, color: t.accentInk)
+                      : null,
+                ),
+                Flexible(
+                  child: Text(
+                    entry.$2,
+                    style: entry.$1 == sort
+                        ? AppTypo.bodyStrong(t, color: t.accentInk)
+                        : AppTypo.body(t, color: t.textPrimary),
+                  ),
+                ),
+              ],
+            ),
           ),
       ],
-      child: FittedBox(
-        fit: BoxFit.scaleDown,
-        alignment: Alignment.centerRight,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
         child: Row(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Text(_label(sort), style: AppTypo.label(t)),
+            Flexible(
+              child: Text(
+                _label(sort),
+                textAlign: TextAlign.right,
+                style: AppTypo.bodyStrong(t, color: t.accentInk),
+              ),
+            ),
             const SizedBox(width: AppSpace.xs),
-            AyreIcon(AyreGlyph.sort, size: 14, color: t.foregroundSubtle),
+            AyreIcon(AyreGlyph.sort, size: 16, color: t.accentInk),
           ],
         ),
       ),
@@ -508,8 +536,8 @@ class _SortControl extends StatelessWidget {
   }
 
   static String _label(_ConstituentSort sort) => switch (sort) {
-    _ConstituentSort.changeDesc => 'GAINERS',
-    _ConstituentSort.changeAsc => 'LOSERS',
+    _ConstituentSort.changeDesc => 'Gainers first',
+    _ConstituentSort.changeAsc => 'Losers first',
     _ConstituentSort.name => 'A–Z',
   };
 }

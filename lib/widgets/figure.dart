@@ -188,10 +188,9 @@ class _RollingChar extends StatelessWidget {
 /// donut's centre label, the gauge's score, an index level) use this and
 /// secondary live tickers keep [Figure].
 ///
-/// Interpolation runs from the previous value, not from zero, on any change
-/// after the first — counting a 12,480 index level back down to zero and up
-/// again every tick would be absurd. Only the first appearance starts at
-/// [from].
+/// D-5: only a figure's *first* reveal animates (from [from], 400 ms). Any
+/// later change — a live tick, a pull-to-refresh — swaps the value instantly,
+/// so a refresh never re-counts and never implies a move that did not happen.
 ///
 /// Under reduced motion the value is simply rendered at its final state: the
 /// information still arrives, only the way it communicates changes.
@@ -261,17 +260,11 @@ class _CountUpFigureState extends State<CountUpFigure>
   void didUpdateWidget(CountUpFigure oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.value == widget.value) return;
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _from = widget.value;
-      _to = widget.value;
-      _controller.value = 1;
-      return;
-    }
-    // Continue from whatever is on screen now, so a second update mid-count
-    // carries on rather than snapping back to the old start.
-    _from = _current;
+    // D-5: later updates swap instantly (no re-count).
+    _controller.stop();
+    _from = widget.value;
     _to = widget.value;
-    _controller.forward(from: 0);
+    _controller.value = 1;
   }
 
   double get _current {
@@ -349,27 +342,43 @@ class DeltaFigure extends StatelessWidget {
       );
     }
 
+    // D-6: a change that rounds to zero is "unchanged": muted tone, flat
+    // marker, unsigned text. (null above stays "—", never zero.)
+    final unchanged =
+        double.parse(change!.abs().toStringAsFixed(decimals)) == 0;
     final up = change! >= 0;
     // Text and glyph use the A4 status-text tokens (>= 4.5:1 in light);
     // fills and chart marks elsewhere keep positive/negative.
-    final tone = color ?? (up ? t.positiveText : t.negativeText);
+    final tone =
+        color ??
+        (unchanged ? t.foregroundMuted : (up ? t.positiveText : t.negativeText));
+    final text = unchanged
+        ? '${(0).toStringAsFixed(decimals)}${percent ? '%' : ''}'
+        : formatDelta(change!, percent: percent, decimals: decimals);
+    final spoken = unchanged
+        ? 'unchanged'
+        : '${up ? 'up' : 'down'} '
+              '${change!.abs().toStringAsFixed(decimals)}'
+              '${percent ? ' percent' : ''}';
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         if (showGlyph) ...[
-          DirectionGlyph(up: up, color: tone, size: fontSize * 0.78),
+          DirectionGlyph(
+            up: up,
+            flat: unchanged,
+            color: tone,
+            size: fontSize * 0.78,
+          ),
           const SizedBox(width: AppSpace.xs),
         ],
         Figure(
-          formatDelta(change!, percent: percent, decimals: decimals),
+          text,
           fontSize: fontSize,
           fontWeight: fontWeight,
           color: tone,
-          semanticsLabel:
-              '${up ? 'up' : 'down'} '
-              '${change!.abs().toStringAsFixed(decimals)}'
-              '${percent ? ' percent' : ''}',
+          semanticsLabel: spoken,
         ),
       ],
     );

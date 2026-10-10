@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'dart:async';
 
 import '../services/app_lifecycle.dart';
@@ -97,7 +96,6 @@ class _EquityDetailScreenState extends State<EquityDetailScreen> {
 
   Future<void> _refresh() async {
     await _load();
-    if (mounted) HapticFeedback.mediumImpact();
   }
 
   @override
@@ -207,13 +205,11 @@ class _EquityHeader extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Text(quote.name, style: AppTypo.cardTitle(t)),
                       Text(
-                        quote.name,
-                        style: AppTypo.cardTitle(t),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                        quote.symbol.toUpperCase(),
+                        style: AppTypo.meta(t),
                       ),
-                      Text(quote.symbol.toUpperCase(), style: AppTypo.label(t)),
                     ],
                   ),
                 ),
@@ -238,40 +234,50 @@ class _EquityHeader extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // The level is the screen's one hero numeral: a documented
+                  // D-9 FittedBox exception (truncation would hide data).
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
                     child: Figure(
                       formatPrice(quote.lastPrice),
-                      fontSize: 32,
+                      fontSize: AppTextScale.hero,
                       fontWeight: FontWeight.w600,
                       color: t.textPrimary,
                     ),
                   ),
                   const SizedBox(height: AppSpace.xs),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Row(
-                      children: [
-                        Figure(
-                          formatDelta(quote.change, percent: false),
-                          fontSize: 13,
-                          color: t.foregroundMuted,
-                        ),
-                        const SizedBox(width: AppSpace.sm),
-                        DeltaFigure(change: quote.percentChange, fontSize: 14),
-                      ],
-                    ),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: AppSpace.sm,
+                    runSpacing: AppSpace.xxs,
+                    children: [
+                      Figure(
+                        formatDelta(quote.change, percent: false),
+                        fontSize: 14,
+                        color: t.foregroundMuted,
+                      ),
+                      DeltaFigure(change: quote.percentChange, fontSize: 14),
+                    ],
+                  ),
+                  const SizedBox(height: AppSpace.xxs),
+                  Text(
+                    'As of ${formatClockShort(quote.asOf)}',
+                    style: AppTypo.meta(t),
                   ),
                   if (quote.trace.length >= 2) ...[
                     const SizedBox(height: AppSpace.md),
                     // §12.1: a chart inherits the colour of its subject —
                     // no fixed neutral chart-line token in v5.
-                    TickerTrace(
-                      points: normaliseTrace(quote.trace),
-                      height: 64,
-                      color: quote.isUp ? t.positive : t.negative,
+                    Semantics(
+                      label:
+                          "Today's trend, ${quote.isUp ? 'up' : 'down'} on the day",
+                      excludeSemantics: true,
+                      child: TickerTrace(
+                        points: normaliseTrace(quote.trace),
+                        height: 64,
+                        color: quote.isUp ? t.positive : t.negative,
+                      ),
                     ),
                   ],
                 ],
@@ -291,6 +297,7 @@ class _KeyStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.tokens;
     final range = (quote.dayLow != null && quote.dayHigh != null)
         ? '${formatPrice(quote.dayLow)} – ${formatPrice(quote.dayHigh)}'
         : null;
@@ -320,8 +327,16 @@ class _KeyStats extends StatelessWidget {
             SizedBox(
               // Two-up on a phone, more on wider windows, and long values wrap
               // to the next run instead of overflowing.
-              width: 132,
-              child: LabelledFigure(label: label, value: value, fontSize: 14),
+              width: 140,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(label, style: AppTypo.meta(t)),
+                  const SizedBox(height: AppSpace.xxs),
+                  Figure(value, fontSize: 15),
+                ],
+              ),
             ),
         ],
       ),

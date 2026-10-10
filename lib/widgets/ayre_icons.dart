@@ -807,31 +807,50 @@ class DirectionGlyph extends StatelessWidget {
     required this.up,
     required this.color,
     this.size = 14,
+    this.flat = false,
   });
 
   final bool up;
   final Color color;
   final double size;
 
+  /// D-6: an unchanged reading draws a flat bar instead of a caret.
+  final bool flat;
+
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
       size: Size.square(size),
-      painter: _CaretPainter(up: up, color: color),
+      painter: _CaretPainter(up: up, color: color, flat: flat),
     );
   }
 }
 
 class _CaretPainter extends CustomPainter {
-  const _CaretPainter({required this.up, required this.color});
+  const _CaretPainter({
+    required this.up,
+    required this.color,
+    this.flat = false,
+  });
 
   final bool up;
   final Color color;
+  final bool flat;
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
+    if (flat) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(w * 0.14, h * 0.5 - h * 0.09, w * 0.72, h * 0.18),
+          Radius.circular(h * 0.09),
+        ),
+        Paint()..color = color,
+      );
+      return;
+    }
     final path = Path();
     if (up) {
       path
@@ -851,5 +870,5 @@ class _CaretPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _CaretPainter old) =>
-      old.up != up || old.color != color;
+      old.up != up || old.color != color || old.flat != flat;
 }

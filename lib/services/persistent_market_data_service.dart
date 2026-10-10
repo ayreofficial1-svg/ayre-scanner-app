@@ -6,8 +6,8 @@ import 'market_models.dart';
 
 /// Wraps any [MarketDataService] with on-device persistence, so every
 /// surface — index board, index detail, constituents, equities, sentiment,
-/// movers, signals, courses, insight notes, full breadth, volatility,
-/// momentum, volume surge, weekly reports, compliance info — falls back to
+/// movers, signals, courses, insight notes, full breadth,
+/// weekly reports, compliance info — falls back to
 /// the most recently seen good reading instead of an empty or failed state.
 /// That applies whether the market is simply closed, the backend is
 /// temporarily unreachable, the device is offline, or the app was
@@ -40,7 +40,19 @@ import 'market_models.dart';
 /// before — it now simply has less to ever paper over, because a cold start
 /// or a dead backend rarely reaches it as `empty`/`failed` at all.
 class PersistentMarketDataService implements MarketDataService {
-  PersistentMarketDataService(this.inner);
+  PersistentMarketDataService(this.inner) {
+    unawaited(purgeRetiredCache());
+  }
+
+  /// R-1: Volatility, Momentum and Volume Surge were removed from the app.
+  /// Existing installs still hold their last good readings under
+  /// `market_cache::volatility`, `::momentum` and `::volume_surge_<limit>`;
+  /// this removes them (idempotent, best-effort, runs once per start).
+  static Future<void> purgeRetiredCache() async {
+    await MarketDataCache.clear('volatility');
+    await MarketDataCache.clear('momentum');
+    await MarketDataCache.clearPrefix('volume_surge_');
+  }
 
   final MarketDataService inner;
 
@@ -57,9 +69,6 @@ class PersistentMarketDataService implements MarketDataService {
   static const _kCourses = 'courses';
   static const _kInsightNotes = 'insight_notes';
   static const _kFullBreadth = 'full_breadth';
-  static const _kVolatility = 'volatility';
-  static const _kMomentum = 'momentum';
-  static String _kVolumeSurge(int limit) => 'volume_surge_$limit';
   static const _kWeeklyReports = 'weekly_reports';
   static const _kCompliance = 'compliance';
 
@@ -218,35 +227,6 @@ class PersistentMarketDataService implements MarketDataService {
     (b) => b.toJson(),
     (j) => j is Map ? FullBreadth.tryParse(j.cast<String, dynamic>()) : null,
   );
-
-  @override
-  Future<DataResult<VolatilityHistogram>> getVolatility() => _persisted(
-    _kVolatility,
-    inner.getVolatility,
-    (v) => v.toJson(),
-    (j) => j is Map
-        ? VolatilityHistogram.tryParse(j.cast<String, dynamic>())
-        : null,
-  );
-
-  @override
-  Future<DataResult<MomentumTilt>> getMomentum() => _persisted(
-    _kMomentum,
-    inner.getMomentum,
-    (m) => m.toJson(),
-    (j) => j is Map ? MomentumTilt.tryParse(j.cast<String, dynamic>()) : null,
-  );
-
-  @override
-  Future<DataResult<VolumeSurgeBoard>> getVolumeSurge({int limit = 15}) =>
-      _persisted(
-        _kVolumeSurge(limit),
-        () => inner.getVolumeSurge(limit: limit),
-        (v) => v.toJson(),
-        (j) => j is Map
-            ? VolumeSurgeBoard.tryParse(j.cast<String, dynamic>())
-            : null,
-      );
 
   @override
   Future<DataResult<List<WeeklyReport>>> getWeeklyReports() => _persistedList(

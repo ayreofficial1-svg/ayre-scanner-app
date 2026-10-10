@@ -103,9 +103,8 @@ class _HomeTabState extends State<HomeTab> {
   // Refreshes on its own fixed hourly schedule server-side — cache-only on
   // every request — so it's loaded in `_load` alongside everything else but
   // deliberately left out of `_refreshLive`'s 10s tick, the same way
-  // Insights treats its own scan-cadence surfaces (volatility/momentum/
-  // volume-surge): polling a cache that only changes hourly would just
-  // re-fetch the same numbers.
+  // Insights treats its own editorial surface (desk notes): polling a cache
+  // that only changes hourly would just re-fetch the same numbers.
   DataResult<FullBreadth>? _fullBreadth;
   // The Market Insight carousel's source: the same admin-curated desk notes
   // (`/api/insights`) the Insights tab lists. Editorial content that changes

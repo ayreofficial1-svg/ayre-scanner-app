@@ -124,8 +124,8 @@ List<AppTourStep> buildAppTourSteps() => [
     target: navDestinationKey('Insights'),
     title: 'Insights',
     body:
-        'Top gainers and losers, most active, volatility, momentum and volume '
-        'surge. Tap the “i” on a section to see what it means.',
+        'Top gainers and losers, most active stocks and short market notes. '
+        'Tap the “i” on a section to see what it means.',
   ),
   AppTourStep(
     tab: 3,

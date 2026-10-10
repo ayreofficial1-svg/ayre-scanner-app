@@ -81,4 +81,18 @@ class MarketDataCache {
       // Best-effort — see class doc.
     }
   }
+
+  /// Removes every cached surface whose key starts with [keyPrefix] (R-1
+  /// cleanup of the retired `volume_surge_<limit>` entries).
+  static Future<void> clearPrefix(String keyPrefix) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final full = '$_prefix$keyPrefix';
+      for (final k in prefs.getKeys().where((k) => k.startsWith(full)).toList()) {
+        await prefs.remove(k);
+      }
+    } catch (_) {
+      // Best-effort — see class doc.
+    }
+  }
 }

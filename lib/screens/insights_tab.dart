@@ -6,7 +6,6 @@ import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
 import '../theme/app_theme.dart';
-import '../widgets/ayre_charts.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_instrument_tile.dart';
 import '../widgets/ayre_tab_scroll.dart';
@@ -16,13 +15,12 @@ import 'equity_detail_screen.dart';
 
 /// Insights — the market intelligence desk.
 ///
-/// All three mover lists, the volatility / momentum / volume-surge readings and
-/// the desk notes live here as one continuous feed: shared row height, shared
+/// All three mover lists and the desk notes live here as one continuous feed: shared row height, shared
 /// hairlines, shared label typography. It replaces the old "Climate" tab in
 /// name and in concept.
 ///
 /// Each section owns its own state. A failed movers list never takes the
-/// volatility reading down with it, and vice versa.
+/// other lists down with it.
 ///
 /// v5 (redesign plan Phase 4): the three movers lists share the tile + two
 /// text lines + trailing value/delta row grammar with a "See all" control
@@ -62,14 +60,6 @@ class _InsightsTabState extends State<InsightsTab> {
   DataResult<List<Quote>>? _losers;
   DataResult<List<Quote>>? _mostActive;
   DataResult<List<InsightNote>>? _notes;
-  // Cache-only on the backend (see market_data_service.dart's endpoint
-  // doc): these refresh at scan cadence (up to 7×/day), not on
-  // [_liveTimer]'s tick, so they're loaded once in [_load] and left alone
-  // by [_refreshLive] — polling them every 10s would just re-fetch the
-  // same cached numbers.
-  DataResult<VolatilityHistogram>? _volatility;
-  DataResult<MomentumTilt>? _momentum;
-  DataResult<VolumeSurgeBoard>? _volumeSurge;
   bool _loading = true;
   Timer? _liveTimer;
   bool _liveRefreshInFlight = false;
@@ -77,7 +67,7 @@ class _InsightsTabState extends State<InsightsTab> {
   @override
   void initState() {
     super.initState();
-    if (widget.active) _load(initial: true);
+    if (widget.active) _load();
     // Gainers/losers/most-active only — not _notes, which is
     // editorially authored content that doesn't change tick to tick.
     // Safe to poll this often: the backend serves the market-data pieces
@@ -96,7 +86,7 @@ class _InsightsTabState extends State<InsightsTab> {
     if (!mounted || !widget.active) return;
     _liveRefreshInFlight = false;
     if (AppLifecycleService.instance.lastAway > const Duration(minutes: 5)) {
-      _load(initial: true);
+      _load();
     } else {
       _refreshLive();
     }
@@ -108,8 +98,8 @@ class _InsightsTabState extends State<InsightsTab> {
     if (!oldWidget.active && widget.active) {
       // First time this tab has ever been selected: it never ran its
       // initial load (see initState), so a plain live-refresh would leave
-      // _notes/_volatility/_momentum/_volumeSurge stuck null forever.
-      _gainers == null ? _load(initial: true) : _refreshLive();
+      // _notes stuck null forever.
+      _gainers == null ? _load() : _refreshLive();
     }
   }
 
@@ -147,16 +137,13 @@ class _InsightsTabState extends State<InsightsTab> {
     }
   }
 
-  Future<void> _load({bool initial = false}) async {
+  Future<void> _load() async {
     // Fired together so one slow section doesn't hold up the rest of the desk.
     final results = await Future.wait([
       widget.marketData.getTopGainers(),
       widget.marketData.getTopLosers(),
       widget.marketData.getMostActive(),
       widget.marketData.getInsightNotes(),
-      widget.marketData.getVolatility(),
-      widget.marketData.getMomentum(),
-      widget.marketData.getVolumeSurge(),
     ]);
     if (!mounted) return;
     setState(() {
@@ -172,34 +159,8 @@ class _InsightsTabState extends State<InsightsTab> {
       _notes = (results[3] as DataResult<List<InsightNote>>).keepingLastGood(
         _notes,
       );
-      _volatility = (results[4] as DataResult<VolatilityHistogram>)
-          .keepingLastGood(_volatility);
-      _momentum = (results[5] as DataResult<MomentumTilt>).keepingLastGood(
-        _momentum,
-      );
-      _volumeSurge = (results[6] as DataResult<VolumeSurgeBoard>)
-          .keepingLastGood(_volumeSurge);
       _loading = false;
     });
-    if (!initial) HapticFeedback.mediumImpact();
-  }
-
-  Future<void> _reloadVolatility() async {
-    final result = await widget.marketData.getVolatility();
-    if (!mounted) return;
-    setState(() => _volatility = result);
-  }
-
-  Future<void> _reloadMomentum() async {
-    final result = await widget.marketData.getMomentum();
-    if (!mounted) return;
-    setState(() => _momentum = result);
-  }
-
-  Future<void> _reloadVolumeSurge() async {
-    final result = await widget.marketData.getVolumeSurge();
-    if (!mounted) return;
-    setState(() => _volumeSurge = result);
   }
 
   void _openEquity(Quote quote) {
@@ -210,22 +171,6 @@ class _InsightsTabState extends State<InsightsTab> {
           symbol: quote.symbol,
           marketData: widget.marketData,
           seed: quote,
-        ),
-      ),
-    );
-  }
-
-  /// Same destination as [_openEquity], for rows that don't carry a full
-  /// [Quote] — the volume-surge leaderboard's rows are symbol + surge +
-  /// close only, so the detail screen fetches its own header data rather
-  /// than being seeded with one.
-  void _openEquityBySymbol(String symbol) {
-    HapticFeedback.selectionClick();
-    Navigator.of(context).push(
-      terminalRoute(
-        builder: (_) => EquityDetailScreen(
-          symbol: symbol,
-          marketData: widget.marketData,
         ),
       ),
     );
@@ -319,30 +264,6 @@ class _InsightsTabState extends State<InsightsTab> {
               byVolume: true,
               columns: columns,
               failedMessage: "Most Active didn't load.",
-            ),
-
-            // ── Section 4: volatility ────────────────────────────────────────
-            // Refreshes at scan cadence, not the 10s live tick — see the
-            // field doc on _volatility.
-            const SizedBox(height: AppSpace.sectionGap),
-            _VolatilitySection(
-              result: _loading ? null : _volatility,
-              onRetry: _reloadVolatility,
-            ),
-
-            // ── Section 5: momentum tilt ─────────────────────────────────────
-            const SizedBox(height: AppSpace.sectionGap),
-            _MomentumSection(
-              result: _loading ? null : _momentum,
-              onRetry: _reloadMomentum,
-            ),
-
-            // ── Section 6: volume-surge leaderboard ──────────────────────────
-            const SizedBox(height: AppSpace.sectionGap),
-            _VolumeSurgeSection(
-              result: _loading ? null : _volumeSurge,
-              onOpen: _openEquityBySymbol,
-              onRetry: _reloadVolumeSurge,
             ),
 
             // ── Desk notes: §13.3's featured-article card + article list ────
@@ -530,10 +451,8 @@ class _MoversSectionState extends State<_MoversSection> {
         SectionLabel(
           label: widget.label,
           info: widget.info,
-          // The "See all" link carries its own vertical tap padding, which
-          // already supplies most of the gap under the label. The
-          // description sits with the heading, so the link's height only
-          // adds room around the pair.
+          // The 48 pt "See all" target already supplies the gap under the
+          // label.
           padding: EdgeInsets.only(
             bottom: showToggle ? AppSpace.xxs : AppSpace.sm,
           ),
@@ -632,15 +551,9 @@ class _MoversSectionState extends State<_MoversSection> {
       );
 }
 
-/// A movers list's trailing header slot: the freshness stamp, and — when the
-/// feed returned more rows than the collapsed list shows — the "See all"
-/// control (§2.2).
-///
-/// Scaled down as one unit rather than letting either part overflow: this slot
-/// is narrow, and both parts are wider than they look at large text sizes.
-/// Past a 1.3× text scale the stamp is dropped when the control is present —
-/// shrinking both to fit would leave the one tappable part unreadably small,
-/// and the stamp is passive.
+/// A movers list's trailing header slot: the "See all" control when the feed
+/// returned more rows than the collapsed list shows. (The freshness stamp is
+/// intentionally not shown on this tab.)
 class _MoversTrailing extends StatelessWidget {
   const _MoversTrailing({
     required this.asOf,
@@ -658,23 +571,15 @@ class _MoversTrailing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The freshness stamp ("As of ...") is intentionally not shown on this
-    // tab — see the Insights heading description.
     if (!showToggle) return const SizedBox.shrink();
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      alignment: Alignment.centerRight,
-      child: _SeeAllLink(expanded: expanded, onTap: onToggle),
-    );
+    return _SeeAllLink(expanded: expanded, onTap: onToggle);
   }
 }
 
 /// "See all" / "Show less" — an in-place expand of the same list, not a new
-/// screen: the feed's whole list is already in hand (at most ten rows), so a
-/// route would only re-render it.
+/// screen: the feed's whole list is already in hand (at most ten rows).
 ///
-/// The vertical padding is tap area, not decoration: 15pt above and below a
-/// ~16pt line clears the 44pt target floor.
+/// The target is at least 48 pt tall; the text wraps rather than shrinks.
 class _SeeAllLink extends StatelessWidget {
   const _SeeAllLink({required this.expanded, required this.onTap});
 
@@ -689,16 +594,26 @@ class _SeeAllLink extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 2),
-          child: Text(
-            expanded ? 'Show less' : 'See all',
-            style: AppTypo.ui(
-              fontSize: AppTextScale.hint,
-              fontWeight: FontWeight.w700,
-              color: t.accentInk,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minHeight: AppSpace.minTarget,
+            minWidth: AppSpace.minTarget,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Align(
+              alignment: Alignment.centerRight,
+              widthFactor: 1,
+              child: Text(
+                expanded ? 'Show less' : 'See all',
+                textAlign: TextAlign.right,
+                style: AppTypo.ui(
+                  fontSize: AppTextScale.hint,
+                  fontWeight: FontWeight.w700,
+                  color: t.accentInk,
+                ),
+              ),
             ),
-            maxLines: 1,
           ),
         ),
       ),
@@ -741,189 +656,8 @@ abstract final class _InsightInfo {
       'The number beside each name is how many shares have changed hands. '
       'A stock can be busy whether its price is rising or falling.';
 
-  static const String volatility =
-      'This chart shows how much stocks usually move up and down in a single '
-      'day. Each bar is a group of stocks. The number above a bar is how many '
-      'stocks are in that group, and the label below it tells you how big '
-      'their usual daily swing is. 0-1% means calm stocks that only move a '
-      'little. 3%+ means stocks that swing a lot. The taller the bar, the '
-      'more stocks fall in that group.';
-
-  static const String momentum =
-      'This ring shows which way most stocks are leaning. Bullish means a '
-      "stock's recent price movement is pointing upward. Bearish means it is "
-      'pointing downward. The big percentage in the middle is the share of '
-      'stocks that are bullish. The two counts underneath show how many '
-      'stocks are in each group.';
-
-  static const String volumeSurge =
-      'These are stocks being traded far more than they normally are. The '
-      'number beside each name, such as 2.4×, tells you how many times bigger '
-      "today's trading is compared with its usual day over the past month "
-      'or so. The longer the bar, the bigger the jump. A sudden rush of '
-      'trading often means people have started paying attention to that '
-      'stock.';
-
   static const String deskNotes =
       'Short written notes from our team about what is happening in the '
       'market and why it may matter. The note marked Featured is the one we '
       'think is most worth reading first.';
-}
-
-// ─── Volatility / momentum / volume-surge ─────────────────────────────────
-//
-// Three byproducts of the same scan (backend spec §2), presented as their
-// own independently-failing sections — same "one section's failure doesn't
-// take the desk down" rule the rest of this screen already follows.
-
-class _VolatilitySection extends StatelessWidget {
-  const _VolatilitySection({required this.result, required this.onRetry});
-
-  final DataResult<VolatilityHistogram>? result;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SectionLabel(
-          label: 'Volatility',
-          info: _InsightInfo.volatility,
-        ),
-        if (result == null)
-          const AyreCard(
-            child: SkeletonBlock(height: 96, radius: AppRadius.chip),
-          )
-        else if (result!.isFailed)
-          StatePanel.failed(
-            headline: "Volatility didn't load.",
-            message: 'The other sections on this page are unaffected.',
-            compact: true,
-            onRetry: onRetry,
-          )
-        else if (result!.isEmpty)
-          const StatePanel.empty(
-            headline: 'No volatility reading',
-            message: _kInsightsEmptyMessage,
-            compact: true,
-          )
-        else
-          AyreCard(
-            padding: const EdgeInsets.all(AppSpace.lg),
-            child: VolatilityBars(buckets: result!.value!.buckets),
-          ),
-      ],
-    );
-  }
-}
-
-class _MomentumSection extends StatelessWidget {
-  const _MomentumSection({required this.result, required this.onRetry});
-
-  final DataResult<MomentumTilt>? result;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SectionLabel(
-          label: 'Momentum',
-          info: _InsightInfo.momentum,
-        ),
-        if (result == null)
-          const AyreCard(
-            padding: EdgeInsets.all(AppSpace.lg),
-            child: Center(
-              child: SkeletonBlock(width: 132, height: 132, radius: 66),
-            ),
-          )
-        else if (result!.isFailed)
-          StatePanel.failed(
-            headline: "Momentum didn't load.",
-            message: 'The other sections on this page are unaffected.',
-            compact: true,
-            onRetry: onRetry,
-          )
-        else if (result!.isEmpty)
-          const StatePanel.empty(
-            headline: 'No momentum reading',
-            message: _kInsightsEmptyMessage,
-            compact: true,
-          )
-        else
-          AyreCard(
-            padding: const EdgeInsets.all(AppSpace.lg),
-            child: Center(
-              child: BreadthDonut(
-                advances: result!.value!.bullish,
-                declines: result!.value!.bearish,
-                centerLabel: 'BULLISH',
-                primaryLabel: 'Bullish',
-                secondaryLabel: 'Bearish',
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-class _VolumeSurgeSection extends StatelessWidget {
-  const _VolumeSurgeSection({
-    required this.result,
-    required this.onOpen,
-    required this.onRetry,
-  });
-
-  final DataResult<VolumeSurgeBoard>? result;
-  final ValueChanged<String> onOpen;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SectionLabel(
-          label: 'Volume surge',
-          info: _InsightInfo.volumeSurge,
-        ),
-        if (result == null)
-          const AyreCard(
-            padding: EdgeInsets.symmetric(vertical: AppSpace.xs),
-            child: Column(
-              children: [
-                SkeletonTickerRow(),
-                SkeletonTickerRow(),
-                SkeletonTickerRow(),
-              ],
-            ),
-          )
-        else if (result!.isFailed)
-          StatePanel.failed(
-            headline: "Volume Surge didn't load.",
-            message: 'The other sections on this page are unaffected.',
-            compact: true,
-            onRetry: onRetry,
-          )
-        else if (result!.isEmpty)
-          const StatePanel.empty(
-            headline: 'No volume surge',
-            message: _kInsightsEmptyMessage,
-            compact: true,
-          )
-        else
-          AyreCard(
-            padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
-            child: VolumeSurgeLeaderboard(
-              rows: result!.value!.rows,
-              onTap: (row) => onOpen(row.symbol),
-            ),
-          ),
-      ],
-    );
-  }
 }

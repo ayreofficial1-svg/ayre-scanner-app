@@ -48,13 +48,8 @@ enum DataSurface {
   courses,
   insightNotes,
   account,
-  // Spec: full Nifty-500 breadth (Home) + volatility / momentum /
-  // volume-surge (Insights). Each is its own surface so, e.g., a failed
-  // volume-surge fetch never takes the volatility histogram down with it.
+  // Spec: full Nifty-500 breadth (Home).
   fullBreadth,
-  volatility,
-  momentum,
-  volumeSurge,
   // Phase 5: admin-entered historical performance, shown on the Reports tab
   // (`GET /api/weekly-report`). Its own surface so a failed fetch never
   // affects any other tab.

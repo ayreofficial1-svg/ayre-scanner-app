@@ -232,7 +232,7 @@ void main() {
     ) async {
       await _pumpCard(tester, _full);
       final h = tester.getSize(_cards.first).height;
-      expect(h, lessThanOrEqualTo(140));
+      expect(h, lessThanOrEqualTo(190));
       expect(h, greaterThan(100));
     });
 

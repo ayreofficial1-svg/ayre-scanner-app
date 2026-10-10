@@ -85,7 +85,7 @@ const List<OnboardingFeature> kOnboardingFeatures = [
   OnboardingFeature(
     glyph: AyreGlyph.insights,
     title: 'Insights',
-    subtitle: 'Gainers, losers, volume and momentum, explained simply.',
+    subtitle: 'Gainers, losers and the most active stocks, explained simply.',
     location: 'Insights tab',
   ),
   OnboardingFeature(

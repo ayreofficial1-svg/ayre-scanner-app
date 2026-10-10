@@ -295,137 +295,6 @@ class ComplianceInfo {
   };
 }
 
-/// ATR% distribution across the tracked universe (`GET
-/// /api/insights/volatility`) — how spread-out today's daily ranges are,
-/// bucketed. Refreshes at scan cadence (up to 7×/day), like [MomentumTilt]
-/// and [VolumeSurgeBoard] below — all three are byproducts of the same scan.
-class VolatilityHistogram {
-  const VolatilityHistogram({required this.buckets, this.asOf});
-
-  /// Ordered bucket label → stock count, e.g. {"0-1%": 120, "1-2%": 90, ...}.
-  /// Insertion order is preserved from the backend response, which already
-  /// orders buckets low-to-high.
-  final Map<String, int> buckets;
-  final DateTime? asOf;
-
-  int get total => buckets.values.fold(0, (a, b) => a + b);
-
-  static VolatilityHistogram? tryParse(Map<String, dynamic> json) {
-    final raw = json['buckets'];
-    if (raw is! Map) return null;
-    final buckets = <String, int>{};
-    raw.forEach((key, value) {
-      final n = _num({'v': value}, const ['v']);
-      if (n != null) buckets[key.toString()] = n.round();
-    });
-    if (buckets.isEmpty) return null;
-    return VolatilityHistogram(buckets: buckets, asOf: _asOfStamp(json));
-  }
-
-  /// Round-trips through [tryParse]; see [Quote.toJson].
-  Map<String, dynamic> toJson() => {
-    'buckets': buckets,
-    if (asOf != null) 'as_of': asOf!.toIso8601String(),
-  };
-}
-
-/// Bullish/bearish MACD tilt across the tracked universe (`GET
-/// /api/insights/momentum`).
-class MomentumTilt {
-  const MomentumTilt({
-    required this.bullish,
-    required this.bearish,
-    this.asOf,
-  });
-
-  final int bullish;
-  final int bearish;
-  final DateTime? asOf;
-
-  int get total => bullish + bearish;
-
-  static MomentumTilt? tryParse(Map<String, dynamic> json) {
-    final bullish = _num(json, const ['bullish'])?.round();
-    final bearish = _num(json, const ['bearish'])?.round();
-    if (bullish == null && bearish == null) return null;
-    return MomentumTilt(
-      bullish: bullish ?? 0,
-      bearish: bearish ?? 0,
-      asOf: _asOfStamp(json),
-    );
-  }
-
-  /// Round-trips through [tryParse]; see [Quote.toJson].
-  Map<String, dynamic> toJson() => {
-    'bullish': bullish,
-    'bearish': bearish,
-    if (asOf != null) 'as_of': asOf!.toIso8601String(),
-  };
-}
-
-/// One row of the volume-surge leaderboard (`GET
-/// /api/insights/volume-surge`) — today's volume as a multiple of the
-/// 20-day average.
-class VolumeSurgeRow {
-  const VolumeSurgeRow({
-    required this.symbol,
-    required this.surge,
-    this.close,
-  });
-
-  final String symbol;
-
-  /// Multiple of the 20-day average volume — 2.4 means 2.4× normal volume.
-  final num surge;
-  final num? close;
-
-  static VolumeSurgeRow? tryParse(Map<String, dynamic> json) {
-    final symbol = _str(json, const ['symbol']);
-    final surge = _num(json, const ['volume_surge', 'surge']);
-    if (symbol == null || surge == null) return null;
-    return VolumeSurgeRow(
-      symbol: symbol,
-      surge: surge,
-      close: _num(json, const ['close']),
-    );
-  }
-
-  /// Round-trips through [tryParse]; see [Quote.toJson].
-  Map<String, dynamic> toJson() => {
-    'symbol': symbol,
-    'volume_surge': surge,
-    if (close != null) 'close': close,
-  };
-}
-
-/// The volume-surge leaderboard as a whole: the ranked rows plus the batch's
-/// own `as_of` reading. Kept as one wrapper rather than folding `asOf` into
-/// each row — the list has a single timestamp, not a per-row one.
-class VolumeSurgeBoard {
-  const VolumeSurgeBoard({required this.rows, this.asOf});
-
-  final List<VolumeSurgeRow> rows;
-  final DateTime? asOf;
-
-  static VolumeSurgeBoard? tryParse(Map<String, dynamic> json) {
-    final raw = json['items'];
-    if (raw is! List) return null;
-    final rows = <VolumeSurgeRow>[];
-    for (final entry in raw) {
-      if (entry is! Map) continue;
-      final row = VolumeSurgeRow.tryParse(entry.cast<String, dynamic>());
-      if (row != null) rows.add(row);
-    }
-    return VolumeSurgeBoard(rows: rows, asOf: _asOfStamp(json));
-  }
-
-  /// Round-trips through [tryParse]; see [Quote.toJson].
-  Map<String, dynamic> toJson() => {
-    'items': rows.map((r) => r.toJson()).toList(),
-    if (asOf != null) 'as_of': asOf!.toIso8601String(),
-  };
-}
-
 /// An admin-curated stock pick on the Signals board (`GET /api/signals`,
 /// `data/app_signals.py`). The website's admin panel only ever sets
 /// `symbol`, `entry_price`, `exit_price`, `stop_loss` and `enabled` — there
@@ -789,10 +658,7 @@ class WeeklyReport {
 /// endpoints' `as_of` fields — into a proper [DateTime].
 ///
 /// Public (unlike the other parsing helpers below, which are private to this
-/// file) because `market_data_service.dart` needs it too, for
-/// [VolumeSurgeBoard]'s top-level `as_of` — the one case here where a
-/// timestamp sits beside a list rather than inside a model with its own
-/// `tryParse`. Returns null (never throws) for anything that isn't exactly
+/// file) so other files can read the same stamp format. Returns null (never throws) for anything that isn't exactly
 /// this format; an ISO-8601 stamp should go through [DateTime.tryParse]
 /// instead, as every other model in this file already does.
 DateTime? parseIstStamp(String raw) {
@@ -831,8 +697,7 @@ DateTime? parseIstStamp(String raw) {
   ).subtract(const Duration(hours: 5, minutes: 30));
 }
 
-/// `as_of` reader shared by [FullBreadth], [VolatilityHistogram],
-/// [MomentumTilt] and [VolumeSurgeBoard]'s `tryParse` methods.
+/// `as_of` reader used by [FullBreadth]'s `tryParse`.
 DateTime? _asOfStamp(Map<String, dynamic> json) {
   final raw = json['as_of'];
   if (raw is! String) return null;
