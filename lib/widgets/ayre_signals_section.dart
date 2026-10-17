@@ -4,7 +4,6 @@ import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
 import '../services/notification_copy.dart';
-import '../services/push_service.dart';
 import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import 'ayre_components.dart';
@@ -81,13 +80,6 @@ class _SignalsSectionState extends State<SignalsSection> {
     widget.controller?._state = this;
     if (widget.active) _load(initial: true);
     AppLifecycleService.instance.addListener(_onAppResumed);
-    PushService.instance.refreshSignalsRequests.addListener(_onRefreshRequested);
-  }
-
-  /// An entry-reached push arrived or was tapped: reload once, right away.
-  void _onRefreshRequested() {
-    if (!mounted) return;
-    _load(initial: true);
   }
 
   /// Fired once, shortly after the app returns to the foreground. Reloads
@@ -104,8 +96,6 @@ class _SignalsSectionState extends State<SignalsSection> {
   void dispose() {
     if (widget.controller?._state == this) widget.controller!._state = null;
     AppLifecycleService.instance.removeListener(_onAppResumed);
-    PushService.instance.refreshSignalsRequests
-        .removeListener(_onRefreshRequested);
     super.dispose();
   }
 

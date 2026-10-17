@@ -634,8 +634,8 @@ class AyreSegment<T> {
   final AyreGlyph? glyph;
 }
 
-/// One shared segmented control, used for the appearance selector and the
-/// Insights time-window toggle — not a bespoke control per screen.
+/// One shared segmented control, used for the appearance selector and similar
+/// choices — not a bespoke control per screen.
 class AyreSegmented<T> extends StatelessWidget {
   const AyreSegmented({
     super.key,
@@ -757,42 +757,28 @@ class _Segment<T> extends StatelessWidget {
 
 // ─── Status chips ──────────────────────────────────────────────────────────
 
-/// `info` is retired (plan §3.3 / §7 open decision — the Spec's fixed
-/// accent set is accent/positive/negative/neutral only, with no separate
-/// "info" role). The one real call site using it
-/// (`profile_tab.dart`'s tier badge — a non-market identity tag) is
-/// reconciled onto [neutral], since a tier label is attention-worthy
-/// metadata, not a brand or market-direction signal.
-enum ChipTone { neutral, live, attention, brand }
+enum ChipTone { neutral, attention, brand }
 
-/// Small, flat, caps chip for states like LIVE, CLOSED, NEW. LIVE is
-/// [AppThemeTokens.positiveText] on `positiveSoft` (its dot keeps `positive`); neutral/attention (muted gold)
-/// carries warnings; the brand accent carries non-market identity tags only
-/// (tiers, badges) — never a market-direction signal.
+/// Small, flat, caps chip for states like NEW or a verification status.
+/// Neutral/attention (muted gold) carries warnings; the brand accent carries
+/// identity tags (tiers, badges).
 class AyreChip extends StatelessWidget {
   const AyreChip({
     super.key,
     required this.label,
     this.tone = ChipTone.neutral,
     this.glyph,
-    this.pulse = false,
   });
 
   final String label;
   final ChipTone tone;
   final AyreGlyph? glyph;
 
-  /// Only meaningful for [ChipTone.live].
-  final bool pulse;
-
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final (Color fg, Color bg) = switch (tone) {
       ChipTone.neutral => (t.foregroundMuted, t.surfaceRaised),
-      // LIVE is a market-liveness signal: `positive` on `positiveSoft` in
-      // both themes, regardless of any per-card identity tint around it.
-      ChipTone.live => (t.positiveText, t.positiveSoft),
       ChipTone.attention => (t.neutralText, t.neutralSoft),
       ChipTone.brand => (t.accentInk, t.accent.withValues(alpha: 0.16)),
     };
@@ -806,13 +792,10 @@ class AyreChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (tone == ChipTone.live)
-            // The dot is a mark, not text: it keeps the fill token.
-            LivePulseDot(color: t.positive, animate: pulse)
-          else if (glyph != null)
+          if (glyph != null) ...[
             AyreIcon(glyph!, size: 12, color: fg),
-          if (tone == ChipTone.live || glyph != null)
             const SizedBox(width: AppSpace.xs),
+          ],
           // Status words wrap, never truncate (D-1 floor: chips are 11 sp).
           Flexible(
             child: Text(
@@ -822,253 +805,6 @@ class AyreChip extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-/// The one "live" signature in the app: a slow, subtle breath — never a hard
-/// blink. Collapses to a static dot under reduced motion.
-class LivePulseDot extends StatefulWidget {
-  const LivePulseDot({
-    super.key,
-    required this.color,
-    this.size = 6,
-    this.animate = true,
-  });
-
-  final Color color;
-  final double size;
-  final bool animate;
-
-  @override
-  State<LivePulseDot> createState() => _LivePulseDotState();
-}
-
-class _LivePulseDotState extends State<LivePulseDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: AppMotion.livePulse,
-    );
-    if (widget.animate) _controller.repeat(reverse: true);
-  }
-
-  @override
-  void didUpdateWidget(LivePulseDot oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.animate && !_controller.isAnimating) {
-      _controller.repeat(reverse: true);
-    } else if (!widget.animate && _controller.isAnimating) {
-      _controller.stop();
-      _controller.value = 1;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final dot = Container(
-      width: widget.size,
-      height: widget.size,
-      decoration: BoxDecoration(color: widget.color, shape: BoxShape.circle),
-    );
-
-    if (!widget.animate || MediaQuery.disableAnimationsOf(context)) return dot;
-
-    // The "live" breath runs for as long as the screen is up, so it gets its own
-    // layer rather than dirtying the chip and card it sits in.
-    return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: _controller,
-        child: dot,
-        builder: (context, child) => Opacity(
-          opacity:
-              0.45 + 0.55 * AppMotion.easeInOut.transform(_controller.value),
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
-// ─── The shared ticker row ─────────────────────────────────────────────────
-
-/// The single row component behind all three Insights movers lists,
-/// Index Detail's constituents and Equity Detail's related lists. Building it
-/// once is what makes Insights read as one integrated desk rather than three
-/// relocated cards.
-///
-/// The figures column keeps a [FittedBox] (a D-9 exception, documented here):
-/// price and change are numerals whose truncation would hide data, so at a
-/// large accessibility text scale they shrink instead of overflowing the
-/// row — the failure mode the layout matrix caught in an earlier build. The
-/// name column wraps/ellipsises normally. Rows keep a 48 pt minimum height.
-class TickerRow extends StatelessWidget {
-  const TickerRow({
-    super.key,
-    required this.symbol,
-    this.name,
-    this.rank,
-    this.price,
-    this.changePercent,
-    this.changeAbsolute,
-    this.volume,
-    this.leading,
-    this.trailing,
-    this.onTap,
-    this.dense = false,
-  });
-
-  final String symbol;
-  final String? name;
-
-  /// 1-based rank, shown in ranked lists (movers).
-  final int? rank;
-  final num? price;
-  final num? changePercent;
-  final num? changeAbsolute;
-  final num? volume;
-  final Widget? leading;
-  final Widget? trailing;
-  final VoidCallback? onTap;
-  final bool dense;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-
-    final row = ConstrainedBox(
-      constraints: BoxConstraints(
-        minHeight: onTap != null ? AppSpace.minTarget : 0,
-      ),
-      child: Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: AppSpace.md,
-        vertical: dense ? AppSpace.sm : AppSpace.row,
-      ),
-      child: Row(
-        children: [
-          if (rank != null) ...[
-            SizedBox(
-              width: 24,
-              child: Figure.static(
-                '$rank',
-                fontSize: 12,
-                color: t.foregroundMuted,
-              ),
-            ),
-            const SizedBox(width: AppSpace.xs),
-          ],
-          if (leading != null) ...[
-            leading!,
-            const SizedBox(width: AppSpace.md),
-          ],
-          // The name column absorbs the remaining width and ellipsizes; long
-          // listed-company names are the norm, not the exception.
-          Expanded(
-            flex: 5,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  symbol,
-                  style: AppTypo.rowLabel(t),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (name != null && name!.isNotEmpty)
-                  Text(
-                    name!,
-                    style: AppTypo.caption(t),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpace.sm),
-          Flexible(
-            flex: 4,
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerRight,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (price != null)
-                    Figure(formatPrice(price), fontSize: 14)
-                  else if (volume != null)
-                    Figure(formatVolume(volume), fontSize: 14),
-                  const SizedBox(height: AppSpace.xxs),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (volume != null && price != null) ...[
-                        Figure(
-                          formatVolume(volume),
-                          fontSize: 12,
-                          color: t.foregroundMuted,
-                        ),
-                        const SizedBox(width: AppSpace.sm),
-                      ] else if (changeAbsolute != null) ...[
-                        Figure(
-                          formatDelta(changeAbsolute!, percent: false),
-                          fontSize: 12,
-                          color: t.foregroundMuted,
-                        ),
-                        const SizedBox(width: AppSpace.sm),
-                      ],
-                      if (changePercent != null)
-                        DeltaFigure(change: changePercent, fontSize: 12),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (trailing != null) ...[
-            const SizedBox(width: AppSpace.sm),
-            trailing!,
-          ],
-        ],
-      ),
-    ),
-    );
-
-    if (onTap == null) return row;
-
-    // Phase 5: grouped row announcement instead of fragmented sub-labels —
-    // symbol/name/price/direction/delta read as one unit, matching the
-    // _NavItem/_ReadMoreButton pattern (Semantics + excludeSemantics on the
-    // visual subtree).
-    final buf = StringBuffer(symbol);
-    if (name != null && name!.isNotEmpty) buf.write(', $name');
-    if (price != null) buf.write(', ${formatPrice(price)}');
-    if (changePercent != null) {
-      final up = changePercent! >= 0;
-      buf.write(
-        ', ${up ? 'up' : 'down'} '
-        '${changePercent!.abs().toStringAsFixed(2)} percent',
-      );
-    }
-
-    return Semantics(
-      button: true,
-      label: buf.toString(),
-      excludeSemantics: true,
-      child: PressableScale(onTap: onTap, borderRadius: 0, child: row),
     );
   }
 }
@@ -1153,7 +889,7 @@ class SettingRow extends StatelessWidget {
     // Phase 5: destructive rows (Sign out) need their weight in the
     // announcement, not just "Sign out" indistinguishable from a normal
     // nav row — subtitle folds in for context, same grouping pattern as
-    // TickerRow/_NavItem.
+    // _NavItem.
     final buf = StringBuffer(title);
     if (subtitle != null && subtitle!.isNotEmpty) buf.write(', $subtitle');
     if (danger) buf.write(', destructive action');
@@ -1185,7 +921,7 @@ class RowGroup extends StatelessWidget {
   final Color? color;
 
   /// Left inset of the hairlines between rows. Lists whose rows lead with
-  /// something other than an 18px icon (the Insights movers' instrument tile)
+  /// something other than an 18px icon (an instrument tile)
   /// pass their own leading width so the dividers start at the text, not
   /// under the tile.
   final double indent;
@@ -1416,7 +1152,7 @@ class _SkeletonBlockState extends State<SkeletonBlock>
   }
 }
 
-/// A skeleton in the exact shape of a [TickerRow]. [tile] adds the leading
+/// A skeleton list row. [tile] adds the leading
 /// instrument-tile block for lists whose rows lead with an
 /// `AyreInstrumentTile`, so the loaded list doesn't shift sideways.
 class SkeletonTickerRow extends StatelessWidget {
@@ -1557,75 +1293,6 @@ class ContentWidth extends StatelessWidget {
           maxWidth: maxWidth ?? AppBreakpoints.contentMaxWidth,
         ),
         child: child,
-      ),
-    );
-  }
-}
-
-// ─── Direction badge ───────────────────────────────────────────────────────
-
-/// A signed market direction shown as icon + label on a tint-on-wash fill —
-/// never a solid fill (Spec §11.5, §20.7: exactly one reused component for
-/// this, never inlined per-screen). Extracted in Phase 1 per plan §6/§9 as a
-/// **new** shared component: no equivalent existed as an isolated widget
-/// before — [DeltaFigure] (`figure.dart`) renders a signed *figure* inline
-/// with a caret, and `home_tab.dart`'s private `_BreadthFigure` does its own
-/// bespoke direction rendering; neither is this component. This widget is
-/// additive in this phase — rewiring call sites onto it (including
-/// `home_tab.dart`'s inline pattern) is Phase 5/6 work, done screen by screen
-/// against its own Spec subsection rather than here.
-///
-/// Color is never the only channel: the caret glyph and the upper-case label
-/// both carry direction independently of the tint.
-class DirectionBadge extends StatelessWidget {
-  const DirectionBadge({
-    super.key,
-    required this.up,
-    required this.label,
-    this.neutral = false,
-  });
-
-  /// Ignored when [neutral] is true.
-  final bool up;
-  final String label;
-
-  /// Renders in the neutral/gold tone instead of positive/negative — for a
-  /// flat/unchanged reading that still needs a badge (e.g. "UNCHANGED").
-  final bool neutral;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final (Color fg, Color bg) = neutral
-        ? (t.neutralText, t.neutralSoft)
-        : up
-        ? (t.positiveText, t.positiveSoft)
-        : (t.negativeText, t.negativeSoft);
-
-    return Semantics(
-      label: '${neutral ? 'unchanged' : (up ? 'up' : 'down')} $label',
-      excludeSemantics: true,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: BorderRadius.circular(AppRadius.pill),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (!neutral) ...[
-              DirectionGlyph(up: up, color: fg, size: 12),
-              const SizedBox(width: 4),
-            ],
-            Flexible(
-              child: Text(
-                label.toUpperCase(),
-                style: AppTypo.label(t, color: fg, fontSize: 11),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

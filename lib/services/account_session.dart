@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api_service.dart';
 import 'auth_service.dart';
 import 'email_verification.dart';
+import 'market_data_cache.dart';
 import 'push_service.dart';
 import 'settings_store.dart';
 
@@ -66,6 +67,7 @@ class AccountSession {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_ownerKey);
     await ApiService.clearContentCaches();
+    await MarketDataCache.clear('signals');
     await NotificationLog.instance.clear();
     await SeenSignalsStore.clear();
     EmailVerificationService.instance.reset();

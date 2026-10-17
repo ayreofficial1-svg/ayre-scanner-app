@@ -2,9 +2,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// On-device persistence for the last-known-good payload behind every market
-/// data surface (index board, constituents, sentiment, signals, insights,
-/// weekly reports, and so on).
+/// On-device persistence for the last-known-good payload behind every content
+/// surface (signals, Learn, desk notes, weekly reports, compliance info).
 ///
 /// This is what lets [PersistentMarketDataService] show real, previously
 /// seen data instead of an empty or failed state when the market is closed
@@ -70,9 +69,8 @@ class MarketDataCache {
     }
   }
 
-  /// Removes a single cached surface — currently unused in-app but kept as
-  /// the counterpart to [save] for a future "clear cached data" affordance
-  /// (e.g. on sign-out) without needing a new class.
+  /// Removes a single cached surface. Used by the one-time legacy purge and
+  /// by account switching.
   static Future<void> clear(String key) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -82,8 +80,8 @@ class MarketDataCache {
     }
   }
 
-  /// Removes every cached surface whose key starts with [keyPrefix] (R-1
-  /// cleanup of the retired `volume_surge_<limit>` entries).
+  /// Removes every cached surface whose key starts with [keyPrefix] (used by
+  /// the legacy purge for keys that carried a suffix).
   static Future<void> clearPrefix(String keyPrefix) async {
     try {
       final prefs = await SharedPreferences.getInstance();

@@ -165,38 +165,6 @@ class ApiService {
     timeout: timeout,
   );
 
-  /// Fetches live Nifty & Sensex data.
-  static Future<Map<String, dynamic>?> getMarket() async {
-    try {
-      final response = await authedGet(Uri.parse('$baseUrl/api/market'));
-      if (response.statusCode == 200) {
-        notifyReachable(true);
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      }
-      return null;
-    } catch (_) {
-      notifyReachable(false);
-      return null;
-    }
-  }
-
-  /// Fetches admin-curated signal picks with live price/% change.
-  static Future<List<Map<String, dynamic>>> getSignals() async {
-    try {
-      final response = await authedGet(Uri.parse('$baseUrl/api/signals'));
-      if (response.statusCode == 200) {
-        notifyReachable(true);
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final list = data['signals'] as List<dynamic>? ?? [];
-        return list.cast<Map<String, dynamic>>();
-      }
-      return [];
-    } catch (_) {
-      notifyReachable(false);
-      return [];
-    }
-  }
-
   /// Registers this device's push token with the backend, along with which
   /// kinds of push it wants. Safe to call repeatedly — the backend treats the
   /// token as the identity and updates it in place. Returns true on success.
@@ -260,22 +228,6 @@ class ApiService {
     } catch (_) {
       notifyReachable(false);
       return 'No connection. Check your internet and try again.';
-    }
-  }
-
-  /// Fetches the current placeholder market-sentiment value (0-100 scale)
-  /// for the Insights tab gauge.
-  static Future<Map<String, dynamic>?> getSentiment() async {
-    try {
-      final response = await authedGet(Uri.parse('$baseUrl/api/sentiment'));
-      if (response.statusCode == 200) {
-        notifyReachable(true);
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      }
-      return null;
-    } catch (_) {
-      notifyReachable(false);
-      return null;
     }
   }
 

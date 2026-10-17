@@ -276,106 +276,6 @@ extension AppThemeContext on BuildContext {
   AppThemeTokens get tokens => Theme.of(this).extension<AppThemeTokens>()!;
 }
 
-// ─── Index-card identity tints ──────────────────────────────────────────────
-// Not `AppThemeTokens` fields (redesign plan §2A / Phase 0 step 6): each Home
-// index card — and anywhere else an index is represented as a card —
-// carries its own fixed light/dark identity tint, independent of theme
-// *semantics* and never a stand-in for gain/loss color. (No screen uses this
-// any more; it is removed in the data-layer / orphan-sweep phase.)
-
-/// One index's identity tint pair for a single brightness. Purely
-/// decorative — never swap these in for [AppThemeTokens.positive] /
-/// [AppThemeTokens.negative].
-@immutable
-class AppIndexTint {
-  const AppIndexTint({
-    required this.cardBackground,
-    required this.iconGradientCenter,
-    required this.iconGradientEdge,
-    required this.trace,
-    required this.activePeriodTabFill,
-  });
-
-  /// Card background fill.
-  final Color cardBackground;
-
-  /// Icon-tile radial-gradient center stop (lighter). See
-  /// [AppRadius]'s "icon-tile shape override" note — this is the one icon
-  /// tile in the app that's circular rather than a rounded square.
-  final Color iconGradientCenter;
-
-  /// Icon-tile radial-gradient edge stop (darker).
-  final Color iconGradientEdge;
-
-  /// Sparkline trace / icon glyph color.
-  final Color trace;
-
-  /// Active period-tab (1D/1W/1M/1Y) pill fill, a deeper shade of the
-  /// card's own tint.
-  final Color activePeriodTabFill;
-}
-
-/// Which index a card represents, for [AppIndexTints] lookup. Extend with a
-/// new case here — and a matching entry in [AppIndexTints.light]/[dark] —
-/// if a fourth index is ever added; never reuse an existing index's tint.
-enum AppIndexId { nifty50, sensex, bankNifty }
-
-/// The fixed light/dark [AppIndexTint] pair for each [AppIndexId].
-abstract final class AppIndexTints {
-  static const Map<AppIndexId, AppIndexTint> light = {
-    AppIndexId.nifty50: AppIndexTint(
-      cardBackground: Color(0xFFE7F3E8),
-      iconGradientCenter: Color(0xFFDFF0E2),
-      iconGradientEdge: Color(0xFFB8DEC0),
-      trace: Color(0xFF2E9E5B),
-      activePeriodTabFill: Color(0xFFC9E4CE),
-    ),
-    AppIndexId.sensex: AppIndexTint(
-      cardBackground: Color(0xFFFBEAE4),
-      iconGradientCenter: Color(0xFFFAE2D8),
-      iconGradientEdge: Color(0xFFEEC3AF),
-      trace: Color(0xFFD97757),
-      activePeriodTabFill: Color(0xFFF3D2C3),
-    ),
-    AppIndexId.bankNifty: AppIndexTint(
-      cardBackground: Color(0xFFE6EEF7),
-      iconGradientCenter: Color(0xFFDCEAF6),
-      iconGradientEdge: Color(0xFFB9D3EB),
-      trace: Color(0xFF4A79B5),
-      activePeriodTabFill: Color(0xFFCBE0F3),
-    ),
-  };
-
-  static const Map<AppIndexId, AppIndexTint> dark = {
-    AppIndexId.nifty50: AppIndexTint(
-      cardBackground: Color(0xFF14251A),
-      iconGradientCenter: Color(0xFF25452F),
-      iconGradientEdge: Color(0xFF15291C),
-      trace: Color(0xFF4ED892),
-      activePeriodTabFill: Color(0xFF255436),
-    ),
-    AppIndexId.sensex: AppIndexTint(
-      cardBackground: Color(0xFF2A1B14),
-      iconGradientCenter: Color(0xFF4A2E1F),
-      iconGradientEdge: Color(0xFF2C1911),
-      trace: Color(0xFFE08A63),
-      activePeriodTabFill: Color(0xFF5A3624),
-    ),
-    AppIndexId.bankNifty: AppIndexTint(
-      cardBackground: Color(0xFF131E2A),
-      iconGradientCenter: Color(0xFF213D57),
-      iconGradientEdge: Color(0xFF122333),
-      trace: Color(0xFF6FA8E0),
-      activePeriodTabFill: Color(0xFF29476A),
-    ),
-  };
-
-  /// Look up [id]'s tint for the current [brightness]. Switches the same
-  /// way the rest of the app already themes conditionally.
-  static AppIndexTint of(AppIndexId id, Brightness brightness) =>
-      (brightness == Brightness.dark ? dark : light)[id]!;
-}
-
 // ─── Radii ─────────────────────────────────────────────────────────────────
 // Smaller and flatter than the previous identity's "chunky, generous" 20–26px
 // cards: 18px reads as rounded-not-bubbly per the Spec's own reasoning (24px+
@@ -429,10 +329,6 @@ abstract final class AppMotion {
 
   /// Chart draw-on (D-8): 700 ms, first reveal only. Reduce-motion snaps.
   static const Duration chartDraw = Duration(milliseconds: 700);
-
-  /// One cycle of the LIVE dot's pulse. Unchanged by v4 — nothing in the Spec
-  /// retires this concept.
-  static const Duration livePulse = Duration(milliseconds: 1600);
 
   // `traceDraw` (620ms) lived here as the line trace's own pre-v4 draw-on,
   // pending Phase 3's decision on whether the line and radial families need
@@ -575,7 +471,7 @@ abstract final class AppSpace {
   /// Vertical padding for a hairline-divided list row.
   static const double hairlineRowPadding = 14;
 
-  /// Retained alias for call sites (`ayre_components.dart`'s `TickerRow`/
+  /// Retained alias for call sites (`ayre_components.dart`'s
   /// `SkeletonTickerRow`) not yet migrated onto the named constant above —
   /// identical to [hairlineRowPadding].
   static const double row = hairlineRowPadding;

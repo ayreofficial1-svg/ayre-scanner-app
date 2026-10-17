@@ -5,11 +5,10 @@ import 'market_data_service.dart';
 import 'market_models.dart';
 
 /// Wraps any [MarketDataService] with on-device persistence, so every
-/// surface — index board, index detail, constituents, equities, sentiment,
-/// movers, signals, courses, insight notes, full breadth,
-/// weekly reports, compliance info — falls back to
+/// surface — signals, courses, insight notes, weekly reports and
+/// compliance info — falls back to
 /// the most recently seen good reading instead of an empty or failed state.
-/// That applies whether the market is simply closed, the backend is
+/// That applies whether the backend is
 /// temporarily unreachable, the device is offline, or the app was
 /// force-quit and relaunched — anything that would otherwise leave a screen
 /// with nothing to show before the network has had a chance to answer.
@@ -23,8 +22,7 @@ import 'market_models.dart';
 ///    actually saw.
 ///  * An **empty or failed** result is instead served from that surface's
 ///    saved cache, if any, re-stamped `stale: true` so it renders through
-///    the UI's existing "delayed" treatment — the same visual language
-///    already used for an aging live reading, not a new one.
+///    the UI's existing "delayed" treatment.
 ///  * If nothing was ever cached for that surface (a genuinely first-ever
 ///    launch with no connectivity), the original empty/failed result passes
 ///    through unchanged — there is nothing to fall back to yet.
@@ -40,35 +38,16 @@ import 'market_models.dart';
 /// before — it now simply has less to ever paper over, because a cold start
 /// or a dead backend rarely reaches it as `empty`/`failed` at all.
 class PersistentMarketDataService implements MarketDataService {
-  PersistentMarketDataService(this.inner) {
-    unawaited(purgeRetiredCache());
-  }
-
-  /// R-1: Volatility, Momentum and Volume Surge were removed from the app.
-  /// Existing installs still hold their last good readings under
-  /// `market_cache::volatility`, `::momentum` and `::volume_surge_<limit>`;
-  /// this removes them (idempotent, best-effort, runs once per start).
-  static Future<void> purgeRetiredCache() async {
-    await MarketDataCache.clear('volatility');
-    await MarketDataCache.clear('momentum');
-    await MarketDataCache.clearPrefix('volume_surge_');
-  }
+  /// Cached payloads hold analyst-published content only (see
+  /// `LegacyCachePurge` for the one-time removal of older market caches).
+  const PersistentMarketDataService(this.inner);
 
   final MarketDataService inner;
 
   // ── cache keys — one per independently-persisted surface ────────────────
-  static const _kIndexBoard = 'index_board';
-  static String _kIndex(IndexId i) => 'index_${i.id}';
-  static String _kConstituents(IndexId i) => 'constituents_${i.id}';
-  static String _kEquity(String symbol) => 'equity_${symbol.toUpperCase()}';
-  static String _kSentiment(bool monthly) => 'sentiment_$monthly';
-  static const _kGainers = 'gainers';
-  static const _kLosers = 'losers';
-  static const _kMostActive = 'most_active';
   static const _kSignals = 'signals';
   static const _kCourses = 'courses';
   static const _kInsightNotes = 'insight_notes';
-  static const _kFullBreadth = 'full_breadth';
   static const _kWeeklyReports = 'weekly_reports';
   static const _kCompliance = 'compliance';
 
@@ -125,76 +104,7 @@ class PersistentMarketDataService implements MarketDataService {
     );
   }
 
-  static Quote? _decodeQuote(dynamic json) =>
-      json is Map ? Quote.tryParse(json.cast<String, dynamic>()) : null;
-
   // ── MarketDataService ────────────────────────────────────────────────────
-
-  @override
-  Future<DataResult<List<Quote>>> getIndexBoard() => _persistedList(
-    _kIndexBoard,
-    inner.getIndexBoard,
-    (q) => q.toJson(),
-    _decodeQuote,
-  );
-
-  @override
-  Future<DataResult<Quote>> getIndex(IndexId index) => _persisted(
-    _kIndex(index),
-    () => inner.getIndex(index),
-    (q) => q.toJson(),
-    _decodeQuote,
-  );
-
-  @override
-  Future<DataResult<List<Quote>>> getConstituents(IndexId index) =>
-      _persistedList(
-        _kConstituents(index),
-        () => inner.getConstituents(index),
-        (q) => q.toJson(),
-        _decodeQuote,
-      );
-
-  @override
-  Future<DataResult<Quote>> getEquity(String symbol) => _persisted(
-    _kEquity(symbol),
-    () => inner.getEquity(symbol),
-    (q) => q.toJson(),
-    _decodeQuote,
-  );
-
-  @override
-  Future<DataResult<Sentiment>> getSentiment({required bool monthly}) =>
-      _persisted(
-        _kSentiment(monthly),
-        () => inner.getSentiment(monthly: monthly),
-        (s) => s.toJson(),
-        (j) => j is Map ? Sentiment.tryParse(j.cast<String, dynamic>()) : null,
-      );
-
-  @override
-  Future<DataResult<List<Quote>>> getTopGainers() => _persistedList(
-    _kGainers,
-    inner.getTopGainers,
-    (q) => q.toJson(),
-    _decodeQuote,
-  );
-
-  @override
-  Future<DataResult<List<Quote>>> getTopLosers() => _persistedList(
-    _kLosers,
-    inner.getTopLosers,
-    (q) => q.toJson(),
-    _decodeQuote,
-  );
-
-  @override
-  Future<DataResult<List<Quote>>> getMostActive() => _persistedList(
-    _kMostActive,
-    inner.getMostActive,
-    (q) => q.toJson(),
-    _decodeQuote,
-  );
 
   @override
   Future<DataResult<List<Signal>>> getSignals() => _persistedList(
@@ -218,14 +128,6 @@ class PersistentMarketDataService implements MarketDataService {
     inner.getInsightNotes,
     (n) => n.toJson(),
     (j) => j is Map ? InsightNote.tryParse(j.cast<String, dynamic>()) : null,
-  );
-
-  @override
-  Future<DataResult<FullBreadth>> getFullBreadth() => _persisted(
-    _kFullBreadth,
-    inner.getFullBreadth,
-    (b) => b.toJson(),
-    (j) => j is Map ? FullBreadth.tryParse(j.cast<String, dynamic>()) : null,
   );
 
   @override

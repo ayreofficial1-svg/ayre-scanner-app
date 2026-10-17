@@ -252,8 +252,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             glyph: AyreGlyph.trendUp,
                             title: 'Signal alerts',
                             subtitle:
-                                'New signals, changes to them, and when a '
-                                'price reaches its entry level.',
+                                'New signals and changes to them.',
                             value: settings.newSignalAlerts,
                             // Governs both the in-app list and push, so it
                             // stays usable while either of them is on.

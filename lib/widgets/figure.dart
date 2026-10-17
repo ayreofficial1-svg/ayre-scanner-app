@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
-import 'ayre_icons.dart';
 
 /// The single component every numeric market value renders through, so no screen
 /// can fall back to the UI face for a price. It always uses the ticker face with
@@ -184,8 +183,8 @@ class _RollingChar extends StatelessWidget {
 /// different animation from [Figure]'s per-character glyph roll, not a
 /// retuning of it: a roll animates the shape of the text, a count-up animates
 /// the quantity. Plan §4 decided the count-up is the primary hero-metric
-/// animation and the roll is retired for that job, so hero readings (the
-/// donut's centre label, the gauge's score, an index level) use this and
+/// animation and the roll is retired for that job, so hero readings (a
+/// ring's centre label, a count) use this and
 /// secondary live tickers keep [Figure].
 ///
 /// D-5: only a figure's *first* reveal animates (from [from], 400 ms). Any
@@ -299,88 +298,6 @@ class _CountUpFigureState extends State<CountUpFigure>
           maxLines: 1,
         ),
       ),
-    );
-  }
-}
-
-/// A signed change figure. Color is always a confirming second channel: the sign
-/// lives in the string and a directional caret sits beside it, so direction
-/// survives with color removed entirely.
-class DeltaFigure extends StatelessWidget {
-  const DeltaFigure({
-    super.key,
-    required this.change,
-    this.percent = true,
-    this.fontSize = 13,
-    this.fontWeight = FontWeight.w600,
-    this.color,
-    this.decimals = 2,
-    this.showGlyph = true,
-  });
-
-  /// Signed change. Null renders a neutral placeholder.
-  final num? change;
-  final bool percent;
-  final double fontSize;
-  final FontWeight fontWeight;
-
-  /// Overrides the semantic gain/loss color, for surfaces that already carry
-  /// the direction (e.g. an ink panel).
-  final Color? color;
-  final int decimals;
-  final bool showGlyph;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    if (change == null) {
-      return Figure.static(
-        '—',
-        fontSize: fontSize,
-        fontWeight: fontWeight,
-        color: t.foregroundSubtle,
-      );
-    }
-
-    // D-6: a change that rounds to zero is "unchanged": muted tone, flat
-    // marker, unsigned text. (null above stays "—", never zero.)
-    final unchanged =
-        double.parse(change!.abs().toStringAsFixed(decimals)) == 0;
-    final up = change! >= 0;
-    // Text and glyph use the A4 status-text tokens (>= 4.5:1 in light);
-    // fills and chart marks elsewhere keep positive/negative.
-    final tone =
-        color ??
-        (unchanged ? t.foregroundMuted : (up ? t.positiveText : t.negativeText));
-    final text = unchanged
-        ? '${(0).toStringAsFixed(decimals)}${percent ? '%' : ''}'
-        : formatDelta(change!, percent: percent, decimals: decimals);
-    final spoken = unchanged
-        ? 'unchanged'
-        : '${up ? 'up' : 'down'} '
-              '${change!.abs().toStringAsFixed(decimals)}'
-              '${percent ? ' percent' : ''}';
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (showGlyph) ...[
-          DirectionGlyph(
-            up: up,
-            flat: unchanged,
-            color: tone,
-            size: fontSize * 0.78,
-          ),
-          const SizedBox(width: AppSpace.xs),
-        ],
-        Figure(
-          text,
-          fontSize: fontSize,
-          fontWeight: fontWeight,
-          color: tone,
-          semanticsLabel: spoken,
-        ),
-      ],
     );
   }
 }

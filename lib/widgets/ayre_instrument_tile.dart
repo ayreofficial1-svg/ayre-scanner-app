@@ -3,9 +3,8 @@ import 'package:flutter/material.dart';
 import '../services/stock_logo_service.dart';
 import '../theme/app_theme.dart';
 
-/// A rounded-square tile for a tradeable instrument — the leading element of
-/// the shared "tile + two text lines + trailing value/delta" row grammar
-/// (redesign plan §2.2), and the app-wide stand-in for a company logo
+/// A rounded-square tile for a recommended instrument — the leading element of
+/// the "tile + text lines" row grammar, and the app-wide stand-in for a company logo
 /// wherever a stock's symbol/name is shown.
 ///
 /// **Shows a real company logo when one can be found, its monogram
@@ -16,15 +15,12 @@ import '../theme/app_theme.dart';
 /// set, or a bundled asset somehow fails to load — this tile falls back to
 /// the same deterministic, offline monogram it always drew:
 /// a neutral tonal fill (`surfaceRaised`, `foregroundMuted` ink), never
-/// direction-tinted (gain/loss color belongs to the figures at the trailing
-/// edge, and a green tile in a Top Losers list would contradict them), and
+/// direction-tinted, and
 /// never an identity accent (that role is `AyreAvatar`'s, reserved for
 /// people). The tile never blocks its row on a network call and never shows
 /// a broken image — a logo either loads or the monogram remains.
 ///
-/// Rounded square by design ([AppRadius.iconTile]); the circular treatment is
-/// the Home index-card icon tile's one deliberate exception (§2A) and does not
-/// carry over here.
+/// Rounded square by design ([AppRadius.iconTile]).
 ///
 /// Used by `ayre_signals_section.dart`'s signal cards and the Weekly Report card
 /// header — every place a stock's symbol/name appears in the app. Passing
@@ -45,8 +41,7 @@ class AyreInstrumentTile extends StatefulWidget {
   final String symbol;
   final double size;
 
-  /// The company name, when the caller has it (e.g. `Quote.name`,
-  /// `Signal.name`). Used only to disambiguate the logo lookup — never
+  /// The company name, when the caller has it (e.g. `Signal.name`). Used only to disambiguate the logo lookup — never
   /// displayed by this tile itself.
   final String? name;
 

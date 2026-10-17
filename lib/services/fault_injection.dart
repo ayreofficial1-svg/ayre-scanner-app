@@ -33,31 +33,20 @@ enum FaultKind {
 }
 
 /// Named data surfaces a fault can be pinned to. One per independently-failing
-/// section, because the whole point is that a failed movers list doesn't take the
-/// sentiment reading down with it.
+/// section, because the whole point is that a failed weekly report doesn't take the
+/// recommendations down with it.
 enum DataSurface {
-  indexBoard,
-  indexDetail,
-  indexConstituents,
-  equityDetail,
   signals,
-  sentiment,
-  gainers,
-  losers,
-  mostActive,
   courses,
   insightNotes,
   account,
-  // Spec: full Nifty-500 breadth (Home).
-  fullBreadth,
-  // Phase 5: admin-entered historical performance, shown on the Reports tab
+  // Admin-entered historical performance, shown on the Reports tab
   // (`GET /api/weekly-report`). Its own surface so a failed fetch never
   // affects any other tab.
   weeklyReport,
-  // Phase 6: the SEBI Research Analyst registration number and disclaimer
+  // The SEBI Research Analyst registration number and disclaimer
   // (`GET /api/compliance`), shown on the Research Analyst information
-  // screen. Its own surface so this can be exercised through fault
-  // injection independently of every other feed.
+  // screen.
   compliance,
 }
 

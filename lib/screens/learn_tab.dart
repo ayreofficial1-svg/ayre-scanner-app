@@ -389,7 +389,7 @@ class _LearnFooter extends StatelessWidget {
 ///
 /// The ring is the reason this card exists rather than being another list row
 /// — a proportion read as a shape is the one thing a row of text can't do, and
-/// it's the same argument the breadth donut makes on Home.
+/// the same argument any progress ring makes.
 class _ContinueCard extends StatelessWidget {
   const _ContinueCard({required this.course, required this.onTap});
 

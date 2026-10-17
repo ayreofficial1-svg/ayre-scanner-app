@@ -13,6 +13,7 @@ import 'services/api_service.dart';
 import 'services/app_lifecycle.dart';
 import 'services/auth_service.dart';
 import 'services/email_verification.dart';
+import 'services/legacy_cache_purge.dart';
 import 'services/onboarding_store.dart';
 import 'services/push_service.dart';
 import 'services/reachability.dart';
@@ -108,6 +109,7 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
       OnboardingStore.instance.load(),
       NotificationLog.instance.load(),
       ApiService.purgeLegacyCookie(),
+      LegacyCachePurge.run(),
     ]);
     await authReady;
     // Deliberately not awaited into the UI path: the permission prompt and

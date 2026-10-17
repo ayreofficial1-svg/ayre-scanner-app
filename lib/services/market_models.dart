@@ -1,265 +1,12 @@
-/// Wire models for every market surface in the app.
+/// Wire models for the research content the app shows: the analyst's
+/// recommendations, Learn courses, desk notes, weekly reports and the
+/// registration details.
 ///
 /// Each `tryParse` returns null when a field the UI genuinely cannot render
 /// without is missing or unparseable, so a malformed row is dropped rather than
 /// producing a half-drawn card. Optional fields degrade the UI locally instead
 /// of failing the whole section.
 library;
-
-/// The three instruments Home treats as primary gateways.
-enum IndexId {
-  nifty50(id: 'NIFTY50', label: 'NIFTY 50', apiKey: 'nifty'),
-  bankNifty(id: 'BANKNIFTY', label: 'BANK NIFTY', apiKey: 'bank_nifty'),
-  sensex(id: 'SENSEX', label: 'SENSEX', apiKey: 'sensex');
-
-  const IndexId({required this.id, required this.label, required this.apiKey});
-
-  final String id;
-  final String label;
-
-  /// Key this index is expected under in a market payload.
-  final String apiKey;
-
-  static IndexId? fromId(String value) {
-    for (final candidate in IndexId.values) {
-      if (candidate.id.toUpperCase() == value.toUpperCase()) return candidate;
-    }
-    return null;
-  }
-}
-
-/// A tradeable instrument's current reading — used for both indices and
-/// equities, because the shape a readout needs is the same for either.
-class Quote {
-  const Quote({
-    required this.symbol,
-    required this.name,
-    required this.lastPrice,
-    required this.change,
-    required this.percentChange,
-    required this.asOf,
-    this.previousClose,
-    this.dayLow,
-    this.dayHigh,
-    this.volume,
-    this.trace = const [],
-  });
-
-  final String symbol;
-  final String name;
-  final num lastPrice;
-
-  /// Absolute change; may be negative. Drives the sign.
-  final num change;
-  final num percentChange;
-  final DateTime asOf;
-
-  final num? previousClose;
-  final num? dayLow;
-  final num? dayHigh;
-  final num? volume;
-
-  /// Intraday samples, oldest first. Empty means the trace is simply not drawn —
-  /// the readout never invents a shape it wasn't given.
-  final List<num> trace;
-
-  bool get isUp => change >= 0;
-
-  static Quote? tryParse(Map<String, dynamic> json, {String? fallbackSymbol}) {
-    final symbol =
-        _str(json, const ['symbol', 'ticker', 'scrip', 'id']) ?? fallbackSymbol;
-    final last = _num(json, const [
-      'lastPrice',
-      'last_price',
-      'ltp',
-      'price',
-      'value',
-      'level',
-    ]);
-    if (symbol == null || symbol.isEmpty || last == null) return null;
-
-    // `change_points` is what the backend calls the absolute change on a
-    // constituent row; its `change` field is the *percentage*, so it must not be
-    // read as an absolute here.
-    final change = _num(json, const [
-      'change_points',
-      'changePoints',
-      'points',
-      'net_change',
-      'netChange',
-    ]);
-    final percent = _num(json, const [
-      'percentChange',
-      'percent_change',
-      'change_pct',
-      'pChange',
-    ]);
-    // A readout with no direction is not a readout; require at least one of the
-    // two change figures and derive the other where possible.
-    if (change == null && percent == null) return null;
-    final previous = _num(json, const [
-      'previousClose',
-      'previous_close',
-      'prevClose',
-    ]);
-    final resolvedChange =
-        change ??
-        (previous != null ? last - previous : (last * percent! / 100));
-    final resolvedPercent =
-        percent ??
-        (previous != null && previous != 0
-            ? (resolvedChange / previous) * 100
-            : 0);
-
-    return Quote(
-      symbol: symbol,
-      name:
-          _str(json, const ['name', 'companyName', 'company_name', 'label']) ??
-          symbol,
-      lastPrice: last,
-      change: resolvedChange,
-      percentChange: resolvedPercent,
-      asOf:
-          _time(json, const ['asOf', 'as_of', 'updated_at', 'timestamp']) ??
-          DateTime.now(),
-      previousClose: previous,
-      dayLow: _num(json, const ['dayLow', 'day_low', 'low']),
-      dayHigh: _num(json, const ['dayHigh', 'day_high', 'high']),
-      volume: _num(json, const [
-        'volume',
-        'totalTradedVolume',
-        'traded_value',
-        'totalTradedValue',
-      ]),
-      trace: _numList(json, const ['trace', 'intraday', 'series', 'points']),
-    );
-  }
-
-  /// Round-trips through [tryParse] — used to persist the last good reading
-  /// to disk (`MarketDataCache`) so it survives process death, not just an
-  /// in-memory `keepingLastGood`. Key names match [tryParse]'s first-choice
-  /// alias for each field.
-  Map<String, dynamic> toJson() => {
-    'symbol': symbol,
-    'name': name,
-    'lastPrice': lastPrice,
-    'change_points': change,
-    'percentChange': percentChange,
-    'asOf': asOf.toIso8601String(),
-    if (previousClose != null) 'previousClose': previousClose,
-    if (dayLow != null) 'dayLow': dayLow,
-    if (dayHigh != null) 'dayHigh': dayHigh,
-    if (volume != null) 'volume': volume,
-    if (trace.isNotEmpty) 'trace': trace,
-  };
-}
-
-/// A market sentiment/breadth reading.
-class Sentiment {
-  const Sentiment({
-    required this.score,
-    required this.asOf,
-    this.note,
-    this.advances,
-    this.declines,
-    this.unchanged,
-  });
-
-  /// 0..100
-  final int score;
-  final DateTime asOf;
-  final String? note;
-
-  /// Breadth counts, shown as a readout row when the feed provides them.
-  final int? advances;
-  final int? declines;
-  final int? unchanged;
-
-  String get band {
-    if (score < 35) return 'Caution';
-    if (score < 65) return 'Neutral';
-    return 'Strong';
-  }
-
-  static Sentiment? tryParse(Map<String, dynamic> json) {
-    final score = _num(json, const ['sentiment', 'score', 'value', 'breadth']);
-    if (score == null) return null;
-    return Sentiment(
-      score: score.round().clamp(0, 100),
-      asOf:
-          _time(json, const ['asOf', 'as_of', 'updated_at', 'timestamp']) ??
-          DateTime.now(),
-      note: _str(json, const ['note', 'summary', 'commentary']),
-      advances: _num(json, const ['advances', 'advancing'])?.round(),
-      declines: _num(json, const ['declines', 'declining'])?.round(),
-      unchanged: _num(json, const ['unchanged', 'flat'])?.round(),
-    );
-  }
-
-  /// Round-trips through [tryParse]; see [Quote.toJson].
-  Map<String, dynamic> toJson() => {
-    'sentiment': score,
-    'asOf': asOf.toIso8601String(),
-    if (note != null) 'note': note,
-    if (advances != null) 'advances': advances,
-    if (declines != null) 'declines': declines,
-    if (unchanged != null) 'unchanged': unchanged,
-  };
-}
-
-/// Full Nifty-500 market breadth (`GET /api/breadth/full`) — a separate,
-/// complete breadth reading from [Sentiment]'s ~140-stock live-tick count.
-/// Refreshes on its own fixed hourly schedule (backend spec §4), not
-/// tick-by-tick, which is why it carries its own [asOf] rather than reusing
-/// the live-refresh cadence the rest of Home polls on.
-class FullBreadth {
-  const FullBreadth({
-    required this.advances,
-    required this.declines,
-    required this.unchanged,
-    required this.avgChangePct,
-    required this.coverage,
-    this.asOf,
-  });
-
-  final int advances;
-  final int declines;
-  final int unchanged;
-  final num avgChangePct;
-
-  /// How many of the ~500 constituents this reading actually covers — shown
-  /// so a partial batch (a few symbols the poller's Fyers call missed) isn't
-  /// silently presented as full-universe breadth.
-  final int coverage;
-  final DateTime? asOf;
-
-  static FullBreadth? tryParse(Map<String, dynamic> json) {
-    final coverage = _num(json, const ['coverage'])?.round();
-    if (coverage == null || coverage <= 0) return null;
-    return FullBreadth(
-      advances: _num(json, const ['advances'])?.round() ?? 0,
-      declines: _num(json, const ['declines'])?.round() ?? 0,
-      unchanged: _num(json, const ['unchanged'])?.round() ?? 0,
-      avgChangePct: _num(json, const ['avg_change_pct']) ?? 0,
-      coverage: coverage,
-      asOf: _asOfStamp(json),
-    );
-  }
-
-  /// Round-trips through [tryParse]; see [Quote.toJson]. `as_of` is written
-  /// as plain ISO-8601 — [_asOfStamp] falls back to [DateTime.tryParse] when
-  /// the backend's own "18 Sep 2026 11:45:12" wall-clock format doesn't
-  /// match, so this reads back correctly even though the backend never
-  /// sends this exact shape itself.
-  Map<String, dynamic> toJson() => {
-    'advances': advances,
-    'declines': declines,
-    'unchanged': unchanged,
-    'avg_change_pct': avgChangePct,
-    'coverage': coverage,
-    if (asOf != null) 'as_of': asOf!.toIso8601String(),
-  };
-}
 
 /// The SEBI Research Analyst registration number and its accompanying
 /// disclaimer (`GET /api/compliance`) — Phase 6. Both values live in the
@@ -288,63 +35,36 @@ class ComplianceInfo {
     );
   }
 
-  /// Round-trips through [tryParse]; see [Quote.toJson].
+  /// Round-trips through [tryParse]; see [Signal.toJson].
   Map<String, dynamic> toJson() => {
     'ra_registration_number': registrationNumber,
     'disclaimer': disclaimer,
   };
 }
 
-/// An admin-curated stock pick on the Signals board (`GET /api/signals`,
-/// `data/app_signals.py`). The website's admin panel only ever sets
-/// `symbol`, `entry_price`, `exit_price`, `stop_loss` and `enabled` — there
-/// is no `rationale`, `bias`/direction, or `strength`/conviction score in
-/// the current backend response, so none of those are parsed here.
+/// An analyst recommendation (`GET /api/signals`). Every field is typed by the
+/// research analyst: symbol, name, rationale and the three levels. Nothing
+/// here is sourced from an exchange feed, and any such field that an older
+/// payload might still carry (last price, percent change, "entry reached"
+/// facts) is deliberately ignored by [tryParse] and never written by [toJson].
 class Signal {
   const Signal({
     required this.symbol,
     this.rationale = '',
     this.name,
-    this.lastPrice,
-    this.percentChange,
     this.entry,
     this.exitPrice,
     this.stop,
     this.addedOn,
-    this.entryReachedAt,
-    this.entryReachedPrice,
-    this.entryReachedExtended = false,
   });
 
   final String symbol;
-
-  /// Still accepted/stored by the backend (older admin-created rows may
-  /// have one), but the current admin panel no longer has a field for it —
-  /// almost always empty for anything created recently.
   final String rationale;
   final String? name;
-  final num? lastPrice;
-  final num? percentChange;
   final num? entry;
   final num? exitPrice;
   final num? stop;
   final String? addedOn;
-
-  /// "Entry reached" facts. Present only after the team published them for
-  /// this pick; absent (null / false) for every other signal and for older
-  /// backend responses. [entryReachedAt] is an ISO time (IST offset).
-  final String? entryReachedAt;
-  final num? entryReachedPrice;
-
-  /// The price had already moved past the entry level when it was noticed.
-  final bool entryReachedExtended;
-
-  bool get hasEntryReached => entryReachedAt != null;
-
-  /// Purely a price-move indicator (percent change >= 0), used only to tint
-  /// the up/down glyph next to the move — the backend has no separate
-  /// bullish/bearish classification for an admin-curated pick.
-  bool get bullish => (percentChange ?? 0) >= 0;
 
   static Signal? tryParse(Map<String, dynamic> json) {
     final symbol = _str(json, const ['symbol', 'ticker', 'scrip']);
@@ -354,36 +74,23 @@ class Signal {
       rationale:
           _str(json, const ['rationale', 'reason', 'note', 'body']) ?? '',
       name: _str(json, const ['name', 'companyName', 'company_name']),
-      lastPrice: _num(json, const ['last_price', 'lastPrice', 'ltp', 'price']),
-      percentChange: _num(json, const [
-        'change_pct',
-        'percentChange',
-        'percent_change',
-      ]),
       entry: _num(json, const ['entry_price', 'entry']),
       exitPrice: _num(json, const ['exit_price', 'exitPrice']),
       stop: _num(json, const ['stop_loss', 'stoploss', 'stop']),
       addedOn: _str(json, const ['date_added', 'added_on', 'created_at']),
-      entryReachedAt: _str(json, const ['entry_reached_at']),
-      entryReachedPrice: _num(json, const ['entry_reached_price']),
-      entryReachedExtended: json['entry_reached_extended'] == true,
     );
   }
 
-  /// Round-trips through [tryParse]; see [Quote.toJson].
+  /// Round-trips through [tryParse]. Writes analyst-typed fields only, so the
+  /// persistent cache never holds anything derived from market data.
   Map<String, dynamic> toJson() => {
     'symbol': symbol,
     'rationale': rationale,
     if (name != null) 'name': name,
-    if (lastPrice != null) 'last_price': lastPrice,
-    if (percentChange != null) 'change_pct': percentChange,
     if (entry != null) 'entry_price': entry,
     if (exitPrice != null) 'exit_price': exitPrice,
     if (stop != null) 'stop_loss': stop,
     if (addedOn != null) 'date_added': addedOn,
-    if (entryReachedAt != null) 'entry_reached_at': entryReachedAt,
-    if (entryReachedPrice != null) 'entry_reached_price': entryReachedPrice,
-    if (entryReachedExtended) 'entry_reached_extended': true,
   };
 }
 
@@ -431,7 +138,7 @@ class Course {
     );
   }
 
-  /// Round-trips through [tryParse]; see [Quote.toJson].
+  /// Round-trips through [tryParse]; see [Signal.toJson].
   Map<String, dynamic> toJson() => {
     'title': title,
     'category': category,
@@ -466,7 +173,7 @@ class InsightNote {
     );
   }
 
-  /// Round-trips through [tryParse]; see [Quote.toJson].
+  /// Round-trips through [tryParse]; see [Signal.toJson].
   Map<String, dynamic> toJson() => {
     'title': title,
     'body': body,
@@ -573,7 +280,7 @@ class WeeklyReportStock {
     );
   }
 
-  /// Round-trips through [tryParse]; see [Quote.toJson].
+  /// Round-trips through [tryParse]; see [Signal.toJson].
   Map<String, dynamic> toJson() => {
     'symbol': symbol,
     'profit_pct': profitPct,
@@ -644,64 +351,13 @@ class WeeklyReport {
     );
   }
 
-  /// Round-trips through [tryParse]; see [Quote.toJson].
+  /// Round-trips through [tryParse]; see [Signal.toJson].
   Map<String, dynamic> toJson() => {
     'id': id,
     'week_start': weekStart.toIso8601String(),
     'week_end': weekEnd.toIso8601String(),
     'stocks': stocks.map((s) => s.toJson()).toList(),
   };
-}
-
-/// Parses the scanner backend's "18 Sep 2026 11:45:12" IST wall-clock
-/// stamps — used by `/api/breadth/full`'s and the `/api/insights/*`
-/// endpoints' `as_of` fields — into a proper [DateTime].
-///
-/// Public (unlike the other parsing helpers below, which are private to this
-/// file) so other files can read the same stamp format. Returns null (never throws) for anything that isn't exactly
-/// this format; an ISO-8601 stamp should go through [DateTime.tryParse]
-/// instead, as every other model in this file already does.
-DateTime? parseIstStamp(String raw) {
-  final match = RegExp(
-    r'^(\d{1,2}) (\w{3}) (\d{4}) (\d{2}):(\d{2}):(\d{2})$',
-  ).firstMatch(raw.trim());
-  if (match == null) return null;
-  const months = {
-    'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
-    'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12,
-  };
-  final month = months[match.group(2)];
-  final day = int.tryParse(match.group(1)!);
-  final year = int.tryParse(match.group(3)!);
-  final hour = int.tryParse(match.group(4)!);
-  final minute = int.tryParse(match.group(5)!);
-  final second = int.tryParse(match.group(6)!);
-  if (month == null ||
-      day == null ||
-      year == null ||
-      hour == null ||
-      minute == null ||
-      second == null) {
-    return null;
-  }
-  // The backend's stamp is IST wall-clock (UTC+5:30) with no offset suffix —
-  // build the matching UTC instant so `.toLocal()` downstream
-  // (`FreshnessStamp`) shows the correct clock time on any device.
-  return DateTime.utc(
-    year,
-    month,
-    day,
-    hour,
-    minute,
-    second,
-  ).subtract(const Duration(hours: 5, minutes: 30));
-}
-
-/// `as_of` reader used by [FullBreadth]'s `tryParse`.
-DateTime? _asOfStamp(Map<String, dynamic> json) {
-  final raw = json['as_of'];
-  if (raw is! String) return null;
-  return parseIstStamp(raw) ?? DateTime.tryParse(raw);
 }
 
 // ─── Shared parsing helpers ────────────────────────────────────────────────
@@ -726,33 +382,6 @@ num? _num(Map<String, dynamic> json, List<String> keys) {
     }
   }
   return null;
-}
-
-List<num> _numList(Map<String, dynamic> json, List<String> keys) {
-  for (final key in keys) {
-    final value = json[key];
-    if (value is List) {
-      final out = <num>[];
-      for (final entry in value) {
-        if (entry is num) {
-          out.add(entry);
-        } else if (entry is String) {
-          final parsed = num.tryParse(entry);
-          if (parsed != null) out.add(parsed);
-        } else if (entry is Map) {
-          final nested = _num(entry.cast<String, dynamic>(), const [
-            'value',
-            'price',
-            'close',
-            'ltp',
-          ]);
-          if (nested != null) out.add(nested);
-        }
-      }
-      if (out.length >= 2) return out;
-    }
-  }
-  return const [];
 }
 
 DateTime? _time(Map<String, dynamic> json, List<String> keys) {
