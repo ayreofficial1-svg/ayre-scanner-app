@@ -418,7 +418,7 @@ class _ConfirmSheet extends StatelessWidget {
 // ─── Appearance & text-size tile selectors ─────────────────────────────────
 // Both selectors render as a row of big tappable tiles (glyph/sample + label +
 // checkmark on the selected tile). `AyreSegmented` is left untouched — it is
-// shared with the Insights time-window toggle, which keeps the bar style.
+// shared with other screens, which keep the bar style.
 
 class _AppearanceTiles extends StatelessWidget {
   const _AppearanceTiles({required this.value, required this.onChanged});

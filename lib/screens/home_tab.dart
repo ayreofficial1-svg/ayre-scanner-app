@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:async';
-import 'dart:ui' show PointerDeviceKind;
 
 import '../main.dart' show AppThemeController;
 import '../services/auth_service.dart';
@@ -12,7 +10,6 @@ import '../services/market_models.dart';
 import '../onboarding/tour_content.dart' show TourKeys;
 import '../theme/app_theme.dart';
 import '../widgets/ayre_avatar.dart';
-import '../widgets/ayre_compact_index_card.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_hills.dart';
 import '../widgets/ayre_icons.dart';
@@ -21,35 +18,19 @@ import '../widgets/ayre_logo.dart';
 import '../widgets/ayre_signals_section.dart';
 import '../widgets/ayre_tab_scroll.dart';
 import '../widgets/pressable_scale.dart';
-import '../widgets/responsive.dart';
 import '../widgets/state_views.dart';
 import 'home_shell.dart' show initialsFor;
-import 'index_detail_screen.dart';
 import 'insight_note_screen.dart';
 import 'notifications_screen.dart';
 
-/// Home — the market gateway (Spec §13.1).
+/// Home.
 ///
 /// Order: greeting header (with the decorative hill ornament behind it) →
-/// **Market Sentiment card** → compact index board → **Signals**
-/// (the Weekly Report now has its own
-/// Reports tab) → **Market Insight carousel**. Sections are separated by
-/// `sectionGap` alone (the closing divider duplicated that spacing).
+/// **Recommendations** (the analyst's published signals) → **Market Insight
+/// carousel** (the analyst's hand-written desk notes). Sections are separated
+/// by `sectionGap` alone. The Weekly Report has its own Reports tab.
 ///
-/// The "Market breadth" donut card that used to sit between the index board
-/// and the insight carousel has been removed; nothing replaces it, and the
-/// remaining sections simply keep the standard section gap between them.
-///
-/// Devices retired in earlier phases and still gone:
-///
-/// * **The ink readout panel.** v3 sat each index's live figures on a dark
-///   "terminal feed" plate. The figures sit on the card, and what marks
-///   them as live is the pulse dot, not a plate behind them.
-/// * **The inlined direction rendering.** `DirectionBadge` carries direction
-///   wherever a badge is what's wanted.
-/// * **The "For informational purposes only, not investment advice."
-///   footer text.** Removed; the hairline divider that sat above it is kept,
-///   unchanged, as the boundary a later phase uses for new content.
+/// Nothing on this screen is sourced from an exchange or market-data feed.
 class HomeTab extends StatefulWidget {
   const HomeTab({
     super.key,
@@ -66,14 +47,9 @@ class HomeTab extends StatefulWidget {
   final VoidCallback? onOpenProfile;
 
   /// Whether this tab is the one currently showing in the shell's
-  /// [IndexedStack]. The tab stays mounted (and its state preserved) while
-  /// on another tab, but there is no reason to keep fetching and rebuilding
-  /// its live data every 10s while it isn't on screen — that's main-thread
-  /// work (network completion, JSON decode, setState, a full chart/carousel
-  /// rebuild) spent on a screen nobody can see. [_liveTimer] keeps ticking
-  /// on its normal cadence regardless, but [_refreshLive] no-ops while
-  /// inactive and a becoming-active transition triggers one immediate catch-
-  /// up refresh instead.
+  /// [IndexedStack]. The tab stays mounted (and its state preserved) while on
+  /// another tab; the Recommendations section uses this to skip reloads while
+  /// off screen.
   final bool active;
 
   /// Changes whenever something (a signal notification) asks Home to bring the
@@ -89,26 +65,9 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  DataResult<List<Quote>>? _board;
-  DataResult<Sentiment>? _breadth;
-  // The full Nifty-500 advance/decline count from `/api/breadth/full`. It no
-  // longer has a card of its own on Home, and as of this phase the Market
-  // Sentiment card no longer shows a description line either, so this fetch
-  // currently has no consumer anywhere in the app. It is kept — rather than
-  // silently removed — because deleting a working fetch other code might
-  // still be expected to rely on is a bigger decision than this phase's
-  // scope; flagged here for a later phase or a deliberate follow-up decision
-  // to actually remove it if it stays unused.
-  // Refreshes on its own fixed hourly schedule server-side — cache-only on
-  // every request — so it's loaded in `_load` alongside everything else but
-  // deliberately left out of `_refreshLive`'s 10s tick, the same way
-  // Insights treats its own editorial surface (desk notes): polling a cache
-  // that only changes hourly would just re-fetch the same numbers.
-  DataResult<FullBreadth>? _fullBreadth;
-  // The Market Insight carousel's source: the same admin-curated desk notes
-  // (`/api/insights`) the Insights tab lists. Editorial content that changes
-  // a few times a day at most, so — like `_fullBreadth` — it loads in `_load`
-  // and is left out of `_refreshLive`'s 10s tick.
+  // The Market Insight carousel's source: the admin-curated desk notes
+  // (`/api/insights`). Editorial content that changes a few times a day at
+  // most, so it loads in `_load` and on resume after a long absence.
   DataResult<List<InsightNote>>? _notes;
   // The signals section owns its own fetch (see [SignalsSection]); Home only
   // holds a controller so pull-to-refresh can reload it.
@@ -116,47 +75,31 @@ class _HomeTabState extends State<HomeTab> {
       SignalsSectionController();
   final GlobalKey _signalsKey = GlobalKey();
   // True from a focus request until the page has finished loading, so a layout
-  // shift above the Signals section (sentiment card landing) re-anchors it.
+  // shift above the Signals section re-anchors it.
   bool _focusPending = false;
   String _accountName = '';
   bool _loading = true;
-  Timer? _liveTimer;
-  bool _liveRefreshInFlight = false;
 
   @override
   void initState() {
     super.initState();
     _load();
     if (widget.signalsFocusToken > 0) _requestSignalsFocus();
-    // Board + breadth only — session is already resolved above, and this
-    // fires often enough that re-checking it every tick would be wasted
-    // work. Safe to poll this often: the backend serves it from Fyers'
-    // single live WebSocket, so this never adds extra Fyers/NSE requests.
-    _liveTimer = Timer.periodic(
-      liveMarketRefreshInterval,
-      (_) => _refreshLive(),
-    );
     AppLifecycleService.instance.addListener(_onAppResumed);
   }
 
-  /// Fired once, shortly after the app returns to the foreground (after the
-  /// network has had a moment to reconnect). A request that was in flight when
-  /// the app was backgrounded may never complete, so its guard is reset.
+  /// Fired once, shortly after the app returns to the foreground. If the app
+  /// was away long enough, the desk notes are reloaded.
   void _onAppResumed() {
     if (!mounted || !widget.active) return;
-    _liveRefreshInFlight = false;
     if (AppLifecycleService.instance.lastAway > const Duration(minutes: 5)) {
-      // Away long enough that the hourly/editorial surfaces are stale too.
       _load();
-    } else {
-      _refreshLive();
     }
   }
 
   @override
   void didUpdateWidget(HomeTab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!oldWidget.active && widget.active) _refreshLive();
     if (oldWidget.signalsFocusToken != widget.signalsFocusToken &&
         widget.signalsFocusToken > 0) {
       _requestSignalsFocus();
@@ -199,44 +142,10 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void dispose() {
     AppLifecycleService.instance.removeListener(_onAppResumed);
-    _liveTimer?.cancel();
     super.dispose();
   }
 
-  Future<void> _refreshLive() async {
-    // Off-screen tabs (the shell keeps every tab mounted in an
-    // IndexedStack) skip the tick entirely rather than fetch and rebuild
-    // for a screen nobody can see — see [HomeTab.active].
-    if (!widget.active) return;
-    // Backgrounded, or still waiting for the network to settle after resume —
-    // the resume listener triggers the catch-up refresh.
-    if (!AppLifecycleService.instance.canFetch) return;
-    // A tick that fires while the previous one is still awaiting its
-    // response would otherwise pile a second request on top of the first —
-    // harmless individually, but across every live-refreshing screen it's
-    // how a single slow response turns into an ever-growing backlog of
-    // in-flight requests. Skipping the tick is enough: the next one four
-    // seconds later picks up cleanly.
-    if (!mounted || _liveRefreshInFlight) return;
-    _liveRefreshInFlight = true;
-    try {
-      final board = await widget.marketData.getIndexBoard();
-      final breadth = await widget.marketData.getSentiment(monthly: false);
-      if (!mounted) return;
-      // A failed poll never replaces good data already on screen.
-      setState(() {
-        _board = board.keepingLastGood(_board);
-        _breadth = breadth.keepingLastGood(_breadth);
-      });
-    } finally {
-      _liveRefreshInFlight = false;
-    }
-  }
-
   Future<void> _load() async {
-    final board = await widget.marketData.getIndexBoard();
-    final breadth = await widget.marketData.getSentiment(monthly: false);
-    final fullBreadth = await widget.marketData.getFullBreadth();
     final notes = await widget.marketData.getInsightNotes();
     if (!mounted) return;
 
@@ -244,9 +153,6 @@ class _HomeTabState extends State<HomeTab> {
 
     setState(() {
       _accountName = name;
-      _board = board.keepingLastGood(_board);
-      _breadth = breadth.keepingLastGood(_breadth);
-      _fullBreadth = fullBreadth.keepingLastGood(_fullBreadth);
       _notes = notes.keepingLastGood(_notes);
       _loading = false;
     });
@@ -271,74 +177,55 @@ class _HomeTabState extends State<HomeTab> {
         _signalsController.reload(silent: true),
       ]),
       children: [
-            // The hills are the header's backdrop, not part of its layout:
-            // positioned to the page's top-right corner (past the list
-            // padding, so they bleed to the viewport edge) and painted first.
-            // `Stack` sizes to the SafeArea child alone.
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Positioned(
-                  top: -AppSpace.pageTop,
-                  right: -AppSpace.gutterOf(context),
-                  child: AyreHills(),
-                ),
-                SafeArea(
-                  bottom: false,
-                  child: Entrance(
-                    child: _Header(
-                      name: displayName,
-                      onOpenProfile: widget.onOpenProfile,
-                    ),
-                  ),
-                ),
-              ],
+        // The hills are the header's backdrop, not part of its layout:
+        // positioned to the page's top-right corner (past the list
+        // padding, so they bleed to the viewport edge) and painted first.
+        // `Stack` sizes to the SafeArea child alone.
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              top: -AppSpace.pageTop,
+              right: -AppSpace.gutterOf(context),
+              child: AyreHills(),
             ),
-            const SizedBox(height: AppSpace.sectionGap),
-            Entrance(
-              index: 1,
-              child: _SentimentCard(
-                sentimentResult: _loading ? null : _breadth,
-                breadthResult: _loading ? null : _fullBreadth,
-                onRetry: _load,
+            SafeArea(
+              bottom: false,
+              child: Entrance(
+                child: _Header(
+                  name: displayName,
+                  onOpenProfile: widget.onOpenProfile,
+                ),
               ),
             ),
-            const SizedBox(height: AppSpace.sectionGap),
-            const Entrance(
-              index: 2,
-              child: SectionLabel(label: 'Index board'),
+          ],
+        ),
+        const SizedBox(height: AppSpace.sectionGap),
+        KeyedSubtree(
+          key: _signalsKey,
+          child: Entrance(
+            index: 1,
+            child: SignalsSection(
+              marketData: widget.marketData,
+              active: widget.active,
+              controller: _signalsController,
+              forceColumns: 1,
             ),
-            _IndexBoard(
-              result: _loading ? null : _board,
-              onOpen: _openIndex,
+          ),
+        ),
+        // An empty desk omits the card *and* its gap, so Home doesn't end
+        // in a hole; loading and failed still show their own states.
+        if (_showsInsights) ...[
+          const SizedBox(height: AppSpace.sectionGap),
+          Entrance(
+            index: 2,
+            child: _InsightSection(
+              result: _loading ? null : _notes,
+              onReadMore: _openInsight,
               onRetry: _load,
             ),
-            const SizedBox(height: AppSpace.sectionGap),
-            KeyedSubtree(
-              key: _signalsKey,
-              child: Entrance(
-                index: 3,
-                child: SignalsSection(
-                  marketData: widget.marketData,
-                  active: widget.active,
-                  controller: _signalsController,
-                  forceColumns: 1,
-                ),
-              ),
-            ),
-            // An empty desk omits the card *and* its gap, so Home doesn't end
-            // in a hole; loading and failed still show their own states.
-            if (_showsInsights) ...[
-              const SizedBox(height: AppSpace.sectionGap),
-              Entrance(
-                index: 4,
-                child: _InsightSection(
-                  result: _loading ? null : _notes,
-                  onReadMore: _openInsight,
-                  onRetry: _load,
-                ),
-              ),
-            ],
+          ),
+        ],
       ],
     );
   }
@@ -355,20 +242,6 @@ class _HomeTabState extends State<HomeTab> {
     HapticFeedback.selectionClick();
     Navigator.of(context).push(
       terminalRoute(builder: (_) => InsightNoteScreen(note: note)),
-    );
-  }
-
-  void _openIndex(Quote quote) {
-    final index = _indexIdFor(quote) ?? IndexId.nifty50;
-    HapticFeedback.selectionClick();
-    Navigator.of(context).push(
-      terminalRoute(
-        builder: (_) => IndexDetailScreen(
-          index: index,
-          marketData: widget.marketData,
-          seed: quote,
-        ),
-      ),
     );
   }
 }
@@ -409,7 +282,7 @@ class _Header extends StatelessWidget {
           children: [
             Expanded(
               // The only in-app brand placement: a small wordmark, sized to
-              // sit beneath the live content rather than compete with it.
+              // sit beneath the page content rather than compete with it.
               child: Wrap(
                 crossAxisAlignment: WrapCrossAlignment.center,
                 spacing: AppSpace.xs,
@@ -622,184 +495,6 @@ class _AccountControl extends StatelessWidget {
   }
 }
 
-/// Which of the three known indices a quote is, by symbol and then by label;
-/// null for anything else (a card then takes the neutral identity rather than
-/// borrowing another index's tint).
-IndexId? _indexIdFor(Quote quote) {
-  final bySymbol = IndexId.fromId(quote.symbol);
-  if (bySymbol != null) return bySymbol;
-  for (final candidate in IndexId.values) {
-    if (candidate.label == quote.name) return candidate;
-  }
-  return null;
-}
-
-// ─── Index board ───────────────────────────────────────────────────────────
-
-/// The three instruments as compact cards in one horizontal row, always in the
-/// backend's order (`IndexId.values`: Nifty 50, Bank Nifty, Sensex). The whole
-/// card is the tap target into Index Detail.
-///
-/// Where all three fit at a legible width (tablet / desktop) they share the
-/// row equally and nothing scrolls. On a phone the row scrolls horizontally,
-/// bleeds to the screen edges and lets the next card peek in so it reads as
-/// scrollable.
-class _IndexBoard extends StatelessWidget {
-  const _IndexBoard({
-    required this.result,
-    required this.onOpen,
-    required this.onRetry,
-  });
-
-  final DataResult<List<Quote>>? result;
-  final ValueChanged<Quote> onOpen;
-  final Future<void> Function() onRetry;
-
-  /// Room above and below the cards so their shadows aren't clipped by the
-  /// horizontal list's viewport.
-  static const double _shadowRoom = 8;
-
-  /// How many cards a phone shows at once (the last one peeks).
-  static const double _visibleCards = 2.35;
-
-  @override
-  Widget build(BuildContext context) {
-    final result = this.result;
-    if (result == null) {
-      return _row(
-        context,
-        count: 3,
-        itemBuilder: (_, _) => const AyreCompactIndexCardSkeleton(),
-      );
-    }
-
-    if (result.isFailed) {
-      return StatePanel.failed(
-        headline: 'Index feed unavailable',
-        message: "The levels below couldn't be fetched for this session.",
-        onRetry: onRetry,
-      );
-    }
-
-    if (result.isEmpty) {
-      return const StatePanel.empty(
-        headline: 'No index data',
-        message: 'The feed returned no instruments for this session.',
-      );
-    }
-
-    final quotes = result.value!;
-    return _row(
-      context,
-      count: quotes.length,
-      itemBuilder: (context, i) => AyreCompactIndexCard(
-        quote: quotes[i],
-        indexId: _indexIdFor(quotes[i]),
-        stale: result.stale,
-        onTap: () => onOpen(quotes[i]),
-      ),
-    );
-  }
-
-  Widget _row(
-    BuildContext context, {
-    required int count,
-    required Widget Function(BuildContext, int) itemBuilder,
-  }) {
-    const gap = AppSpace.cardGap;
-    const pad = AppSpace.pageHorizontal;
-    final height = AyreCompactIndexMetrics.heightFor(context);
-
-    // Large text: reflow into a vertical list of content-height, full-width
-    // cards rather than shrinking or capping the text (D-9).
-    if (AyreCompactIndexMetrics.stacksFor(context)) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: _shadowRoom),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var i = 0; i < count; i++) ...[
-              if (i > 0) const SizedBox(height: gap),
-              Entrance(index: i + 1, child: itemBuilder(context, i)),
-            ],
-          ],
-        ),
-      );
-    }
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final available = constraints.maxWidth;
-        final fitsAll =
-            available >= 3 * AyreCompactIndexMetrics.minWidth + 2 * gap;
-
-        Widget item(int i, double width) => SizedBox(
-          width: width,
-          height: height,
-          child: Entrance(index: i + 1, child: itemBuilder(context, i)),
-        );
-
-        // Wide enough: three equal cells, left-aligned so a missing index
-        // leaves a gap at the end rather than stretching the others.
-        if (fitsAll) {
-          final width = (available - 2 * gap) / 3;
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: _shadowRoom),
-            child: Row(
-              children: [
-                for (var i = 0; i < count; i++) ...[
-                  if (i > 0) const SizedBox(width: gap),
-                  item(i, width),
-                ],
-              ],
-            ),
-          );
-        }
-
-        final width = ((available - 2 * gap) / _visibleCards).clamp(
-          AyreCompactIndexMetrics.minWidth,
-          double.infinity,
-        );
-        final list = ScrollConfiguration(
-          // Mouse and trackpad can drag on desktop, where it isn't default.
-          behavior: ScrollConfiguration.of(context).copyWith(
-            dragDevices: {
-              ...ScrollConfiguration.of(context).dragDevices,
-              if (AppBreakpoints.hasPointer(context)) ...{
-                PointerDeviceKind.mouse,
-                PointerDeviceKind.trackpad,
-              },
-            },
-          ),
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(
-              horizontal: pad,
-              vertical: _shadowRoom,
-            ),
-            itemCount: count,
-            separatorBuilder: (_, _) => const SizedBox(width: gap),
-            itemBuilder: (context, i) => item(i, width),
-          ),
-        );
-
-        // Bleed into the page's side padding so cards scroll under the screen
-        // edge instead of being cut off 20pt in. Only reached on narrow
-        // screens, where the page padding *is* the screen edge.
-        return SizedBox(
-          height: height + 2 * _shadowRoom,
-          child: OverflowBox(
-            minWidth: available + 2 * pad,
-            maxWidth: available + 2 * pad,
-            alignment: Alignment.center,
-            child: list,
-          ),
-        );
-      },
-    );
-  }
-}
-
 // ─── Market Insight ────────────────────────────────────────────────────────
 
 /// The carousel's loading / failed / ready states. An empty desk never gets
@@ -832,207 +527,5 @@ class _InsightSection extends StatelessWidget {
     final notes = r.value;
     if (notes == null || notes.isEmpty) return const SizedBox.shrink();
     return AyreInsightCarousel(notes: notes, onReadMore: onReadMore);
-  }
-}
-
-// ─── Market Sentiment ──────────────────────────────────────────────────────
-
-/// The three buckets a 0–100 sentiment score is read into.
-///
-/// Breakpoints are **< 35 bearish · 35–64 neutral · ≥ 65 bullish** — the same
-/// cut points `Sentiment.band` (Caution / Neutral / Strong) and the Insights
-/// gauge's directional tone already use, so the same score never reads as two
-/// different moods on two tabs.
-enum _Mood { bullish, neutral, bearish }
-
-_Mood _moodFor(int score) => switch (score) {
-  < 35 => _Mood.bearish,
-  < 65 => _Mood.neutral,
-  _ => _Mood.bullish,
-};
-
-/// Component-specific colors for the Market Sentiment card (v5 §2A component
-/// table). Not `AppThemeTokens` fields — Phase 0 forbids adding any — so they
-/// live beside the one widget that consumes them. The bucket word/arrow
-/// deliberately do *not* appear here: those reuse `positive`/`neutral`/
-/// `negative` per the spec.
-abstract final class _SentimentCardColors {
-  static const List<Color> gradientLight = [
-    Color(0xFFDCEEDF),
-    Color(0xFFEAF5EC),
-  ];
-  static const List<Color> gradientDark = [
-    Color(0xFF14251A),
-    Color(0xFF0F1D15),
-  ];
-  static const Color labelLight = Color(0xFF3D5045);
-  static const Color labelDark = Color(0xFFD0DCD3);
-}
-
-/// The top-of-page Market Sentiment card (§2.1): a small icon + label and the
-/// bucketed reading set large and bold with a directional glyph. The numeric
-/// score is deliberately not shown — the bucket word is the whole reading.
-///
-/// **Everything on it is real.** The bucket comes from the `/api/sentiment`
-/// 0–100 score alone. The card no longer carries a one-line description
-/// ("X of Y stocks advancing") — status only.
-///
-/// Neutral carries no glyph, matching `DirectionBadge`'s convention for a
-/// flat reading: the word itself is the non-color channel.
-class _SentimentCard extends StatelessWidget {
-  const _SentimentCard({
-    required this.sentimentResult,
-    required this.breadthResult,
-    required this.onRetry,
-  });
-
-  final DataResult<Sentiment>? sentimentResult;
-
-  /// The full Nifty-500 breadth reading. No longer consulted by this card
-  /// now that its description line is gone — kept as a constructor
-  /// parameter (unused here) because `HomeTab._fullBreadth` still fetches it
-  /// each load and nothing else in the app currently reads `FullBreadth`;
-  /// removing the fetch itself is outside this phase's scope (see
-  /// `_HomeTabState._fullBreadth`'s doc comment).
-  final DataResult<FullBreadth>? breadthResult;
-  final Future<void> Function() onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final result = sentimentResult;
-    if (result == null) return const _SentimentSkeleton();
-
-    if (result.isFailed) {
-      return StatePanel.failed(
-        headline: "Sentiment didn't load",
-        message: 'The index levels below are unaffected.',
-        compact: true,
-        onRetry: onRetry,
-      );
-    }
-
-    final sentiment = result.value;
-    if (sentiment == null) {
-      return const StatePanel.empty(
-        headline: 'No sentiment reading yet',
-        message: 'The overall market mood appears once the session is under way.',
-        compact: true,
-      );
-    }
-
-    final t = context.tokens;
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final (String word, Color tone, AyreGlyph? glyph) = switch (_moodFor(
-      sentiment.score,
-    )) {
-      _Mood.bullish => ('Bullish', t.positiveText, AyreGlyph.trendUp),
-      _Mood.neutral => ('Neutral', t.neutralText, null),
-      _Mood.bearish => ('Bearish', t.negativeText, AyreGlyph.trendDown),
-    };
-    final labelColor = dark
-        ? _SentimentCardColors.labelDark
-        : _SentimentCardColors.labelLight;
-
-    return AyreCard(
-      // The gradient has to reach the card's edge, so the padding moves
-      // inside it; `AyreCard` still supplies the radius clip, hairline and
-      // shadow.
-      padding: EdgeInsets.zero,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: dark
-                ? _SentimentCardColors.gradientDark
-                : _SentimentCardColors.gradientLight,
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpace.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Semantics(
-                container: true,
-                excludeSemantics: true,
-                label: 'Market sentiment: $word.',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        AyreIcon(
-                          AyreGlyph.instrument,
-                          size: 16,
-                          color: labelColor,
-                        ),
-                        const SizedBox(width: AppSpace.xs),
-                        Expanded(
-                          child: Text(
-                            'Sentiment',
-                            style: AppTypo.ui(
-                              fontSize: AppTextScale.body,
-                              fontWeight: FontWeight.w600,
-                              color: labelColor,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpace.sm),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            word,
-                            style: AppTypo.pageTitle(t, color: tone),
-                          ),
-                        ),
-                        if (glyph != null) ...[
-                          const SizedBox(width: AppSpace.xs),
-                          AyreIcon(
-                            glyph,
-                            size: 26,
-                            color: tone,
-                            strokeWidth: 2.4,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-}
-
-/// Mirrors the real card's blocks — label, bucket word — so the
-/// loaded card doesn't reflow the page (§14.4).
-class _SentimentSkeleton extends StatelessWidget {
-  const _SentimentSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return const AyreCard(
-      padding: EdgeInsets.all(AppSpace.lg),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SkeletonBlock(width: 120, height: 12),
-          SizedBox(height: AppSpace.sm),
-          SkeletonBlock(width: 150, height: 30, radius: AppRadius.inset),
-        ],
-      ),
-    );
   }
 }

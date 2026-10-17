@@ -21,7 +21,6 @@ class NavDestination {
 const List<NavDestination> kNavDestinations = [
   NavDestination(label: 'Home', glyph: AyreGlyph.home),
   NavDestination(label: 'Reports', glyph: AyreGlyph.report),
-  NavDestination(label: 'Insights', glyph: AyreGlyph.insights),
   NavDestination(label: 'Learn', glyph: AyreGlyph.learn),
   NavDestination(label: 'Profile', glyph: AyreGlyph.profile),
 ];
@@ -46,7 +45,7 @@ Color _unselectedColor(AppThemeTokens t, bool dark) =>
 
 /// The always-visible bottom navigation: a floating dock (plan §3.3).
 ///
-/// Five equal slots, each an indicator capsule holding a 24-pt glyph with the
+/// Four equal slots, each an indicator capsule holding a 24-pt glyph with the
 /// destination's label beneath it. The selected capsule glides between slots on
 /// [AppSpring.navPill]; the glyph crossfades outline to filled and colours lerp
 /// on the same value. Nothing pops, lifts or enlarges.

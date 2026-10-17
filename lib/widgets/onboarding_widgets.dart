@@ -86,69 +86,7 @@ class OnboardingWash extends StatelessWidget {
   }
 }
 
-/// Page 1: the three index names as tinted pills. Names only, so nothing
-/// reads as live data.
-class OnboardingIndexPills extends StatelessWidget {
-  const OnboardingIndexPills({super.key});
-
-  static const _ids = [
-    AppIndexId.nifty50,
-    AppIndexId.sensex,
-    AppIndexId.bankNifty,
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final brightness = Theme.of(context).brightness;
-    return ExcludeSemantics(
-      child: Wrap(
-        alignment: WrapAlignment.center,
-        spacing: AppSpace.xs,
-        runSpacing: AppSpace.xs,
-        children: [
-          for (var i = 0; i < _ids.length; i++)
-            Builder(
-              builder: (context) {
-                final tint = AppIndexTints.of(_ids[i], brightness);
-                return Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpace.sm,
-                    vertical: AppSpace.xs,
-                  ),
-                  decoration: BoxDecoration(
-                    color: tint.cardBackground,
-                    borderRadius: BorderRadius.circular(AppRadius.pill),
-                    border: Border.all(color: t.hairline),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: tint.trace,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: AppSpace.xs),
-                      Text(
-                        kOnboardingIndexNames[i],
-                        style: AppTypo.label(t, color: t.textPrimary),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Page 2: where Weekly Report, Insights and Learn live. Rows have no
+/// Page 2: where Weekly Report and Learn live. Rows have no
 /// `onTap`, so they read as information rather than navigation.
 class OnboardingFeatureRows extends StatelessWidget {
   const OnboardingFeatureRows({super.key});

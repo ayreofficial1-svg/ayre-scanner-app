@@ -16,13 +16,12 @@ import '../widgets/ayre_tab_host.dart';
 import '../widgets/spotlight_tour.dart';
 import '../widgets/verification_banner.dart';
 import 'home_tab.dart';
-import 'insights_tab.dart';
 import 'learn_tab.dart';
 import 'notifications_screen.dart';
 import 'profile_tab.dart';
 import 'weekly_reports_tab.dart';
 
-/// The signed-in shell: five destinations, each hosting **its own
+/// The signed-in shell: four destinations, each hosting **its own
 /// [Navigator]** inside an [IndexedStack] (plan A3), so the dock (or rail)
 /// stays visible on in-tab detail screens and every tab keeps its own back
 /// stack while another tab is shown.
@@ -37,14 +36,10 @@ import 'weekly_reports_tab.dart';
 ///  * Deep links — a signal tap selects Home and its root; an exit/alert tap
 ///    opens Alerts on Home's navigator.
 class HomeShell extends StatefulWidget {
-  // Not const: the remote service holds a short-lived constituents cache, which
-  // it needs because movers and breadth are derived from that data rather than
-  // served by dedicated endpoints. Wrapped in `PersistentMarketDataService` so
-  // every surface it serves falls back to the last on-device saved reading —
-  // rather than an empty or failed state — when the market is closed longer
-  // than the in-memory session remembers, the backend is unreachable, or the
-  // app was relaunched after being closed. See that class's doc for exactly
-  // what it changes (nothing any screen below this needs to know about).
+  // Not const: the default service is built at runtime. Wrapped in
+  // `PersistentMarketDataService` so the published research content (signals,
+  // courses, notes, reports) falls back to the last on-device saved copy when
+  // the backend is unreachable or the app was relaunched after being closed.
   HomeShell({super.key, MarketDataService? marketData})
     : marketData =
           marketData ?? PersistentMarketDataService(RemoteMarketDataService());
@@ -272,7 +267,7 @@ class _HomeShellState extends State<HomeShell> {
               target: s.target,
               title: s.title,
               body: s.body,
-              onEnter: () => _select(4),
+              onEnter: () => _select(3),
             ),
       ],
       onClosed: (_) {
@@ -281,7 +276,7 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
-  /// Walks the five tabs, switching to each so its nav item (and, on Home, the
+  /// Walks the four tabs, switching to each so its nav item (and, on Home, the
   /// header controls) can be highlighted, then returns to the tab the person
   /// was on.
   Future<void> _startAppTour() async {
@@ -343,7 +338,7 @@ class _HomeShellState extends State<HomeShell> {
           0 => HomeTab(
             marketData: widget.marketData,
             onAccountResolved: _onAccountResolved,
-            onOpenProfile: () => _select(4),
+            onOpenProfile: () => _select(3),
             active: scope.index == 0,
             signalsFocusToken: scope.signalsFocusToken,
             scrollController: controller,
@@ -353,14 +348,9 @@ class _HomeShellState extends State<HomeShell> {
             active: scope.index == 1,
             scrollController: controller,
           ),
-          2 => InsightsTab(
+          2 => LearnTab(
             marketData: widget.marketData,
             active: scope.index == 2,
-            scrollController: controller,
-          ),
-          3 => LearnTab(
-            marketData: widget.marketData,
-            active: scope.index == 3,
             scrollController: controller,
           ),
           _ => ProfileTab(
@@ -397,11 +387,9 @@ class _HomeShellState extends State<HomeShell> {
     final showDock = !wide && !keyboardOpen;
     final clearance = showDock ? AyreNavMetrics.clearanceOf(context) : 0.0;
 
-    // Every visible live quote carries its own repeating AnimationController
-    // (LivePulseDot's breathing dot). IndexedStack keeps all five tabs mounted
-    // for the life of the app, and TickerMode mutes every ticker in an
-    // inactive tab's subtree (detail screens included) without touching the
-    // widgets that own them.
+    // IndexedStack keeps all four tabs mounted for the life of the app, and
+    // TickerMode mutes every ticker (animations) in an inactive tab's subtree
+    // without touching the widgets that own them.
     Widget tickered(int index, Widget child) =>
         TickerMode(enabled: index == _index, child: child);
 

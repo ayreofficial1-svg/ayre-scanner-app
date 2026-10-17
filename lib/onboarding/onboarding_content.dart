@@ -56,8 +56,8 @@ const List<OnboardingStep> kOnboardingSteps = [
   OnboardingStep(
     kind: OnboardingStepKind.orientation,
     eyebrow: 'WELCOME',
-    title: 'Your market, at a glance.',
-    body: 'Index levels, research signals and lessons in one place.',
+    title: 'Your research, in one place.',
+    body: 'Research signals, weekly reports and lessons in one place.',
     notice: 'Signals are general research, not personal advice.',
   ),
   OnboardingStep(
@@ -70,10 +70,6 @@ const List<OnboardingStep> kOnboardingSteps = [
   ),
 ];
 
-/// Index names shown as pills on the first page. Names only: no numbers or
-/// arrows, so nothing reads as live data.
-const List<String> kOnboardingIndexNames = ['NIFTY 50', 'SENSEX', 'BANK NIFTY'];
-
 /// The second page's rows.
 const List<OnboardingFeature> kOnboardingFeatures = [
   OnboardingFeature(
@@ -81,12 +77,6 @@ const List<OnboardingFeature> kOnboardingFeatures = [
     title: 'Weekly Report',
     subtitle: 'Picks from past weeks and their reported results.',
     location: 'Reports tab',
-  ),
-  OnboardingFeature(
-    glyph: AyreGlyph.insights,
-    title: 'Insights',
-    subtitle: 'Gainers, losers and the most active stocks, explained simply.',
-    location: 'Insights tab',
   ),
   OnboardingFeature(
     glyph: AyreGlyph.learn,

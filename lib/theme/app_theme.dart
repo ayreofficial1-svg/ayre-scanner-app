@@ -278,12 +278,10 @@ extension AppThemeContext on BuildContext {
 
 // ─── Index-card identity tints ──────────────────────────────────────────────
 // Not `AppThemeTokens` fields (redesign plan §2A / Phase 0 step 6): each Home
-// index card — and anywhere else an index is represented as a card, e.g.
-// `index_detail_screen.dart`'s header — carries its own fixed light/dark
-// identity tint, independent of theme *semantics* and never a stand-in for
-// gain/loss color. This is the single shared lookup; consume it from both
-// `home_tab.dart` and `index_detail_screen.dart` rather than duplicating the
-// table.
+// index card — and anywhere else an index is represented as a card —
+// carries its own fixed light/dark identity tint, independent of theme
+// *semantics* and never a stand-in for gain/loss color. (No screen uses this
+// any more; it is removed in the data-layer / orphan-sweep phase.)
 
 /// One index's identity tint pair for a single brightness. Purely
 /// decorative — never swap these in for [AppThemeTokens.positive] /
@@ -436,7 +434,7 @@ abstract final class AppMotion {
   /// retires this concept.
   static const Duration livePulse = Duration(milliseconds: 1600);
 
-  // `traceDraw` (620ms) lived here as `TickerTrace`'s own pre-v4 draw-on,
+  // `traceDraw` (620ms) lived here as the line trace's own pre-v4 draw-on,
   // pending Phase 3's decision on whether the line and radial families need
   // separate timings. They don't: Phase 3 confirmed one parametrized painter
   // serves Sparkline and AreaTrend, and every chart in the app now draws on

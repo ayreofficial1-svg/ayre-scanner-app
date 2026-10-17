@@ -357,7 +357,7 @@ class _OnboardingPage extends StatelessWidget {
   }
 }
 
-/// Screen 1's illustration: wash, logo and index pills. The logo appears only
+/// Screen 1's illustration: wash and logo. The logo appears only
 /// here, per the brand rule that it is not repeated on every step.
 class _Orientation extends StatelessWidget {
   const _Orientation({required this.compact});
@@ -375,8 +375,6 @@ class _Orientation extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               LogoMark(placement: LogoPlacement.auth),
-              SizedBox(height: AppSpace.md),
-              OnboardingIndexPills(),
             ],
           ),
         ],

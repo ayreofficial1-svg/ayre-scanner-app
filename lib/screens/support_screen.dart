@@ -56,7 +56,7 @@ class SupportScreen extends StatelessWidget {
                 SettingRow(
                   glyph: AyreGlyph.course,
                   title: 'App tutorial',
-                  subtitle: 'The five tabs and the Home controls.',
+                  subtitle: 'The four tabs and the Home controls.',
                   onTap: () {
                     HapticFeedback.selectionClick();
                     // The tutorial switches tabs, which only the shell can

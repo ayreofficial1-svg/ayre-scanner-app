@@ -101,10 +101,8 @@ class AyreCard extends StatelessWidget {
 /// "terminal readout panel" concept, not a rename-only pass — there are no
 /// "live feed" semantics for this component, just a plain sub-surface fill at
 /// the Spec's 12px inset radius. The class name is kept as `InkPanel` (rather
-/// than introducing e.g. `AyreInset`) so the existing call sites in
-/// `equity_detail_screen.dart`, `home_tab.dart` and `index_detail_screen.dart`
-/// — none of which are in this phase's file list — don't need touching to
-/// keep compiling; consider a rename when one of those screens' own phase
+/// than introducing e.g. `AyreInset`) so the existing call sites don't need
+/// touching to keep compiling; consider a rename when one of those screens' own phase
 /// (5/6) is in progress.
 class InkPanel extends StatelessWidget {
   const InkPanel({
@@ -1734,11 +1732,10 @@ class AyreFilterChip extends StatelessWidget {
 /// Insights note, a topic marker. Distinct from [AyreChip]: chips carry a
 /// state (LIVE, CLOSED, a tier), tags label a piece of content and never
 /// pulse, animate, or carry a glyph. Extracted in Phase 1 per plan §6 as a
-/// **new** shared component: `insights_tab.dart`'s `note.category` label was
+/// **new** shared component: the insight notes' `note.category` label was
 /// previously rendered as a bare uppercase [Text] with no pill/fill at all,
 /// not an inlined variant of this widget — nothing is retired by adding this.
-/// Rewiring that call site onto [TagPill] is Phase 5 work (`insights_tab.dart`
-/// against Spec §13.3), not done here.
+/// Rewiring that call site onto [TagPill] was left for a later phase.
 class TagPill extends StatelessWidget {
   const TagPill({super.key, required this.label});
 

@@ -2,8 +2,7 @@
 // SentimentGauge.
 //
 // All three are hand-painted arcs, not a chart package — §12.1's "custom, not
-// a third-party library" rule, which `ticker_trace.dart` already followed for
-// the line family. They share `_ArcGeometry` below rather than each
+// a third-party library" rule, which the line charts also followed. They share `_ArcGeometry` below rather than each
 // re-deriving cap/gap compensation, because getting that wrong is invisible in
 // code review and obvious on screen.
 //

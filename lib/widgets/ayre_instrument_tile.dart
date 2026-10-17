@@ -26,9 +26,7 @@ import '../theme/app_theme.dart';
 /// the Home index-card icon tile's one deliberate exception (§2A) and does not
 /// carry over here.
 ///
-/// Used by the Insights movers lists, `index_detail_screen.dart`'s constituent
-/// rows, `equity_detail_screen.dart`'s header, `ayre_signals_section.dart`'s
-/// signal cards, and the Weekly Report card
+/// Used by `ayre_signals_section.dart`'s signal cards and the Weekly Report card
 /// header — every place a stock's symbol/name appears in the app. Passing
 /// [name] wherever the caller has it (most call sites do) sharply improves
 /// logo match confidence; it is optional and never required.
