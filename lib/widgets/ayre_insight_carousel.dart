@@ -16,8 +16,7 @@ import 'pressable_scale.dart';
 /// radial green glow — a decorative ascending-bar flourish.
 ///
 /// **The content is real.** Every page is an [InsightNote] from
-/// `GET /api/insights`, the same admin-curated desk notes the Insights tab
-/// lists; nothing is written client-side. Notes flagged `featured` lead, and
+/// `GET /api/insights`, the admin-curated desk notes; nothing is written client-side. Notes flagged `featured` lead, and
 /// at most [maxNotes] are paged. The flourish is ornament only — it plots no
 /// data and is excluded from semantics.
 ///

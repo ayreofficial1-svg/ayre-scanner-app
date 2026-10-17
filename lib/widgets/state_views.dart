@@ -7,7 +7,7 @@ import 'pressable_scale.dart';
 
 /// What a data section is currently showing. Every data-driven surface in the
 /// app resolves to exactly one of these, and each section resolves its own —
-/// a failed movers list never takes the sentiment reading down with it.
+/// a failed weekly report never takes the recommendations down with it.
 enum DataPhase {
   loading,
   ready,

@@ -96,8 +96,7 @@ class RemoteMarketDataService implements MarketDataService {
   /// writes it via POST/DELETE (Phase 4); the app only ever GETs it.
   static const _weeklyReport = '/api/weekly-report';
 
-  /// Cache-only, same shape as `_breadthFull` above —
-  /// two already-in-memory config strings, nothing computed per request.
+  /// Two config strings, nothing computed per request.
   static const _compliance = '/api/compliance';
 
   @override

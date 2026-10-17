@@ -1,3 +1,11 @@
+> **Status after compliance removal (2026-10-17).** The app no longer shows any exchange-sourced
+> data: no index levels, movers, breadth, sentiment, live prices or "entry reached" facts. It shows
+> the analyst's recommendations (typed entry / exit / stop-loss), Weekly Report, Learn and desk
+> notes. Navigation is Home, Reports, Learn, Profile. The sections below that describe the
+> Insights tab, index board, equity/index detail screens or the removed `/api/market*`,
+> `/api/sentiment`, `/api/breadth/full` and `/api/insights/{volatility,momentum,volume-surge}`
+> endpoints are historical. See `compliance_removal_plan.md`.
+
 # §12 — Backend & Admin-Frontend Analysis
 
 Read-only cross-reference of the Flutter app against `ayre_scanner`

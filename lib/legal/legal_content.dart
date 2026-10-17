@@ -84,10 +84,7 @@ final LegalDocument kTermsDocument = LegalDocument(
         'Weekly Report: a record of recommendations that were closed during a '
             'week, showing entry and exit prices, the outcome (target or '
             'stop-loss) and the resulting return per share.',
-        'Insights: market information such as index levels, top gainers, top '
-            'losers, most active stocks, volatility, momentum and volume '
-            'readings, a market-breadth based sentiment indicator, and short '
-            'market notes.',
+        'Market Insight: short written notes from the Research Analyst.',
         'Learn: educational articles about markets and investing.',
         'Alerts: in-app and push notifications about new signals and other '
             'messages from the Research Analyst.',
@@ -172,14 +169,13 @@ final LegalDocument kTermsDocument = LegalDocument(
       ],
     ),
     LegalSection(
-      heading: '8. Market data and third-party content',
+      heading: '8. Third-party content',
       paragraphs: [
-        'Prices, index levels, movers, breadth and similar data come from '
-            'third-party market data sources and are processed automatically. '
-            'They may be delayed, incomplete, revised or wrong, and are shown '
-            'for information only. Do not use them as the sole basis for a '
-            'trade. Company logos are bundled with the app with attribution to '
-            'AllInvestView.',
+        'The app does not show live or delayed market prices, index levels '
+            'or similar market data. Entry, exit and stop-loss levels are '
+            'typed by the Research Analyst when a recommendation is '
+            'published. Company logos are bundled with the app with '
+            'attribution to AllInvestView.',
       ],
     ),
     LegalSection(
@@ -194,9 +190,7 @@ final LegalDocument kTermsDocument = LegalDocument(
     ),
     LegalSection(
       heading: '10. Acceptable use and confidentiality of content',
-      paragraphs: [
-        'Research is provided for your own use. You must not:',
-      ],
+      paragraphs: ['Research is provided for your own use. You must not:'],
       bullets: [
         'copy, forward, publish, sell or share signals, reports or other app '
             'content with others, including on social media or messaging '
@@ -294,9 +288,7 @@ final LegalDocument kTermsDocument = LegalDocument(
     ),
     LegalSection(
       heading: '18. Contact',
-      paragraphs: [
-        '$kRaName, $kRaAddress. E-mail $kRaEmail. Phone $kRaPhone.',
-      ],
+      paragraphs: ['$kRaName, $kRaAddress. E-mail $kRaEmail. Phone $kRaPhone.'],
     ),
   ],
 );
@@ -431,16 +423,8 @@ final LegalDocument kRiskDocument = LegalDocument(
       ],
     ),
     LegalSection(
-      heading: 'Market data and indicators',
+      heading: 'Notes and articles',
       bullets: [
-        'Prices, index levels, gainers, losers, volume, volatility and '
-            'momentum readings come from third parties and are computed '
-            'automatically. They can be delayed or wrong, and may be '
-            'unavailable at times.',
-        'The sentiment indicator is a statistic based on how many stocks in '
-            'a broad set of listed companies are rising or falling. It '
-            'describes what has happened, not what will happen, and is not a '
-            'recommendation.',
         'Market notes and educational articles are general information and '
             'are not recommendations to buy or sell.',
       ],
@@ -520,7 +504,7 @@ final LegalDocument kDisclosuresDocument = LegalDocument(
             'are not published. Each recommendation carries a rationale, and '
             'the Research Analyst keeps a record of the basis for it as SEBI '
             'requires.',
-        'Research is based on publicly available information and market data. '
+        'Research is based on publicly available information. '
             'Recommendations are made independently and are not influenced by '
             'any company covered.',
       ],
@@ -741,7 +725,8 @@ final LegalDocument kPrivacyDocument = LegalDocument(
             'account, but not with your name or e-mail address.',
         'Data kept on your device: your settings (alerts, text size, theme), '
             'a list of alerts the app has recorded, which signals you have '
-            'seen, and cached market data so screens load quickly. Alerts, '
+            'seen, and cached research content (recommendations, articles, notes and '
+            'reports) so screens load quickly. Alerts, '
             'seen-signal records and cached articles are cleared when you '
             'sign out or a different account signs in.',
         'Technical data: like most online services, the server and hosting '
@@ -804,14 +789,10 @@ final LegalDocument kPrivacyDocument = LegalDocument(
             '$kHostingRegion.',
         'The app’s fonts may be downloaded from Google’s font servers, which '
             'can see your device’s IP address when that happens.',
-        'Market data providers and exchanges supply price data to the '
-            'server. Your personal data is not sent to them.',
         'Regulators, courts, law-enforcement or other authorities where the '
             'law requires disclosure.',
       ],
-      closing: [
-        'Personal data is not sold or shared for advertising.',
-      ],
+      closing: ['Personal data is not sold or shared for advertising.'],
     ),
     LegalSection(
       heading: '7. Transfers outside India',
@@ -910,7 +891,7 @@ final List<LegalFaq> kLegalFaqs = [
     'What is Ayre?',
     'Ayre is a research service run by an individual SEBI-registered '
         'Research Analyst. It publishes research recommendations on listed '
-        'Indian stocks, a record of closed recommendations, market insights '
+        'Indian stocks, a record of closed recommendations, market notes '
         'and learning articles.',
   ),
   LegalFaq(
@@ -951,9 +932,11 @@ final List<LegalFaq> kLegalFaqs = [
         'indicate future performance.',
   ),
   const LegalFaq(
-    'Why does the price in the app differ from my broker?',
-    'Market data comes from third parties and may be delayed or differ. Use '
-        'your broker’s live price before placing any order.',
+    'Does the app show live prices?',
+    'No. The app does not show market prices. The levels in a recommendation '
+        'were set by the Research Analyst when it was published and may differ '
+        'from where the stock trades now. Check your broker’s live price '
+        'before placing any order.',
   ),
   const LegalFaq(
     'Does Ayre use artificial intelligence?',
