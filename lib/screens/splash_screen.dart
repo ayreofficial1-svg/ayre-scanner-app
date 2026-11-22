@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_logo.dart';
 
-/// The splash screen: the logo's primary and most prominent placement.
+/// The splash screen: the approved lockup centred on the page canvas with the
+/// tagline beneath it and a short decorative track near the bottom.
 ///
-/// The mark is the supplied brand asset, centred and generously sized with clear
-/// space around it — not a recreation, and not scaled to fill the screen. The
-/// previous identity's hand-drawn bar mark is gone: there is a real logo now.
-///
-/// Motion is a single quiet settle. Nothing rotates, sweeps or bounces.
+/// No card, no gradient, nothing rotates or bounces. The track is a quiet
+/// startup indicator, not a measured progress value: a 21px saffron segment
+/// settles along a 55×4 track while the (unchanged) ~1s completion timer runs.
+/// With reduced motion the mark and indicator are static.
 class AyreSplashScreen extends StatefulWidget {
   const AyreSplashScreen({super.key, required this.onFinished});
 
@@ -48,31 +48,46 @@ class _AyreSplashScreenState extends State<AyreSplashScreen>
 
     return Scaffold(
       backgroundColor: t.background,
-      // Phase 5: purely presentational and time-boxed — auto-dismisses via
-      // onFinished, so VoiceOver/TalkBack shouldn't announce it as content
-      // or a loading state that outlives its ~1s actual visible duration.
+      // Purely presentational and time-boxed — auto-dismisses via onFinished,
+      // so screen readers should not announce it as content or a loading
+      // state that outlives its ~1s visible duration.
       body: ExcludeSemantics(
-        child: Center(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              if (reduceMotion) return child!;
-              // A short rise and fade in, then a fade out as the app takes over.
-              final enter = AppMotion.ease.transform(
-                (_controller.value / 0.45).clamp(0.0, 1.0),
-              );
-              final exit =
-                  1 - ((_controller.value - 0.88) / 0.12).clamp(0.0, 1.0);
-              return Opacity(
-                opacity: enter * exit,
-                child: Transform.translate(
-                  offset: Offset(0, 10 * (1 - enter)),
-                  child: child,
+        child: Stack(
+          children: [
+            Center(
+              child: AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  if (reduceMotion) return child!;
+                  // A short rise and fade in, then a fade out as the app
+                  // takes over.
+                  final enter = AppMotion.ease.transform(
+                    (_controller.value / 0.45).clamp(0.0, 1.0),
+                  );
+                  final exit =
+                      1 - ((_controller.value - 0.88) / 0.12).clamp(0.0, 1.0);
+                  return Opacity(
+                    opacity: enter * exit,
+                    child: Transform.translate(
+                      offset: Offset(0, 10 * (1 - enter)),
+                      child: child,
+                    ),
+                  );
+                },
+                child: const _SplashMark(),
+              ),
+            ),
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: AppSpace.s89 + MediaQuery.paddingOf(context).bottom,
+              child: Center(
+                child: _SplashTrack(
+                  animation: reduceMotion ? null : _controller,
                 ),
-              );
-            },
-            child: const _SplashMark(),
-          ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -89,12 +104,70 @@ class _SplashMark extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         const LogoMark(placement: LogoPlacement.splash),
-        const SizedBox(height: AppSpace.md),
+        const SizedBox(height: AppSpace.s21),
         Text(
-          'MARKET TERMINAL',
-          style: AppTypo.label(t, color: t.foregroundMuted),
+          'Market research and signals.',
+          textAlign: TextAlign.center,
+          style: AppTypo.ui(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: t.foregroundMuted,
+          ),
         ),
       ],
+    );
+  }
+}
+
+/// 55×4 track (radius 2) with a 21×4 saffron leading segment.
+class _SplashTrack extends StatelessWidget {
+  const _SplashTrack({required this.animation});
+
+  final Animation<double>? animation;
+
+  static const double _width = 55;
+  static const double _segment = 21;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    Widget segment(double progress) => Positioned(
+      left: (_width - _segment) * progress,
+      top: 0,
+      width: _segment,
+      height: 4,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: t.highlight,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    );
+
+    return SizedBox(
+      width: _width,
+      height: 4,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: t.splashTrack,
+          borderRadius: BorderRadius.circular(2),
+        ),
+        child: Stack(
+          children: [
+            if (animation == null)
+              segment(0)
+            else
+              AnimatedBuilder(
+                animation: animation!,
+                builder: (context, _) => Stack(
+                  children: [
+                    segment(AppMotion.ease.transform(animation!.value)),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

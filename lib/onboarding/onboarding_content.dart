@@ -1,4 +1,4 @@
-import '../widgets/ayre_icons.dart';
+import '../widgets/finance_icons.dart';
 
 /// Which illustration a step uses. The screen maps each kind to a widget, so
 /// this file stays free of layout and holds copy only.
@@ -37,7 +37,7 @@ class OnboardingFeature {
     required this.location,
   });
 
-  final AyreGlyph glyph;
+  final FinanceGlyph glyph;
   final String title;
   final String subtitle;
 
@@ -73,13 +73,13 @@ const List<OnboardingStep> kOnboardingSteps = [
 /// The second page's rows.
 const List<OnboardingFeature> kOnboardingFeatures = [
   OnboardingFeature(
-    glyph: AyreGlyph.trendUp,
+    glyph: FinanceGlyph.trend,
     title: 'Weekly Report',
     subtitle: 'Picks from past weeks and their reported results.',
     location: 'Reports tab',
   ),
   OnboardingFeature(
-    glyph: AyreGlyph.learn,
+    glyph: FinanceGlyph.learn,
     title: 'Learn',
     subtitle: 'Short lessons to understand the stock market better.',
     location: 'Learn tab',
@@ -88,7 +88,7 @@ const List<OnboardingFeature> kOnboardingFeatures = [
 
 /// Control labels. Tooltips and semantics reuse these so they cannot drift.
 abstract final class OnboardingLabels {
-  static const String next = 'Next';
+  static const String next = 'Continue';
   static const String back = 'Back';
   static const String skip = 'Skip';
   static const String getStarted = 'Get started';

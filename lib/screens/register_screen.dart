@@ -7,6 +7,8 @@ import '../services/auth_validators.dart';
 import '../theme/app_theme.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/ayre_components.dart';
+import '../widgets/ayre_masthead.dart';
+import '../widgets/finance_icons.dart';
 import 'privacy_policy_screen.dart';
 import 'terms_screen.dart';
 
@@ -99,17 +101,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     return AuthScaffold(
       showBack: true,
+      title: 'Create account',
+      subtitle: 'Set up your Investee account.',
+      tone: AyreMastTone.champagne,
+      mastHeight: AppShape.mastRegister,
+      bodyTop: AppSpace.s8,
       children: [
-        Text('Create account', style: AppTypo.pageTitle(t)),
-        const SizedBox(height: AppSpace.xxs),
-        Text('Set up your Investee account.', style: AppTypo.body(t)),
-        const SizedBox(height: AppSpace.xl),
         AutofillGroup(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               AuthField(
-                label: 'Name',
+                label: 'Full name',
                 controller: _name,
                 hint: 'Your name',
                 textCapitalization: TextCapitalization.words,
@@ -118,7 +121,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 enabled: !_loading,
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: AppSpace.lg),
+              const SizedBox(height: AppSpace.s13),
               AuthField(
                 label: 'Email',
                 controller: _email,
@@ -131,7 +134,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 enabled: !_loading,
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: AppSpace.lg),
+              const SizedBox(height: AppSpace.s13),
               AuthField(
                 label: 'Password',
                 controller: _password,
@@ -141,9 +144,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 enabled: !_loading,
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: AppSpace.sm),
+              const SizedBox(height: AppSpace.s8),
               PasswordChecklist(check: _check),
-              const SizedBox(height: AppSpace.lg),
+              const SizedBox(height: AppSpace.s13),
               AuthField(
                 label: 'Confirm password',
                 controller: _confirm,
@@ -158,57 +161,90 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
               if (matches) ...[
                 const SizedBox(height: AppSpace.xs),
-                Text(
-                  'Passwords match',
-                  style: AppTypo.caption(t, color: t.accentInk),
+                Semantics(
+                  liveRegion: true,
+                  child: Row(
+                    children: [
+                      FinanceIcon(
+                        FinanceGlyph.check,
+                        size: 14,
+                        color: t.positiveText,
+                        strokeWidth: 2,
+                      ),
+                      const SizedBox(width: AppSpace.xs),
+                      Text(
+                        'Passwords match',
+                        style: AppTypo.caption(t, color: t.positiveText),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ],
           ),
         ),
         if (_submitted && !_check.valid) ...[
-          const SizedBox(height: AppSpace.md),
+          const SizedBox(height: AppSpace.s13),
           const AuthMessage(
             message: 'Your password does not meet the requirements above.',
           ),
         ],
         if (_error != null) ...[
-          const SizedBox(height: AppSpace.md),
+          const SizedBox(height: AppSpace.s13),
           AuthMessage(message: _error!),
         ],
-        const SizedBox(height: AppSpace.xl),
-        AyreButton(
-          label: 'Create account',
-          busy: _loading,
-          onPressed: _loading ? null : _submit,
-        ),
-        const SizedBox(height: AppSpace.md),
+        const SizedBox(height: AppSpace.s21),
         Text.rich(
           TextSpan(
-            style: AppTypo.caption(t),
+            style: AppTypo.meta(t),
             children: [
               const TextSpan(text: 'By creating an account you agree to the '),
               TextSpan(
                 text: 'Terms',
                 recognizer: _termsTap,
-                style: AppTypo.caption(
+                style: AppTypo.meta(
                   t,
-                  color: t.accentInk,
-                ).copyWith(decoration: TextDecoration.underline),
+                  color: t.positiveText,
+                ).copyWith(
+                  decoration: TextDecoration.underline,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const TextSpan(text: ' and '),
               TextSpan(
                 text: 'Privacy Policy',
                 recognizer: _privacyTap,
-                style: AppTypo.caption(
+                style: AppTypo.meta(
                   t,
-                  color: t.accentInk,
-                ).copyWith(decoration: TextDecoration.underline),
+                  color: t.positiveText,
+                ).copyWith(
+                  decoration: TextDecoration.underline,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const TextSpan(text: '.'),
             ],
           ),
-          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: AppSpace.s13),
+        AyreButton(
+          label: 'Create account',
+          busy: _loading,
+          onPressed: _loading ? null : _submit,
+        ),
+        const SizedBox(height: AppSpace.s13),
+        Center(
+          child: Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text('Already have an account?', style: AppTypo.meta(t)),
+              AuthTextLink(
+                label: 'Sign in',
+                onTap: _loading ? null : () => Navigator.of(context).maybePop(),
+              ),
+            ],
+          ),
         ),
       ],
     );

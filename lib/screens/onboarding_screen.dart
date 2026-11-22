@@ -4,11 +4,10 @@ import 'package:flutter/services.dart';
 import '../onboarding/onboarding_content.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
-import '../widgets/ayre_hills.dart';
 import '../widgets/ayre_icons.dart';
 import '../widgets/ayre_logo.dart';
 import '../widgets/onboarding_widgets.dart';
-import '../widgets/responsive.dart';
+import '../widgets/pressable_scale.dart';
 
 /// The two first-run pages: what Ayre is, and where the rest lives. The
 /// element-by-element explanation is the spotlight tutorial that follows
@@ -108,64 +107,63 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               opacity: _opacity,
               duration: _reduce ? Duration.zero : AppMotion.pageTransition,
               curve: AppMotion.ease,
-              child: Stack(
-                children: [
-                  const Positioned(
-                    top: -AppSpace.pageTop,
-                    right: -AppSpace.pageHorizontal,
-                    child: AyreHills(),
-                  ),
-                  SafeArea(
-                    child: ContentWidth(
-                      maxWidth: 480,
-                      child: Column(
-                        children: [
-                          _TopBar(
-                            showBack: _page > 0,
-                            // Space is reserved on the last page so nothing
-                            // shifts; the control is hidden there.
-                            showExit: _page < _last,
-                            onBack: () => _goTo(_page - 1),
-                            onExit: () => _finish(startTour: false),
-                          ),
-                          Expanded(
-                            child: PageView.builder(
-                              controller: _controller,
-                              itemCount: kOnboardingSteps.length,
-                              onPageChanged: (p) => setState(() => _page = p),
-                              itemBuilder: (context, i) =>
-                                  _OnboardingPage(step: kOnboardingSteps[i]),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpace.xl,
-                              AppSpace.sm,
-                              AppSpace.xl,
-                              AppSpace.xl,
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                AyreButton(
-                                  label: _page == _last
-                                      ? OnboardingLabels.getStarted
-                                      : OnboardingLabels.next,
-                                  onPressed: _primary,
-                                ),
-                                const SizedBox(height: AppSpace.lg),
-                                OnboardingPageIndicator(
-                                  page: _page,
-                                  total: kOnboardingSteps.length,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+              child: SafeArea(
+                child: ContentWidth(
+                  maxWidth: 480,
+                  child: Column(
+                    children: [
+                      // Reference top is y = 55 including the safe inset.
+                      SizedBox(
+                        height: (55 - MediaQuery.paddingOf(context).top)
+                            .clamp(AppSpace.s13, AppSpace.s55),
                       ),
-                    ),
+                      _TopBar(
+                        showBack: _page > 0,
+                        showExit: _page < _last,
+                        onBack: () => _goTo(_page - 1),
+                        onExit: () => _finish(startTour: false),
+                      ),
+                      Expanded(
+                        child: PageView.builder(
+                          controller: _controller,
+                          itemCount: kOnboardingSteps.length,
+                          onPageChanged: (p) => setState(() => _page = p),
+                          itemBuilder: (context, i) =>
+                              _OnboardingPage(step: kOnboardingSteps[i]),
+                        ),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          AppSpace.gutterOf(context),
+                          AppSpace.s21,
+                          AppSpace.gutterOf(context),
+                          AppSpace.s34,
+                        ),
+                        child: Row(
+                          children: [
+                            OnboardingPageIndicator(
+                              page: _page,
+                              total: kOnboardingSteps.length,
+                            ),
+                            const Spacer(),
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minWidth: _page == _last ? 178 : 144,
+                              ),
+                              child: AyreButton(
+                                expand: false,
+                                label: _page == _last
+                                    ? OnboardingLabels.getStarted
+                                    : OnboardingLabels.next,
+                                onPressed: _primary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -193,43 +191,62 @@ class _TopBar extends StatelessWidget {
     final t = context.tokens;
 
     return SizedBox(
-      height: AppSpace.minTarget + AppSpace.xs,
+      height: AppSpace.minTarget,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpace.sm),
+        padding: EdgeInsets.symmetric(horizontal: AppSpace.gutterOf(context)),
         child: Row(
           children: [
-            SizedBox(
-              width: AppSpace.minTarget,
-              height: AppSpace.minTarget,
-              child: showBack
-                  ? IconButton(
-                      tooltip: OnboardingLabels.back,
-                      onPressed: onBack,
-                      icon: AyreIcon(
-                        AyreGlyph.back,
-                        size: 20,
-                        color: t.textPrimary,
-                      ),
-                    )
-                  : null,
-            ),
+            const LogoMark(placement: LogoPlacement.auth),
             const Spacer(),
-            SizedBox(
-              height: AppSpace.minTarget,
-              child: showExit
-                  ? TextButton(
-                      onPressed: onExit,
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(
-                          AppSpace.minTarget,
-                          AppSpace.minTarget,
+            if (showBack)
+              Semantics(
+                button: true,
+                label: OnboardingLabels.back,
+                excludeSemantics: true,
+                child: Tooltip(
+                  message: OnboardingLabels.back,
+                  child: PressableScale(
+                    onTap: onBack,
+                    borderRadius: AppRadius.control,
+                    child: SizedBox(
+                      width: AppSpace.minTarget,
+                      height: AppSpace.minTarget,
+                      child: Center(
+                        child: Container(
+                          width: AppShape.iconTileSize,
+                          height: AppShape.iconTileSize,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: t.surface,
+                            borderRadius: AppShape.field,
+                            border: Border.all(color: t.hairline),
+                          ),
+                          child: AyreIcon(
+                            AyreGlyph.back,
+                            size: 20,
+                            color: t.textPrimary,
+                          ),
                         ),
-                        foregroundColor: t.foregroundMuted,
                       ),
-                      child: Text(OnboardingLabels.skip, style: AppTypo.button(t)),
-                    )
-                  : null,
-            ),
+                    ),
+                  ),
+                ),
+              ),
+            if (showExit)
+              TextButton(
+                onPressed: onExit,
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(
+                    AppSpace.minTarget,
+                    AppSpace.minTarget,
+                  ),
+                  foregroundColor: t.foregroundMuted,
+                ),
+                child: Text(
+                  OnboardingLabels.skip,
+                  style: AppTypo.button(t, color: t.foregroundMuted),
+                ),
+              ),
           ],
         ),
       ),
@@ -245,140 +262,114 @@ class _OnboardingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final compact = AppBreakpoints.isCompact(context);
+    final gutter = AppSpace.gutterOf(context);
     final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final tour = step.kind == OnboardingStepKind.tour;
+
+    final eyebrowAndTitle = Entrance(
+      index: 0,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            step.eyebrow,
+            style: AppTypo.label(t, color: t.positiveText),
+          ),
+          const SizedBox(height: AppSpace.s8),
+          Semantics(
+            header: true,
+            liveRegion: true,
+            child: Text(step.title, style: AppTypo.pageTitle(t)),
+          ),
+        ],
+      ),
+    );
+
+    final notice = step.notice == null
+        ? null
+        : Padding(
+            padding: const EdgeInsets.only(top: AppSpace.s21),
+            child: Text(step.notice!, style: AppTypo.meta(t)),
+          );
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Short viewports and large text drop the decorative illustration on
-        // page 1; page 2's rows are the content, so they stay.
-        final roomy = constraints.maxHeight >= 420 && textScale <= 1.4;
+        final Widget top;
+        final Widget bottom;
 
-        final Widget? illustration = switch (step.kind) {
-          OnboardingStepKind.orientation =>
-            roomy ? _Orientation(compact: compact) : null,
-          OnboardingStepKind.tour => const OnboardingFeatureRows(),
-        };
-        // On the tour page the rows follow the heading; elsewhere the
-        // illustration leads and the text follows it.
-        final illustrationFirst = step.kind != OnboardingStepKind.tour;
-
-        final text = Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Entrance(
-              index: 0,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    step.eyebrow,
-                    style: AppTypo.label(t, color: t.accentInk),
+        if (tour) {
+          top = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              eyebrowAndTitle,
+              const SizedBox(height: AppSpace.s34),
+              const Entrance(index: 1, child: OnboardingFeatureRows()),
+              const SizedBox(height: AppSpace.s13),
+              const Entrance(index: 2, child: OnboardingLocationPills()),
+            ],
+          );
+          bottom = notice ?? const SizedBox.shrink();
+        } else {
+          // The decorative bars take whatever height the copy leaves, scaled
+          // down as a whole, and drop out on short windows or large text.
+          final copyEstimate = 250 * textScale.clamp(1.0, 2.0);
+          final leftover = constraints.maxHeight - copyEstimate;
+          final barsHeight = (leftover - AppSpace.s34).clamp(0.0, 246.0);
+          final showBars = textScale <= 1.4 && barsHeight >= 89;
+          top = showBars
+              ? Padding(
+                  padding: EdgeInsets.only(
+                    top: (leftover - barsHeight) / 2,
                   ),
-                  const SizedBox(height: AppSpace.xs),
-                  Semantics(
-                    header: true,
-                    liveRegion: true,
-                    child: Text(
-                      step.title,
-                      style: AppTypo.display(
-                        fontSize: compact
-                            ? AppTextScale.page
-                            : AppTextScale.greeting,
-                        fontWeight: FontWeight.w800,
-                        color: t.textPrimary,
-                        height: 1.1,
-                        letterSpacing: -1.0,
-                      ),
+                  child: Center(
+                    child: Entrance(
+                      index: 2,
+                      child: OnboardingBars(height: barsHeight),
                     ),
                   ),
-                ],
-              ),
-            ),
-            if (step.body != null) ...[
-              const SizedBox(height: AppSpace.sm),
-              Entrance(
-                index: 1,
-                child: Text(
-                  step.body!,
-                  style: AppTypo.ui(
-                    fontSize: AppTextScale.rowLabel,
-                    fontWeight: FontWeight.w500,
-                    color: t.foregroundMuted,
-                    height: 1.45,
+                )
+              : const SizedBox.shrink();
+          bottom = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              eyebrowAndTitle,
+              if (step.body != null) ...[
+                const SizedBox(height: AppSpace.s13),
+                Entrance(
+                  index: 1,
+                  child: Text(
+                    step.body!,
+                    style: AppTypo.ui(
+                      fontSize: AppTextScale.rowLabel,
+                      fontWeight: FontWeight.w500,
+                      color: t.foregroundMuted,
+                      height: 1.45,
+                    ),
                   ),
                 ),
-              ),
+              ],
+              ?notice,
             ],
-          ],
-        );
-
-        final notice = step.notice == null
-            ? null
-            : Padding(
-                padding: const EdgeInsets.only(top: AppSpace.md),
-                child: Text(
-                  step.notice!,
-                  style: AppTypo.caption(t, color: t.foregroundMuted),
-                ),
-              );
-
-        final wrappedIllustration = illustration == null
-            ? null
-            : Entrance(index: 2, child: illustration);
+          );
+        }
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpace.xl,
-            vertical: AppSpace.xs,
+          padding: EdgeInsets.symmetric(
+            horizontal: gutter,
+            vertical: AppSpace.s13,
           ),
           child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight - 2 * AppSpace.s13,
+            ),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (illustrationFirst && wrappedIllustration != null) ...[
-                  wrappedIllustration,
-                  const SizedBox(height: AppSpace.xl),
-                ],
-                text,
-                if (!illustrationFirst && wrappedIllustration != null) ...[
-                  const SizedBox(height: AppSpace.xl),
-                  wrappedIllustration,
-                ],
-                ?notice,
-              ],
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [top, bottom],
             ),
           ),
         );
       },
-    );
-  }
-}
-
-/// Screen 1's illustration: wash and logo. The logo appears only
-/// here, per the brand rule that it is not repeated on every step.
-class _Orientation extends StatelessWidget {
-  const _Orientation({required this.compact});
-
-  final bool compact;
-
-  @override
-  Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          OnboardingWash(size: compact ? 240 : 300),
-          const Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              LogoMark(placement: LogoPlacement.auth),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

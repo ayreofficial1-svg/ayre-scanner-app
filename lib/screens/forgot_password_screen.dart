@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
+import '../widgets/ayre_masthead.dart';
 
 /// Sends a password-reset email. The confirmation is the same whether or not
 /// an account exists for the address.
@@ -84,20 +85,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
     final emailError = _submitted ? AuthValidators.email(_email.text) : null;
     final canSend = !_loading && _cooldown <= 0;
 
     return AuthScaffold(
       showBack: true,
-      children: [
-        Text('Reset password', style: AppTypo.pageTitle(t)),
-        const SizedBox(height: AppSpace.xxs),
-        Text(
+      title: 'Forgot password',
+      subtitle:
           "Enter your email and we'll send you a link to set a new password.",
-          style: AppTypo.body(t),
-        ),
-        const SizedBox(height: AppSpace.xl),
+      tone: AyreMastTone.standard,
+      mastHeight: AppShape.mastTab,
+      bodyTop: AppSpace.s21,
+      children: [
         AuthField(
           label: 'Email',
           controller: _email,
@@ -111,7 +110,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           onSubmitted: (_) => canSend ? _send() : null,
         ),
         if (_sent) ...[
-          const SizedBox(height: AppSpace.lg),
+          const SizedBox(height: AppSpace.s13),
           const AuthMessage(
             glyph: AyreGlyph.check,
             message:
@@ -120,10 +119,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           ),
         ],
         if (_error != null) ...[
-          const SizedBox(height: AppSpace.lg),
+          const SizedBox(height: AppSpace.s13),
           AuthMessage(message: _error!),
         ],
-        const SizedBox(height: AppSpace.xl),
+        const SizedBox(height: AppSpace.s21),
         AyreButton(
           label: _cooldown > 0
               ? 'Resend in ${_cooldown}s'
@@ -131,7 +130,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           busy: _loading,
           onPressed: canSend ? _send : null,
         ),
-        const SizedBox(height: AppSpace.md),
+        const SizedBox(height: AppSpace.s13),
         AyreButton(
           label: 'Back to sign in',
           kind: AyreButtonKind.outline,

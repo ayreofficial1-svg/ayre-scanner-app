@@ -6,7 +6,7 @@ import '../services/auth_validators.dart';
 import '../theme/app_theme.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/ayre_components.dart';
-import '../widgets/ayre_logo.dart';
+import '../widgets/ayre_masthead.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
 
@@ -67,26 +67,26 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
     final emailError = _submitted ? AuthValidators.email(_email.text) : null;
     final passError = _submitted && _password.text.isEmpty
         ? 'Enter your password'
         : null;
 
     return AuthScaffold(
+      title: 'Sign in',
+      subtitle: 'Welcome back. Sign in to continue.',
+      largeTitle: true,
+      tone: AyreMastTone.standard,
+      mastHeight: AppShape.mastLogin,
+      titleGap: AppSpace.s89,
+      bodyTop: AppSpace.s21,
       children: [
-        const Center(child: LogoMark(placement: LogoPlacement.auth)),
-        const SizedBox(height: AppSpace.md),
-        Text('Sign in', style: AppTypo.pageTitle(t)),
-        const SizedBox(height: AppSpace.xxs),
-        Text('Continue to your market terminal.', style: AppTypo.body(t)),
-        const SizedBox(height: AppSpace.xl),
         ValueListenableBuilder<String?>(
           valueListenable: AuthService.instance.notice,
           builder: (context, notice, _) => notice == null
               ? const SizedBox.shrink()
               : Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpace.lg),
+                  padding: const EdgeInsets.only(bottom: AppSpace.s13),
                   child: AuthMessage(message: notice),
                 ),
         ),
@@ -104,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 enabled: !_loading,
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: AppSpace.lg),
+              const SizedBox(height: AppSpace.s13),
               AuthField(
                 label: 'Password',
                 controller: _password,
@@ -122,24 +122,25 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         Align(
           alignment: Alignment.centerRight,
-          child: TextButton(
-            onPressed: _loading
+          child: AuthTextLink(
+            label: 'Forgot password?',
+            onTap: _loading
                 ? null
                 : () => _open(ForgotPasswordScreen(initialEmail: _email.text)),
-            child: const Text('Forgot password?'),
           ),
         ),
         if (_error != null) ...[
           const SizedBox(height: AppSpace.xs),
           AuthMessage(message: _error!),
-        ],
-        const SizedBox(height: AppSpace.lg),
+          const SizedBox(height: AppSpace.s13),
+        ] else
+          const SizedBox(height: AppSpace.s8),
         AyreButton(
           label: 'Sign in',
           busy: _loading,
           onPressed: _loading ? null : _signIn,
         ),
-        const SizedBox(height: AppSpace.md),
+        const SizedBox(height: AppSpace.s13),
         AyreButton(
           label: 'Create account',
           kind: AyreButtonKind.outline,

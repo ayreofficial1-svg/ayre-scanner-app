@@ -21,7 +21,8 @@ import 'services/settings_store.dart';
 import 'services/tour_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/ayre_components.dart';
-import 'widgets/ayre_icons.dart';
+import 'widgets/ayre_logo.dart';
+import 'widgets/finance_icons.dart';
 import 'widgets/state_views.dart';
 
 void main() {
@@ -292,21 +293,50 @@ class AuthUnavailableScreen extends StatelessWidget {
       body: SafeArea(
         child: ContentWidth(
           maxWidth: 360,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(AppSpace.xl),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                StatePanel.failed(
-                  headline: 'Sign-in unavailable',
-                  message:
-                      "We couldn't start sign-in. Check your connection and "
-                      'try again.',
-                  glyph: AyreGlyph.lock,
-                  onRetry: onRetry,
-                ),
-              ],
+          child: Center(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(AppSpace.gutterOf(context)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  const LogoMark(placement: LogoPlacement.auth),
+                  const SizedBox(height: AppSpace.s34),
+                  Container(
+                    width: AppShape.prominentTileSize,
+                    height: AppShape.prominentTileSize,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: t.surfaceRaised,
+                      borderRadius: AppShape.field,
+                    ),
+                    child: FinanceIcon(
+                      FinanceGlyph.info,
+                      size: 24,
+                      color: t.foregroundMuted,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpace.s21),
+                  Semantics(
+                    header: true,
+                    liveRegion: true,
+                    child: Text(
+                      'Sign-in unavailable',
+                      textAlign: TextAlign.center,
+                      style: AppTypo.sectionTitle(t),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpace.s8),
+                  Text(
+                    "We couldn't start sign-in. Check your connection and "
+                    'try again.',
+                    textAlign: TextAlign.center,
+                    style: AppTypo.body(t),
+                  ),
+                  const SizedBox(height: AppSpace.s21),
+                  AyreButton(label: 'Try again', onPressed: onRetry),
+                ],
+              ),
             ),
           ),
         ),
