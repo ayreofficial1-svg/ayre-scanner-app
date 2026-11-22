@@ -18,6 +18,12 @@ Future<T?> showAyreSheet<T>({
     enableDrag: isDismissible,
     showDragHandle: false,
     barrierColor: context.tokens.scrim,
+    sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
+        ? AnimationStyle.noAnimation
+        : const AnimationStyle(
+            duration: AppMotion.overlaySlide,
+            reverseDuration: AppMotion.pageTransition,
+          ),
     builder: builder,
   );
 }
@@ -56,9 +62,7 @@ class AyreSheet extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Semantics(
-                label: 'Drag handle',
-                excludeSemantics: true,
+              ExcludeSemantics(
                 child: Center(
                   child: Container(
                     margin: const EdgeInsets.only(

@@ -13,16 +13,14 @@ import 'figure.dart';
 /// label" tiles. Building it once here is the plan's instruction — Profile
 /// must not grow a second, near-identical tile.
 ///
-/// The figure goes through [Figure.static] (the readout face, like every other
-/// number in the app) and scales down instead of overflowing at large text
-/// sizes. Label and figure merge into a single semantics node, so a screen
-/// reader hears "3 Subjects" rather than two unrelated fragments.
+/// The count and label share one semantics node.
 class AyreStatTile extends StatelessWidget {
   const AyreStatTile({
     super.key,
     required this.value,
     required this.label,
     this.glyph,
+    this.animate = true,
   });
 
   /// Already formatted by the caller — `'—'` is a valid value while a count is
@@ -33,10 +31,12 @@ class AyreStatTile extends StatelessWidget {
   /// Optional leading glyph, set in a rounded-square `surfaceRaised` tile.
   /// Omit for the icon-less Learn variant.
   final AyreGlyph? glyph;
+  final bool animate;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final count = int.tryParse(value);
 
     return AyreCard(
       padding: const EdgeInsets.all(AppSpace.s21),
@@ -61,25 +61,25 @@ class AyreStatTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Hero-style numeral: truncating it would hide data, so it
-                  // keeps a FittedBox (documented D-9 exception).
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: Figure.static(
-                      value,
-                      fontSize: AppTextScale.stat,
+                  if (count != null)
+                    CountUpFigure(
+                      value: count.toDouble(),
+                      from: animate ? 0 : count.toDouble(),
+                      format: (number) => number.round().toString(),
+                      fontSize: 34,
                       fontWeight: FontWeight.w800,
-                      color: t.textPrimary,
+                    )
+                  else
+                    Text(
+                      value,
+                      style: AppTypo.num(
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        color: t.textPrimary,
+                      ),
                     ),
-                  ),
                   const SizedBox(height: AppSpace.xxs),
-                  Text(
-                    label,
-                    style: AppTypo.body(t, color: t.foregroundMuted),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  Text(label, style: AppTypo.body(t, color: t.foregroundMuted)),
                 ],
               ),
             ),

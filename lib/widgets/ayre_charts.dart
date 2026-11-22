@@ -63,6 +63,7 @@ class _DrawOn extends StatefulWidget {
 
 class _DrawOnState extends State<_DrawOn> with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
+  bool _started = false;
 
   @override
   void initState() {
@@ -71,15 +72,17 @@ class _DrawOnState extends State<_DrawOn> with SingleTickerProviderStateMixin {
       vsync: this,
       duration: AppMotion.chartDraw,
     );
-    // MediaQuery isn't readable in initState — decide on the first frame.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (MediaQuery.disableAnimationsOf(context)) {
-        _controller.value = 1;
-      } else {
-        _controller.forward();
-      }
-    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.value = 1;
+    } else if (!_started) {
+      _controller.forward();
+    }
+    _started = true;
   }
 
   @override

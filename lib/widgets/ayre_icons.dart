@@ -88,6 +88,11 @@ enum AyreGlyph {
   signOut,
   support,
   course,
+  sliders,
+  shield,
+  mail,
+  trash,
+  document,
 }
 
 /// Renders an [AyreGlyph] at [size] on the shared keyline grid.
@@ -165,6 +170,11 @@ class AyreIcon extends StatelessWidget {
     AyreGlyph.trendUp: FinanceGlyph.trend,
     AyreGlyph.check: FinanceGlyph.check,
     AyreGlyph.edit: FinanceGlyph.edit,
+    AyreGlyph.sliders: FinanceGlyph.sliders,
+    AyreGlyph.shield: FinanceGlyph.shield,
+    AyreGlyph.mail: FinanceGlyph.mail,
+    AyreGlyph.trash: FinanceGlyph.trash,
+    AyreGlyph.document: FinanceGlyph.document,
   };
 
   @override
@@ -233,6 +243,12 @@ class _AyreIconPainter extends CustomPainter {
 
   void _draw(Canvas c, Paint s, Paint f) {
     switch (glyph) {
+      case AyreGlyph.sliders:
+      case AyreGlyph.shield:
+      case AyreGlyph.mail:
+      case AyreGlyph.trash:
+      case AyreGlyph.document:
+        return; // Drawn by FinanceIcon.
       // ── Navigation ─────────────────────────────────────────────────────────
       case AyreGlyph.home:
         // Rounded house with a door; selected = the same silhouette, solid,
@@ -317,7 +333,11 @@ class _AyreIconPainter extends CustomPainter {
                 ),
               ),
               strokes: [line],
-              fills: [Path()..addOval(Rect.fromCircle(center: const Offset(18.4, 8.2), radius: 1.9))],
+              fills: [
+                Path()..addOval(
+                  Rect.fromCircle(center: const Offset(18.4, 8.2), radius: 1.9),
+                ),
+              ],
             );
           } else {
             c.drawPath(
@@ -359,12 +379,13 @@ class _AyreIconPainter extends CustomPainter {
         // Portrait sheet with three ascending bars. Selected = solid sheet,
         // bars knocked out.
         {
-          final sheet = Path()..addRRect(
-            RRect.fromRectAndRadius(
-              const Rect.fromLTRB(4.6, 3.6, 19.4, 20.4),
-              const Radius.circular(2.6),
-            ),
-          );
+          final sheet = Path()
+            ..addRRect(
+              RRect.fromRectAndRadius(
+                const Rect.fromLTRB(4.6, 3.6, 19.4, 20.4),
+                const Radius.circular(2.6),
+              ),
+            );
           final bars = Path()
             ..moveTo(9, 16.4)
             ..lineTo(9, 13.4)
@@ -631,7 +652,9 @@ class _AyreIconPainter extends CustomPainter {
         // consistent family.
         {
           final outer = Path()
-            ..addOval(Rect.fromCircle(center: const Offset(12, 12), radius: 7.6));
+            ..addOval(
+              Rect.fromCircle(center: const Offset(12, 12), radius: 7.6),
+            );
           final bite = Path()
             ..addOval(
               Rect.fromCircle(center: const Offset(15.4, 8.6), radius: 6.6),

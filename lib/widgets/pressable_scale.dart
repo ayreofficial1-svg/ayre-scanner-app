@@ -17,6 +17,7 @@ class PressableScale extends StatefulWidget {
     this.shape,
     this.scale = 0.985,
     this.hoverTint = true,
+    this.focusColor,
   });
 
   final Widget child;
@@ -27,6 +28,7 @@ class PressableScale extends StatefulWidget {
   final BorderRadius? shape;
   final double scale;
   final bool hoverTint;
+  final Color? focusColor;
 
   @override
   State<PressableScale> createState() => _PressableScaleState();
@@ -67,7 +69,10 @@ class _PressableScaleState extends State<PressableScale> {
         foregroundDecoration: showRing
             ? BoxDecoration(
                 borderRadius: radius,
-                border: Border.all(color: t.focusRing, width: 2),
+                border: Border.all(
+                  color: widget.focusColor ?? t.focusRing,
+                  width: 2,
+                ),
               )
             : null,
         child: Material(
@@ -131,22 +136,22 @@ class _PressableScaleRowState extends State<PressableScaleRow> {
         FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
     return Container(
       foregroundDecoration: showRing
-          ? BoxDecoration(border: Border.all(color: t.accentInk, width: 2))
+          ? BoxDecoration(border: Border.all(color: t.focusRing, width: 2))
           : null,
       child: Material(
-      color: AppTheme.transparent,
-      child: InkWell(
-        onTap: widget.onTap,
-        onFocusChange: (v) {
-          if (_focused != v) setState(() => _focused = v);
-        },
-        focusColor: t.accent.withValues(alpha: 0.08),
-        hoverColor: t.accent.withValues(alpha: 0.05),
-        splashColor: t.accent.withValues(alpha: 0.06),
-        highlightColor: t.accent.withValues(alpha: 0.03),
-        child: widget.child,
+        color: AppTheme.transparent,
+        child: InkWell(
+          onTap: widget.onTap,
+          onFocusChange: (v) {
+            if (_focused != v) setState(() => _focused = v);
+          },
+          focusColor: t.accent.withValues(alpha: 0.08),
+          hoverColor: t.accent.withValues(alpha: 0.05),
+          splashColor: t.accent.withValues(alpha: 0.06),
+          highlightColor: t.accent.withValues(alpha: 0.03),
+          child: widget.child,
+        ),
       ),
-    ),
     );
   }
 }

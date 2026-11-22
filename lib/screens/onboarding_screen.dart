@@ -114,8 +114,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     children: [
                       // Reference top is y = 55 including the safe inset.
                       SizedBox(
-                        height: (55 - MediaQuery.paddingOf(context).top)
-                            .clamp(AppSpace.s13, AppSpace.s55),
+                        height: (55 - MediaQuery.paddingOf(context).top).clamp(
+                          AppSpace.s13,
+                          AppSpace.s55,
+                        ),
                       ),
                       _TopBar(
                         showBack: _page > 0,
@@ -145,17 +147,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               page: _page,
                               total: kOnboardingSteps.length,
                             ),
-                            const Spacer(),
-                            ConstrainedBox(
-                              constraints: BoxConstraints(
-                                minWidth: _page == _last ? 178 : 144,
-                              ),
-                              child: AyreButton(
-                                expand: false,
-                                label: _page == _last
-                                    ? OnboardingLabels.getStarted
-                                    : OnboardingLabels.next,
-                                onPressed: _primary,
+                            const SizedBox(width: AppSpace.s13),
+                            Expanded(
+                              child: Align(
+                                alignment: AlignmentDirectional.centerEnd,
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    minWidth: _page == _last ? 178 : 144,
+                                  ),
+                                  child: AyreButton(
+                                    expand: false,
+                                    label: _page == _last
+                                        ? OnboardingLabels.getStarted
+                                        : OnboardingLabels.next,
+                                    onPressed: _finishing ? null : _primary,
+                                  ),
+                                ),
                               ),
                             ),
                           ],
@@ -190,8 +197,8 @@ class _TopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
 
-    return SizedBox(
-      height: AppSpace.minTarget,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: AppSpace.gutterOf(context)),
         child: Row(
@@ -202,6 +209,7 @@ class _TopBar extends StatelessWidget {
               Semantics(
                 button: true,
                 label: OnboardingLabels.back,
+                onTap: onBack,
                 excludeSemantics: true,
                 child: Tooltip(
                   message: OnboardingLabels.back,
@@ -233,18 +241,20 @@ class _TopBar extends StatelessWidget {
                 ),
               ),
             if (showExit)
-              TextButton(
-                onPressed: onExit,
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(
-                    AppSpace.minTarget,
-                    AppSpace.minTarget,
+              Flexible(
+                child: TextButton(
+                  onPressed: onExit,
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(
+                      AppSpace.minTarget,
+                      AppSpace.minTarget,
+                    ),
+                    foregroundColor: t.foregroundMuted,
                   ),
-                  foregroundColor: t.foregroundMuted,
-                ),
-                child: Text(
-                  OnboardingLabels.skip,
-                  style: AppTypo.button(t, color: t.foregroundMuted),
+                  child: Text(
+                    OnboardingLabels.skip,
+                    style: AppTypo.button(t, color: t.foregroundMuted),
+                  ),
                 ),
               ),
           ],
@@ -263,7 +273,7 @@ class _OnboardingPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final gutter = AppSpace.gutterOf(context);
-    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final textScale = MediaQuery.textScalerOf(context).scale(15) / 15;
     final tour = step.kind == OnboardingStepKind.tour;
 
     final eyebrowAndTitle = Entrance(
@@ -271,10 +281,7 @@ class _OnboardingPage extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            step.eyebrow,
-            style: AppTypo.label(t, color: t.positiveText),
-          ),
+          Text(step.eyebrow, style: AppTypo.label(t, color: t.positiveText)),
           const SizedBox(height: AppSpace.s8),
           Semantics(
             header: true,
@@ -318,9 +325,7 @@ class _OnboardingPage extends StatelessWidget {
           final showBars = textScale <= 1.4 && barsHeight >= 89;
           top = showBars
               ? Padding(
-                  padding: EdgeInsets.only(
-                    top: (leftover - barsHeight) / 2,
-                  ),
+                  padding: EdgeInsets.only(top: (leftover - barsHeight) / 2),
                   child: Center(
                     child: Entrance(
                       index: 2,
@@ -360,7 +365,10 @@ class _OnboardingPage extends StatelessWidget {
           ),
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              minHeight: constraints.maxHeight - 2 * AppSpace.s13,
+              minHeight: (constraints.maxHeight - 2 * AppSpace.s13).clamp(
+                0.0,
+                double.infinity,
+              ),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,

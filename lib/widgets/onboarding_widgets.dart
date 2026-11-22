@@ -36,23 +36,21 @@ class OnboardingPageIndicator extends StatelessWidget {
     return Semantics(
       label: OnboardingLabels.step(page + 1, total),
       excludeSemantics: true,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Wrap(
+        spacing: _gap,
+        runSpacing: _gap,
         children: [
           for (var i = 0; i < total; i++)
-            Padding(
-              padding: EdgeInsets.only(left: i == 0 ? 0 : _gap),
-              child: AnimatedContainer(
-                duration: reduce ? Duration.zero : AppMotion.buttonPress,
-                curve: AppMotion.ease,
-                width: i == page ? _activeWidth : _dot,
-                height: _dot,
-                decoration: BoxDecoration(
-                  color: i == page
-                      ? (activeColor ?? t.accent)
-                      : t.foregroundSubtle.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(4),
-                ),
+            AnimatedContainer(
+              duration: reduce ? Duration.zero : AppMotion.buttonPress,
+              curve: AppMotion.ease,
+              width: i == page ? _activeWidth : _dot,
+              height: _dot,
+              decoration: BoxDecoration(
+                color: i == page
+                    ? (activeColor ?? t.accent)
+                    : t.foregroundSubtle.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(4),
               ),
             ),
         ],
@@ -96,11 +94,7 @@ class OnboardingBars extends StatelessWidget {
             height: _h,
             child: Stack(
               children: [
-                Positioned(
-                  left: 0,
-                  bottom: 0,
-                  child: bar(89, t.surfaceRaised),
-                ),
+                Positioned(left: 0, bottom: 0, child: bar(89, t.surfaceRaised)),
                 Positioned(
                   left: 0,
                   bottom: 89 + 8,
@@ -114,7 +108,11 @@ class OnboardingBars extends StatelessWidget {
                   ),
                 ),
                 Positioned(left: 102, bottom: 0, child: bar(144, t.positive)),
-                Positioned(left: 204, bottom: 0, child: bar(233, t.textPrimary)),
+                Positioned(
+                  left: 204,
+                  bottom: 0,
+                  child: bar(233, t.textPrimary),
+                ),
               ],
             ),
           ),

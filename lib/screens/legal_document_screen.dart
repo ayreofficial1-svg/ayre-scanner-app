@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import '../legal/legal_config.dart';
 import '../legal/legal_content.dart';
 import '../theme/app_theme.dart';
-import '../widgets/ayre_components.dart';
-import '../widgets/ayre_icons.dart';
+import '../widgets/ayre_page_header.dart';
 
 /// Renders any [LegalDocument] in the app's standard pushed-screen layout.
 ///
@@ -21,31 +20,12 @@ class LegalDocumentScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Scaffold(
-      backgroundColor: t.background,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: AyreIcon(AyreGlyph.back, size: 20, color: t.textPrimary),
-          onPressed: () => Navigator.of(context).maybePop(),
-          tooltip: 'Back',
-        ),
-        title: Text(document.title),
-      ),
-      body: ContentWidth(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpace.lg,
-            AppSpace.sm,
-            AppSpace.lg,
-            AppSpace.xxl,
-          ),
-          children: [
-            LegalDocumentBody(document: document),
-            ...?footer,
-          ],
-        ),
-      ),
+    return AyrePageScaffold(
+      title: document.title,
+      children: [
+        LegalDocumentBody(document: document),
+        ...?footer,
+      ],
     );
   }
 }
@@ -66,22 +46,25 @@ class LegalDocumentBody extends StatelessWidget {
           Text('Last updated: $kLegalLastUpdated', style: AppTypo.caption(t)),
         if (document.intro != null) ...[
           const SizedBox(height: AppSpace.md),
-          SelectableText(document.intro!, style: AppTypo.body(t)),
+          SelectableText(document.intro!, style: AppTypo.reading(t)),
         ],
         for (final section in document.sections) ...[
-          const SizedBox(height: AppSpace.xl),
+          const SizedBox(height: AppSpace.s21),
           if (section.heading != null) ...[
-            Text(section.heading!, style: AppTypo.sectionTitle(t)),
-            const SizedBox(height: AppSpace.sm),
+            Semantics(
+              header: true,
+              child: Text(section.heading!, style: AppTypo.sectionTitle(t)),
+            ),
+            const SizedBox(height: AppSpace.s13),
           ],
           for (final p in section.paragraphs) ...[
-            SelectableText(p, style: AppTypo.body(t)),
-            const SizedBox(height: AppSpace.sm),
+            SelectableText(p, style: AppTypo.reading(t)),
+            const SizedBox(height: AppSpace.s13),
           ],
           for (final b in section.bullets) _Bullet(text: b),
           for (final p in section.closing) ...[
-            const SizedBox(height: AppSpace.xs),
-            SelectableText(p, style: AppTypo.body(t)),
+            const SizedBox(height: AppSpace.s13),
+            SelectableText(p, style: AppTypo.reading(t)),
           ],
         ],
       ],
@@ -107,9 +90,9 @@ class _Bullet extends StatelessWidget {
           if (!numbered)
             Padding(
               padding: const EdgeInsets.only(right: AppSpace.sm, top: 1),
-              child: Text('•', style: AppTypo.body(t)),
+              child: Text('•', style: AppTypo.reading(t)),
             ),
-          Expanded(child: SelectableText(text, style: AppTypo.body(t))),
+          Expanded(child: SelectableText(text, style: AppTypo.reading(t))),
         ],
       ),
     );

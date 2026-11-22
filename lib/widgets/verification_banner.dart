@@ -73,16 +73,13 @@ Future<void> checkVerification(BuildContext context) async {
   HapticFeedback.selectionClick();
   final result = await service.recheck();
   if (!context.mounted) return;
-  _toast(
-    context,
-    switch (result) {
-      VerifyCheck.verified => 'Your email is verified. Thank you.',
-      VerifyCheck.notYet =>
-        "Not verified yet. Open the link in the email, then try again.",
-      VerifyCheck.failed =>
-        "Couldn't check right now. Check your connection and try again.",
-    },
-  );
+  _toast(context, switch (result) {
+    VerifyCheck.verified => 'Your email is verified. Thank you.',
+    VerifyCheck.notYet =>
+      "Not verified yet. Open the link in the email, then try again.",
+    VerifyCheck.failed =>
+      "Couldn't check right now. Check your connection and try again.",
+  });
 }
 
 class _VerificationBanner extends StatelessWidget {
@@ -102,16 +99,16 @@ class _VerificationBanner extends StatelessWidget {
               : 'Resend email');
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpace.pageHorizontal,
+      padding: EdgeInsets.fromLTRB(
+        AppSpace.gutterOf(context),
         AppSpace.xs,
-        AppSpace.pageHorizontal,
+        AppSpace.gutterOf(context),
         AppSpace.xs,
       ),
       child: Material(
         color: t.surfaceRaised,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.card),
+          borderRadius: AppShape.card,
           side: BorderSide(color: t.hairline),
         ),
         child: Padding(
@@ -127,7 +124,7 @@ class _VerificationBanner extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(top: 2),
                 child: AyreIcon(
-                  AyreGlyph.account,
+                  AyreGlyph.mail,
                   size: 16,
                   color: t.foregroundMuted,
                 ),
@@ -148,7 +145,7 @@ class _VerificationBanner extends StatelessWidget {
                       email.isEmpty
                           ? 'Open the link we emailed you.'
                           : 'We sent a link to $email.',
-                      style: AppTypo.caption(t),
+                      style: AppTypo.body(t, color: t.foregroundMuted),
                     ),
                     Wrap(
                       children: [
@@ -173,7 +170,7 @@ class _VerificationBanner extends StatelessWidget {
               ),
               if (!isRequired)
                 IconButton(
-                  tooltip: 'Dismiss',
+                  tooltip: 'Dismiss email verification reminder',
                   icon: AyreIcon(
                     AyreGlyph.close,
                     size: 16,

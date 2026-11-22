@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Launch canvas: the dark page background (--bg). -->
+    <!-- Launch canvas matches the dark page background. -->
     <color name="ayre_launch_background">#0F1512</color>
 </resources>

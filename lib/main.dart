@@ -184,27 +184,25 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
         themeMode: _themeMode,
         // Colours (including the mast palettes) interpolate via
         // AppThemeTokens.lerp; calm, non-bouncing ease.
-        themeAnimationDuration: AppMotion.themeSwitch,
+        themeAnimationDuration:
+            MediaQuery.maybeOf(context)?.disableAnimations == true
+            ? Duration.zero
+            : AppMotion.themeSwitch,
         themeAnimationCurve: AppMotion.ease,
         builder: (context, child) {
           // Two pieces of app-wide chrome, applied once here rather than
           // re-implemented per screen: the offline notice, and the user's chosen
           // text size as a scale over everything (including Material's own
           // widgets, which theme tokens alone would miss).
+          final settings = SettingsStore.instance;
+          final reachability = ReachabilityStore.instance;
           return ListenableBuilder(
-            listenable: SettingsStore.instance,
+            listenable: Listenable.merge([settings, reachability]),
             builder: (context, _) {
               final media = MediaQuery.of(context);
-              // Multiply, don't clamp: clamping would silently ignore a
-              // *smaller* preference whenever the OS scale already sat inside
-              // the range. Measuring a known size recovers the OS's effective
-              // linear factor, which the preference then scales.
-              final osFactor = media.textScaler.scale(100) / 100;
-              final effective =
-                  (osFactor * SettingsStore.instance.textSize.scale).clamp(
-                    0.8,
-                    2.2,
-                  );
+              final textScale = settings.textSize.scale;
+              final showOffline =
+                  reachability.offline && !reachability.dismissed;
               // The *effective* brightness: the in-app choice, or the phone's
               // when the mode is System. System bars follow it, not the phone
               // theme alone (N-14).
@@ -217,25 +215,25 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
                 value: AppTheme.overlayStyle(brightness),
                 child: MediaQuery(
                   data: media.copyWith(
-                    textScaler: TextScaler.linear(effective),
+                    textScaler: textScale == 1
+                        ? media.textScaler
+                        : _AppTextScaler(media.textScaler, textScale),
                   ),
                   child: Column(
                     children: [
-                      // Scoped listener: only this banner rebuilds when
-                      // reachability changes, not the whole app tree.
-                      ListenableBuilder(
-                        listenable: ReachabilityStore.instance,
-                        builder: (context, _) {
-                          final store = ReachabilityStore.instance;
-                          if (!store.offline || store.dismissed) {
-                            return const SizedBox.shrink();
-                          }
-                          return OfflineBanner(
-                            onDismiss: ReachabilityStore.instance.dismiss,
-                          );
-                        },
+                      if (showOffline)
+                        OfflineBanner(onDismiss: reachability.dismiss)
+                      else
+                        const SizedBox.shrink(),
+                      Expanded(
+                        child: Builder(
+                          builder: (context) => MediaQuery.removePadding(
+                            context: context,
+                            removeTop: showOffline,
+                            child: child ?? const SizedBox.shrink(),
+                          ),
+                        ),
                       ),
-                      Expanded(child: child ?? const SizedBox.shrink()),
                     ],
                   ),
                 ),
@@ -250,6 +248,29 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
       ),
     );
   }
+}
+
+/// Applies the in-app preference to each size the OS has already scaled.
+class _AppTextScaler extends TextScaler {
+  const _AppTextScaler(this.platform, this.multiplier);
+
+  final TextScaler platform;
+  final double multiplier;
+
+  @override
+  double scale(double fontSize) => platform.scale(fontSize) * multiplier;
+
+  @override
+  double get textScaleFactor => scale(14) / 14;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _AppTextScaler &&
+      platform == other.platform &&
+      multiplier == other.multiplier;
+
+  @override
+  int get hashCode => Object.hash(platform, multiplier);
 }
 
 class AppThemeController extends InheritedWidget {

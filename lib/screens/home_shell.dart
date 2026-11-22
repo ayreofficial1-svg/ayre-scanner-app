@@ -1,6 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
@@ -239,21 +240,25 @@ class _HomeShellState extends State<HomeShell> {
 
   void _onProfileTourRequested() => unawaited(_startProfileTour());
 
+  Future<void> _settleTourTargets() async {
+    if (MediaQuery.disableAnimationsOf(context)) {
+      await WidgetsBinding.instance.endOfFrame;
+    } else {
+      await Future<void>.delayed(AppMotion.pageTransition);
+    }
+  }
+
   /// Switches to Profile and walks every option on it, then returns to the tab
   /// the person was on. The verification step is left out once the email is
   /// confirmed, because those rows are not on screen then.
   Future<void> _startProfileTour() async {
-    await Future<void>.delayed(
-      AppMotion.pageTransition + const Duration(milliseconds: 150),
-    );
+    await _settleTourTargets();
     if (!mounted || SpotlightTour.isActive) return;
     if (ModalRoute.of(context)?.isCurrent == false) return;
     // A tab can have a detail open now (A3), so return every tab to its root
     // before anything is measured.
     if (_returnTabsToRoot()) {
-      await Future<void>.delayed(
-        AppMotion.pageTransition + const Duration(milliseconds: 150),
-      );
+      await _settleTourTargets();
       if (!mounted || SpotlightTour.isActive) return;
     }
     final origin = _index;
@@ -281,15 +286,11 @@ class _HomeShellState extends State<HomeShell> {
   /// was on.
   Future<void> _startAppTour() async {
     // Let first paint, or a pop back from Settings, settle before measuring.
-    await Future<void>.delayed(
-      AppMotion.pageTransition + const Duration(milliseconds: 150),
-    );
+    await _settleTourTargets();
     if (!mounted || SpotlightTour.isActive) return;
     if (ModalRoute.of(context)?.isCurrent == false) return;
     if (_returnTabsToRoot()) {
-      await Future<void>.delayed(
-        AppMotion.pageTransition + const Duration(milliseconds: 150),
-      );
+      await _settleTourTargets();
       if (!mounted || SpotlightTour.isActive) return;
     }
     final origin = _index;
@@ -320,7 +321,8 @@ class _HomeShellState extends State<HomeShell> {
     return ListenableBuilder(
       listenable: AuthService.instance.user,
       builder: (context, _) {
-        final name = AuthService.instance.currentUser?.shownName ?? _accountName;
+        final name =
+            AuthService.instance.currentUser?.shownName ?? _accountName;
         return _build(context, name);
       },
     );
@@ -390,8 +392,10 @@ class _HomeShellState extends State<HomeShell> {
     // IndexedStack keeps all four tabs mounted for the life of the app, and
     // TickerMode mutes every ticker (animations) in an inactive tab's subtree
     // without touching the widgets that own them.
-    Widget tickered(int index, Widget child) =>
-        TickerMode(enabled: index == _index, child: child);
+    Widget tickered(int index, Widget child) => ExcludeFocus(
+      excluding: index != _index,
+      child: TickerMode(enabled: index == _index, child: child),
+    );
 
     final tabs = IndexedStack(
       index: _index,
@@ -526,10 +530,8 @@ class _TabFadeState extends State<_TabFade>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: AppMotion.tabFade,
-    )..value = 1.0;
+    _controller = AnimationController(vsync: this, duration: AppMotion.tabFade)
+      ..value = 1.0;
     _curved = CurvedAnimation(parent: _controller, curve: AppMotion.ease);
   }
 
@@ -545,31 +547,20 @@ class _TabFadeState extends State<_TabFade>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) _controller.value = 1;
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
 
   @override
-  Widget build(BuildContext context) {
-    // AnimatedBuilder, not a bare read of `_curved.value` inside a
-    // `FadeTransition`'s child. The child subtree of a transition is built
-    // once and reused every frame, so the previous version sampled the curve
-    // a single time and the 8px shift §15.4 asks for never actually
-    // happened — the tab only ever cross-faded. Caught in Phase 5 while
-    // rebuilding the screens this transition carries.
-    return AnimatedBuilder(
-      animation: _curved,
-      child: widget.child,
-      builder: (context, child) => Opacity(
-        opacity: _curved.value,
-        child: Transform.translate(
-          offset: Offset(0, (1 - _curved.value) * AppSpace.xs),
-          child: child,
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      FadeTransition(opacity: _curved, child: widget.child);
 }
 
 /// Initials for the account, used by the Fold's Profile slot and Profile's own

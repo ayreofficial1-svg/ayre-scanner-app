@@ -11,9 +11,11 @@ class AyreTabHost extends InheritedWidget {
 
   final double clearance;
 
+  static double? maybeClearanceOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<AyreTabHost>()?.clearance;
+
   static double clearanceOf(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<AyreTabHost>()?.clearance ??
-      0;
+      maybeClearanceOf(context) ?? 0;
 
   @override
   bool updateShouldNotify(AyreTabHost oldWidget) =>

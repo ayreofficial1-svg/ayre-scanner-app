@@ -6,7 +6,7 @@ import '../services/auth_validators.dart';
 import '../theme/app_theme.dart';
 import '../widgets/auth_widgets.dart';
 import '../widgets/ayre_components.dart';
-import '../widgets/ayre_icons.dart';
+import '../widgets/ayre_page_header.dart';
 
 /// Sets a new password for the signed-in account.
 ///
@@ -53,6 +53,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   }
 
   Future<void> _submit() async {
+    if (_busy) return;
     HapticFeedback.mediumImpact();
     FocusScope.of(context).unfocus();
     setState(() {
@@ -91,112 +92,93 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         : null;
     final matches = _confirm.text.isNotEmpty && _confirm.text == _password.text;
 
-    return Scaffold(
-      backgroundColor: t.background,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: AyreIcon(AyreGlyph.back, size: 20, color: t.textPrimary),
-          onPressed: _busy ? null : () => Navigator.of(context).maybePop(),
-          tooltip: 'Back',
+    return AyrePageScaffold(
+      title: 'Change password',
+      backEnabled: !_busy,
+      children: [
+        Text(
+          'Enter your current password, then your new one twice.',
+          style: AppTypo.reading(t),
         ),
-        title: const Text('Change password'),
-      ),
-      body: ContentWidth(
-        child: ListView(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          padding: const EdgeInsets.fromLTRB(
-            AppSpace.pageHorizontal,
-            AppSpace.sm,
-            AppSpace.pageHorizontal,
-            AppSpace.xxl,
+        const SizedBox(height: AppSpace.xl),
+        AutofillGroup(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              AuthField(
+                label: 'Current password',
+                controller: _current,
+                hint: 'Your current password',
+                password: true,
+                autofillHints: const [AutofillHints.password],
+                errorText: _submitted ? _currentError : null,
+                enabled: !_busy,
+                onChanged: (_) => setState(() => _error = null),
+              ),
+              const SizedBox(height: AppSpace.lg),
+              AuthField(
+                label: 'New password',
+                controller: _password,
+                hint: 'Create a new password',
+                password: true,
+                autofillHints: const [AutofillHints.newPassword],
+                errorText: _submitted ? _newError : null,
+                enabled: !_busy,
+                onChanged: (_) => setState(() => _error = null),
+              ),
+              const SizedBox(height: AppSpace.sm),
+              PasswordChecklist(check: _check),
+              const SizedBox(height: AppSpace.lg),
+              AuthField(
+                label: 'Confirm new password',
+                controller: _confirm,
+                hint: 'Re-enter your new password',
+                password: true,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.newPassword],
+                errorText: confirmError,
+                enabled: !_busy,
+                onChanged: (_) => setState(() {
+                  _confirmTouched = true;
+                  _error = null;
+                }),
+                onSubmitted: (_) => _busy ? null : _submit(),
+              ),
+              if (matches) ...[
+                const SizedBox(height: AppSpace.xs),
+                Text(
+                  'Passwords match',
+                  style: AppTypo.caption(t, color: t.accentInk),
+                ),
+              ],
+            ],
           ),
-          children: [
-            Text('Set a new password', style: AppTypo.pageTitle(t)),
-            const SizedBox(height: AppSpace.xxs),
-            Text(
-              'Enter your current password, then your new one twice.',
-              style: AppTypo.body(t),
-            ),
-            const SizedBox(height: AppSpace.xl),
-            AutofillGroup(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AuthField(
-                    label: 'Current password',
-                    controller: _current,
-                    hint: 'Your current password',
-                    password: true,
-                    autofillHints: const [AutofillHints.password],
-                    errorText: _submitted ? _currentError : null,
-                    enabled: !_busy,
-                    onChanged: (_) => setState(() => _error = null),
-                  ),
-                  const SizedBox(height: AppSpace.lg),
-                  AuthField(
-                    label: 'New password',
-                    controller: _password,
-                    hint: 'Create a new password',
-                    password: true,
-                    autofillHints: const [AutofillHints.newPassword],
-                    errorText: _submitted ? _newError : null,
-                    enabled: !_busy,
-                    onChanged: (_) => setState(() => _error = null),
-                  ),
-                  const SizedBox(height: AppSpace.sm),
-                  PasswordChecklist(check: _check),
-                  const SizedBox(height: AppSpace.lg),
-                  AuthField(
-                    label: 'Confirm new password',
-                    controller: _confirm,
-                    hint: 'Re-enter your new password',
-                    password: true,
-                    textInputAction: TextInputAction.done,
-                    autofillHints: const [AutofillHints.newPassword],
-                    errorText: confirmError,
-                    enabled: !_busy,
-                    onChanged: (_) => setState(() {
-                      _confirmTouched = true;
-                      _error = null;
-                    }),
-                    onSubmitted: (_) => _busy ? null : _submit(),
-                  ),
-                  if (matches) ...[
-                    const SizedBox(height: AppSpace.xs),
-                    Text(
-                      'Passwords match',
-                      style: AppTypo.caption(t, color: t.accentInk),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            if (_submitted && !_check.valid) ...[
-              const SizedBox(height: AppSpace.md),
-              const AuthMessage(
-                message: 'Your new password does not meet the requirements '
-                    'above.',
-              ),
-            ],
-            if (_error != null) ...[
-              const SizedBox(height: AppSpace.md),
-              AuthMessage(message: _error!),
-            ],
-            const SizedBox(height: AppSpace.xl),
-            AyreButton(
-              label: 'Update password',
-              busy: _busy,
-              onPressed: _busy ? null : _submit,
-            ),
-            const SizedBox(height: AppSpace.sm),
-            AyreButton(
-              label: 'Cancel',
-              kind: AyreButtonKind.outline,
-              onPressed: _busy ? null : () => Navigator.of(context).maybePop(),
-            ),
-          ],
         ),
-      ),
+        if (_submitted && !_check.valid) ...[
+          const SizedBox(height: AppSpace.md),
+          const AuthMessage(
+            message:
+                'Your new password does not meet the requirements '
+                'above.',
+          ),
+        ],
+        if (_error != null) ...[
+          const SizedBox(height: AppSpace.md),
+          AuthMessage(message: _error!),
+        ],
+        const SizedBox(height: AppSpace.xl),
+        AyreButton(
+          label: 'Update password',
+          busy: _busy,
+          onPressed: _busy ? null : _submit,
+        ),
+        const SizedBox(height: AppSpace.sm),
+        AyreButton(
+          label: 'Cancel',
+          kind: AyreButtonKind.outline,
+          onPressed: _busy ? null : () => Navigator.of(context).maybePop(),
+        ),
+      ],
     );
   }
 }

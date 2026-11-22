@@ -8,9 +8,9 @@ import '../theme/app_theme.dart';
 import '../widgets/ayre_charts.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
+import '../widgets/ayre_masthead.dart';
 import '../widgets/ayre_stat_tile.dart';
 import '../widgets/figure.dart';
-import '../widgets/pressable_scale.dart';
 import '../widgets/ayre_tab_scroll.dart';
 import '../widgets/responsive.dart';
 import '../widgets/state_views.dart';
@@ -64,6 +64,8 @@ class _LearnTabState extends State<LearnTab> {
 
   /// The selected subject filter; null means "All".
   String? _category;
+  bool _hasShownCourses = false;
+  bool _animateCourses = false;
 
   @override
   void initState() {
@@ -100,9 +102,15 @@ class _LearnTabState extends State<LearnTab> {
   Future<void> _load({bool initial = false}) async {
     final fetched = await widget.marketData.getCourses();
     if (!mounted) return;
-    final result = fetched.keepingLastGood(_result);
     setState(() {
-      _result = result;
+      final result = fetched.keepingLastGood(_result);
+      final hasCourses = result.value?.isNotEmpty == true;
+      _result = fetched.isFailed && result.isReady
+          ? DataResult.ready(result.value, stale: true)
+          : result;
+      _animateCourses =
+          hasCourses && !_hasShownCourses && !result.stale && !fetched.isFailed;
+      _hasShownCourses = _hasShownCourses || hasCourses;
       _loading = false;
       // A refresh can drop a subject entirely; a filter left pointing at it
       // would show an empty library with no way to see why.
@@ -123,7 +131,10 @@ class _LearnTabState extends State<LearnTab> {
   void _selectSubject(String? subject) {
     if (subject == _category) return;
     HapticFeedback.selectionClick();
-    setState(() => _category = subject);
+    setState(() {
+      _category = subject;
+      _animateCourses = false;
+    });
   }
 
   /// The course to continue: the one furthest along that isn't finished. A
@@ -145,111 +156,133 @@ class _LearnTabState extends State<LearnTab> {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final p = t.mast;
     final courses = _result?.value ?? const <Course>[];
     final subjects = _subjects;
     final columns = AppBreakpoints.columns(context);
     final resume = _inProgress;
-    // Counts read "—" until the library has actually answered: a "0 Courses"
-    // tile during the first load, or after a failure, would state something
-    // the app doesn't know.
     final countsKnown = !_loading && _result != null && !_result!.isFailed;
     final showLibrary = !_loading && _result!.isReady && courses.isNotEmpty;
     final visible = _category == null
         ? courses
-        : courses.where((c) => c.category == _category).toList();
+        : courses.where((course) => course.category == _category).toList();
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : AppMotion.pageTransition;
 
     return AyreTabScroll(
+      eager: true,
       controller: widget.scrollController,
       onRefresh: _load,
       maxWidth: columns > 1 ? 960 : null,
+      header: AyreMastScaffold(
+        mast: AyreMasthead(
+          overlap: AppShape.mastOverlap,
+          constrainContent: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Semantics(
+                header: true,
+                child: Text(
+                  'Learning Hub',
+                  style: AppTypo.pageTitle(t, color: p.ink),
+                ),
+              ),
+              const SizedBox(height: AppSpace.s8),
+              Text(
+                'Understand the stock market better.',
+                style: AppTypo.subtitle(t, color: p.muted),
+              ),
+            ],
+          ),
+        ),
+        overlapChild: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: AyreStatTile(
+                  value: countsKnown ? '${subjects.length}' : '—',
+                  label: 'Subjects',
+                  animate: _result?.stale != true,
+                ),
+              ),
+              const SizedBox(width: AppSpace.cardGap),
+              Expanded(
+                child: AyreStatTile(
+                  value: countsKnown ? '${courses.length}' : '—',
+                  label: 'Courses',
+                  animate: _result?.stale != true,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
       children: [
-            SafeArea(
-              bottom: false,
-              child: Entrance(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Learning Hub', style: AppTypo.pageTitle(t)),
-                    const SizedBox(height: AppSpace.xxs),
-                    Text(
-                      'Understand the stock market better.',
-                      style: AppTypo.body(t),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSpace.sectionGap),
-            Entrance(
-              index: 1,
-              child: Align(
-                alignment: Alignment.centerLeft,
-                // Two tiles across a tablet-width column would be mostly
-                // empty card; they stay a compact pair.
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: AyreStatTile(
-                          value: countsKnown ? '${subjects.length}' : '—',
-                          label: 'Subjects',
-                        ),
-                      ),
-                      const SizedBox(width: AppSpace.cardGap),
-                      Expanded(
-                        child: AyreStatTile(
-                          value: countsKnown ? '${courses.length}' : '—',
-                          label: 'Courses',
-                        ),
-                      ),
-                    ],
+        if (_result?.stale == true) ...[
+          const SizedBox(height: AppSpace.s13),
+          Text('Showing the last available lessons.', style: AppTypo.meta(t)),
+        ],
+        if (resume != null) ...[
+          const SizedBox(height: AppSpace.s21),
+          Entrance(
+            animate: _animateCourses,
+            child: _ContinueCard(course: resume, onTap: () => _open(resume)),
+          ),
+        ],
+        const SizedBox(height: AppSpace.s21),
+        if (showLibrary) const SectionLabel(label: 'Library'),
+        if (showLibrary && subjects.length > 1) ...[
+          _SubjectFilter(
+            subjects: subjects,
+            selected: _category,
+            onSelected: _selectSubject,
+          ),
+          const SizedBox(height: AppSpace.s13),
+        ],
+        AnimatedSize(
+          alignment: Alignment.topCenter,
+          duration: duration,
+          curve: AppMotion.ease,
+          child: AnimatedSwitcher(
+            duration: duration,
+            layoutBuilder: (current, previous) => Stack(
+              alignment: Alignment.topCenter,
+              children: [
+                for (final child in previous)
+                  ExcludeFocus(
+                    child: ExcludeSemantics(child: IgnorePointer(child: child)),
                   ),
-                ),
-              ),
+                ?current,
+              ],
             ),
-            if (resume != null) ...[
-              const SizedBox(height: AppSpace.sectionGap),
-              Entrance(
-                index: 2,
-                child: _ContinueCard(
-                  course: resume,
-                  onTap: () => _open(resume),
-                ),
-              ),
-            ],
-            const SizedBox(height: AppSpace.sectionGap),
-            if (showLibrary)
-              const Entrance(index: 3, child: SectionLabel(label: 'Library')),
-            // Nothing to choose between with a single subject, so no filter.
-            if (showLibrary && subjects.length > 1) ...[
-              Entrance(
-                index: 3,
-                child: _SubjectFilter(
-                  subjects: subjects,
-                  selected: _category,
-                  onSelected: _selectSubject,
-                ),
-              ),
-              const SizedBox(height: AppSpace.sm),
-            ],
-            _list(columns, visible),
-            const SizedBox(height: AppSpace.sectionGap),
-            const Entrance(index: 4, child: _LearnFooter()),
+            child: KeyedSubtree(
+              key: ValueKey(_category),
+              child: _list(columns, visible),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpace.s34),
+        const _LearnFooter(),
       ],
     );
   }
 
   Widget _list(int columns, List<Course> courses) {
     if (_loading) {
-      return const AyreCard(
-        padding: EdgeInsets.symmetric(vertical: AppSpace.xs),
-        child: Column(
-          children: [
-            SkeletonTickerRow(),
-            SkeletonTickerRow(),
-            SkeletonTickerRow(),
-          ],
+      return Semantics(
+        label: 'Loading lessons',
+        liveRegion: true,
+        child: const AyreCard(
+          child: Column(
+            children: [
+              SkeletonTickerRow(),
+              SkeletonTickerRow(),
+              SkeletonTickerRow(),
+            ],
+          ),
         ),
       );
     }
@@ -266,44 +299,31 @@ class _LearnTabState extends State<LearnTab> {
       return CalmStatePanel.empty(
         headline: 'No lessons yet',
         message: 'New material appears here as the library grows.',
+        illustration: const _LibraryIllustration(),
         onRetry: _load,
       );
     }
 
-    if (columns == 1) {
-      return Entrance(
-        index: 3,
-        child: RowGroup(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width =
+            (constraints.maxWidth - (columns - 1) * AppSpace.cardGap) / columns;
+        return Wrap(
+          spacing: AppSpace.cardGap,
+          runSpacing: AppSpace.cardGap,
           children: [
-            for (final course in courses)
-              _CourseRow(course: course, onTap: () => _open(course)),
+            for (final (index, course) in courses.indexed)
+              SizedBox(
+                width: width,
+                child: Entrance(
+                  index: index,
+                  animate: _animateCourses,
+                  child: _CourseRow(course: course, onTap: () => _open(course)),
+                ),
+              ),
           ],
-        ),
-      );
-    }
-
-    // Learn is a list of self-contained, independently-scannable items, so it
-    // goes multi-column once the viewport genuinely fits it.
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: EdgeInsets.zero,
-      itemCount: courses.length,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: columns,
-        mainAxisSpacing: AppSpace.cardGap,
-        crossAxisSpacing: AppSpace.cardGap,
-        // Height driven by ratio rather than a fixed extent, so a large
-        // accessibility text scale grows the tile instead of overflowing it.
-        childAspectRatio: 2.4,
-      ),
-      itemBuilder: (context, index) => AyreCard(
-        padding: EdgeInsets.zero,
-        child: _CourseRow(
-          course: courses[index],
-          onTap: () => _open(courses[index]),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -338,9 +358,6 @@ class _SubjectFilter extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      // Not clipped: pills scroll out through the page's side padding to the
-      // screen edge instead of being cut off a page-margin short of it.
-      clipBehavior: Clip.none,
       child: Row(
         children: [
           AyreFilterChip(
@@ -403,47 +420,41 @@ class _ContinueCard extends StatelessWidget {
 
     return Semantics(
       button: true,
-      label: 'Continue, ${course.title}, '
+      label:
+          'Continue, ${course.title}, '
           '${course.lessonsDone} of ${course.lessonsTotal} lessons',
+      onTap: onTap,
       excludeSemantics: true,
       child: AyreCard(
-      onTap: onTap,
-      accentEdge: true,
-      padding: const EdgeInsets.all(AppSpace.lg),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          ProgressRing(value: progress),
-          const SizedBox(width: AppSpace.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'CONTINUE',
-                  style: AppTypo.label(t, color: t.accentInk),
-                ),
-                const SizedBox(height: AppSpace.xxs),
-                Text(
-                  course.title,
-                  style: AppTypo.cardTitle(t),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: AppSpace.xxs),
-                Figure.static(
-                  '${course.lessonsDone} of ${course.lessonsTotal} lessons',
-                  fontSize: AppTextScale.hint,
-                  color: t.foregroundMuted,
-                ),
-              ],
+        onTap: onTap,
+        notch: true,
+        padding: const EdgeInsets.all(AppSpace.lg),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            ProgressRing(value: progress),
+            const SizedBox(width: AppSpace.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('CONTINUE', style: AppTypo.label(t, color: t.accentInk)),
+                  const SizedBox(height: AppSpace.xxs),
+                  Text(course.title, style: AppTypo.sectionTitle(t)),
+                  const SizedBox(height: AppSpace.xxs),
+                  Figure.static(
+                    '${course.lessonsDone} of ${course.lessonsTotal} lessons',
+                    fontSize: AppTextScale.hint,
+                    color: t.foregroundMuted,
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: AppSpace.xs),
-          AyreIcon(AyreGlyph.forward, size: 16, color: t.accentInk),
-        ],
-      ),
+            const SizedBox(width: AppSpace.xs),
+            AyreIcon(AyreGlyph.forward, size: 16, color: t.accentInk),
+          ],
+        ),
       ),
     );
   }
@@ -462,101 +473,65 @@ class _CourseRow extends StatelessWidget {
     final t = context.tokens;
     final progress = course.progress;
     final complete = progress != null && progress >= 1;
-
-    // Phase 5: grouped announcement (title, category, completion, progress).
-    final buf = StringBuffer(course.title);
-    buf.write(', ${course.category}');
-    if (complete) {
-      buf.write(', complete');
-    } else if (progress != null) {
-      buf.write(', ${course.lessonsDone} of ${course.lessonsTotal} lessons');
-    }
+    final lessons = '${course.lessonsDone} of ${course.lessonsTotal} lessons';
+    final spoken = [
+      course.title,
+      course.category,
+      if (complete) 'Complete' else if (progress != null) lessons,
+    ].join(', ');
 
     return Semantics(
       button: true,
-      label: buf.toString(),
-      excludeSemantics: true,
-      child: PressableScaleRow(
+      label: spoken,
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpace.md),
+      excludeSemantics: true,
+      child: AyreCard(
+        onTap: onTap,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
-                // §13.4's completion state change. Not a colour swap on its
-                // own: the glyph itself changes from a course marker to a
-                // check, so "finished" survives with colour removed, and the
-                // swap crossfades on the Ayre ease rather than cutting. This
-                // is the one animated state change on this screen, which is
-                // what makes it read as an event rather than as decoration.
-                AnimatedSwitcher(
-                  duration: AppMotion.pageTransition,
-                  switchInCurve: AppMotion.ease,
-                  switchOutCurve: AppMotion.ease,
+                Container(
+                  width: AppShape.iconTileSize,
+                  height: AppShape.iconTileSize,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: t.surfaceRaised,
+                    borderRadius: AppShape.field,
+                  ),
                   child: AyreIcon(
                     complete ? AyreGlyph.check : AyreGlyph.course,
-                    key: ValueKey(complete),
-                    size: 17,
-                    color: complete ? t.positive : t.foregroundSubtle,
+                    size: 20,
+                    color: complete ? t.positiveText : t.accentInk,
                   ),
                 ),
-                const SizedBox(width: AppSpace.sm),
+                const SizedBox(width: AppSpace.s13),
                 Expanded(
-                  child: Text(
-                    course.category.toUpperCase(),
-                    style: AppTypo.label(t),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(course.title, style: AppTypo.cardTitle(t)),
+                      const SizedBox(height: 3),
+                      Text(course.category, style: AppTypo.meta(t)),
+                    ],
                   ),
                 ),
-                if (complete) ...[
-                  const ShrinkTrailing(
-                    child: AyreChip(label: 'Complete', tone: ChipTone.neutral),
-                  ),
-                  const SizedBox(width: AppSpace.xs),
-                ],
-                AyreIcon(
-                  AyreGlyph.forward,
-                  size: 14,
-                  color: t.foregroundSubtle,
-                ),
+                const SizedBox(width: AppSpace.s8),
+                AyreIcon(AyreGlyph.forward, size: 16, color: t.foregroundMuted),
               ],
             ),
-            const SizedBox(height: AppSpace.xs),
-            Text(
-              course.title,
-              style: AppTypo.cardTitle(t),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
             if (progress != null) ...[
-              const SizedBox(height: AppSpace.sm),
-              // The rule animates to its value and re-tints on completion, so
-              // finishing a lesson is visible as movement when you come back
-              // to this list rather than as a bar that was simply already
-              // full.
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: progress.clamp(0.0, 1.0)),
-                duration: MediaQuery.disableAnimationsOf(context)
-                    ? Duration.zero
-                    : AppMotion.chartDraw,
-                curve: AppMotion.ease,
-                builder: (context, value, _) => ProgressRule(
-                  value: value,
-                  color: complete ? t.positive : null,
-                ),
-              ),
-              const SizedBox(height: AppSpace.xs),
-              Figure.static(
-                '${course.lessonsDone}/${course.lessonsTotal} lessons',
-                fontSize: AppTextScale.hint,
-                color: complete ? t.positive : t.foregroundSubtle,
-              ),
+              const SizedBox(height: AppSpace.s13),
+              if (complete)
+                const AyreChip(label: 'Complete', tone: ChipTone.success)
+              else ...[
+                ProgressRule(value: progress),
+                const SizedBox(height: AppSpace.s8),
+                Text(lessons, style: AppTypo.meta(t)),
+              ],
             ] else if (course.body.isNotEmpty) ...[
-              const SizedBox(height: AppSpace.xxs),
+              const SizedBox(height: AppSpace.s8),
               Text(
                 course.body,
                 style: AppTypo.body(t),
@@ -567,7 +542,59 @@ class _CourseRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _LibraryIllustration extends StatelessWidget {
+  const _LibraryIllustration();
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tokens;
+    return ExcludeSemantics(
+      child: SizedBox(
+        width: 105,
+        height: 89,
+        child: CustomPaint(painter: _LibraryOutline(t.accentInk, t.highlight)),
       ),
     );
   }
+}
+
+class _LibraryOutline extends CustomPainter {
+  const _LibraryOutline(this.ink, this.accent);
+
+  final Color ink;
+  final Color accent;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final outline = Paint()
+      ..color = ink
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2;
+    for (final (i, height) in [27.0, 44.0, 61.0].indexed) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(12.0 + i * 29, 80 - height, 21, height),
+          const Radius.circular(3),
+        ),
+        outline,
+      );
+    }
+    canvas.drawPath(
+      Path()
+        ..moveTo(9, 21)
+        ..lineTo(26, 17)
+        ..lineTo(26, 25)
+        ..lineTo(9, 29)
+        ..close(),
+      Paint()..color = accent,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_LibraryOutline oldDelegate) =>
+      ink != oldDelegate.ink || accent != oldDelegate.accent;
 }

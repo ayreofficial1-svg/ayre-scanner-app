@@ -11,10 +11,10 @@ import '../onboarding/tour_content.dart' show TourKeys;
 import '../theme/app_theme.dart';
 import '../widgets/ayre_avatar.dart';
 import '../widgets/ayre_components.dart';
-import '../widgets/ayre_hills.dart';
 import '../widgets/ayre_icons.dart';
 import '../widgets/ayre_insight_carousel.dart';
 import '../widgets/ayre_logo.dart';
+import '../widgets/ayre_masthead.dart';
 import '../widgets/ayre_signals_section.dart';
 import '../widgets/ayre_tab_scroll.dart';
 import '../widgets/pressable_scale.dart';
@@ -25,7 +25,7 @@ import 'notifications_screen.dart';
 
 /// Home.
 ///
-/// Order: greeting header (with the decorative hill ornament behind it) →
+/// Order: masthead with the account greeting →
 /// **Recommendations** (the analyst's published signals) → **Market Insight
 /// carousel** (the analyst's hand-written desk notes). Sections are separated
 /// by `sectionGap` alone. The Weekly Report has its own Reports tab.
@@ -121,9 +121,7 @@ class _HomeTabState extends State<HomeTab> {
     final target = _signalsKey.currentContext;
     if (target == null) {
       if (retry) {
-        WidgetsBinding.instance.addPostFrameCallback(
-          (_) => _scrollToSignals(),
-        );
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSignals());
       }
       return;
     }
@@ -171,36 +169,19 @@ class _HomeTabState extends State<HomeTab> {
 
     return AyreTabScroll(
       controller: widget.scrollController,
+      eager: true,
+      header: AyreMasthead(
+        tone: AyreMastTone.home,
+        height: AppShape.mastHome,
+        contentBottomClearance: AppSpace.s34,
+        constrainContent: true,
+        child: _Header(name: displayName, onOpenProfile: widget.onOpenProfile),
+      ),
       // One network pass per surface; the signals reload is silent.
-      onRefresh: () => Future.wait([
-        _load(),
-        _signalsController.reload(silent: true),
-      ]),
+      onRefresh: () =>
+          Future.wait([_load(), _signalsController.reload(silent: true)]),
       children: [
-        // The hills are the header's backdrop, not part of its layout:
-        // positioned to the page's top-right corner (past the list
-        // padding, so they bleed to the viewport edge) and painted first.
-        // `Stack` sizes to the SafeArea child alone.
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Positioned(
-              top: -AppSpace.pageTop,
-              right: -AppSpace.gutterOf(context),
-              child: AyreHills(),
-            ),
-            SafeArea(
-              bottom: false,
-              child: Entrance(
-                child: _Header(
-                  name: displayName,
-                  onOpenProfile: widget.onOpenProfile,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpace.sectionGap),
+        const SizedBox(height: AppSpace.s21),
         KeyedSubtree(
           key: _signalsKey,
           child: Entrance(
@@ -240,9 +221,9 @@ class _HomeTabState extends State<HomeTab> {
 
   void _openInsight(InsightNote note) {
     HapticFeedback.selectionClick();
-    Navigator.of(context).push(
-      terminalRoute(builder: (_) => InsightNoteScreen(note: note)),
-    );
+    Navigator.of(
+      context,
+    ).push(terminalRoute(builder: (_) => InsightNoteScreen(note: note)));
   }
 }
 
@@ -257,6 +238,33 @@ String _greetingFor(DateTime now) {
   return 'Good evening';
 }
 
+String _dateFor(DateTime now) {
+  const weekdays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+  const months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+  return '${weekdays[now.weekday - 1]}, ${now.day} ${months[now.month - 1]}';
+}
+
 class _Header extends StatelessWidget {
   const _Header({required this.name, required this.onOpenProfile});
 
@@ -266,203 +274,137 @@ class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final mast = t.mastHome;
     final resolved = name.trim();
-    final greeting = _greetingFor(DateTime.now());
-
-    // Two stacked bands. The wordmark and the three controls share the top
-    // band, so the salutation below gets the page's full width. Nothing here
-    // shrinks to fit: the wordmark wraps, the greeting and name wrap to two
-    // lines (G-2).
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final now = DateTime.now();
+    final date = _dateFor(now);
+    final brand = Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: AppSpace.s8,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              // The only in-app brand placement: a small wordmark, sized to
-              // sit beneath the page content rather than compete with it.
-              child: Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: AppSpace.xs,
-                children: [
-                  const LogoWordmark(fontSize: 15),
-                  Text(
-                    'SCANNER',
-                    style: AppTypo.label(t, color: t.foregroundMuted),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpace.xs),
-            const KeyedSubtree(key: TourKeys.homeTheme, child: _ThemeToggle()),
-            const SizedBox(width: AppSpace.xs),
-            KeyedSubtree(
-              key: TourKeys.homeAlerts,
-              child: ListenableBuilder(
-                listenable: NotificationLog.instance,
-                builder: (context, _) => _HeaderControl(
-                  glyph: AyreGlyph.bell,
-                  label: 'Alerts',
-                  badge: NotificationLog.instance.hasUnread,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    Navigator.of(context).push(
-                      terminalRoute(
-                        builder: (_) => const NotificationsScreen(),
+        LogoMark(placement: LogoPlacement.home, color: mast.ink),
+        Text(
+          'Scanner',
+          style: AppTypo.ui(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: mast.muted,
+          ),
+        ),
+      ],
+    );
+    final controls = Wrap(
+      spacing: 4,
+      runSpacing: 4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        const _ThemeToggle(key: TourKeys.homeTheme),
+        ListenableBuilder(
+          key: TourKeys.homeAlerts,
+          listenable: NotificationLog.instance,
+          builder: (context, _) {
+            final unread = NotificationLog.instance.hasUnread;
+            return MastIconButton(
+              tone: AyreMastTone.home,
+              semanticLabel: unread ? 'Alerts, unread' : 'Alerts',
+              onTap: () {
+                HapticFeedback.selectionClick();
+                Navigator.of(context).push(
+                  terminalRoute(builder: (_) => const NotificationsScreen()),
+                );
+              },
+              child: SizedBox.expand(
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    const AyreIcon(AyreGlyph.bell, size: 20),
+                    if (unread)
+                      PositionedDirectional(
+                        top: 9,
+                        end: 10,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: t.highlight,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const SizedBox.square(dimension: 9),
+                        ),
                       ),
-                    );
-                  },
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(width: AppSpace.xs),
-            _AccountControl(name: resolved, onTap: onOpenProfile),
-          ],
+            );
+          },
         ),
-        const SizedBox(height: AppSpace.sm),
-        // The salutation is the header's largest text; the name sits on its
-        // own line directly beneath it, a step down and heavier-set so the
-        // pair still reads as one greeting. Both wrap (up to two lines)
-        // instead of scaling down.
-        Text(
-          greeting,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: AppTypo.display(
-            fontSize: AppTextScale.greeting,
-            fontWeight: FontWeight.w700,
-            color: t.textPrimary,
-            height: 1.1,
-            letterSpacing: -1.0,
-          ),
+        _AccountControl(name: resolved, onTap: onOpenProfile),
+      ],
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final scale = MediaQuery.textScalerOf(context).scale(13) / 13;
+            if (constraints.maxWidth < 280 + 52 * scale) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  brand,
+                  const SizedBox(height: AppSpace.s8),
+                  controls,
+                ],
+              );
+            }
+            return Row(
+              children: [
+                Expanded(child: brand),
+                const SizedBox(width: AppSpace.s8),
+                controls,
+              ],
+            );
+          },
         ),
-        // With no name yet the salutation stands alone — no empty line, no
-        // dangling gap under it.
+        const SizedBox(height: AppSpace.s34),
+        Text(_greetingFor(now), style: AppTypo.subtitle(t, color: mast.muted)),
         if (resolved.isNotEmpty) ...[
-          const SizedBox(height: AppSpace.xxs),
-          Text(
-            resolved,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: AppTypo.display(
-              fontSize: AppTextScale.greetingName,
+          const SizedBox(height: 3),
+          Text(resolved, style: AppTypo.homeName(t, color: mast.ink)),
+        ],
+        const SizedBox(height: AppSpace.s8),
+        FractionallySizedBox(
+          alignment: AlignmentDirectional.centerStart,
+          widthFactor: 0.72,
+          child: Text(
+            date,
+            style: AppTypo.ui(
+              fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: t.textPrimary,
-              height: 1.2,
-              letterSpacing: -0.5,
+              color: mast.muted,
             ),
           ),
-        ],
+        ),
       ],
     );
   }
 }
 
-/// The Home theme toggle (§13.1).
-///
-/// Writes to the same `setThemeMode` the Settings tiles do, so the two can
-/// never disagree — there is one setter, on `AppThemeController`, and both
-/// call it. Phase 1A restored `System` as a Settings option; this toggle
-/// still only moves between explicit Light/Dark, matching a single-button
-/// toggle's "shows the mode you're about to move to" convention — tapping
-/// it while on `System` pins the theme to the opposite of whatever `System`
-/// is currently resolving to, same as picking a tile in Settings would.
-///
-/// Icon-only, so unlike the nav it genuinely needs a semantic label — and the
-/// label states what tapping *does*, not what mode you're in, since "Dark" as
-/// a button name is ambiguous about direction.
 class _ThemeToggle extends StatelessWidget {
-  const _ThemeToggle();
+  const _ThemeToggle({super.key});
 
   @override
   Widget build(BuildContext context) {
     final controller = AppThemeController.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return _HeaderControl(
-      // Shows the mode you are about to move to, which is the convention that
-      // makes a single-button toggle legible.
-      glyph: isDark ? AyreGlyph.sun : AyreGlyph.moon,
-      label: isDark ? 'Switch to light theme' : 'Switch to dark theme',
+    return MastIconButton(
+      tone: AyreMastTone.home,
+      semanticLabel: isDark ? 'Switch to light theme' : 'Switch to dark theme',
       onTap: () {
         HapticFeedback.selectionClick();
         controller.setThemeMode(isDark ? ThemeMode.light : ThemeMode.dark);
       },
-    );
-  }
-}
-
-/// Header controls (v5 §2A, "Circular header icon buttons"): flat 40pt
-/// circles inside a 48pt hit area — `surface` (white) in light, `surfaceRaised` in dark — with a
-/// `textPrimary` glyph and, for the bell, a saffron (`highlight`) unread dot. A circle
-/// is the spec'd exception to the rounded-square icon-tile rule here;
-/// no gradient, no shadow.
-class _HeaderControl extends StatelessWidget {
-  const _HeaderControl({
-    required this.glyph,
-    required this.label,
-    required this.onTap,
-    this.badge = false,
-  });
-
-  final AyreGlyph glyph;
-  final String label;
-  final VoidCallback onTap;
-  final bool badge;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final fill = dark ? t.surfaceRaised : t.surface;
-    return Semantics(
-      button: true,
-      label: label,
-      child: PressableScale(
-        onTap: onTap,
-        borderRadius: AppRadius.circle,
-        child: SizedBox(
-          height: AppSpace.minTarget,
-          width: AppSpace.minTarget,
-          child: Center(
-            child: Container(
-          height: 40,
-          width: 40,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: fill,
-            shape: BoxShape.circle,
-            border: Border.all(color: t.hairline),
-          ),
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.center,
-            children: [
-              AyreIcon(glyph, size: 18, color: t.textPrimary),
-              if (badge)
-                Positioned(
-                  top: 2,
-                  right: 2,
-                  child: Container(
-                    height: 8,
-                    width: 8,
-                    decoration: BoxDecoration(
-                      // An unread marker is an attention cue, not a data cue:
-                      // saffron, ringed in the button's own fill so it reads
-                      // as a dot sitting on the circle.
-                      color: t.highlight,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: fill, width: 1.5),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-            ),
-          ),
-        ),
-      ),
+      child: AyreIcon(isDark ? AyreGlyph.sun : AyreGlyph.moon, size: 20),
     );
   }
 }
@@ -477,17 +419,18 @@ class _AccountControl extends StatelessWidget {
   Widget build(BuildContext context) {
     return Semantics(
       button: true,
+      enabled: onTap != null,
       label: 'Profile',
+      onTap: onTap,
+      excludeSemantics: true,
       child: PressableScale(
         onTap: onTap,
         borderRadius: AppRadius.circle,
-        // The identity-accent chip (lavender/plum), never brand green; 40pt
-        // visual in a 48pt hit area.
-        child: SizedBox(
-          height: AppSpace.minTarget,
-          width: AppSpace.minTarget,
+        focusColor: context.tokens.mastHome.ink,
+        child: SizedBox.square(
+          dimension: AppSpace.minTarget,
           child: Center(
-            child: AyreAvatar(initials: initialsFor(name), size: 40),
+            child: AyreAvatar(initials: initialsFor(name), home: true),
           ),
         ),
       ),
@@ -513,7 +456,15 @@ class _InsightSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final r = result;
-    if (r == null) return const AyreInsightSkeleton();
+    if (r == null) {
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SectionLabel(label: 'Market insight'),
+          AyreInsightSkeleton(),
+        ],
+      );
+    }
 
     if (r.isFailed) {
       return StatePanel.failed(
@@ -526,6 +477,12 @@ class _InsightSection extends StatelessWidget {
 
     final notes = r.value;
     if (notes == null || notes.isEmpty) return const SizedBox.shrink();
-    return AyreInsightCarousel(notes: notes, onReadMore: onReadMore);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SectionLabel(label: 'Market insight'),
+        AyreInsightCarousel(notes: notes, onReadMore: onReadMore),
+      ],
+    );
   }
 }

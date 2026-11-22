@@ -5,6 +5,7 @@ import '../services/market_data_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
+import '../widgets/ayre_page_header.dart';
 import 'privacy_policy_screen.dart';
 import 'research_analyst_screen.dart';
 import 'risk_disclosure_screen.dart';
@@ -29,80 +30,58 @@ class LegalHubScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
-
-    return Scaffold(
-      backgroundColor: t.background,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: AyreIcon(AyreGlyph.back, size: 20, color: t.textPrimary),
-          onPressed: () => Navigator.of(context).maybePop(),
-          tooltip: 'Back',
-        ),
-        title: const Text('Legal and disclosures'),
-      ),
-      body: ContentWidth(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpace.pageHorizontal,
-            AppSpace.sm,
-            AppSpace.pageHorizontal,
-            AppSpace.xxl,
-          ),
+    return AyrePageScaffold(
+      title: 'Legal and disclosures',
+      children: [
+        const SectionLabel(label: 'Using Investee', eyebrow: true),
+        RowGroup(
           children: [
-            const SectionLabel(label: 'Using Investee'),
-            RowGroup(
-              children: [
-                SettingRow(
-                  glyph: AyreGlyph.about,
-                  title: 'Terms and Conditions',
-                  subtitle: 'The terms for using this app',
-                  onTap: () => _open(context, const TermsScreen()),
-                ),
-                SettingRow(
-                  glyph: AyreGlyph.lock,
-                  title: 'Privacy Policy',
-                  subtitle: 'How your information is handled',
-                  onTap: () => _open(context, const PrivacyPolicyScreen()),
-                ),
-                SettingRow(
-                  glyph: AyreGlyph.alerts,
-                  title: 'Risk Disclosure',
-                  subtitle: 'The risks of investing in securities',
-                  onTap: () => _open(context, const RiskDisclosureScreen()),
-                ),
-              ],
+            SettingRow(
+              glyph: AyreGlyph.document,
+              title: 'Terms and Conditions',
+              subtitle: 'The terms for using this app',
+              onTap: () => _open(context, const TermsScreen()),
             ),
-            const SizedBox(height: AppSpace.sectionGap),
-            const SectionLabel(label: 'Research Analyst'),
-            RowGroup(
-              children: [
-                SettingRow(
-                  glyph: AyreGlyph.account,
-                  title: 'Registration and disclosures',
-                  subtitle: 'Our registration details and standard disclaimer',
-                  onTap: () => _open(
-                    context,
-                    ResearchAnalystScreen(marketData: marketData),
-                  ),
-                ),
-                SettingRow(
-                  glyph: AyreGlyph.about,
-                  title: 'Most Important Terms and Conditions',
-                  subtitle: 'The MITC for research services',
-                  onTap: () => _open(context, const MitcScreen()),
-                ),
-                SettingRow(
-                  glyph: AyreGlyph.check,
-                  title: 'Investor Charter',
-                  subtitle: 'Your rights and our duties as an analyst',
-                  onTap: () => _open(context, const InvestorCharterScreen()),
-                ),
-              ],
+            SettingRow(
+              glyph: AyreGlyph.shield,
+              title: 'Privacy Policy',
+              subtitle: 'How your information is handled',
+              onTap: () => _open(context, const PrivacyPolicyScreen()),
+            ),
+            SettingRow(
+              glyph: AyreGlyph.alerts,
+              title: 'Risk Disclosure',
+              subtitle: 'The risks of investing in securities',
+              onTap: () => _open(context, const RiskDisclosureScreen()),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: AppSpace.sectionGap),
+        const SectionLabel(label: 'Research Analyst', eyebrow: true),
+        RowGroup(
+          children: [
+            SettingRow(
+              glyph: AyreGlyph.about,
+              title: 'Registration and disclosures',
+              subtitle: 'Our registration details and standard disclaimer',
+              onTap: () =>
+                  _open(context, ResearchAnalystScreen(marketData: marketData)),
+            ),
+            SettingRow(
+              glyph: AyreGlyph.document,
+              title: 'Most Important Terms and Conditions',
+              subtitle: 'The MITC for research services',
+              onTap: () => _open(context, const MitcScreen()),
+            ),
+            SettingRow(
+              glyph: AyreGlyph.check,
+              title: 'Investor Charter',
+              subtitle: 'Your rights and our duties as an analyst',
+              onTap: () => _open(context, const InvestorCharterScreen()),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }

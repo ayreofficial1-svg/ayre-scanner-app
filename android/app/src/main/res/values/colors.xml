@@ -2,6 +2,6 @@
 <resources>
     <!-- Accent tint for the push notification icon (brand saffron, visible on light and dark shades). -->
     <color name="ayre_notification_accent">#FF9933</color>
-    <!-- Launch canvas: the light page background (--bg). -->
+    <!-- Launch canvas matches the light page background. -->
     <color name="ayre_launch_background">#F7F5EF</color>
 </resources>

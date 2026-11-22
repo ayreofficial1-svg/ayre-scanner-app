@@ -7,64 +7,58 @@ import 'ayre_components.dart';
 import 'ayre_icons.dart';
 import 'finance_icons.dart';
 import 'ayre_instrument_tile.dart';
+import 'ayre_masthead.dart';
 import 'ayre_sheet.dart';
+import 'ayre_tab_scroll.dart';
 import 'figure.dart';
 import 'pressable_scale.dart';
 
-// ─── Weekly Report (Phase 11 redesign) ─────────────────────────────────────
-//
-// Presentation-only. Same data, same week navigation, same picker, same
-// "See all". Nothing is added to the model.
-//
-//   Weekly Report                           ‹ ›     standard page-title heading,
-//   1 – 8 Sep 2026 ⌄                                 date second, no gradient/rule
-//   Latest week · 1 of 3
-//
-//   Stock card: flat, one inset surface. Header (logo, symbol and company |
-//   signed return over the outcome in words), then Entry · Exit in a single
-//   inset panel, then Profit per share under a hairline. No hills, no nested
-//   cards.
-//
-// Cards are separated by space, not dividers. The stock cards stay
-// quiet — flat, single-level, no decoration behind the results. Outcome
-// colour sits on text only (green target / red stop-loss), and direction is
-// also in the sign and the written outcome, never colour alone.
-//
-// Every colour is an `AppThemeTokens` value, so Light and Dark follow the
-// theme with no per-mode code.
-
-/// The full Weekly Report section: week header and stock cards.
-///
-/// [reports] is the backend's list, newest week first (`GET
-/// /api/weekly-report`). The first entry is selected initially.
+/// The selected published week, its full summary and its result cards.
 class WeeklyReportCard extends StatefulWidget {
   const WeeklyReportCard({
     super.key,
     required this.reports,
     this.collapsedCount = 3,
+    this.controller,
+    this.onRefresh,
+    this.stale = false,
   });
 
   final List<WeeklyReport> reports;
-
-  /// How many stock cards show before "See all". Weeks with this many or
-  /// fewer show every card and no control.
   final int collapsedCount;
+  final ScrollController? controller;
+  final Future<void> Function()? onRefresh;
+  final bool stale;
 
   @override
   State<WeeklyReportCard> createState() => _WeeklyReportCardState();
 }
 
 class _WeeklyReportCardState extends State<WeeklyReportCard> {
-  // Selected week is remembered by id so a refresh that inserts a newer week
-  // doesn't silently move the user onto another one.
   String? _selectedId;
   bool _showAll = false;
+  late final String? _firstWeek = widget.reports.firstOrNull?.id;
+  bool _changedWeek = false;
 
   int get _index {
-    final id = _selectedId;
-    if (id == null) return 0;
-    final i = widget.reports.indexWhere((r) => r.id == id);
+    final i = widget.reports.indexWhere((report) => report.id == _selectedId);
     return i < 0 ? 0 : i;
+  }
+
+  @override
+  void didUpdateWidget(WeeklyReportCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldIndex = oldWidget.reports.indexWhere(
+      (report) => report.id == _selectedId,
+    );
+    final previousId = oldWidget.reports.isEmpty
+        ? null
+        : oldWidget.reports[oldIndex < 0 ? 0 : oldIndex].id;
+    final currentId = widget.reports.isEmpty ? null : widget.reports[_index].id;
+    if (previousId != currentId) {
+      _showAll = false;
+      _changedWeek = true;
+    }
   }
 
   void _select(int index) {
@@ -73,17 +67,25 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
     setState(() {
       _selectedId = widget.reports[index].id;
       _showAll = false;
+      _changedWeek = true;
     });
   }
 
   void _openPicker() {
+    final reports = widget.reports;
+    final selectedIndex = _index;
     HapticFeedback.selectionClick();
     showAyreSheet<void>(
       context: context,
       builder: (_) => _WeekPickerSheet(
-        reports: widget.reports,
-        selectedIndex: _index,
-        onSelected: _select,
+        reports: reports,
+        selectedIndex: selectedIndex,
+        onSelected: (i) {
+          if (!mounted) return;
+          _select(
+            widget.reports.indexWhere((report) => report.id == reports[i].id),
+          );
+        },
       ),
     );
   }
@@ -97,44 +99,60 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
     final report = reports[index];
     final stocks = report.stocks;
     final canExpand = stocks.length > widget.collapsedCount;
-    final visible = (_showAll || !canExpand)
-        ? stocks
-        : stocks.take(widget.collapsedCount).toList();
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final visible = _showAll ? stocks : stocks.take(widget.collapsedCount);
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : AppMotion.pageTransition;
+    final animate = !_changedWeek && report.id == _firstWeek && !widget.stale;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _WeekHeader(
+    return AyreTabScroll(
+      eager: true,
+      controller: widget.controller,
+      onRefresh: widget.onRefresh,
+      header: AyreMastScaffold(
+        mast: WeeklyReportMast(
           report: report,
           index: index,
           total: reports.length,
-          // Older = next in the newest-first list.
-          onOlder: index < reports.length - 1
-              ? () => _select(index + 1)
-              : null,
+          hasSummary: true,
+          onOlder: index < reports.length - 1 ? () => _select(index + 1) : null,
           onNewer: index > 0 ? () => _select(index - 1) : null,
           onPick: reports.length > 1 ? _openPicker : null,
         ),
-        const SizedBox(height: AppSpace.md),
+        overlapChild: _ReportSummary(stocks: stocks, animate: animate),
+      ),
+      children: [
+        const SizedBox(height: AppSpace.s21),
+        if (widget.stale) ...[
+          Text(
+            'Showing the last available reports.',
+            style: AppTypo.meta(context.tokens),
+          ),
+          const SizedBox(height: AppSpace.s13),
+        ],
         AnimatedSize(
-          duration: reduceMotion ? Duration.zero : AppMotion.pageTransition,
+          duration: duration,
           curve: AppMotion.ease,
           alignment: Alignment.topCenter,
           child: AnimatedSwitcher(
-            duration: reduceMotion ? Duration.zero : AppMotion.buttonPress,
+            duration: duration,
+            layoutBuilder: (current, previous) => Stack(
+              alignment: Alignment.topCenter,
+              children: [
+                for (final child in previous) ExcludeSemantics(child: child),
+                ?current,
+              ],
+            ),
             child: Column(
-              // Keyed by week only — "See all" animates through AnimatedSize
-              // rather than cross-fading the list.
               key: ValueKey(report.id),
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                for (var i = 0; i < visible.length; i++) ...[
-                  if (i > 0) const SizedBox(height: AppSpace.sm),
-                  _StockCard(
-                    stock: visible[i],
-                    fallbackStart: report.weekStart,
-                    fallbackEnd: report.weekEnd,
+                for (final (i, stock) in visible.indexed) ...[
+                  if (i > 0) const SizedBox(height: AppSpace.cardGap),
+                  Entrance(
+                    index: i,
+                    animate: animate && i < widget.collapsedCount,
+                    child: _StockCard(stock: stock, report: report),
                   ),
                 ],
               ],
@@ -142,7 +160,7 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
           ),
         ),
         if (canExpand) ...[
-          const SizedBox(height: AppSpace.xxs),
+          const SizedBox(height: AppSpace.s8),
           _ExpandToggle(
             expanded: _showAll,
             count: stocks.length,
@@ -157,25 +175,22 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
   }
 }
 
-// ─── Week header ───────────────────────────────────────────────────────────
-
-/// The section's heading: "Weekly Report" in the same page-title style the
-/// other tabs use, the week under it, and where it sits in the list — with
-/// round older / newer buttons on the right. Tapping the date opens the week
-/// list. No gradient, glow or divider: it sits directly on the page.
-class _WeekHeader extends StatelessWidget {
-  const _WeekHeader({
-    required this.report,
-    required this.index,
-    required this.total,
-    required this.onOlder,
-    required this.onNewer,
-    required this.onPick,
+class WeeklyReportMast extends StatelessWidget {
+  const WeeklyReportMast({
+    super.key,
+    this.report,
+    this.index = 0,
+    this.total = 0,
+    this.hasSummary = false,
+    this.onOlder,
+    this.onNewer,
+    this.onPick,
   });
 
-  final WeeklyReport report;
+  final WeeklyReport? report;
   final int index;
   final int total;
+  final bool hasSummary;
   final VoidCallback? onOlder;
   final VoidCallback? onNewer;
   final VoidCallback? onPick;
@@ -183,140 +198,177 @@ class _WeekHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final range = formatWeekRange(report.weekStart, report.weekEnd);
-    final spoken = _spokenWeekRange(report.weekStart, report.weekEnd);
-    final multiple = total > 1;
-    final sub = total == 1
-        ? 'Latest week'
-        : (index == 0
-              ? 'Latest week · 1 of $total'
-              : 'Earlier week · ${index + 1} of $total');
+    final p = t.mastChampagne;
+    final week = report;
+    final status = index == 0 ? 'Latest week' : 'Earlier week';
 
-    // Hierarchy, in order: the heading (what this is), the date (which
-    // week), the position caption (where it sits in the list).
-    final titleBlock = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text('Weekly Report', style: AppTypo.pageTitle(t)),
-        const SizedBox(height: AppSpace.xxs),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Flexible(
-              child: Text(
-                range,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: AppTypo.rowLabel(t, color: t.accentInk),
-              ),
-            ),
-            if (multiple) ...[
-              const SizedBox(width: 2),
-              FinanceIcon(
-                FinanceGlyph.chevron,
-                size: 18,
-                color: t.accentInk,
-                quarterTurns: 1,
-              ),
-            ],
-          ],
-        ),
-        const SizedBox(height: 2),
-        Text(
-          sub,
-          style: AppTypo.meta(t),
-        ),
-      ],
-    );
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Expanded(
-          child: Semantics(
+    return AyreMasthead(
+      tone: AyreMastTone.champagne,
+      overlap: hasSummary ? AppShape.mastOverlap : 0,
+      constrainContent: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Semantics(
             header: true,
-            button: onPick != null,
-            label: 'Weekly report, $spoken. $sub.',
-            hint: onPick != null ? 'Opens a list of weeks' : null,
-            excludeSemantics: true,
-            child: onPick == null
-                ? titleBlock
-                : GestureDetector(
-                    behavior: HitTestBehavior.opaque,
+            child: Text(
+              'Weekly Report',
+              style: AppTypo.pageTitle(t, color: p.ink),
+            ),
+          ),
+          if (week != null) ...[
+            const SizedBox(height: AppSpace.s8),
+            Wrap(
+              spacing: AppSpace.s8,
+              runSpacing: AppSpace.s8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Semantics(
+                  label:
+                      '${_spokenWeekRange(week.weekStart, week.weekEnd)}. $status'
+                      '${total > 1 ? ', ${index + 1} of $total' : ''}',
+                  button: onPick != null,
+                  onTap: onPick,
+                  hint: onPick == null ? null : 'Choose a week',
+                  excludeSemantics: true,
+                  child: PressableScale(
                     onTap: onPick,
-                    child: titleBlock,
+                    shape: AppShape.field,
+                    focusColor: p.ink,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: onPick == null ? 0 : AppSpace.minTarget,
+                      ),
+                      child: Wrap(
+                        spacing: AppSpace.s8,
+                        runSpacing: AppSpace.s8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            formatWeekRange(week.weekStart, week.weekEnd),
+                            style: AppTypo.subtitle(t, color: p.muted),
+                          ),
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: p.glass,
+                              borderRadius: AppShape.field,
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              child: Text(
+                                status,
+                                style: AppTypo.meta(t, color: p.ink),
+                              ),
+                            ),
+                          ),
+                          if (onPick != null)
+                            FinanceIcon(
+                              FinanceGlyph.chevron,
+                              quarterTurns: 1,
+                              size: 16,
+                              color: p.ink,
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
-          ),
-        ),
-        if (multiple) ...[
-          const SizedBox(width: AppSpace.xs),
-          _WeekArrow(
-            glyph: AyreGlyph.back,
-            label: 'Older week',
-            onTap: onOlder,
-            fill: t.textPrimary.withValues(alpha: 0.08),
-            ink: t.textPrimary,
-          ),
-          _WeekArrow(
-            glyph: AyreGlyph.forward,
-            label: 'Newer week',
-            onTap: onNewer,
-            fill: t.textPrimary.withValues(alpha: 0.08),
-            ink: t.textPrimary,
-          ),
+                ),
+                if (total > 1)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      MastIconButton(
+                        palette: p,
+                        semanticLabel: 'Older week',
+                        onTap: onOlder,
+                        child: FinanceIcon(
+                          FinanceGlyph.chevron,
+                          quarterTurns: 2,
+                          size: 20,
+                          color: p.ink,
+                        ),
+                      ),
+                      MastIconButton(
+                        palette: p,
+                        semanticLabel: 'Newer week',
+                        onTap: onNewer,
+                        child: FinanceIcon(
+                          FinanceGlyph.chevron,
+                          size: 20,
+                          color: p.ink,
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
 
-/// A 48pt tap target holding a 34pt tinted circle and a chevron, coloured
-/// from the header's ink so it reads on both the light and dark wash. The
-/// disabled end fades rather than disappears, so the pair never shifts.
-class _WeekArrow extends StatelessWidget {
-  const _WeekArrow({
-    required this.glyph,
-    required this.label,
-    required this.onTap,
-    required this.fill,
-    required this.ink,
-  });
+class _ReportSummary extends StatelessWidget {
+  const _ReportSummary({required this.stocks, required this.animate});
 
-  static const double size = AppSpace.minTarget;
-
-  final AyreGlyph glyph;
-  final String label;
-  final VoidCallback? onTap;
-  final Color fill;
-  final Color ink;
+  final List<WeeklyReportStock> stocks;
+  final bool animate;
 
   @override
   Widget build(BuildContext context) {
-    final enabled = onTap != null;
-    return Semantics(
-      button: true,
-      enabled: enabled,
-      label: label,
-      excludeSemantics: true,
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: PressableScale(
-          onTap: onTap,
-          borderRadius: size / 2,
-          scale: 0.9,
-          child: Center(
-            child: Opacity(
-              opacity: enabled ? 1 : 0.4,
-              child: Container(
-                width: 36,
-                height: 38,
-                decoration: BoxDecoration(shape: BoxShape.circle, color: fill),
-                child: Center(child: AyreIcon(glyph, size: 16, color: ink)),
+    final t = context.tokens;
+    final cells = [
+      (stocks.length, 'Picks'),
+      (stocks.where((stock) => stock.targetHit).length, 'Target hit'),
+      (
+        stocks.where((stock) => stock.outcome == 'stop_loss').length,
+        'Stop-loss hit',
+      ),
+    ];
+    return AyreCard(
+      strongShadow: true,
+      padding: const EdgeInsets.symmetric(vertical: AppSpace.s13),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final (i, (value, label)) in cells.indexed) ...[
+              if (i > 0)
+                VerticalDivider(width: 1, thickness: 1, color: t.hairline),
+              Expanded(
+                child: Semantics(
+                  label: '$value $label',
+                  excludeSemantics: true,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CountUpFigure(
+                          value: value.toDouble(),
+                          from: animate ? 0 : value.toDouble(),
+                          format: (number) => number.round().toString(),
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          label,
+                          textAlign: TextAlign.center,
+                          style: AppTypo.meta(t),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
+            ],
+          ],
         ),
       ),
     );
@@ -417,222 +469,147 @@ class _WeekPickerSheet extends StatelessWidget {
   }
 }
 
-// ─── Stock card ────────────────────────────────────────────────────────────
-
-/// Sizes and text styles shared by the real stock card and its skeleton, so
-/// the placeholder is built from the same measurements and cannot drift.
-abstract final class _CardSpec {
-  /// Logo tile edge. 44 keeps a bundled logo legible and sits on the 4 pt
-  /// grid.
-  static const double tile = 44;
-
-  /// Gap between the card's three bands (header · prices · profit).
-  static const double band = AppSpace.sm;
-
-  /// Padding inside the Entry / Exit panel.
-  static const EdgeInsets panelPadding = EdgeInsets.all(AppSpace.sm);
-
-  /// Inner width the header needs to put the result beside the identity,
-  /// per text-scale unit.
-  static const double headerSideBySide = 300;
-
-  /// Panel width needed to set Entry and Exit side by side, per text-scale
-  /// unit. Below it they stack as label / value lines.
-  static const double panelColumns = 2 * 128 + AppSpace.md;
-
-  static TextStyle symbol(AppThemeTokens t) => AppTypo.ui(
-    fontSize: 16,
-    fontWeight: FontWeight.w700,
-    color: t.textPrimary,
-    letterSpacing: -0.2,
-  );
-
-  static TextStyle outcome(Color tone) =>
-      AppTypo.ui(fontSize: 12, fontWeight: FontWeight.w700, color: tone);
-
-  static const double returnSize = 22;
-  static const double priceSize = 16;
-}
-
-/// One stock's result as a flat card with three clear bands:
-///
-///   1. **Header** — logo, symbol and company on the left; the signed return
-///      with the outcome in words beneath it on the right. Identity and
-///      result are each one block, so the eye reads "who" then "how it did".
-///   2. **Prices** — Entry and Exit side by side in a single inset panel,
-///      each label / price / date.
-///   3. **Profit / share** — a hairline, then the label left and the figure
-///      right in the outcome colour.
-///
-/// One inset surface inside the card and nothing nested deeper. Direction is
-/// carried by the sign, the written outcome and the dot, never colour alone.
-///
-/// Spacing (Spec §4.1): 16 pt card padding, 12 pt between bands, 4 pt inside
-/// a label/value pair, 12 pt between cards. With less room (a 320 pt phone,
-/// or larger text) the result drops under the identity and Entry / Exit
-/// become label/value lines. Text is never shrunk.
-///
-/// [fallbackStart]/[fallbackEnd] are the report's own week range, used only
-/// when this stock doesn't carry its own dates — real data, not a guess.
 class _StockCard extends StatelessWidget {
-  const _StockCard({
-    required this.stock,
-    required this.fallbackStart,
-    required this.fallbackEnd,
-  });
+  const _StockCard({required this.stock, required this.report});
 
   final WeeklyReportStock stock;
-  final DateTime? fallbackStart;
-  final DateTime? fallbackEnd;
+  final WeeklyReport report;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final hit = stock.targetHit;
-    // Text and glyphs use the A4 status-text tokens; the dot is a mark.
-    final tone = hit ? t.positiveText : t.negativeText;
-    final dot = hit ? t.positive : t.negative;
-    final outcomeLabel = hit ? 'Target hit' : 'Stop-loss hit';
-
-    final recDate = stock.dateOfRecommendation ?? fallbackStart;
-    final exitDate = stock.exitDate ?? fallbackEnd;
-    final pnl = stock.pnlAmount;
+    final outcome = stock.targetHit ? 'Target hit' : 'Stop-loss hit';
+    final name = stock.name?.trim() ?? '';
     final hasName =
-        stock.name != null &&
-        stock.name!.isNotEmpty &&
-        stock.name!.toUpperCase() != stock.symbol.toUpperCase();
-
-    final spoken = [
-      stock.symbol,
-      if (hasName) stock.name!,
-      outcomeLabel,
-      '${stock.profitPct.toStringAsFixed(2)} percent',
-      if (stock.entryPrice != null)
-        'Entry ₹${formatPrice(stock.entryPrice)}'
-            '${recDate != null ? ' on ${_shortDate(recDate)}' : ''}',
-      if (stock.exitPrice != null)
-        'Exit ₹${formatPrice(stock.exitPrice)}'
-            '${exitDate != null ? ' on ${_shortDate(exitDate)}' : ''}',
-      if (pnl != null) 'Profit per share ${_formatSignedRupees(pnl)}',
-    ].join(', ');
-
-    final scale = MediaQuery.textScalerOf(context).scale(100) / 100;
-    final k = scale < 1 ? 1.0 : scale;
-
-    final prices = <_MetricData>[
-      if (stock.entryPrice != null)
-        _MetricData(
+        name.isNotEmpty && name.toUpperCase() != stock.symbol.toUpperCase();
+    final pct = stock.profitPct;
+    final pnl = stock.pnlAmount;
+    final returnText = pct.isFinite ? formatDelta(pct) : '—';
+    final profitText = pnl != null && pnl.isFinite
+        ? _formatSignedRupees(pnl)
+        : null;
+    final prices = [
+      if (stock.entryPrice case final price? when price.isFinite)
+        (
           'Entry',
-          '₹${formatPrice(stock.entryPrice)}',
-          recDate,
-          t.textPrimary,
+          '₹${formatPrice(price)}',
+          stock.dateOfRecommendation == null
+              ? 'Week start ${_shortDate(report.weekStart)}'
+              : _shortDate(stock.dateOfRecommendation!),
         ),
-      if (stock.exitPrice != null)
-        _MetricData(
+      if (stock.exitPrice case final price? when price.isFinite)
+        (
           'Exit',
-          '₹${formatPrice(stock.exitPrice)}',
-          exitDate,
-          t.textPrimary,
+          '₹${formatPrice(price)}',
+          stock.exitDate == null
+              ? 'Week end ${_shortDate(report.weekEnd)}'
+              : _shortDate(stock.exitDate!),
         ),
     ];
 
+    Color signedTone(num value) => !value.isFinite || value == 0
+        ? t.textPrimary
+        : (value > 0 ? t.positiveText : t.negativeText);
+
     final identity = Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         AyreInstrumentTile(
           symbol: stock.symbol,
-          size: _CardSpec.tile,
-          name: hasName ? stock.name : null,
+          size: 44,
+          name: hasName ? name : null,
         ),
-        const SizedBox(width: AppSpace.sm),
+        const SizedBox(width: AppSpace.s13),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(stock.symbol, style: _CardSpec.symbol(t)),
-              if (hasName) ...[
-                const SizedBox(height: 2),
-                Text(
-                  stock.name!,
-                  style: AppTypo.meta(t),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+              Text(
+                stock.symbol,
+                style: AppTypo.rowLabel(
+                  t,
+                ).copyWith(fontSize: 17, fontWeight: FontWeight.w800),
+              ),
+              if (hasName)
+                Text(name, style: AppTypo.meta(t).copyWith(fontSize: 13)),
             ],
           ),
         ),
       ],
     );
-
-    final returnFigure = Figure.static(
-      formatDelta(stock.profitPct),
-      fontSize: _CardSpec.returnSize,
-      fontWeight: FontWeight.w700,
-      color: tone,
+    final chip = AyreChip(
+      label: outcome,
+      tone: stock.targetHit ? ChipTone.success : ChipTone.negative,
     );
-    final outcomeChip = _OutcomeChip(label: outcomeLabel, tone: tone, dot: dot);
 
     return Semantics(
       container: true,
-      label: spoken,
       excludeSemantics: true,
+      label: [
+        stock.symbol,
+        if (hasName) name,
+        outcome,
+        if (pct.isFinite) '${pct.toStringAsFixed(2)} percent',
+        if (profitText != null) 'Profit per share $profitText',
+        for (final (label, value, date) in prices) '$label $value, $date',
+      ].join(', '),
       child: AyreCard(
-        padding: const EdgeInsets.all(AppSpace.md),
         child: LayoutBuilder(
-          builder: (context, c) {
-            final width = c.maxWidth;
-            final header = width >= _CardSpec.headerSideBySide * k
-                ? Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(child: identity),
-                      const SizedBox(width: AppSpace.md),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          returnFigure,
-                          const SizedBox(height: AppSpace.xxs),
-                          outcomeChip,
-                        ],
-                      ),
-                    ],
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      identity,
-                      const SizedBox(height: AppSpace.sm),
-                      Wrap(
-                        alignment: WrapAlignment.spaceBetween,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        spacing: AppSpace.md,
-                        runSpacing: AppSpace.xxs,
-                        children: [returnFigure, outcomeChip],
-                      ),
-                    ],
-                  );
-
-            final panelWidth =
-                width - _CardSpec.panelPadding.horizontal;
+          builder: (context, constraints) {
+            final scale = MediaQuery.textScalerOf(context).scale(13) / 13;
+            final inline = constraints.maxWidth >= 285 * scale;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                header,
-                if (prices.isNotEmpty) ...[
-                  const SizedBox(height: _CardSpec.band),
-                  _PricePanel(
-                    items: prices,
-                    columns: panelWidth >= _CardSpec.panelColumns * k,
+                if (inline)
+                  Row(
+                    children: [
+                      Expanded(flex: 3, child: identity),
+                      const SizedBox(width: AppSpace.s13),
+                      Flexible(flex: 2, child: chip),
+                    ],
+                  )
+                else ...[
+                  identity,
+                  const SizedBox(height: AppSpace.s8),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: chip,
                   ),
                 ],
-                if (pnl != null) ...[
-                  const SizedBox(height: _CardSpec.band),
-                  const HairlineDivider(),
-                  const SizedBox(height: _CardSpec.band),
-                  _ProfitRow(value: _formatSignedRupees(pnl), tone: tone),
+                const SizedBox(height: AppSpace.s21),
+                Wrap(
+                  spacing: AppSpace.s13,
+                  runSpacing: AppSpace.s8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  alignment: WrapAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      returnText,
+                      style: AppTypo.reportPercent(t, color: signedTone(pct)),
+                    ),
+                    if (profitText != null)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Profit / share', style: AppTypo.meta(t)),
+                          Text(
+                            profitText,
+                            style: AppTypo.ticker(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: signedTone(pnl!),
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+                if (prices.isNotEmpty) ...[
+                  const SizedBox(height: AppSpace.s21),
+                  InkPanel(
+                    padding: const EdgeInsets.all(AppSpace.s13),
+                    child: _PricePanel(prices: prices, inline: inline),
+                  ),
                 ],
               ],
             );
@@ -643,191 +620,60 @@ class _StockCard extends StatelessWidget {
   }
 }
 
-/// `● Target hit` — a dot and the outcome in words, no fill.
-class _OutcomeChip extends StatelessWidget {
-  const _OutcomeChip({
-    required this.label,
-    required this.tone,
-    required this.dot,
-  });
-
-  final String label;
-  final Color tone;
-  final Color dot;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 7,
-          height: 7,
-          decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 6),
-        Flexible(child: Text(label, style: _CardSpec.outcome(tone))),
-      ],
-    );
-  }
-}
-
-class _MetricData {
-  const _MetricData(this.label, this.value, this.date, this.valueColor);
-
-  final String label;
-  final String value;
-  final DateTime? date;
-  final Color valueColor;
-}
-
-/// Entry and Exit in one inset panel: two even columns, or — with less room —
-/// label/value lines separated by a hairline.
 class _PricePanel extends StatelessWidget {
-  const _PricePanel({required this.items, required this.columns});
+  const _PricePanel({required this.prices, required this.inline});
 
-  final List<_MetricData> items;
-  final bool columns;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final Widget body;
-    if (columns) {
-      body = Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) const SizedBox(width: AppSpace.md),
-            Expanded(child: _MetricStack(data: items[i])),
-          ],
-        ],
-      );
-    } else {
-      body = Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) ...[
-              const SizedBox(height: AppSpace.sm),
-              const HairlineDivider(),
-              const SizedBox(height: AppSpace.sm),
-            ],
-            _MetricLine(data: items[i]),
-          ],
-        ],
-      );
-    }
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: t.surfaceSunken,
-        borderRadius: BorderRadius.circular(AppRadius.inset),
-      ),
-      child: Padding(padding: _CardSpec.panelPadding, child: body),
-    );
-  }
-}
-
-/// Label, price, date — each on its own line with a clear gap.
-class _MetricStack extends StatelessWidget {
-  const _MetricStack({required this.data});
-
-  final _MetricData data;
+  final List<(String, String, String)> prices;
+  final bool inline;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(data.label, style: AppTypo.meta(t)),
-        const SizedBox(height: AppSpace.xxs),
-        Figure.static(
-          data.value,
-          fontSize: _CardSpec.priceSize,
-          fontWeight: FontWeight.w600,
-          color: data.valueColor,
-        ),
-        if (data.date != null) ...[
-          const SizedBox(height: AppSpace.xxs),
-          Text(
-            _shortDate(data.date!),
-            style: AppTypo.meta(t, color: t.foregroundSubtle),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-/// Label (and date) left, value right — the reflow form. A [Wrap], so a very
-/// long figure drops under its label instead of overflowing.
-class _MetricLine extends StatelessWidget {
-  const _MetricLine({required this.data});
-
-  final _MetricData data;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Wrap(
-      alignment: WrapAlignment.spaceBetween,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: AppSpace.md,
-      runSpacing: AppSpace.xxs,
-      children: [
+    final cells = [
+      for (final (i, (label, value, date)) in prices.indexed)
         Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: inline && i == 1
+              ? CrossAxisAlignment.end
+              : CrossAxisAlignment.start,
           children: [
-            Text(data.label, style: AppTypo.meta(t)),
-            if (data.date != null) ...[
-              const SizedBox(height: AppSpace.xxs),
-              Text(
-                _shortDate(data.date!),
-                style: AppTypo.meta(t, color: t.foregroundSubtle),
+            Text(
+              '$label · $date',
+              style: AppTypo.meta(t),
+              textAlign: inline && i == 1 ? TextAlign.end : TextAlign.start,
+            ),
+            const SizedBox(height: 3),
+            Text(
+              value,
+              style: AppTypo.ticker(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: t.textPrimary,
               ),
-            ],
+            ),
           ],
         ),
-        Figure.static(
-          data.value,
-          fontSize: _CardSpec.priceSize,
-          fontWeight: FontWeight.w600,
-          color: data.valueColor,
-        ),
-      ],
-    );
-  }
-}
-
-/// `Profit / share ············ +₹80` — label left, figure right in the
-/// outcome colour. Wraps rather than overflows at large text sizes.
-class _ProfitRow extends StatelessWidget {
-  const _ProfitRow({required this.value, required this.tone});
-
-  final String value;
-  final Color tone;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Wrap(
-      alignment: WrapAlignment.spaceBetween,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: AppSpace.md,
-      runSpacing: AppSpace.xxs,
-      children: [
-        Text('Profit / share', style: AppTypo.meta(t)),
-        Figure.static(
-          value,
-          fontSize: _CardSpec.priceSize,
-          fontWeight: FontWeight.w700,
-          color: tone,
-        ),
-      ],
-    );
+    ];
+    return inline && cells.length > 1
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: cells.first),
+              const SizedBox(width: AppSpace.s13),
+              Expanded(child: cells.last),
+            ],
+          )
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              cells.first,
+              if (cells.length > 1) ...[
+                const SizedBox(height: AppSpace.s13),
+                const HairlineDivider(),
+                const SizedBox(height: AppSpace.s13),
+                cells.last,
+              ],
+            ],
+          );
   }
 }
 
@@ -877,175 +723,59 @@ class _ExpandToggle extends StatelessWidget {
 
 // ─── Skeleton ──────────────────────────────────────────────────────────────
 
-/// Mirrors the section's shape — separator, week header, two cards — so
-/// nothing jumps once real data arrives.
+class WeeklyReportSummarySkeleton extends StatelessWidget {
+  const WeeklyReportSummarySkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AyreCard(
+      strongShadow: true,
+      padding: const EdgeInsets.symmetric(vertical: AppSpace.s13),
+      child: Row(
+        children: [
+          for (var i = 0; i < 3; i++)
+            const Expanded(
+              child: Column(
+                children: [
+                  SkeletonBlock(width: 26, height: 21),
+                  SizedBox(height: 3),
+                  SkeletonBlock(width: 55, height: 12),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class WeeklyReportSkeleton extends StatelessWidget {
   const WeeklyReportSkeleton({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        HairlineDivider(),
-        SizedBox(height: AppSpace.md),
-        SkeletonBlock(width: 110, height: 11),
-        SizedBox(height: AppSpace.xs),
-        SkeletonBlock(width: 200, height: 26),
-        SizedBox(height: AppSpace.xs),
-        SkeletonBlock(width: 90, height: 11),
-        SizedBox(height: AppSpace.md),
-        _StockCardSkeleton(),
-        SizedBox(height: AppSpace.xs),
-        _StockCardSkeleton(),
-      ],
-    );
-  }
-}
-
-/// Same bands, spacing and text styles as the real stock card (it reads them
-/// from [_CardSpec]), with each line of text replaced by a bar of that line's
-/// height. Because the height comes from the real styles, the placeholder
-/// grows with the text size exactly as the card will, so loading to loaded
-/// does not jump.
-class _StockCardSkeleton extends StatelessWidget {
-  const _StockCardSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final symbol = _CardSpec.symbol(t);
-    final meta = AppTypo.meta(t);
-    final ret = AppTypo.ticker(
-      fontSize: _CardSpec.returnSize,
-      fontWeight: FontWeight.w700,
-      height: 1.15,
-    );
-    final price = AppTypo.ticker(
-      fontSize: _CardSpec.priceSize,
-      fontWeight: FontWeight.w600,
-      height: 1.15,
-    );
-    final outcome = _CardSpec.outcome(t.foregroundMuted);
-
-    Widget priceStack(double labelW) => Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _GhostLine(style: meta, width: labelW),
-          const SizedBox(height: AppSpace.xxs),
-          _GhostLine(style: price, width: 80),
-          const SizedBox(height: AppSpace.xxs),
-          _GhostLine(style: meta, width: 64),
-        ],
-      ),
-    );
-
-    return AyreCard(
-      padding: const EdgeInsets.all(AppSpace.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    const SkeletonBlock(
-                      width: _CardSpec.tile,
-                      height: _CardSpec.tile,
-                      radius: AppRadius.iconTile,
-                    ),
-                    const SizedBox(width: AppSpace.sm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _GhostLine(style: symbol, width: 88),
-                          const SizedBox(height: 2),
-                          _GhostLine(style: meta, width: 120),
-                        ],
-                      ),
-                    ),
-                  ],
+        for (var i = 0; i < 2; i++) ...[
+          if (i > 0) const SizedBox(height: AppSpace.cardGap),
+          const AyreCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SkeletonTickerRow(),
+                SizedBox(height: AppSpace.s21),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: SkeletonBlock(width: 89, height: 34),
                 ),
-              ),
-              const SizedBox(width: AppSpace.md),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  _GhostLine(style: ret, width: 72),
-                  const SizedBox(height: AppSpace.xxs),
-                  _GhostLine(style: outcome, width: 72),
-                ],
-              ),
-            ],
-          ),
-          const SizedBox(height: _CardSpec.band),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: t.surfaceSunken,
-              borderRadius: BorderRadius.circular(AppRadius.inset),
-            ),
-            child: Padding(
-              padding: _CardSpec.panelPadding,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  priceStack(36),
-                  const SizedBox(width: AppSpace.md),
-                  priceStack(32),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: _CardSpec.band),
-          const HairlineDivider(),
-          const SizedBox(height: _CardSpec.band),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _GhostLine(style: meta, width: 84),
-              _GhostLine(style: price, width: 64),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A shimmer bar as tall as one line of [style]. An invisible, semantics-free
-/// line of real text gives it that height at the current text scale.
-class _GhostLine extends StatelessWidget {
-  const _GhostLine({required this.style, required this.width});
-
-  final TextStyle style;
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    final bar = (style.fontSize ?? 14) * 0.7;
-    return SizedBox(
-      width: width,
-      child: Stack(
-        children: [
-          ExcludeSemantics(
-            child: Opacity(
-              opacity: 0,
-              child: Text(' ', style: style, maxLines: 1),
-            ),
-          ),
-          Positioned.fill(
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: SkeletonBlock(width: width, height: bar),
+                SizedBox(height: AppSpace.s21),
+                InkPanel(child: SkeletonBlock(height: 34)),
+              ],
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 }
@@ -1081,13 +811,33 @@ String _spokenWeekRange(DateTime start, DateTime end) {
 }
 
 const List<String> _monthNames = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
 ];
 
 const List<String> _monthAbbrev = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 
 String _ordinalDay(DateTime date) =>

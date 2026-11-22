@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../services/tour_service.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/ayre_components.dart';
 import '../../widgets/ayre_icons.dart';
 import '../onboarding_screen.dart';
@@ -32,7 +33,7 @@ class _ReplayOnboardingRowState extends State<ReplayOnboardingRow> {
     // so it goes on the root navigator, not the tab's (A3).
     final navigator = Navigator.of(context, rootNavigator: true);
     await navigator.push<void>(
-      MaterialPageRoute<void>(
+      terminalRoute<void>(
         fullscreenDialog: true,
         builder: (routeContext) => OnboardingScreen(
           onFinished: ({required bool startTour}) {

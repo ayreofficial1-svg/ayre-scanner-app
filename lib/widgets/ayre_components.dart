@@ -213,8 +213,6 @@ class SectionLabel extends StatelessWidget {
       child: Text(
         eyebrow ? label.toUpperCase() : label,
         style: eyebrow ? AppTypo.label(t) : AppTypo.sectionTitle(t),
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
       ),
     );
 
@@ -241,12 +239,7 @@ class SectionLabel extends StatelessWidget {
           ),
         if (subtitle != null) ...[
           const SizedBox(height: AppSpace.xxs),
-          Text(
-            subtitle!,
-            style: AppTypo.meta(t),
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-          ),
+          Text(subtitle!, style: AppTypo.subtitle(t).copyWith(fontSize: 14)),
         ],
       ],
     );
@@ -309,6 +302,7 @@ class SectionInfoButton extends StatelessWidget {
     return Semantics(
       button: true,
       label: 'About $title',
+      onTap: () => _open(context),
       excludeSemantics: true,
       child: PressableScale(
         onTap: () => _open(context),
@@ -346,7 +340,7 @@ class _SectionInfoSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(message, style: AppTypo.body(context.tokens)),
+          Text(message, style: AppTypo.reading(context.tokens)),
           const SizedBox(height: AppSpace.xl),
           AyreButton(
             label: 'Got it',
@@ -404,7 +398,7 @@ class HairlineDivider extends StatelessWidget {
 
 // ─── Buttons ───────────────────────────────────────────────────────────────
 
-enum AyreButtonKind { primary, outline, danger }
+enum AyreButtonKind { primary, outline, danger, destructive }
 
 /// The reference button: 55 minimum height, TL 8 / others 28 silhouette,
 /// 15/800 label. Primary is a solid brand fill with `onAccent` content;
@@ -447,52 +441,60 @@ class AyreButton extends StatelessWidget {
         t.negative.withValues(alpha: 0.6),
         1.5,
       ),
+      AyreButtonKind.destructive => (t.negative, t.onAccent, t.negative, 1.0),
     };
 
-    return Opacity(
-      opacity: enabled ? 1 : 0.45,
-      child: PressableScale(
-        onTap: enabled ? onPressed : null,
-        shape: AppShape.button,
-        scale: 0.985,
-        child: Container(
-          width: expand ? double.infinity : null,
-          constraints: const BoxConstraints(minHeight: AppShape.controlHeight),
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpace.s21,
-            vertical: AppSpace.md,
-          ),
-          decoration: BoxDecoration(
-            color: bg,
-            borderRadius: AppShape.button,
-            border: Border.all(color: edge, width: edgeWidth),
-          ),
-          child: Row(
-            mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (busy)
-                SizedBox(
-                  height: 18,
-                  width: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: fg),
-                )
-              else ...[
-                if (glyph != null) ...[
-                  AyreIcon(glyph!, size: 18, color: fg),
-                  const SizedBox(width: AppSpace.sm),
-                ],
-                Flexible(
-                  child: Text(
-                    label,
-                    style: AppTypo.button(t, color: fg),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
+    return Semantics(
+      label: busy ? '$label, in progress' : label,
+      enabled: enabled,
+      button: true,
+      onTap: enabled ? onPressed : null,
+      excludeSemantics: true,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.45,
+        child: PressableScale(
+          onTap: enabled ? onPressed : null,
+          shape: AppShape.button,
+          scale: 0.985,
+          child: Container(
+            width: expand ? double.infinity : null,
+            constraints: const BoxConstraints(
+              minHeight: AppShape.controlHeight,
+            ),
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpace.s21,
+              vertical: AppSpace.md,
+            ),
+            decoration: BoxDecoration(
+              color: bg,
+              borderRadius: AppShape.button,
+              border: Border.all(color: edge, width: edgeWidth),
+            ),
+            child: Row(
+              mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (busy)
+                  SizedBox(
+                    height: 18,
+                    width: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: fg),
+                  )
+                else ...[
+                  if (glyph != null) ...[
+                    AyreIcon(glyph!, size: 18, color: fg),
+                    const SizedBox(width: AppSpace.sm),
+                  ],
+                  Flexible(
+                    child: Text(
+                      label,
+                      style: AppTypo.button(t, color: fg),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -576,9 +578,7 @@ class _AyreSwitchState extends State<AyreSwitch> {
                     decoration: BoxDecoration(
                       color: value ? t.accent : t.surfaceRaised,
                       borderRadius: BorderRadius.circular(AppRadius.chip),
-                      border: Border.all(
-                        color: value ? t.accent : t.hairline,
-                      ),
+                      border: Border.all(color: value ? t.accent : t.hairline),
                     ),
                     child: AnimatedAlign(
                       duration: duration,
@@ -637,24 +637,34 @@ class AyreSegmented<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final scale = MediaQuery.textScalerOf(context).scale(13) / 13;
+    final options = [
+      for (final segment in segments)
+        _Segment(
+          segment: segment,
+          selected: segment.value == value,
+          compact: compact,
+          onTap: () => onChanged(segment.value),
+        ),
+    ];
     return Container(
       padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
         color: t.surfaceRaised,
         borderRadius: AppShape.field,
       ),
-      child: Row(
-        children: [
-          for (final segment in segments)
-            Expanded(
-              child: _Segment(
-                segment: segment,
-                selected: segment.value == value,
-                compact: compact,
-                onTap: () => onChanged(segment.value),
-              ),
-            ),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < options.length * (24 + 52 * scale)) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: options,
+            );
+          }
+          return Row(
+            children: [for (final option in options) Expanded(child: option)],
+          );
+        },
       ),
     );
   }
@@ -691,6 +701,9 @@ class _Segment<T> extends StatelessWidget {
       button: true,
       selected: selected,
       label: segment.label,
+      onTap: onTap,
+      inMutuallyExclusiveGroup: true,
+      excludeSemantics: true,
       child: PressableScale(
         onTap: onTap,
         shape: AppShape.segmentSelected,
@@ -726,8 +739,6 @@ class _Segment<T> extends StatelessWidget {
                   color: fg,
                   height: 1.2,
                 ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
               ),
             ],
@@ -764,11 +775,13 @@ class AyreChip extends StatelessWidget {
     required this.label,
     this.tone = ChipTone.neutral,
     this.glyph,
+    this.dot = false,
   });
 
   final String label;
   final ChipTone tone;
   final AyreGlyph? glyph;
+  final bool dot;
 
   @override
   Widget build(BuildContext context) {
@@ -791,16 +804,19 @@ class AyreChip extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (glyph != null) ...[
+          if (dot) ...[
+            DecoratedBox(
+              decoration: BoxDecoration(color: fg, shape: BoxShape.circle),
+              child: const SizedBox.square(dimension: 6),
+            ),
+            const SizedBox(width: AppSpace.xs),
+          ] else if (glyph != null) ...[
             AyreIcon(glyph!, size: 12, color: fg),
             const SizedBox(width: AppSpace.xs),
           ],
           // Status words wrap, never truncate (D-1 floor: chips are 11 sp).
           Flexible(
-            child: Text(
-              label.toUpperCase(),
-              style: AppTypo.chip(t, color: fg),
-            ),
+            child: Text(label.toUpperCase(), style: AppTypo.chip(t, color: fg)),
           ),
         ],
       ),
@@ -821,6 +837,8 @@ class SettingRow extends StatelessWidget {
     this.trailing,
     this.danger = false,
     this.enabled = true,
+    this.toggled,
+    this.status,
   });
 
   final AyreGlyph glyph;
@@ -830,6 +848,8 @@ class SettingRow extends StatelessWidget {
   final Widget? trailing;
   final bool danger;
   final bool enabled;
+  final bool? toggled;
+  final String? status;
 
   @override
   Widget build(BuildContext context) {
@@ -859,6 +879,7 @@ class SettingRow extends StatelessWidget {
               ),
               const SizedBox(width: AppSpace.s13),
               Expanded(
+                flex: 2,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -872,41 +893,42 @@ class SettingRow extends StatelessWidget {
                     ),
                     if (subtitle != null) ...[
                       const SizedBox(height: 2),
-                      Text(subtitle!, style: AppTypo.body(t, color: t.foregroundMuted)),
+                      Text(
+                        subtitle!,
+                        style: AppTypo.body(t, color: t.foregroundMuted),
+                      ),
                     ],
                   ],
                 ),
               ),
-              const SizedBox(width: AppSpace.sm),
-              trailing ??
-                  (onTap == null
-                      ? const SizedBox.shrink()
-                      : AyreIcon(
-                          AyreGlyph.forward,
-                          size: 18,
-                          color: t.foregroundMuted,
-                        )),
+              if (trailing != null) ...[
+                const SizedBox(width: AppSpace.s8),
+                Flexible(child: trailing!),
+              ],
+              if (onTap != null && (trailing == null || status != null)) ...[
+                const SizedBox(width: AppSpace.s8),
+                AyreIcon(AyreGlyph.forward, size: 18, color: t.foregroundMuted),
+              ],
             ],
           ),
         ),
       ),
     );
 
-    if (onTap == null || !enabled) return row;
+    if (onTap == null && enabled && toggled == null) return row;
 
-    // Phase 5: destructive rows (Sign out) need their weight in the
-    // announcement, not just "Sign out" indistinguishable from a normal
-    // nav row — subtitle folds in for context, same grouping pattern as
-    // _NavItem.
-    final buf = StringBuffer(title);
-    if (subtitle != null && subtitle!.isNotEmpty) buf.write(', $subtitle');
-    if (danger) buf.write(', destructive action');
+    final action = enabled ? onTap : null;
 
     return Semantics(
-      button: true,
-      label: buf.toString(),
+      button: toggled == null,
+      enabled: enabled,
+      toggled: toggled,
+      onTap: action,
+      label: [title, ?subtitle, ?status].join(', '),
       excludeSemantics: true,
-      child: PressableScaleRow(onTap: onTap!, child: row),
+      child: action == null
+          ? row
+          : PressableScaleRow(onTap: action, child: row),
     );
   }
 }
@@ -919,6 +941,7 @@ class RowGroup extends StatelessWidget {
     required this.children,
     this.color,
     this.indent = defaultIndent,
+    this.notch = false,
   });
 
   /// Where the hairlines start: the row padding, the 44 icon tile and the
@@ -928,6 +951,7 @@ class RowGroup extends StatelessWidget {
 
   final List<Widget> children;
   final Color? color;
+  final bool notch;
 
   /// Left inset of the hairlines between rows. Lists whose rows lead with
   /// something other than an 18px icon (an instrument tile)
@@ -938,7 +962,9 @@ class RowGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AyreCard(
-      padding: EdgeInsets.zero,
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      notch: notch,
+      clip: true,
       color: color,
       child: Column(
         children: [
@@ -1142,11 +1168,13 @@ class Entrance extends StatefulWidget {
     super.key,
     required this.child,
     this.index = 0,
+    this.animate = true,
     this.offset = const Offset(0, AppMotion.entranceRise),
   });
 
   final Widget child;
   final int index;
+  final bool animate;
   final Offset offset;
 
   @override
@@ -1157,6 +1185,7 @@ class _EntranceState extends State<Entrance>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   Timer? _delay;
+  bool _started = false;
 
   @override
   void initState() {
@@ -1165,6 +1194,32 @@ class _EntranceState extends State<Entrance>
       vsync: this,
       duration: AppMotion.entrance,
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!widget.animate || MediaQuery.disableAnimationsOf(context)) {
+      _finish();
+    } else if (!_started) {
+      _start();
+    }
+  }
+
+  @override
+  void didUpdateWidget(Entrance oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.animate && oldWidget.animate) _finish();
+  }
+
+  void _finish() {
+    _started = true;
+    _delay?.cancel();
+    _controller.value = 1;
+  }
+
+  void _start() {
+    _started = true;
     // Cap the stagger budget so the last element in a long list still starts
     // promptly instead of trickling in.
     final delay = AppMotion.stagger * widget.index.clamp(0, 4);
@@ -1188,7 +1243,6 @@ class _EntranceState extends State<Entrance>
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.disableAnimationsOf(context)) return widget.child;
     return AnimatedBuilder(
       animation: _controller,
       child: widget.child,
@@ -1273,6 +1327,9 @@ class AyreFilterChip extends StatelessWidget {
       button: true,
       selected: selected,
       label: label,
+      value: count?.toString(),
+      onTap: onTap,
+      excludeSemantics: true,
       child: PressableScale(
         onTap: onTap,
         shape: AppShape.field,
@@ -1284,7 +1341,6 @@ class AyreFilterChip extends StatelessWidget {
           // 48 pt minimum hit height (Phase 3); grows with text scale.
           constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
-          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: selected ? t.accent : t.surface,
             borderRadius: AppShape.field,
@@ -1297,12 +1353,14 @@ class AyreFilterChip extends StatelessWidget {
                 AyreIcon(AyreGlyph.check, size: 14, color: fg),
                 const SizedBox(width: AppSpace.xs),
               ],
-              Text(
-                label,
-                style: AppTypo.ui(
-                  fontSize: AppTextScale.body,
-                  fontWeight: FontWeight.w700,
-                  color: fg,
+              Flexible(
+                child: Text(
+                  label,
+                  style: AppTypo.ui(
+                    fontSize: AppTextScale.body,
+                    fontWeight: FontWeight.w700,
+                    color: fg,
+                  ),
                 ),
               ),
               if (count != null) ...[

@@ -636,6 +636,7 @@ abstract final class AppSpace {
   static const double s8 = 8;
   static const double s13 = 13;
   static const double s21 = 21;
+  static const double s26 = 26;
   static const double s34 = 34;
   static const double s55 = 55;
   static const double s89 = 89;
@@ -665,7 +666,7 @@ abstract final class AppSpace {
   }
 
   /// Gap above a section label / between major sections.
-  static const double sectionGap = 26;
+  static const double sectionGap = s26;
 
   /// Gap between sibling cards and rows.
   static const double cardGap = 13;
@@ -1050,8 +1051,9 @@ abstract final class AppTheme {
       statusBarBrightness: dark ? Brightness.dark : Brightness.light,
       systemNavigationBarColor: t.navBg,
       systemNavigationBarDividerColor: transparent,
-      systemNavigationBarIconBrightness:
-          dark ? Brightness.light : Brightness.dark,
+      systemNavigationBarIconBrightness: dark
+          ? Brightness.light
+          : Brightness.dark,
       systemNavigationBarContrastEnforced: false,
       systemStatusBarContrastEnforced: false,
     );
@@ -1457,7 +1459,12 @@ abstract final class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
           shape: const RoundedRectangleBorder(borderRadius: AppShape.field),
           textStyle: AppTypo.ui(fontSize: 13, fontWeight: FontWeight.w800),
-        ),
+        ).copyWith(side: _buttonFocusEdge(t)),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size.square(AppSpace.minTarget),
+        ).copyWith(side: _buttonFocusEdge(t)),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: t.surfaceRaised,
@@ -1494,7 +1501,7 @@ abstract final class AppTheme {
         selectionColor: t.accent.withValues(alpha: 0.24),
         selectionHandleColor: t.accentInk,
       ),
-      splashFactory: InkRipple.splashFactory,
+      splashFactory: NoSplash.splashFactory,
       splashColor: t.accent.withValues(alpha: 0.06),
       highlightColor: t.accent.withValues(alpha: 0.04),
       hoverColor: t.accent.withValues(alpha: 0.05),
@@ -1553,9 +1560,8 @@ abstract final class AppTheme {
               : t.surfaceRaised,
         ),
         trackOutlineColor: WidgetStateProperty.resolveWith(
-          (states) => states.contains(WidgetState.selected)
-              ? transparent
-              : t.hairline,
+          (states) =>
+              states.contains(WidgetState.selected) ? transparent : t.hairline,
         ),
       ),
       checkboxTheme: CheckboxThemeData(
@@ -1604,6 +1610,13 @@ abstract final class AppTheme {
       ),
     );
   }
+
+  static WidgetStateProperty<BorderSide?> _buttonFocusEdge(AppThemeTokens t) =>
+      WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.focused)
+            ? BorderSide(color: t.focusRing, width: 2)
+            : null,
+      );
 }
 
 /// Route-level push/pop transition, used for overlay pushes (Settings, the
@@ -1617,6 +1630,12 @@ class TerminalPageTransitions extends PageTransitionsBuilder {
   const TerminalPageTransitions();
 
   @override
+  Duration get transitionDuration => AppMotion.pageTransition;
+
+  @override
+  Duration get reverseTransitionDuration => AppMotion.pageTransition;
+
+  @override
   Widget buildTransitions<T>(
     PageRoute<T>? route,
     BuildContext context,
@@ -1624,6 +1643,8 @@ class TerminalPageTransitions extends PageTransitionsBuilder {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
+    if (MediaQuery.disableAnimationsOf(context)) return child;
+
     final incoming = CurvedAnimation(
       parent: animation,
       curve: AppMotion.ease,
@@ -1678,17 +1699,59 @@ class TerminalPageTransitions extends PageTransitionsBuilder {
 Route<T> terminalRoute<T>({
   required WidgetBuilder builder,
   RouteSettings? settings,
+  bool fullscreenDialog = false,
 }) {
   // Inside a tab navigator (A3) the page ends above the floating dock;
   // anywhere else `AyreDockClearance` does nothing.
   Widget wrapped(BuildContext context) =>
       AyreDockClearance(child: builder(context));
   return switch (defaultTargetPlatform) {
-    TargetPlatform.iOS ||
-    TargetPlatform.macOS => CupertinoPageRoute<T>(
+    TargetPlatform.iOS || TargetPlatform.macOS => _AyreCupertinoRoute<T>(
       builder: wrapped,
       settings: settings,
+      fullscreenDialog: fullscreenDialog,
     ),
-    _ => MaterialPageRoute<T>(builder: wrapped, settings: settings),
+    _ => _AyreMaterialRoute<T>(
+      builder: wrapped,
+      settings: settings,
+      fullscreenDialog: fullscreenDialog,
+    ),
   };
+}
+
+Duration _routeDuration(NavigatorState? navigator) {
+  final context = navigator?.context;
+  final reduce = context
+      ?.getInheritedWidgetOfExactType<MediaQuery>()
+      ?.data
+      .disableAnimations;
+  return reduce == true ? Duration.zero : AppMotion.pageTransition;
+}
+
+class _AyreMaterialRoute<T> extends MaterialPageRoute<T> {
+  _AyreMaterialRoute({
+    required super.builder,
+    super.settings,
+    super.fullscreenDialog,
+  });
+
+  @override
+  Duration get transitionDuration => _routeDuration(navigator);
+
+  @override
+  Duration get reverseTransitionDuration => _routeDuration(navigator);
+}
+
+class _AyreCupertinoRoute<T> extends CupertinoPageRoute<T> {
+  _AyreCupertinoRoute({
+    required super.builder,
+    super.settings,
+    super.fullscreenDialog,
+  });
+
+  @override
+  Duration get transitionDuration => _routeDuration(navigator);
+
+  @override
+  Duration get reverseTransitionDuration => _routeDuration(navigator);
 }

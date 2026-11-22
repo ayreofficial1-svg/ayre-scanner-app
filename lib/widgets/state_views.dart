@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 
 import '../theme/app_theme.dart';
 import 'ayre_components.dart';
@@ -297,63 +298,63 @@ class StatePanel extends StatelessWidget {
     return Semantics(
       container: true,
       child: AyreCard(
-      padding: EdgeInsets.symmetric(
-        horizontal: AppSpace.s21,
-        vertical: compact ? AppSpace.s21 : AppSpace.s34,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            padding: EdgeInsets.all(compact ? 11 : 15),
-            decoration: BoxDecoration(
-              color: preset.plateOf(t),
-              // A rounded square, not the card's own 18px radius and not a
-              // circle — §7 reserves circles for avatars and the toggle knob.
-              borderRadius: BorderRadius.circular(AppRadius.iconTile),
+        padding: EdgeInsets.symmetric(
+          horizontal: AppSpace.s21,
+          vertical: compact ? AppSpace.s21 : AppSpace.s34,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              padding: EdgeInsets.all(compact ? 11 : 15),
+              decoration: BoxDecoration(
+                color: preset.plateOf(t),
+                // A rounded square, not the card's own 18px radius and not a
+                // circle — §7 reserves circles for avatars and the toggle knob.
+                borderRadius: BorderRadius.circular(AppRadius.iconTile),
+              ),
+              child: AyreIcon(
+                glyph ?? preset.glyph,
+                size: compact ? 20 : 24,
+                color: tone,
+              ),
             ),
-            child: AyreIcon(
-              glyph ?? preset.glyph,
-              size: compact ? 20 : 24,
-              color: tone,
-            ),
-          ),
-          SizedBox(height: AppSpace.s21),
-          Text(
-            headline,
-            textAlign: TextAlign.center,
-            style: compact ? AppTypo.cardTitle(t) : AppTypo.sectionTitle(t),
-          ),
-          const SizedBox(height: AppSpace.xs),
-          Text(message, textAlign: TextAlign.center, style: AppTypo.body(t)),
-          if (onRetry != null) ...[
-            SizedBox(height: compact ? AppSpace.md : AppSpace.lg),
-            AyreButton(
-              label: resolvedActionLabel,
-              // The refresh glyph belongs to states that re-fetch. An expired
-              // session isn't refetched, so pairing it with a circular-arrow
-              // would promise the wrong thing.
-              glyph: preset == StatePreset.sessionExpired
-                  ? AyreGlyph.lock
-                  : AyreGlyph.refresh,
-              kind: AyreButtonKind.outline,
-              expand: false,
-              onPressed: onRetry,
-            ),
-          ] else if (pullToRefreshHint) ...[
-            const SizedBox(height: AppSpace.sm),
-            // Phase 4: shortened from "Pull down to try again" — the one
-            // shared location for this hint, used across every empty state
-            // in the app that sets `pullToRefreshHint`.
+            SizedBox(height: AppSpace.s21),
             Text(
-              'Pull to refresh',
+              headline,
               textAlign: TextAlign.center,
-              style: AppTypo.meta(t),
+              style: compact ? AppTypo.cardTitle(t) : AppTypo.sectionTitle(t),
             ),
+            const SizedBox(height: AppSpace.xs),
+            Text(message, textAlign: TextAlign.center, style: AppTypo.body(t)),
+            if (onRetry != null) ...[
+              SizedBox(height: compact ? AppSpace.md : AppSpace.lg),
+              AyreButton(
+                label: resolvedActionLabel,
+                // The refresh glyph belongs to states that re-fetch. An expired
+                // session isn't refetched, so pairing it with a circular-arrow
+                // would promise the wrong thing.
+                glyph: preset == StatePreset.sessionExpired
+                    ? AyreGlyph.lock
+                    : AyreGlyph.refresh,
+                kind: AyreButtonKind.outline,
+                expand: false,
+                onPressed: onRetry,
+              ),
+            ] else if (pullToRefreshHint) ...[
+              const SizedBox(height: AppSpace.sm),
+              // Phase 4: shortened from "Pull down to try again" — the one
+              // shared location for this hint, used across every empty state
+              // in the app that sets `pullToRefreshHint`.
+              Text(
+                'Pull to refresh',
+                textAlign: TextAlign.center,
+                style: AppTypo.meta(t),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
-    ),
     );
   }
 }
@@ -378,6 +379,7 @@ class CalmStatePanel extends StatelessWidget {
     required this.message,
     this.preset = StatePreset.empty,
     this.onRetry,
+    this.illustration,
   });
 
   /// Succeeded, nothing to show.
@@ -386,6 +388,7 @@ class CalmStatePanel extends StatelessWidget {
     required this.headline,
     required this.message,
     this.onRetry,
+    this.illustration,
   }) : preset = StatePreset.empty;
 
   /// The request failed.
@@ -394,11 +397,13 @@ class CalmStatePanel extends StatelessWidget {
     required this.headline,
     required this.message,
     this.onRetry,
-  }) : preset = StatePreset.failed;
+  }) : preset = StatePreset.failed,
+       illustration = null;
 
   final String headline;
   final String message;
   final StatePreset preset;
+  final Widget? illustration;
 
   /// Shown as the circular refresh control when non-null.
   final VoidCallback? onRetry;
@@ -411,37 +416,50 @@ class CalmStatePanel extends StatelessWidget {
     return Semantics(
       container: true,
       child: Padding(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpace.lg,
-        vertical: AppSpace.xxl,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(15),
-            decoration: BoxDecoration(
-              color: preset.plateOf(t),
-              borderRadius: BorderRadius.circular(AppRadius.iconTile),
-            ),
-            child: AyreIcon(preset.glyph, size: 24, color: tone),
-          ),
-          const SizedBox(height: AppSpace.lg),
-          Text(
-            headline,
-            textAlign: TextAlign.center,
-            style: AppTypo.cardTitle(t),
-          ),
-          const SizedBox(height: AppSpace.xs),
-          Text(message, textAlign: TextAlign.center, style: AppTypo.body(t)),
-          if (onRetry != null) ...[
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.lg,
+          vertical: AppSpace.xxl,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            illustration ??
+                Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: preset.plateOf(t),
+                    borderRadius: BorderRadius.circular(AppRadius.iconTile),
+                  ),
+                  child: AyreIcon(preset.glyph, size: 24, color: tone),
+                ),
             const SizedBox(height: AppSpace.lg),
-            _RefreshDot(label: preset.action.label, onTap: onRetry!),
+            Text(
+              headline,
+              textAlign: TextAlign.center,
+              style: AppTypo.sectionTitle(t),
+            ),
+            const SizedBox(height: AppSpace.xs),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 233),
+              child: Text(
+                message,
+                textAlign: TextAlign.center,
+                style: AppTypo.subtitle(t),
+              ),
+            ),
+            if (onRetry != null) ...[
+              const SizedBox(height: AppSpace.lg),
+              _RefreshDot(
+                label: preset == StatePreset.empty
+                    ? 'Refresh'
+                    : preset.action.label,
+                onTap: onRetry!,
+              ),
+            ],
           ],
-        ],
+        ),
       ),
-    ),
     );
   }
 }
@@ -460,19 +478,24 @@ class _RefreshDot extends StatelessWidget {
     return Semantics(
       button: true,
       label: label,
-      child: PressableScale(
-        onTap: onTap,
-        borderRadius: AppRadius.circle,
-        child: Container(
-          width: AppSpace.minTarget,
-          height: AppSpace.minTarget,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: t.surface,
-            shape: BoxShape.circle,
-            border: Border.all(color: t.hairline),
+      onTap: onTap,
+      excludeSemantics: true,
+      child: Tooltip(
+        message: label,
+        child: PressableScale(
+          onTap: onTap,
+          borderRadius: AppRadius.circle,
+          child: Container(
+            width: AppSpace.minTarget,
+            height: AppSpace.minTarget,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: t.surface,
+              borderRadius: AppShape.field,
+              border: Border.all(color: t.textPrimary),
+            ),
+            child: AyreIcon(AyreGlyph.refresh, size: 18, color: t.textPrimary),
           ),
-          child: AyreIcon(AyreGlyph.refresh, size: 18, color: t.textPrimary),
         ),
       ),
     );
@@ -490,50 +513,56 @@ class OfflineBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Material(
-      color: t.neutralSoft,
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpace.md,
-            vertical: AppSpace.sm,
-          ),
-          child: Row(
-            children: [
-              AyreIcon(AyreGlyph.offline, size: 18, color: t.neutralText),
-              const SizedBox(width: AppSpace.sm),
-              Expanded(
-                child: Text(
-                  "You're offline — showing the last saved data",
-                  // Body copy stays in `textPrimary`: the amber carries the
-                  // state via the glyph (`neutralText`) and the wash.
-                  style: AppTypo.bodyStrong(t),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: AppTheme.overlayStyleOver(
+        t.neutralSoft,
+        Theme.of(context).brightness,
+      ),
+      child: Material(
+        color: t.neutralSoft,
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpace.md,
+              vertical: AppSpace.sm,
+            ),
+            child: Row(
+              children: [
+                AyreIcon(AyreGlyph.offline, size: 18, color: t.neutralText),
+                const SizedBox(width: AppSpace.sm),
+                Expanded(
+                  child: Text(
+                    "You're offline — showing the last saved data",
+                    // Body copy stays in `textPrimary`: the amber carries the
+                    // state via the glyph (`neutralText`) and the wash.
+                    style: AppTypo.bodyStrong(t),
+                  ),
                 ),
-              ),
-              const SizedBox(width: AppSpace.sm),
-              Semantics(
-                button: true,
-                label: 'Dismiss offline notice',
-                child: PressableScale(
-                  onTap: onDismiss,
-                  borderRadius: AppRadius.pill,
-                  // 48x48 hit box, glyph centred, so the dismiss target meets
-                  // the app's minimum without growing the glyph.
-                  child: SizedBox(
-                    width: AppSpace.minTarget,
-                    height: AppSpace.minTarget,
-                    child: Center(
-                      child: AyreIcon(
-                        AyreGlyph.close,
-                        size: 16,
-                        color: t.foregroundMuted,
+                const SizedBox(width: AppSpace.sm),
+                Semantics(
+                  button: true,
+                  label: 'Dismiss offline notice',
+                  child: PressableScale(
+                    onTap: onDismiss,
+                    borderRadius: AppRadius.pill,
+                    // 48x48 hit box, glyph centred, so the dismiss target meets
+                    // the app's minimum without growing the glyph.
+                    child: SizedBox(
+                      width: AppSpace.minTarget,
+                      height: AppSpace.minTarget,
+                      child: Center(
+                        child: AyreIcon(
+                          AyreGlyph.close,
+                          size: 16,
+                          color: t.foregroundMuted,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

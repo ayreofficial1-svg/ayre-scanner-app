@@ -1,6 +1,5 @@
 import 'dart:async' show unawaited;
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -30,7 +29,7 @@ class SpotlightStep {
   final VoidCallback? onEnter;
 }
 
-/// A dimmed, blurred overlay that cuts a hole around real widgets and explains
+/// A dimmed overlay that cuts a hole around real widgets and explains
 /// them one at a time.
 ///
 /// The overlay is inserted in the **root** overlay, so it sits above every
@@ -122,6 +121,7 @@ class _SpotlightOverlayState extends State<_SpotlightOverlay>
   static const Duration _searchTimeout = Duration(milliseconds: 1500);
 
   late final Ticker _ticker;
+  final _focusScope = FocusScopeNode(debugLabel: 'Spotlight tutorial');
   int _index = 0;
   bool _closed = false;
 
@@ -153,6 +153,7 @@ class _SpotlightOverlayState extends State<_SpotlightOverlay>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _ticker.dispose();
+    _focusScope.dispose();
     super.dispose();
   }
 
@@ -260,41 +261,8 @@ class _SpotlightOverlayState extends State<_SpotlightOverlay>
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final reduce = MediaQuery.disableAnimationsOf(context);
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final size = MediaQuery.sizeOf(context);
-    final padding = MediaQuery.paddingOf(context);
-    final textScale = MediaQuery.textScalerOf(context).scale(1);
-    final hole = _display;
-    final radius = hole == null
-        ? 0.0
-        : (hole.shortestSide <= 72
-              ? hole.shortestSide / 2
-              : AppRadius.card);
-
-    // Card placement: below the hole if it fits, else above, else pinned to
-    // the bottom edge (a tall target such as a whole settings group).
-    final need = 200 * math.max(1.0, textScale);
-    final spaceBelow = hole == null ? 0.0 : size.height - hole.bottom - padding.bottom;
-    final spaceAbove = hole == null ? 0.0 : hole.top - padding.top;
-    final maxCardHeight = size.height - padding.top - padding.bottom - AppSpace.xl;
-
-    double? top;
-    double? bottom;
-    if (hole == null) {
-      top = padding.top + AppSpace.xl;
-      bottom = padding.bottom + AppSpace.xl;
-    } else if (spaceBelow >= need) {
-      top = hole.bottom + AppSpace.sm;
-    } else if (spaceAbove >= need) {
-      bottom = size.height - hole.top + AppSpace.sm;
-    } else {
-      bottom = padding.bottom + AppSpace.md;
-    }
-
-    final scrim = Theme.of(context).colorScheme.scrim.withValues(
-      alpha: dark ? 0.72 : 0.58,
-    );
+    final media = MediaQuery.of(context);
+    final reduce = media.disableAnimations;
 
     return BlockSemantics(
       child: Material(
@@ -307,77 +275,122 @@ class _SpotlightOverlayState extends State<_SpotlightOverlay>
             const SingleActivator(LogicalKeyboardKey.escape): () =>
                 _close(false),
           },
-          child: Focus(
+          child: FocusScope(
+            node: _focusScope,
             autofocus: true,
             child: TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: reduce ? 1.0 : 0.0, end: 1.0),
+              tween: Tween(begin: reduce ? 1.0 : 0.0, end: 1.0),
               duration: reduce ? Duration.zero : AppMotion.pageTransition,
               curve: AppMotion.ease,
               builder: (context, fade, child) =>
-                  Opacity(opacity: fade, child: child),
-              child: Stack(
-                children: [
-                  // The scrim swallows every tap, including those over the
-                  // hole: the highlighted control is explained, not pressed.
-                  Positioned.fill(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () {},
-                      child: ClipPath(
-                        clipper: _HoleClipper(hole, radius),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-                          child: ColoredBox(color: scrim),
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (hole != null)
-                    Positioned.fromRect(
-                      rect: hole,
-                      child: IgnorePointer(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(radius),
-                            border: Border.all(color: t.highlight, width: 2),
+                  Opacity(opacity: reduce ? 1 : fade, child: child),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final gutter = AppSpace.gutterOf(context);
+                  final top = media.padding.top + AppSpace.s13;
+                  final bottom =
+                      math.max(media.padding.bottom, media.viewInsets.bottom) +
+                      AppSpace.s13;
+                  final usable = Rect.fromLTRB(
+                    0,
+                    top,
+                    constraints.maxWidth,
+                    math.max(top, constraints.maxHeight - bottom),
+                  );
+                  final clipped = _display?.intersect(usable);
+                  final hole = clipped == null || clipped.isEmpty
+                      ? null
+                      : clipped;
+                  final radius = hole == null
+                      ? 0.0
+                      : math.min(AppRadius.card, hole.shortestSide / 2);
+                  final minimum =
+                      165 * math.max(1.0, media.textScaler.scale(15) / 15);
+                  final below = hole == null
+                      ? 0.0
+                      : usable.bottom - hole.bottom - AppSpace.s13;
+                  final above = hole == null
+                      ? 0.0
+                      : hole.top - usable.top - AppSpace.s13;
+                  final placeBelow = below >= minimum;
+                  final placeAbove = !placeBelow && above >= minimum;
+                  final cardTop = placeBelow
+                      ? hole!.bottom + AppSpace.s13
+                      : top;
+                  final cardBottom = placeAbove
+                      ? constraints.maxHeight - hole!.top + AppSpace.s13
+                      : bottom;
+
+                  return Stack(
+                    children: [
+                      Positioned.fill(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          excludeFromSemantics: true,
+                          onTap: () {},
+                          child: ClipPath(
+                            clipper: _HoleClipper(hole, radius),
+                            child: ColoredBox(color: t.scrim),
                           ),
                         ),
                       ),
-                    ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    top: top,
-                    bottom: bottom,
-                    child: Align(
-                      alignment: top != null && bottom != null
-                          ? Alignment.center
-                          : (top != null
+                      if (hole != null)
+                        Positioned.fromRect(
+                          rect: hole,
+                          child: IgnorePointer(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(radius),
+                                border: Border.all(
+                                  color: t.highlight,
+                                  width: 2,
+                                ),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(2),
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(
+                                      math.max(0, radius - 2),
+                                    ),
+                                    border: Border.all(color: t.onHighlight),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (usable.height > 0)
+                        Positioned(
+                          left: media.padding.left + gutter,
+                          right: media.padding.right + gutter,
+                          top: cardTop,
+                          bottom: cardBottom,
+                          child: Align(
+                            alignment: placeBelow
                                 ? Alignment.topCenter
-                                : Alignment.bottomCenter),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: 420 + AppSpace.xl * 2,
-                          maxHeight: maxCardHeight,
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpace.xl,
+                                : (hole == null
+                                      ? Alignment.center
+                                      : Alignment.bottomCenter),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 420),
+                              child: _Card(
+                                step: _step,
+                                index: _index,
+                                total: widget.steps.length,
+                                isLast: _isLast,
+                                onNext: _next,
+                                onBack: _index > 0
+                                    ? () => _go(_index - 1)
+                                    : null,
+                                onSkip: () => _close(false),
+                              ),
+                            ),
                           ),
-                          child: _Card(
-                            step: _step,
-                            index: _index,
-                            total: widget.steps.length,
-                            isLast: _isLast,
-                            onNext: _next,
-                            onBack: _index > 0 ? () => _go(_index - 1) : null,
-                            onSkip: () => _close(false),
-                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                ],
+                    ],
+                  );
+                },
               ),
             ),
           ),
@@ -405,7 +418,8 @@ class _HoleClipper extends CustomClipper<Path> {
   }
 
   @override
-  bool shouldReclip(_HoleClipper old) => old.hole != hole || old.radius != radius;
+  bool shouldReclip(_HoleClipper old) =>
+      old.hole != hole || old.radius != radius;
 }
 
 class _Card extends StatelessWidget {
@@ -452,27 +466,10 @@ class _Card extends StatelessWidget {
                   Semantics(
                     header: true,
                     liveRegion: true,
-                    child: Text(
-                      step.title,
-                      style: AppTypo.display(
-                        fontSize: AppTextScale.cardTitle,
-                        fontWeight: FontWeight.w800,
-                        color: t.textPrimary,
-                        height: 1.2,
-                        letterSpacing: -0.3,
-                      ),
-                    ),
+                    child: Text(step.title, style: AppTypo.sectionTitle(t)),
                   ),
-                  const SizedBox(height: AppSpace.xs),
-                  Text(
-                    step.body,
-                    style: AppTypo.ui(
-                      fontSize: AppTextScale.rowLabel,
-                      fontWeight: FontWeight.w500,
-                      color: t.foregroundMuted,
-                      height: 1.4,
-                    ),
-                  ),
+                  const SizedBox(height: AppSpace.s8),
+                  Text(step.body, style: AppTypo.reading(t)),
                 ],
               ),
             ),
@@ -484,47 +481,19 @@ class _Card extends StatelessWidget {
             ),
             const SizedBox(height: AppSpace.sm),
             Wrap(
-              alignment: WrapAlignment.spaceBetween,
+              alignment: WrapAlignment.end,
               crossAxisAlignment: WrapCrossAlignment.center,
-              runSpacing: AppSpace.xs,
+              spacing: AppSpace.s8,
+              runSpacing: AppSpace.s8,
               children: [
-                if (isLast)
-                  const SizedBox.shrink()
-                else
-                  TextButton(
-                    onPressed: onSkip,
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(
-                        AppSpace.minTarget,
-                        AppSpace.minTarget,
-                      ),
-                      foregroundColor: t.foregroundMuted,
-                    ),
-                    child: Text('Skip', style: AppTypo.button(t)),
-                  ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (onBack != null) ...[
-                      TextButton(
-                        onPressed: onBack,
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size(
-                            AppSpace.minTarget,
-                            AppSpace.minTarget,
-                          ),
-                          foregroundColor: t.foregroundMuted,
-                        ),
-                        child: Text('Back', style: AppTypo.button(t)),
-                      ),
-                      const SizedBox(width: AppSpace.xs),
-                    ],
-                    AyreButton(
-                      label: isLast ? 'Finish' : 'Next',
-                      onPressed: onNext,
-                      expand: false,
-                    ),
-                  ],
+                if (!isLast)
+                  TextButton(onPressed: onSkip, child: const Text('Skip')),
+                if (onBack != null)
+                  TextButton(onPressed: onBack, child: const Text('Back')),
+                AyreButton(
+                  label: isLast ? 'Finish' : 'Next',
+                  onPressed: onNext,
+                  expand: false,
                 ),
               ],
             ),

@@ -238,6 +238,7 @@ class _CountUpFigureState extends State<CountUpFigure>
   late final AnimationController _controller;
   late double _from;
   late double _to;
+  bool _started = false;
 
   @override
   void initState() {
@@ -245,16 +246,17 @@ class _CountUpFigureState extends State<CountUpFigure>
     _from = widget.from;
     _to = widget.value;
     _controller = AnimationController(vsync: this, duration: widget.duration);
-    // MediaQuery isn't readable in initState, so the reduced-motion check
-    // happens on the first frame rather than here.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (MediaQuery.disableAnimationsOf(context)) {
-        _controller.value = 1;
-      } else {
-        _controller.forward();
-      }
-    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context) || _from == _to) {
+      _controller.value = 1;
+    } else if (!_started) {
+      _controller.forward();
+    }
+    _started = true;
   }
 
   @override
@@ -389,6 +391,7 @@ String formatClockShort(DateTime at) {
 
 /// Indian digit grouping: the last three digits, then pairs.
 String _group(String fixed) {
+  if (fixed.contains('e')) return fixed;
   final parts = fixed.split('.');
   var digits = parts.first;
   if (digits.length <= 3) return fixed;

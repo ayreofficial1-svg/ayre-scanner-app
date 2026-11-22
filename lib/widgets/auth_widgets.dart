@@ -96,7 +96,7 @@ class _AuthFieldState extends State<AuthField> {
               hintText: widget.hint,
               hintStyle: AppTypo.fieldValue(t, color: t.foregroundMuted),
               errorText: widget.errorText,
-              errorMaxLines: 3,
+              errorMaxLines: 8,
               filled: true,
               fillColor: t.surface,
               contentPadding: const EdgeInsets.symmetric(
@@ -198,7 +198,8 @@ class PasswordChecklist extends StatelessWidget {
       children: [
         _Row(
           ok: check.length,
-          text: '${PasswordCheck.minLength}–${PasswordCheck.maxLength} characters',
+          text:
+              '${PasswordCheck.minLength}–${PasswordCheck.maxLength} characters',
         ),
         _Row(ok: check.upper, text: 'One uppercase letter'),
         _Row(ok: check.lower, text: 'One lowercase letter'),
@@ -279,6 +280,7 @@ class AuthTextLink extends StatelessWidget {
       button: true,
       enabled: onTap != null,
       label: label,
+      onTap: onTap,
       excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
@@ -385,10 +387,7 @@ class AuthScaffold extends StatelessWidget {
               ],
             ),
             SizedBox(height: gap),
-            Semantics(
-              header: true,
-              child: Text(title, style: titleStyle),
-            ),
+            Semantics(header: true, child: Text(title, style: titleStyle)),
             if (subtitle != null) ...[
               const SizedBox(height: AppSpace.xs),
               Text(subtitle!, style: AppTypo.subtitle(t, color: p.muted)),

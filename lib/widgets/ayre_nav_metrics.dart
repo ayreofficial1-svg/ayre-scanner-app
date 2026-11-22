@@ -112,7 +112,7 @@ abstract final class AyreNavMetrics {
     return clearanceFor(
       viewportWidth: media.size.width,
       bottomInset: bottomInset ?? media.viewPadding.bottom,
-      textScale: media.textScaler.scale(100) / 100,
+      textScale: media.textScaler.scale(labelSize) / labelSize,
       labelSize: labelSize,
     );
   }

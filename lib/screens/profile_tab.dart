@@ -10,8 +10,9 @@ import '../services/settings_store.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_avatar.dart';
 import '../widgets/ayre_components.dart';
-import '../widgets/ayre_hills.dart';
 import '../widgets/ayre_icons.dart';
+import '../widgets/ayre_masthead.dart';
+import '../widgets/ayre_sheet.dart';
 import '../widgets/ayre_tab_scroll.dart';
 import '../widgets/verification_banner.dart'
     show resendVerification, checkVerification;
@@ -96,9 +97,8 @@ class _ProfileTabState extends State<ProfileTab> {
   Future<void> _confirmSignOut() async {
     // Warning weight on open: this leads somewhere consequential.
     HapticFeedback.heavyImpact();
-    final confirmed = await showModalBottomSheet<bool>(
+    final confirmed = await showAyreSheet<bool>(
       context: context,
-      useSafeArea: true,
       builder: (_) => const _SignOutSheet(),
     );
     if (confirmed != true || !mounted) return;
@@ -115,248 +115,194 @@ class _ProfileTabState extends State<ProfileTab> {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final p = t.mast;
+    final auth = AuthService.instance;
+    final verification = EmailVerificationService.instance;
 
-    // `eager`: a plain Column so every row exists at once and the Profile
-    // tutorial can find and scroll to any of them. The list is short.
     return AyreTabScroll(
       controller: widget.scrollController,
       eager: true,
-      children: [
-          // Same soft layered shape as Home's header, bled to the top-right
-          // corner behind the title. Decorative, not part of the layout.
-          Stack(
-            clipBehavior: Clip.none,
+      header: AyreMastScaffold(
+        mast: AyreMasthead(
+          overlap: AppShape.mastOverlap,
+          constrainContent: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Positioned(
-                top: -AppSpace.pageTop,
-                right: -AppSpace.gutterOf(context),
-                child: AyreHills(),
-              ),
-              SafeArea(
-                bottom: false,
-                child: Entrance(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Profile', style: AppTypo.pageTitle(t)),
-                      const SizedBox(height: AppSpace.xxs),
-                      Text(
-                        'Your account, alerts and help.',
-                        style: AppTypo.body(t),
-                      ),
-                    ],
-                  ),
+              Semantics(
+                header: true,
+                child: Text(
+                  'Profile',
+                  style: AppTypo.pageTitle(t, color: p.ink),
                 ),
+              ),
+              const SizedBox(height: AppSpace.s8),
+              Text(
+                'Your account, alerts and help.',
+                style: AppTypo.subtitle(t, color: p.muted),
               ),
             ],
           ),
-          const SizedBox(height: AppSpace.sectionGap),
-
-          // ── Identity ─────────────────────────────────────────────────────
-          Entrance(
-            index: 1,
-            child: ListenableBuilder(
-              listenable: AuthService.instance.user,
-              builder: (context, _) => KeyedSubtree(
- key: TourKeys.profileIdentity,
- child: _IdentityCard(
-                name: _name,
-                email: _email,
-                verified: AuthService.instance.currentUser?.emailVerified,
-                onTap: _editProfile,
-              ),
- ),
-            ),
+        ),
+        overlapChild: ListenableBuilder(
+          listenable: auth.user,
+          builder: (context, _) => _IdentityCard(
+            key: TourKeys.profileIdentity,
+            name: _name,
+            email: _email,
+            verified: auth.currentUser?.emailVerified,
+            onTap: auth.currentUser == null ? null : _editProfile,
           ),
-
-          // ── Email verification (only while it is outstanding) ────────────
-          ListenableBuilder(
-            listenable: Listenable.merge([
-              AuthService.instance.user,
-              EmailVerificationService.instance,
-            ]),
-            builder: (context, _) {
-              final user = AuthService.instance.currentUser;
-              if (user == null || user.emailVerified) {
-                return const SizedBox.shrink();
-              }
-              final verification = EmailVerificationService.instance;
-              final resendTitle = verification.sending
-                  ? 'Sending…'
-                  : (verification.cooldown > 0
-                        ? 'Resend in ${verification.cooldown}s'
-                        : 'Resend verification email');
-              return Padding(
-                padding: const EdgeInsets.only(top: AppSpace.sectionGap),
-                child: Entrance(
-                  index: 2,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+        ),
+      ),
+      children: [
+        ListenableBuilder(
+          listenable: Listenable.merge([auth.user, verification]),
+          builder: (context, _) {
+            final user = auth.currentUser;
+            if (user == null || user.emailVerified) {
+              return const SizedBox.shrink();
+            }
+            final resendTitle = verification.sending
+                ? 'Sending…'
+                : (verification.cooldown > 0
+                      ? 'Resend in ${verification.cooldown}s'
+                      : 'Resend verification email');
+            return Padding(
+              padding: const EdgeInsets.only(top: AppSpace.s13),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SectionLabel(
+                    label: 'Verify your email',
+                    subtitle: 'Nothing is blocked while you wait.',
+                    info:
+                        'Open the verification link sent to your sign-in email, then check again here.',
+                  ),
+                  RowGroup(
+                    key: TourKeys.profileVerify,
                     children: [
-                      const SectionLabel(
-                        label: 'Verify your email',
-                        subtitle: 'Nothing is blocked while you wait.',
+                      SettingRow(
+                        glyph: AyreGlyph.mail,
+                        title: resendTitle,
+                        subtitle: 'Sends a new link to your inbox',
+                        enabled: verification.canResend,
+                        onTap: verification.canResend
+                            ? () => resendVerification(context)
+                            : null,
                       ),
-                      KeyedSubtree(
- key: TourKeys.profileVerify,
- child: RowGroup(
-                        children: [
-                          SettingRow(
-                            glyph: AyreGlyph.refresh,
-                            title: resendTitle,
-                            subtitle: 'Sends a new link to your inbox',
-                            enabled: verification.canResend,
-                            onTap: verification.canResend
-                                ? () => resendVerification(context)
-                                : null,
-                          ),
-                          SettingRow(
-                            glyph: AyreGlyph.check,
-                            title: verification.checking
-                                ? 'Checking…'
-                                : 'I’ve verified my email',
-                            subtitle: 'Tap after opening the link',
-                            enabled: !verification.checking,
-                            onTap: verification.checking
-                                ? null
-                                : () => checkVerification(context),
-                          ),
-                        ],
+                      SettingRow(
+                        glyph: AyreGlyph.check,
+                        title: verification.checking
+                            ? 'Checking…'
+                            : 'I’ve verified my email',
+                        subtitle: 'Tap after opening the link',
+                        enabled: !verification.checking,
+                        onTap: verification.checking
+                            ? null
+                            : () => checkVerification(context),
                       ),
- ),
                     ],
                   ),
-                ),
-              );
-            },
-          ),
-
-          // ── Alerts and Settings ──────────────────────────────────────────
-          const SizedBox(height: AppSpace.sectionGap),
-          Entrance(
-            index: 3,
-            child: ListenableBuilder(
-              listenable: NotificationLog.instance,
-              builder: (context, _) => RowGroup(
-                children: [
-                  KeyedSubtree(
- key: TourKeys.profileAlerts,
- child: SettingRow(
-                    glyph: AyreGlyph.bell,
-                    title: 'Alerts',
-                    subtitle: 'New signals, updates and exit calls',
-                    trailing: NotificationLog.instance.hasUnread
-                        ? const AyreChip(label: 'New', tone: ChipTone.brand)
-                        : null,
-                    onTap: () => _push(const NotificationsScreen()),
-                  ),
- ),
-                  KeyedSubtree(
- key: TourKeys.profileSettings,
- child: SettingRow(
-                    glyph: AyreGlyph.appearance,
-                    title: 'Settings',
-                    subtitle: 'Appearance, notifications and account',
-                    onTap: () => _push(const SettingsScreen()),
-                  ),
- ),
                 ],
               ),
-            ),
-          ),
-
-          // ── Help ─────────────────────────────────────────────────────────
-          const SizedBox(height: AppSpace.sectionGap),
-          Entrance(
-            index: 4,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            );
+          },
+        ),
+        const SizedBox(height: AppSpace.s13),
+        ListenableBuilder(
+          listenable: NotificationLog.instance,
+          builder: (context, _) {
+            final unread = NotificationLog.instance.hasUnread;
+            return RowGroup(
               children: [
-                const SectionLabel(label: 'Help'),
-                RowGroup(
-                  children: [
-                    KeyedSubtree(
- key: TourKeys.profileSupport,
- child: SettingRow(
-                      glyph: AyreGlyph.support,
-                      title: 'Help and support',
-                      subtitle: 'Contact the team and replay tutorials',
-                      onTap: () => _push(const SupportScreen()),
-                    ),
- ),
-                    KeyedSubtree(
- key: TourKeys.profileFaq,
- child: SettingRow(
-                      glyph: AyreGlyph.about,
-                      title: 'FAQ',
-                      subtitle: 'Answers to common questions',
-                      onTap: () => _push(const FaqScreen()),
-                    ),
- ),
-                    KeyedSubtree(
- key: TourKeys.profileGrievance,
- child: SettingRow(
-                      glyph: AyreGlyph.alerts,
-                      title: 'Grievance redressal',
-                      subtitle: 'Raise a complaint or concern',
-                      onTap: () => _push(const GrievanceScreen()),
-                    ),
- ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // ── Legal ────────────────────────────────────────────────────────
-          const SizedBox(height: AppSpace.sectionGap),
-          Entrance(
-            index: 5,
-            child: RowGroup(
-              children: [
-                KeyedSubtree(
- key: TourKeys.profileLegal,
- child: SettingRow(
-                  glyph: AyreGlyph.lock,
-                  title: 'Legal and disclosures',
-                  subtitle: 'Terms, privacy, risk and analyst information',
-                  onTap: () =>
-                      _push(LegalHubScreen(marketData: widget.marketData)),
-                ),
- ),
-              ],
-            ),
-          ),
-
-          // ── Sign out ─────────────────────────────────────────────────────
-          const SizedBox(height: AppSpace.xl),
-          Entrance(
-            index: 6,
-            child: RowGroup(
-              children: [
-                KeyedSubtree(
- key: TourKeys.profileSignOut,
- child: SettingRow(
-                  glyph: AyreGlyph.signOut,
-                  title: 'Sign out',
-                  subtitle: 'End this session on this device',
-                  danger: true,
-                  trailing: _signingOut
-                      ? SizedBox(
-                          height: 15,
-                          width: 15,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.6,
-                            color: t.negative,
-                          ),
-                        )
+                SettingRow(
+                  key: TourKeys.profileAlerts,
+                  glyph: AyreGlyph.bell,
+                  title: 'Alerts',
+                  subtitle: 'New signals, updates and exit calls',
+                  status: unread ? 'New' : null,
+                  trailing: unread
+                      ? const AyreChip(label: 'New', tone: ChipTone.badge)
                       : null,
-                  onTap: _signingOut ? null : _confirmSignOut,
+                  onTap: () => _push(const NotificationsScreen()),
                 ),
- ),
+                SettingRow(
+                  key: TourKeys.profileSettings,
+                  glyph: AyreGlyph.sliders,
+                  title: 'Settings',
+                  subtitle: 'Appearance, notifications and account',
+                  onTap: () => _push(const SettingsScreen()),
+                ),
               ],
+            );
+          },
+        ),
+        const SizedBox(height: 26),
+        const SectionLabel(
+          label: 'Help',
+          eyebrow: true,
+          padding: EdgeInsets.only(bottom: AppSpace.s8),
+        ),
+        RowGroup(
+          children: [
+            SettingRow(
+              key: TourKeys.profileSupport,
+              glyph: AyreGlyph.support,
+              title: 'Help and support',
+              subtitle: 'Contact the team and replay tutorials',
+              onTap: () => _push(const SupportScreen()),
             ),
-          ),
+            SettingRow(
+              key: TourKeys.profileFaq,
+              glyph: AyreGlyph.about,
+              title: 'FAQ',
+              subtitle: 'Answers to common questions',
+              onTap: () => _push(const FaqScreen()),
+            ),
+            SettingRow(
+              key: TourKeys.profileGrievance,
+              glyph: AyreGlyph.insights,
+              title: 'Grievance redressal',
+              subtitle: 'Raise a complaint or concern',
+              onTap: () => _push(const GrievanceScreen()),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpace.s13),
+        RowGroup(
+          children: [
+            SettingRow(
+              key: TourKeys.profileLegal,
+              glyph: AyreGlyph.shield,
+              title: 'Legal and disclosures',
+              subtitle: 'Terms, privacy, risk and analyst information',
+              onTap: () => _push(LegalHubScreen(marketData: widget.marketData)),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpace.s13),
+        RowGroup(
+          children: [
+            SettingRow(
+              key: TourKeys.profileSignOut,
+              glyph: AyreGlyph.signOut,
+              title: 'Sign out',
+              subtitle: 'End this session on this device',
+              enabled: !_signingOut,
+              trailing: _signingOut
+                  ? SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: t.accent,
+                      ),
+                    )
+                  : null,
+              onTap: _signingOut ? null : _confirmSignOut,
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -366,6 +312,7 @@ class _ProfileTabState extends State<ProfileTab> {
 /// card is the "Edit profile" control, so there is no separate button.
 class _IdentityCard extends StatelessWidget {
   const _IdentityCard({
+    super.key,
     required this.name,
     required this.email,
     required this.verified,
@@ -377,61 +324,62 @@ class _IdentityCard extends StatelessWidget {
 
   /// Null when nobody is signed in, so no verification state is shown.
   final bool? verified;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
 
     return Semantics(
-      button: true,
+      button: onTap != null,
+      onTap: onTap,
       excludeSemantics: true,
       label: [
-        'Edit profile',
+        if (onTap != null) 'Edit profile',
         name,
         ?email,
-        if (verified != null) verified! ? 'Email verified' : 'Email not verified',
+        if (verified != null)
+          verified! ? 'Email verified' : 'Email not verified',
       ].join(', '),
       child: AyreCard(
         onTap: onTap,
-        padding: const EdgeInsets.all(AppSpace.md),
+        padding: const EdgeInsets.all(AppSpace.s21),
+        strongShadow: true,
+        notch: true,
         child: Row(
           children: [
-            AyreAvatar(initials: initialsFor(name), size: 56, fontSize: 20),
-            const SizedBox(width: AppSpace.md),
+            AyreAvatar(
+              initials: initialsFor(name),
+              size: 55,
+              fontSize: 17,
+              square: true,
+            ),
+            const SizedBox(width: AppSpace.s13),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    name,
-                    style: AppTypo.cardTitle(t),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  Text(name, style: AppTypo.cardTitle(t)),
                   if (email != null) ...[
                     const SizedBox(height: AppSpace.xxs),
-                    Text(
-                      email!,
-                      style: AppTypo.caption(t),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    Text(email!, style: AppTypo.caption(t)),
                   ],
                   if (verified != null) ...[
-                    const SizedBox(height: AppSpace.xs),
+                    const SizedBox(height: AppSpace.s8),
                     AyreChip(
                       label: verified! ? 'Verified' : 'Unverified',
-                      tone: verified! ? ChipTone.brand : ChipTone.attention,
+                      tone: verified! ? ChipTone.success : ChipTone.attention,
                       glyph: verified! ? AyreGlyph.check : null,
                     ),
                   ],
                 ],
               ),
             ),
-            const SizedBox(width: AppSpace.sm),
-            AyreIcon(AyreGlyph.forward, size: 16, color: t.foregroundSubtle),
+            if (onTap != null) ...[
+              const SizedBox(width: AppSpace.s8),
+              AyreIcon(AyreGlyph.forward, size: 18, color: t.foregroundMuted),
+            ],
           ],
         ),
       ),
@@ -439,44 +387,29 @@ class _IdentityCard extends StatelessWidget {
   }
 }
 
-/// Destructive confirmation. Cancel is the visually primary action; Sign out
-/// carries the negative tone — the one place in the app where that colour
-/// means "this is destructive" rather than "the market went down", and it is
-/// confined to an explicit confirmation sheet for exactly that reason.
 class _SignOutSheet extends StatelessWidget {
   const _SignOutSheet();
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpace.lg,
-        AppSpace.xl,
-        AppSpace.lg,
-        AppSpace.xxl,
-      ),
+    return AyreSheet(
+      title: 'Sign out?',
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Sign out?', style: AppTypo.sectionTitle(t)),
-          const SizedBox(height: AppSpace.sm),
           Text(
-            'You will need your email and password to sign back in on this '
-            'device.',
-            style: AppTypo.body(t),
+            'You will need your email and password to sign back in on this device.',
+            style: AppTypo.reading(context.tokens),
           ),
-          const SizedBox(height: AppSpace.xl),
+          const SizedBox(height: AppSpace.s21),
           AyreButton(
             label: 'Cancel',
+            kind: AyreButtonKind.outline,
             onPressed: () => Navigator.of(context).pop(false),
           ),
-          const SizedBox(height: AppSpace.sm),
+          const SizedBox(height: AppSpace.s13),
           AyreButton(
             label: 'Sign out',
-            kind: AyreButtonKind.danger,
-            glyph: AyreGlyph.signOut,
             onPressed: () => Navigator.of(context).pop(true),
           ),
         ],

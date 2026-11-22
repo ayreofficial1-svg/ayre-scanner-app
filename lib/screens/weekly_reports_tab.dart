@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/market_models.dart';
-import '../widgets/ayre_components.dart';
+import '../theme/app_theme.dart';
+import '../widgets/ayre_masthead.dart';
 import '../widgets/ayre_tab_scroll.dart';
 import '../widgets/ayre_weekly_report.dart';
 import '../widgets/state_views.dart';
@@ -71,47 +72,59 @@ class _WeeklyReportsTabState extends State<WeeklyReportsTab> {
   }
 
   Future<void> _load() async {
-    final result = (await widget.marketData.getWeeklyReports())
-        .keepingLastGood(_result);
+    final incoming = await widget.marketData.getWeeklyReports();
     if (!mounted) return;
     setState(() {
-      _result = result;
+      final resolved = incoming.keepingLastGood(_result);
+      _result = incoming.isFailed && resolved.isReady
+          ? DataResult.ready(resolved.value, stale: true)
+          : resolved;
       _loading = false;
     });
-    // A5: no completion haptic after a refresh.
   }
 
   @override
   Widget build(BuildContext context) {
+    final result = _result;
+    final reports = result?.value;
+    if (reports != null && reports.isNotEmpty) {
+      return WeeklyReportCard(
+        reports: reports,
+        controller: widget.scrollController,
+        onRefresh: _load,
+        stale: result!.stale,
+      );
+    }
+
     return AyreTabScroll(
       controller: widget.scrollController,
       onRefresh: _load,
+      header: _loading
+          ? const AyreMastScaffold(
+              mast: WeeklyReportMast(hasSummary: true),
+              overlapChild: WeeklyReportSummarySkeleton(),
+            )
+          : const WeeklyReportMast(),
       children: [
-            SafeArea(bottom: false, child: _body()),
+        const SizedBox(height: AppSpace.s21),
+        if (_loading)
+          Semantics(
+            label: 'Loading weekly reports',
+            liveRegion: true,
+            child: const WeeklyReportSkeleton(),
+          )
+        else if (result?.isFailed == true)
+          StatePanel.failed(
+            headline: "Weekly report didn't load",
+            message: 'Pull down or try again in a moment.',
+            onRetry: _load,
+          )
+        else
+          const StatePanel.empty(
+            headline: 'No weekly reports yet',
+            message: 'Pull down to check again once a report is published.',
+          ),
       ],
     );
-  }
-
-  Widget _body() {
-    if (_loading) return const WeeklyReportSkeleton();
-
-    final result = _result!;
-    if (result.isFailed) {
-      return StatePanel.failed(
-        headline: "Weekly report didn't load",
-        message: 'Pull down or try again in a moment.',
-        onRetry: _load,
-      );
-    }
-
-    final reports = result.value;
-    if (result.isEmpty || reports == null || reports.isEmpty) {
-      return const StatePanel.empty(
-        headline: 'No weekly reports yet',
-        message: 'Pull down to check again once a report is published.',
-      );
-    }
-
-    return Entrance(child: WeeklyReportCard(reports: reports));
   }
 }

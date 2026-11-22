@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import 'ayre_components.dart' show ContentWidth;
 import 'ayre_icons.dart';
 import 'pressable_scale.dart';
 
@@ -19,6 +20,7 @@ class AyrePageHeader extends StatelessWidget {
     this.trailing,
     this.showBack = true,
     this.backLabel = 'Back',
+    this.backEnabled = true,
   });
 
   final String title;
@@ -28,6 +30,7 @@ class AyrePageHeader extends StatelessWidget {
   final Widget? trailing;
   final bool showBack;
   final String backLabel;
+  final bool backEnabled;
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +39,12 @@ class AyrePageHeader extends StatelessWidget {
     final gutter = AppSpace.gutterOf(context);
     final topPad = (55 - top) < AppSpace.s13 ? AppSpace.s13 : 55 - top;
 
+    final VoidCallback? back = !backEnabled
+        ? null
+        : onBack ??
+              () {
+                Navigator.maybePop(context);
+              };
     return Padding(
       padding: EdgeInsetsDirectional.fromSTEB(
         gutter,
@@ -50,9 +59,11 @@ class AyrePageHeader extends StatelessWidget {
             Semantics(
               button: true,
               label: backLabel,
+              onTap: back,
+              enabled: backEnabled,
               excludeSemantics: true,
               child: PressableScale(
-                onTap: onBack ?? () => Navigator.maybePop(context),
+                onTap: back,
                 borderRadius: AppRadius.control,
                 child: SizedBox(
                   width: AppSpace.minTarget,
@@ -70,7 +81,7 @@ class AyrePageHeader extends StatelessWidget {
                       child: AyreIcon(
                         AyreGlyph.back,
                         size: 20,
-                        color: t.textPrimary,
+                        color: backEnabled ? t.textPrimary : t.textDisabled,
                       ),
                     ),
                   ),
@@ -87,9 +98,56 @@ class AyrePageHeader extends StatelessWidget {
           ),
           if (trailing != null) ...[
             const SizedBox(width: AppSpace.s13),
-            trailing!,
+            Flexible(child: trailing!),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// A scrolling secondary route with a shared header and reading width.
+class AyrePageScaffold extends StatelessWidget {
+  const AyrePageScaffold({
+    super.key,
+    required this.title,
+    required this.children,
+    this.trailing,
+    this.backEnabled = true,
+  });
+
+  final String title;
+  final List<Widget> children;
+  final Widget? trailing;
+  final bool backEnabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final gutter = AppSpace.gutterOf(context);
+    return Scaffold(
+      backgroundColor: context.tokens.background,
+      body: SafeArea(
+        top: false,
+        child: ContentWidth(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            children: [
+              AyrePageHeader(
+                title: title,
+                trailing: trailing,
+                backEnabled: backEnabled,
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(gutter, 13, gutter, 34),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: children,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

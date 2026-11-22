@@ -56,8 +56,8 @@ class AyreBottomNav extends StatelessWidget {
     final media = MediaQuery.of(context);
     final highContrast = MediaQuery.highContrastOf(context);
 
-    final scale = media.textScaler.scale(100) / 100;
     final labelSize = AyreNavMetrics.labelSize;
+    final scale = media.textScaler.scale(labelSize) / labelSize;
     final inset = media.viewPadding.bottom;
     final barHeight = AyreNavMetrics.barHeightFor(
       textScale: scale,
@@ -70,9 +70,7 @@ class AyreBottomNav extends StatelessWidget {
         color: t.surface,
         borderRadius: AppShape.sheetTop,
         border: Border(
-          top: BorderSide(
-            color: highContrast ? t.foregroundMuted : t.hairline,
-          ),
+          top: BorderSide(color: highContrast ? t.foregroundMuted : t.hairline),
           left: BorderSide(color: t.hairline),
           right: BorderSide(color: t.hairline),
         ),
@@ -80,8 +78,9 @@ class AyreBottomNav extends StatelessWidget {
       child: SizedBox(
         height: barHeight,
         child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AyreNavMetrics.horizontalPadding,
+          padding: EdgeInsets.only(
+            left: AyreNavMetrics.horizontalPadding + media.viewPadding.left,
+            right: AyreNavMetrics.horizontalPadding + media.viewPadding.right,
           ),
           child: _DockItems(
             selectedIndex: selectedIndex,
@@ -103,10 +102,7 @@ class AyreBottomNav extends StatelessWidget {
               ? AyreNavMetrics.maxWidth
               : double.infinity,
         ),
-        child: ClipRRect(
-          borderRadius: AppShape.sheetTop,
-          child: surface,
-        ),
+        child: ClipRRect(borderRadius: AppShape.sheetTop, child: surface),
       ),
     );
   }
@@ -169,13 +165,11 @@ class _DockItems extends StatelessWidget {
                     ),
                 ],
               ),
-              AnimatedPositioned(
+              AnimatedPositionedDirectional(
                 duration: reduceMotion ? Duration.zero : AppMotion.navMarker,
                 curve: AppMotion.ease,
-                left: markerLeft,
-                // On the dock's top edge: the child area starts below the 1px
-                // border, so −1 puts the marker on the border row (y = 0).
-                top: -1,
+                start: markerLeft,
+                top: 0,
                 width: AyreNavMetrics.markerWidth,
                 height: AyreNavMetrics.markerHeight,
                 child: ExcludeSemantics(
@@ -243,40 +237,86 @@ class AyreNavRail extends StatelessWidget {
     final t = context.tokens;
     final media = MediaQuery.of(context);
     final labelSize = AyreNavMetrics.labelSize;
-    final scale = media.textScaler.scale(100) / 100;
+    final scale = media.textScaler.scale(labelSize) / labelSize;
+
+    final duration = media.disableAnimations
+        ? Duration.zero
+        : AppMotion.navMarker;
+    const gap = AppSpace.xxs;
+    const railTop = AppSpace.s13;
+    final itemHeight = math.max(
+      AyreNavMetrics.railItemMinHeight,
+      16 +
+          AyreNavMetrics.slotHeight +
+          AyreNavMetrics.labelGap +
+          AyreNavMetrics.labelLineFor(scale, labelSize),
+    );
+    final leftToRight = Directionality.of(context) == TextDirection.ltr;
+    final leadingInset = leftToRight ? media.padding.left : media.padding.right;
 
     return Container(
-      width: width,
+      width: width + leadingInset,
       decoration: BoxDecoration(
         color: t.surface,
-        border: Border(right: BorderSide(color: t.hairline)),
+        border: BorderDirectional(end: BorderSide(color: t.hairline)),
       ),
       child: SafeArea(
+        left: leftToRight,
+        right: !leftToRight,
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(vertical: AppSpace.s13),
           child: FocusTraversalGroup(
             policy: ReadingOrderTraversalPolicy(),
-            child: Column(
+            child: Stack(
               children: [
-                for (var i = 0; i < kNavDestinations.length; i++)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: AppSpace.xxs),
-                    child: _NavItem(
-                      key: navDestinationKey(kNavDestinations[i].label),
-                      index: i,
-                      destination: kNavDestinations[i],
-                      selected: i == selectedIndex,
-                      onTap: () => _handleTap(
-                        i,
-                        selectedIndex,
-                        onSelected,
-                        onReselected,
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: railTop),
+                  child: Column(
+                    children: [
+                      for (var i = 0; i < kNavDestinations.length; i++)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: gap),
+                          child: SizedBox(
+                            height: itemHeight,
+                            child: _NavItem(
+                              key: navDestinationKey(kNavDestinations[i].label),
+                              index: i,
+                              destination: kNavDestinations[i],
+                              selected: i == selectedIndex,
+                              onTap: () => _handleTap(
+                                i,
+                                selectedIndex,
+                                onSelected,
+                                onReselected,
+                              ),
+                              labelSize: labelSize,
+                              textScale: scale,
+                              vertical: true,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                AnimatedPositionedDirectional(
+                  duration: duration,
+                  curve: AppMotion.ease,
+                  start: 0,
+                  top:
+                      railTop +
+                      gap +
+                      8 +
+                      selectedIndex * (itemHeight + 2 * gap),
+                  width: AyreNavMetrics.markerHeight,
+                  height: AyreNavMetrics.slotHeight,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: t.notch,
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      labelSize: labelSize,
-                      textScale: scale,
-                      vertical: true,
                     ),
                   ),
+                ),
               ],
             ),
           ),
@@ -307,7 +347,7 @@ class _NavItem extends StatefulWidget {
   final double labelSize;
   final double textScale;
 
-  /// True in the rail: min height applies and a vertical marker is drawn.
+  /// True in the rail, where each destination is centred in its row.
   final bool vertical;
 
   @override
@@ -327,7 +367,7 @@ class _NavItemState extends State<_NavItem> {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final selected = widget.selected;
-    final color = selected ? t.accent : t.foregroundMuted;
+    final color = selected ? t.accentInk : t.foregroundMuted;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final label = widget.destination.label;
     const radius = BorderRadius.all(Radius.circular(AyreNavMetrics.slotRadius));
@@ -406,38 +446,7 @@ class _NavItemState extends State<_NavItem> {
     );
 
     if (widget.vertical) {
-      content = ConstrainedBox(
-        constraints: const BoxConstraints(
-          minHeight: AyreNavMetrics.railItemMinHeight,
-        ),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Positioned(
-              left: 0,
-              top: 8,
-              child: AnimatedOpacity(
-                duration: reduceMotion ? Duration.zero : AppMotion.navMarker,
-                opacity: selected ? 1 : 0,
-                child: Container(
-                  width: AyreNavMetrics.markerHeight,
-                  height: AyreNavMetrics.slotHeight,
-                  decoration: BoxDecoration(
-                    color: t.notch,
-                    borderRadius: const BorderRadius.horizontal(
-                      right: Radius.circular(2),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: content,
-            ),
-          ],
-        ),
-      );
+      content = Center(child: content);
     } else {
       content = Align(
         alignment: Alignment.topCenter,

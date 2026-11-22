@@ -1,8 +1,12 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
+import 'ayre_components.dart' show ContentWidth;
+import 'pressable_scale.dart';
+import 'responsive.dart';
 
 /// Which [MastPalette] a masthead uses.
 enum AyreMastTone {
@@ -32,7 +36,7 @@ extension AyreMastToneX on AyreMastTone {
 /// [height] is the reference mast height (233 tabs, 267 Home, 322 sign-in);
 /// the mast grows with the top safe inset and with [child] so text always
 /// stays above the diagonal. The first overlapping card should use
-/// [AyreMastScaffold] / [AyreMastOverlap] so it occupies real layout space.
+/// [AyreMastScaffold] so it occupies real layout space.
 class AyreMasthead extends StatelessWidget {
   const AyreMasthead({
     super.key,
@@ -42,6 +46,8 @@ class AyreMasthead extends StatelessWidget {
     this.palette,
     this.padding,
     this.overlap = 0,
+    this.contentBottomClearance,
+    this.constrainContent = false,
   });
 
   final AyreMastTone tone;
@@ -50,6 +56,10 @@ class AyreMasthead extends StatelessWidget {
   /// *paints* [overlap] below its layout box, so the card that follows
   /// occupies real layout space, stays hit-testable and paints over it.
   final double overlap;
+  final double? contentBottomClearance;
+
+  /// Aligns tab headings with their standard reading column.
+  final bool constrainContent;
 
   /// Reference height at 390 width, measured from the top of the window (the
   /// safe inset is *included*, not added on top).
@@ -72,7 +82,8 @@ class AyreMasthead extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final p = palette ?? tone.paletteOf(t);
-    final top = MediaQuery.paddingOf(context).top;
+    final safe = MediaQuery.paddingOf(context);
+    final top = safe.top;
     final gutter = AppSpace.gutterOf(context);
     // Never add a second 55 on top of the inset: reserve what is left of 55
     // after the inset, with at least 13 of air on tall cutouts.
@@ -84,22 +95,43 @@ class AyreMasthead extends StatelessWidget {
       style: TextStyle(color: p.ink),
       child: IconTheme.merge(
         data: IconThemeData(color: p.ink),
-        child: CustomPaint(
-          painter: _MastPainter(palette: p, overlap: overlap),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight:
-                  height -
-                  overlap +
-                  math.max(0, top - contentTop + AppSpace.s13),
-            ),
-            child: Padding(
-              padding: EdgeInsetsDirectional.only(
-                top: top,
-                // Keep content above the diagonal: it rises 55 at the right.
-                bottom: math.max(0, AppShape.mastDiagonal - overlap),
-              ).add(resolved),
-              child: child,
+        child: AnnotatedRegion<SystemUiOverlayStyle>(
+          value: AppTheme.overlayStyleOver(
+            p.fill,
+            Theme.of(context).brightness,
+          ),
+          child: CustomPaint(
+            painter: _MastPainter(palette: p, overlap: overlap),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight:
+                    height -
+                    overlap +
+                    math.max(0, top - contentTop + AppSpace.s13),
+              ),
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: safe.left,
+                  right: safe.right,
+                  top: top,
+                  // Keep content above the diagonal: it rises 55 at the right.
+                  bottom:
+                      contentBottomClearance ??
+                      math.max(0, AppShape.mastDiagonal - overlap),
+                ).add(resolved),
+                child: constrainContent
+                    ? Align(
+                        alignment: Alignment.topCenter,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth:
+                                AppBreakpoints.contentMaxWidth - 2 * gutter,
+                          ),
+                          child: SizedBox(width: double.infinity, child: child),
+                        ),
+                      )
+                    : child,
+              ),
             ),
           ),
         ),
@@ -159,7 +191,12 @@ class _MastPainter extends CustomPainter {
 /// Stack-only height, nothing clipped or overflowing) and stays tappable.
 /// Use as the first child of a scroll view with zero padding.
 class AyreMastScaffold extends StatelessWidget {
-  const AyreMastScaffold({super.key, required this.mast, this.overlapChild});
+  const AyreMastScaffold({
+    super.key,
+    required this.mast,
+    this.overlapChild,
+    this.maxWidth,
+  });
 
   /// An [AyreMasthead] built with `overlap: AppShape.mastOverlap` when
   /// [overlapChild] is set.
@@ -167,6 +204,7 @@ class AyreMastScaffold extends StatelessWidget {
 
   /// First card, laid out directly after the mast and painted over it.
   final Widget? overlapChild;
+  final double? maxWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -176,9 +214,16 @@ class AyreMastScaffold extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         mast,
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: gutter),
-          child: overlapChild,
+        SafeArea(
+          top: false,
+          bottom: false,
+          child: ContentWidth(
+            maxWidth: maxWidth,
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: gutter),
+              child: overlapChild,
+            ),
+          ),
         ),
       ],
     );
@@ -208,28 +253,34 @@ class MastIconButton extends StatelessWidget {
     final p = palette ?? tone.paletteOf(t);
     return Semantics(
       button: true,
+      enabled: onTap != null,
       label: semanticLabel,
+      onTap: onTap,
       excludeSemantics: true,
       child: Tooltip(
         message: semanticLabel,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
+        child: PressableScale(
+          shape: AppShape.field,
+          focusColor: p.ink,
           onTap: onTap,
-          child: SizedBox(
-            width: AppSpace.minTarget,
-            height: AppSpace.minTarget,
-            child: Center(
-              child: Container(
-                width: AppShape.iconTileSize,
-                height: AppShape.iconTileSize,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: p.glass,
-                  borderRadius: AppShape.field,
-                ),
-                child: IconTheme.merge(
-                  data: IconThemeData(color: p.ink),
-                  child: child,
+          child: Opacity(
+            opacity: onTap == null ? 0.45 : 1,
+            child: SizedBox(
+              width: AppSpace.minTarget,
+              height: AppSpace.minTarget,
+              child: Center(
+                child: Container(
+                  width: AppShape.iconTileSize,
+                  height: AppShape.iconTileSize,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: p.glass,
+                    borderRadius: AppShape.field,
+                  ),
+                  child: IconTheme.merge(
+                    data: IconThemeData(color: p.ink),
+                    child: child,
+                  ),
                 ),
               ),
             ),

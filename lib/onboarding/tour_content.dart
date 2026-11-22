@@ -106,7 +106,7 @@ List<AppTourStep> buildAppTourSteps() => [
     title: 'Alerts',
     body:
         'Opens your alerts: new recommendations, updates and exit calls. A '
-        'red dot means something is unread.',
+        'dot means something is unread.',
   ),
   AppTourStep(
     tab: 1,
@@ -154,7 +154,7 @@ const List<SettingsTourStep> kSettingsTourSteps = [
     target: TourKeys.settingsAccount,
     title: 'Account',
     body:
-        'Get an email link to change your password, or delete your '
+        'Enter your current password to set a new one, or delete your '
         'account. These options show only when you are signed in.',
     needsAccount: true,
   ),

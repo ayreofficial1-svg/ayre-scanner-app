@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'ayre_components.dart' show ContentWidth;
 import 'ayre_nav_metrics.dart';
+import 'ayre_tab_host.dart';
 
 /// The shared scroll frame of the five tabs: pull-to-refresh, a centred
 /// reading measure, theme-aware gutters and a bottom padding that always
-/// clears the floating dock (plan Phase 1, task 5; replaces the hard-coded
-/// `120` / `edgeOffset: 72` each tab used to carry).
+/// clears the dock and system insets.
 ///
 /// [controller] lets the shell scroll a tab to the top on a re-tap (A2).
 /// [onRefresh] may be null for a tab without pull-to-refresh.
@@ -47,7 +47,8 @@ class AyreTabScroll extends StatelessWidget {
   static double bottomPaddingOf(BuildContext context) =>
       math.max(
         MediaQuery.paddingOf(context).bottom,
-        AyreNavMetrics.clearanceOf(context),
+        AyreTabHost.maybeClearanceOf(context) ??
+            AyreNavMetrics.clearanceOf(context),
       ) +
       AppSpace.s21;
 
@@ -63,8 +64,9 @@ class AyreTabScroll extends StatelessWidget {
       0,
       bottomPaddingOf(context),
     );
-    final physics =
-        onRefresh == null ? null : const AlwaysScrollableScrollPhysics();
+    final physics = onRefresh == null
+        ? null
+        : const AlwaysScrollableScrollPhysics();
 
     // With a full-bleed header the reading measure applies per child, so the
     // mast still reaches both screen edges on wide windows.
@@ -73,7 +75,13 @@ class AyreTabScroll extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: gutter),
         child: child,
       );
-      return hasHeader ? ContentWidth(maxWidth: maxWidth, child: padded) : padded;
+      return hasHeader
+          ? SafeArea(
+              top: false,
+              bottom: false,
+              child: ContentWidth(maxWidth: maxWidth, child: padded),
+            )
+          : padded;
     }
 
     final Widget list = eager
@@ -83,20 +91,14 @@ class AyreTabScroll extends StatelessWidget {
             padding: padding,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ?header,
-                for (final c in children) gutterWrap(c),
-              ],
+              children: [?header, for (final c in children) gutterWrap(c)],
             ),
           )
         : ListView(
             controller: controller,
             physics: physics,
             padding: padding,
-            children: [
-              ?header,
-              for (final c in children) gutterWrap(c),
-            ],
+            children: [?header, for (final c in children) gutterWrap(c)],
           );
 
     final body = hasHeader

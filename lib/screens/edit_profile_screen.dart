@@ -4,8 +4,12 @@ import 'package:flutter/services.dart';
 import '../services/auth_service.dart';
 import '../services/auth_validators.dart';
 import '../theme/app_theme.dart';
+import '../widgets/auth_widgets.dart';
+import '../widgets/ayre_avatar.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
+import '../widgets/ayre_page_header.dart';
+import 'home_shell.dart' show initialsFor;
 
 /// A pushed route, not a tab. Cancel on the left, Save on the right, disabled
 /// until a field actually changes.
@@ -51,6 +55,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool get _valid => _problem == null;
 
   Future<void> _save() async {
+    if (_saving || !_dirty || !_valid) return;
     FocusScope.of(context).unfocus();
     setState(() {
       _saving = true;
@@ -74,94 +79,77 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final canSave = _dirty && _valid && !_saving;
+    final verified = AuthService.instance.currentUser?.emailVerified;
+    void save() {
+      HapticFeedback.mediumImpact();
+      _save();
+    }
 
-    return Scaffold(
-      backgroundColor: t.background,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: AyreIcon(AyreGlyph.close, size: 19, color: t.textPrimary),
-          onPressed: () => Navigator.of(context).maybePop(),
-          tooltip: 'Cancel',
-        ),
-        title: const Text('Edit profile'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: AppSpace.md),
-            child: TextButton(
-              onPressed: canSave
-                  ? () {
-                      HapticFeedback.mediumImpact();
-                      _save();
-                    }
-                  : null,
-              child: Text(
-                'Save',
-                style: AppTypo.button(
-                  t,
-                  color: canSave ? t.accentInk : t.textDisabled,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: ContentWidth(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpace.lg,
-            AppSpace.md,
-            AppSpace.lg,
-            AppSpace.xxl,
-          ),
+    return AyrePageScaffold(
+      title: 'Edit profile',
+      backEnabled: !_saving,
+      children: [
+        Row(
           children: [
-            const SectionLabel(label: 'Display name'),
-            TextField(
-              controller: _name,
-              textCapitalization: TextCapitalization.words,
-              textInputAction: TextInputAction.done,
-              style: AppTypo.bodyStrong(t),
-              decoration: InputDecoration(
-                hintText: 'How the app should address you',
-                errorText: _dirty && !_valid ? _problem : _saveError,
-              ),
-              onSubmitted: canSave ? (_) => _save() : null,
+            AyreAvatar(
+              initials: initialsFor(_initial),
+              size: 55,
+              fontSize: 17,
+              square: true,
             ),
-            if (widget.handle != null && widget.handle!.isNotEmpty) ...[
-              const SizedBox(height: AppSpace.xl),
-              const SectionLabel(label: 'Sign-in email'),
-              AyreCard(
-                // Sunken, not raised: this reads as a locked, inactive
-                // field, so it takes the same tonal fill a disabled text
-                // field would (InputDecorationTheme.fillColor) rather than
-                // a lifted tile.
-                color: t.surfaceSunken,
-                padding: const EdgeInsets.all(AppSpace.md),
-                child: Row(
-                  children: [
-                    AyreIcon(
-                      AyreGlyph.lock,
-                      size: 16,
-                      color: t.foregroundSubtle,
-                    ),
-                    const SizedBox(width: AppSpace.md),
-                    Expanded(
-                      child: Text(
-                        widget.handle!,
-                        style: AppTypo.bodyStrong(t, color: t.foregroundMuted),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSpace.sm),
-              Text(
-                'Your email identifies the account and cannot be changed here.',
-                style: AppTypo.caption(t),
-              ),
-            ],
+            const SizedBox(width: AppSpace.s13),
+            Expanded(child: Text(_initial, style: AppTypo.sectionTitle(t))),
           ],
         ),
-      ),
+        const SizedBox(height: AppSpace.s21),
+        AyreCard(
+          child: AuthField(
+            label: 'Display name',
+            controller: _name,
+            hint: 'How the app should address you',
+            enabled: !_saving,
+            textCapitalization: TextCapitalization.words,
+            textInputAction: TextInputAction.done,
+            errorText: _dirty && !_valid ? _problem : _saveError,
+            onSubmitted: canSave ? (_) => save() : null,
+          ),
+        ),
+        if (widget.handle case final email? when email.isNotEmpty) ...[
+          const SizedBox(height: AppSpace.s21),
+          RowGroup(
+            children: [
+              SettingRow(
+                glyph: AyreGlyph.lock,
+                title: 'Sign-in email',
+                subtitle: email,
+                trailing: verified == null
+                    ? null
+                    : AyreChip(
+                        label: verified ? 'Verified' : 'Unverified',
+                        tone: verified ? ChipTone.success : ChipTone.attention,
+                      ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.s8),
+          Text(
+            'Your email identifies the account and cannot be changed here.',
+            style: AppTypo.caption(t),
+          ),
+        ],
+        const SizedBox(height: AppSpace.s21),
+        AyreButton(
+          label: 'Save',
+          busy: _saving,
+          onPressed: canSave ? save : null,
+        ),
+        const SizedBox(height: AppSpace.s13),
+        AyreButton(
+          label: 'Cancel',
+          kind: AyreButtonKind.outline,
+          onPressed: _saving ? null : () => Navigator.of(context).maybePop(),
+        ),
+      ],
     );
   }
 }
