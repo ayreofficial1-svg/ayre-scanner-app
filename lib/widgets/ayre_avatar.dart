@@ -19,11 +19,20 @@ class AyreAvatar extends StatelessWidget {
     required this.initials,
     this.size = 44,
     this.fontSize = 14,
+    this.square = false,
+    this.home = false,
   });
 
   final String initials;
   final double size;
   final double fontSize;
+
+  /// Profile identity: a soft rounded square (radius 13, default size 55)
+  /// instead of the circle.
+  final bool square;
+
+  /// Home header control: circular ivory fill (`homeAvatarFill/Ink`).
+  final bool home;
 
   @override
   Widget build(BuildContext context) {
@@ -34,8 +43,13 @@ class AyreAvatar extends StatelessWidget {
       alignment: Alignment.center,
       padding: EdgeInsets.all(size * 0.14),
       decoration: BoxDecoration(
-        color: t.avatarFill,
-        shape: BoxShape.circle,
+        color: home
+            ? t.homeAvatarFill
+            : square
+            ? t.surfaceRaised
+            : t.avatarFill,
+        shape: square ? BoxShape.rectangle : BoxShape.circle,
+        borderRadius: square ? AppShape.field : null,
       ),
       // Scales the initials down rather than overflowing the circle at large
       // accessibility text sizes.
@@ -45,8 +59,12 @@ class AyreAvatar extends StatelessWidget {
           initials,
           style: AppTypo.ui(
             fontSize: fontSize,
-            fontWeight: FontWeight.w700,
-            color: t.avatarInk,
+            fontWeight: FontWeight.w800,
+            color: home
+                ? t.homeAvatarInk
+                : square
+                ? t.accentInk
+                : t.avatarInk,
           ),
         ),
       ),

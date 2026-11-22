@@ -298,8 +298,8 @@ class StatePanel extends StatelessWidget {
       container: true,
       child: AyreCard(
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? AppSpace.md : AppSpace.lg,
-        vertical: compact ? AppSpace.lg : AppSpace.xl,
+        horizontal: AppSpace.s21,
+        vertical: compact ? AppSpace.s21 : AppSpace.s34,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -318,7 +318,7 @@ class StatePanel extends StatelessWidget {
               color: tone,
             ),
           ),
-          SizedBox(height: compact ? AppSpace.md : AppSpace.lg),
+          SizedBox(height: AppSpace.s21),
           Text(
             headline,
             textAlign: TextAlign.center,

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// Press feedback for every tappable surface: a 0.97 scale with no overshoot
+/// Press feedback for every tappable surface: a subtle scale with no overshoot
 /// (suppressed under reduce-motion), a visible keyboard focus ring in
 /// `accentInk`, and a hover tint that only a pointer device can produce.
 ///
@@ -14,13 +14,17 @@ class PressableScale extends StatefulWidget {
     required this.child,
     this.onTap,
     this.borderRadius = AppRadius.card,
-    this.scale = 0.97,
+    this.shape,
+    this.scale = 0.985,
     this.hoverTint = true,
   });
 
   final Widget child;
   final VoidCallback? onTap;
   final double borderRadius;
+
+  /// An explicit (e.g. asymmetric) silhouette; overrides [borderRadius].
+  final BorderRadius? shape;
   final double scale;
   final bool hoverTint;
 
@@ -45,7 +49,7 @@ class _PressableScaleState extends State<PressableScale> {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final radius = BorderRadius.circular(widget.borderRadius);
+    final radius = widget.shape ?? BorderRadius.circular(widget.borderRadius);
     final enabled = widget.onTap != null;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
@@ -57,13 +61,13 @@ class _PressableScaleState extends State<PressableScale> {
 
     return AnimatedScale(
       scale: (_pressed && !reduceMotion) ? widget.scale : 1,
-      duration: reduceMotion ? Duration.zero : AppMotion.fast,
+      duration: reduceMotion ? Duration.zero : AppMotion.buttonPress,
       curve: AppMotion.ease,
       child: Container(
         foregroundDecoration: showRing
             ? BoxDecoration(
                 borderRadius: radius,
-                border: Border.all(color: t.accentInk, width: 2),
+                border: Border.all(color: t.focusRing, width: 2),
               )
             : null,
         child: Material(

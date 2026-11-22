@@ -2,6 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'finance_icons.dart';
+
 /// Ayre's icon vocabulary — drawn for this identity rather than pulled from a
 /// stock library, because a mixed-provenance icon set is one of the clearest
 /// tells of a templated app.
@@ -136,8 +138,47 @@ class AyreIcon extends StatelessWidget {
     return filled ? 2.1 : 1.7;
   }
 
+  /// Glyphs that now render through the supplied [FinanceIcon] vocabulary
+  /// (Phase 2 compatibility adapter). `filled` is ignored for these: selection
+  /// is colour plus marker, never a solid variant. Every other glyph keeps its
+  /// original outline drawing (documented gaps: close, copy, search, sort,
+  /// filter, signOut, status and market glyphs).
+  static const Map<AyreGlyph, FinanceGlyph> financeMap = {
+    AyreGlyph.home: FinanceGlyph.home,
+    AyreGlyph.report: FinanceGlyph.reports,
+    AyreGlyph.learn: FinanceGlyph.learn,
+    AyreGlyph.course: FinanceGlyph.learn,
+    AyreGlyph.profile: FinanceGlyph.profile,
+    AyreGlyph.account: FinanceGlyph.profile,
+    AyreGlyph.bell: FinanceGlyph.bell,
+    AyreGlyph.alerts: FinanceGlyph.bell,
+    AyreGlyph.moon: FinanceGlyph.moon,
+    AyreGlyph.sun: FinanceGlyph.sun,
+    AyreGlyph.forward: FinanceGlyph.chevron,
+    AyreGlyph.back: FinanceGlyph.back,
+    AyreGlyph.support: FinanceGlyph.help,
+    AyreGlyph.about: FinanceGlyph.info,
+    AyreGlyph.signals: FinanceGlyph.pulse,
+    AyreGlyph.insights: FinanceGlyph.pulse,
+    AyreGlyph.lock: FinanceGlyph.lock,
+    AyreGlyph.refresh: FinanceGlyph.refresh,
+    AyreGlyph.trendUp: FinanceGlyph.trend,
+    AyreGlyph.check: FinanceGlyph.check,
+    AyreGlyph.edit: FinanceGlyph.edit,
+  };
+
   @override
   Widget build(BuildContext context) {
+    final mapped = financeMap[glyph];
+    if (mapped != null) {
+      return FinanceIcon(
+        mapped,
+        size: size,
+        color: color,
+        strokeWidth: strokeWidth ?? navStroke,
+        semanticLabel: semanticLabel,
+      );
+    }
     final resolved =
         color ?? IconTheme.of(context).color ?? const Color(0xFF000000);
     final icon = SizedBox(

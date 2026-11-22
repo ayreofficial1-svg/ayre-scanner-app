@@ -6,8 +6,10 @@ import '../theme/app_theme.dart';
 /// can fall back to the UI face for a price. It always uses the ticker face with
 /// tabular figures.
 ///
-/// When the value changes, **only the digits that actually changed** roll to
-/// their new character — an unchanged rupee-lakh digit doesn't twitch because
+/// Rolling digits are off by default (the redesign counts up once via
+/// [CountUpFigure] and otherwise changes calmly); pass `roll: true` to opt in.
+/// When enabled and the value changes, **only the digits that actually
+/// changed** roll to their new character — an unchanged rupee-lakh digit doesn't twitch because
 /// the paise moved. Skipped on first build and under reduced motion.
 class Figure extends StatefulWidget {
   const Figure(
@@ -16,7 +18,7 @@ class Figure extends StatefulWidget {
     this.fontSize = 14,
     this.fontWeight = FontWeight.w500,
     this.color,
-    this.roll = true,
+    this.roll = false,
     this.semanticsLabel,
     this.textAlign = TextAlign.left,
   });

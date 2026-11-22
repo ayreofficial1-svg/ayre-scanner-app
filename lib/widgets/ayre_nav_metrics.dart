@@ -6,80 +6,87 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'responsive.dart';
 
-/// Shared geometry for the floating bottom dock and the navigation rail
-/// (plan §3.3). Everything that needs to know how much room the dock takes —
-/// the nav itself, scrolling tabs, detail screens — reads it from here so the
-/// numbers cannot drift.
+/// Single source of truth for the bottom dock and the navigation rail
+/// geometry (reference: full-width dock, 89 logical px at the 390×844 board).
+/// The nav itself, scrolling tabs and pushed detail screens all read their
+/// clearance from here so the numbers cannot drift.
 abstract final class AyreNavMetrics {
-  /// Dock horizontal margin for viewports ≥ [narrowViewport].
-  static const double margin = 16;
+  /// Reference dock height at baseline (no inset, default text scale).
+  static const double minHeight = 89;
 
-  /// Dock horizontal margin below [narrowViewport].
-  static const double marginNarrow = 12;
+  /// Padding above the destinations (reference 13).
+  static const double topPadding = 13;
 
-  /// Viewport width below which [marginNarrow] applies.
-  static const double narrowViewport = 360;
+  /// Smallest breathing room kept under the label (89 − 13 − 34 − 5 − label).
+  static const double minBottomPadding = 24;
 
-  /// Gap between the dock and the bottom safe-area inset.
-  static const double bottomGap = 12;
+  /// Extra air kept between the system inset and the label when an inset
+  /// exists.
+  static const double insetAir = 8;
+
+  /// Dock horizontal padding.
+  static const double horizontalPadding = 8;
+
+  /// Transparent icon slot per destination (55×34, radius 13).
+  static const double slotWidth = 55;
+  static const double slotHeight = 34;
+  static const double slotRadius = 13;
+
+  /// Outline icon size inside the slot.
+  static const double glyphSize = 22;
+
+  /// Gap between slot and label.
+  static const double labelGap = 5;
+
+  /// Saffron marker: 34×4 on the dock's top edge, skewed −24°.
+  static const double markerWidth = 34;
+  static const double markerHeight = 4;
+  static const double markerSkewDegrees = -24;
 
   /// Widest the dock gets before it centres ([AppBreakpoints.dockMaxWidth]).
   static const double maxWidth = AppBreakpoints.dockMaxWidth;
-
-  /// Minimum dock height.
-  static const double minHeight = 68;
-
-  /// Selected-state indicator capsule.
-  static const double capsuleWidth = 56;
-  static const double capsuleHeight = 32;
-  static const double glyphSize = 24;
-
-  /// Gap between capsule and label.
-  static const double labelGap = 4;
-
-  /// Vertical padding above the capsule and below the label.
-  static const double verticalPadding = 8;
 
   /// Label text scale is capped here (single-word labels in a fixed-width
   /// slot); beyond it a `FittedBox(scaleDown)` is the last resort.
   static const double labelScaleCap = 1.3;
 
-  /// Navigation rail width.
+  /// Navigation rail width and minimum item height.
   static const double railWidth = 80;
-
-  /// Minimum rail item height.
   static const double railItemMinHeight = 64;
 
-  /// Label size: 11 on iOS/macOS (Apple's minimum), 12 elsewhere.
-  static double labelSizeFor(TargetPlatform platform) => switch (platform) {
-    TargetPlatform.iOS ||
-    TargetPlatform.macOS => AppTextScale.navLabelApple,
-    _ => AppTextScale.navLabel,
-  };
+  /// Dock label size: 11/700 on every platform.
+  static double labelSizeFor(TargetPlatform platform) => AppTextScale.navLabel;
 
   static double get labelSize => labelSizeFor(defaultTargetPlatform);
-
-  static double marginFor(double viewportWidth) =>
-      viewportWidth < narrowViewport ? marginNarrow : margin;
 
   /// True when the rail replaces the dock (at/above the two-column pivot).
   static bool usesRail(double viewportWidth) =>
       viewportWidth >= AppBreakpoints.twoColumn;
 
-  /// Height of the dock's content-driven bar for a given OS/app text scale.
+  static double labelLineFor(double textScale, double labelSize) =>
+      labelSize * math.min(textScale, labelScaleCap) * 1.15;
+
+  /// Space under the label: the reference breathing room, or the system inset
+  /// plus a little air, whichever is larger. The inset is counted once.
+  static double bottomPaddingFor(double bottomInset) =>
+      math.max(minBottomPadding, bottomInset + insetAir);
+
+  /// Height of the dock including the bottom safe-area inset.
   static double barHeightFor({
     required double textScale,
     required double labelSize,
+    double bottomInset = 0,
   }) {
-    final labelLine = labelSize * math.min(textScale, labelScaleCap) * 1.15;
-    return math.max(
-      minHeight,
-      verticalPadding + capsuleHeight + labelGap + labelLine + verticalPadding,
-    );
+    final content =
+        topPadding +
+        slotHeight +
+        labelGap +
+        labelLineFor(textScale, labelSize) +
+        bottomPaddingFor(bottomInset);
+    return math.max(minHeight, content);
   }
 
-  /// Pure clearance calculation: bar height + bottom gap + safe inset, or 0
-  /// when a rail is shown.
+  /// Pure clearance: the full dock height (inset included), or 0 with a rail.
   static double clearanceFor({
     required double viewportWidth,
     required double bottomInset,
@@ -87,9 +94,11 @@ abstract final class AyreNavMetrics {
     required double labelSize,
   }) {
     if (usesRail(viewportWidth)) return 0;
-    return barHeightFor(textScale: textScale, labelSize: labelSize) +
-        bottomGap +
-        bottomInset;
+    return barHeightFor(
+      textScale: textScale,
+      labelSize: labelSize,
+      bottomInset: bottomInset,
+    );
   }
 
   /// Space a scrolling body must leave at its end so the last row clears the

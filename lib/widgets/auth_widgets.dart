@@ -4,6 +4,7 @@ import '../services/auth_validators.dart';
 import '../theme/app_theme.dart';
 import 'ayre_components.dart';
 import 'ayre_icons.dart';
+import 'finance_icons.dart';
 
 /// A labelled text field for the sign-in flow. Password fields are obscured by
 /// default with a show/hide toggle, and never autocorrect.
@@ -70,10 +71,8 @@ class _AuthFieldState extends State<AuthField> {
             suffixIcon: widget.password
                 ? IconButton(
                     tooltip: _hidden ? 'Show password' : 'Hide password',
-                    icon: Icon(
-                      _hidden
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
+                    icon: FinanceIcon(
+                      _hidden ? FinanceGlyph.eye : FinanceGlyph.eyeOff,
                       size: 20,
                       color: t.foregroundMuted,
                     ),

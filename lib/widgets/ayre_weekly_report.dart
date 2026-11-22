@@ -5,6 +5,7 @@ import '../services/market_models.dart';
 import '../theme/app_theme.dart';
 import 'ayre_components.dart';
 import 'ayre_icons.dart';
+import 'finance_icons.dart';
 import 'ayre_instrument_tile.dart';
 import 'ayre_sheet.dart';
 import 'figure.dart';
@@ -212,7 +213,12 @@ class _WeekHeader extends StatelessWidget {
             ),
             if (multiple) ...[
               const SizedBox(width: 2),
-              Icon(Icons.expand_more_rounded, size: 18, color: t.accentInk),
+              FinanceIcon(
+                FinanceGlyph.chevron,
+                size: 18,
+                color: t.accentInk,
+                quarterTurns: 1,
+              ),
             ],
           ],
         ),

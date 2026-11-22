@@ -36,7 +36,7 @@ class AyreInstrumentTile extends StatefulWidget {
 
   /// The tile's default edge length. Public so a list can size its divider
   /// indent from the same number (`RowGroup.indent`).
-  static const double defaultSize = 40;
+  static const double defaultSize = AppShape.iconTileSize;
 
   final String symbol;
   final double size;
@@ -210,8 +210,8 @@ class _Monogram extends StatelessWidget {
           AyreInstrumentTile.monogram(symbol),
           style: AppTypo.ui(
             fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: t.foregroundMuted,
+            fontWeight: FontWeight.w800,
+            color: t.textPrimary,
             letterSpacing: 0.2,
           ),
         ),

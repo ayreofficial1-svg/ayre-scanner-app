@@ -5,20 +5,20 @@ import 'package:flutter/services.dart';
 
 import '../theme/app_theme.dart';
 import 'ayre_icons.dart';
+import 'finance_icons.dart';
 import 'ayre_sheet.dart';
 import 'figure.dart';
 import 'pressable_scale.dart';
 import 'responsive.dart';
-import 'spring.dart';
 
-/// The app's card material: `surface` fill, 18px radius, 1px hairline.
+/// The app's card material: `surface` fill, 1px opaque line and the
+/// asymmetric silhouette (TL 8, TR/BR/BL 26).
 ///
-/// Elevation follows the ladder in `AppElevation` (D-3): a card is **flat**
-/// (hairline only) by default and gains one soft shadow — light theme only;
-/// dark uses tone, not shadow — when it is tappable ([onTap] set) or marked
-/// [featured]. Never nested — a card inside a card is always a
-/// hairline-divided row group ([RowGroup]) or a sunken/raised tonal fill
-/// ([InkPanel]) instead.
+/// Cards are **flat** by default. A shadow is reserved for the explicitly
+/// raised hero surfaces ([featured]; [strongShadow] for the report summary /
+/// profile identity). The saffron [notch] is opt-in. Never nested — a card
+/// inside a card is a hairline-divided row group ([RowGroup]) or a soft inset
+/// ([InkPanel]).
 class AyreCard extends StatelessWidget {
   const AyreCard({
     super.key,
@@ -26,11 +26,13 @@ class AyreCard extends StatelessWidget {
     this.padding = const EdgeInsets.all(AppSpace.cardPadding),
     this.color,
     this.borderColor,
-    this.radius = AppRadius.card,
+    this.radius,
     this.onTap,
     this.accentEdge = false,
     this.accentColor,
     this.featured = false,
+    this.strongShadow = false,
+    this.notch = false,
     this.clip,
   });
 
@@ -38,36 +40,48 @@ class AyreCard extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   final Color? color;
   final Color? borderColor;
-  final double radius;
+
+  /// Overrides the asymmetric [AppShape.card] with a uniform radius.
+  final double? radius;
   final VoidCallback? onTap;
 
-  /// An accent-tinted border (§8.4) marking a featured card — emphasis comes
-  /// from the tinted edge itself, never a solid tint fill behind the card.
-  /// Renders as a 1.5px full-perimeter accent-toned border, not a leading-edge
-  /// bar.
+  /// An accent-tinted 1.5px border marking a featured card.
   final bool accentEdge;
   final Color? accentColor;
 
-  /// Opts a non-tappable card into the `raised` elevation step.
+  /// Opts the card into the reference raised shadow.
   final bool featured;
 
-  /// Whether the content is clipped to the card's rounded corners. Null (the
-  /// default) clips only when [padding] is zero — i.e. when content can reach
-  /// the corners (row groups, art, gradients). Padded cards cannot overflow
-  /// the radius, so they skip the extra clip layer.
+  /// The slightly stronger (.13) raised shadow.
+  final bool strongShadow;
+
+  /// Draws the saffron notch on the top edge (21 from the left, 21×5).
+  final bool notch;
+
+  /// Whether the content is clipped to the card's corners. Null (default)
+  /// clips only when [padding] is zero.
   final bool? clip;
+
+  static BorderRadius _inner(BorderRadius r) => BorderRadius.only(
+    topLeft: Radius.circular((r.topLeft.x - 1).clamp(0, 999)),
+    topRight: Radius.circular((r.topRight.x - 1).clamp(0, 999)),
+    bottomRight: Radius.circular((r.bottomRight.x - 1).clamp(0, 999)),
+    bottomLeft: Radius.circular((r.bottomLeft.x - 1).clamp(0, 999)),
+  );
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final borderRadius = BorderRadius.circular(radius);
+    final borderRadius = radius == null
+        ? AppShape.card
+        : BorderRadius.circular(radius!);
     final edgeColor = accentColor ?? t.accent;
-    final raised = onTap != null || featured;
+    final brightness = Theme.of(context).brightness;
     final shouldClip = clip ?? (padding == EdgeInsets.zero);
 
     final padded = Padding(padding: padding, child: child);
 
-    final card = DecoratedBox(
+    Widget card = DecoratedBox(
       decoration: BoxDecoration(
         color: color ?? t.surface,
         borderRadius: borderRadius,
@@ -77,20 +91,42 @@ class AyreCard extends StatelessWidget {
               : (borderColor ?? t.hairline),
           width: accentEdge ? 1.5 : 1,
         ),
-        boxShadow: raised
-            ? AppElevation.raised(t, Theme.of(context).brightness)
+        boxShadow: strongShadow
+            ? AppElevation.raisedStrong(t, brightness)
+            : featured
+            ? AppElevation.raised(t, brightness)
             : AppElevation.flat,
       ),
       child: shouldClip
-          ? ClipRRect(
-              borderRadius: BorderRadius.circular(radius - 1),
-              child: padded,
-            )
+          ? ClipRRect(borderRadius: _inner(borderRadius), child: padded)
           : padded,
     );
 
+    if (notch) {
+      card = Stack(
+        clipBehavior: Clip.none,
+        children: [
+          card,
+          Positioned(
+            left: AppShape.notchInset,
+            top: AppShape.notchOffsetY,
+            width: AppShape.notchWidth,
+            height: AppShape.notchHeight,
+            child: ExcludeSemantics(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: t.notch,
+                  borderRadius: AppShape.notch,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     if (onTap == null) return card;
-    return PressableScale(onTap: onTap, borderRadius: radius, child: card);
+    return PressableScale(onTap: onTap, shape: borderRadius, child: card);
   }
 }
 
@@ -154,13 +190,18 @@ class SectionLabel extends StatelessWidget {
     this.trailing,
     this.subtitle,
     this.info,
-    this.padding = const EdgeInsets.only(bottom: AppSpace.sm),
+    this.eyebrow = false,
+    this.padding = const EdgeInsets.only(bottom: AppSpace.sectionLabelBelow),
   });
 
   final String label;
   final Widget? trailing;
   final String? subtitle;
   final String? info;
+
+  /// The 11/800 tracked uppercase group label instead of the 21/800 section
+  /// title.
+  final bool eyebrow;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -170,8 +211,8 @@ class SectionLabel extends StatelessWidget {
     final heading = Semantics(
       header: true,
       child: Text(
-        label,
-        style: AppTypo.sectionHeading(t),
+        eyebrow ? label.toUpperCase() : label,
+        style: eyebrow ? AppTypo.label(t) : AppTypo.sectionTitle(t),
         maxLines: 2,
         overflow: TextOverflow.ellipsis,
       ),
@@ -252,7 +293,7 @@ class SectionInfoButton extends StatelessWidget {
   /// The explanation shown in the sheet.
   final String message;
 
-  static const double _glyphSize = 16;
+  static const double _glyphSize = 20;
 
   void _open(BuildContext context) {
     HapticFeedback.selectionClick();
@@ -271,53 +312,22 @@ class SectionInfoButton extends StatelessWidget {
       excludeSemantics: true,
       child: PressableScale(
         onTap: () => _open(context),
-        borderRadius: AppRadius.pill,
+        borderRadius: AppRadius.control,
         scale: 0.92,
         child: SizedBox(
           width: AppSpace.minTarget,
           height: AppSpace.minTarget,
           child: Center(
-            child: CustomPaint(
-              size: const Size.square(_glyphSize),
-              painter: _InfoGlyphPainter(color: t.foregroundMuted),
+            child: FinanceIcon(
+              FinanceGlyph.info,
+              size: _glyphSize,
+              color: t.foregroundMuted,
             ),
           ),
         ),
       ),
     );
   }
-}
-
-/// Paints the "i" glyph: a thin circle with a dot above a short stem.
-class _InfoGlyphPainter extends CustomPainter {
-  const _InfoGlyphPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final stroke = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.3
-      ..strokeCap = StrokeCap.round;
-    final fill = Paint()
-      ..color = color
-      ..style = PaintingStyle.fill;
-
-    final centre = Offset(size.width / 2, size.height / 2);
-    canvas.drawCircle(centre, size.width / 2 - 0.6, stroke);
-    canvas.drawCircle(Offset(centre.dx, size.height * 0.31), 0.9, fill);
-    canvas.drawLine(
-      Offset(centre.dx, size.height * 0.46),
-      Offset(centre.dx, size.height * 0.72),
-      stroke,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_InfoGlyphPainter oldDelegate) =>
-      oldDelegate.color != color;
 }
 
 /// The sheet opened by [SectionInfoButton]: an [AyreSheet] with the
@@ -396,11 +406,10 @@ class HairlineDivider extends StatelessWidget {
 
 enum AyreButtonKind { primary, outline, danger }
 
-/// A fully-rounded pill. Primary is a solid accent fill with `onAccent`
-/// content: ivory on deep green in light, deep green on ivory in dark (11.15:1
-/// in both). Outline is a stronger hairline edge with `accentInk` content.
-/// Danger is a transparent pill with `negativeText` content (>= 4.5:1 on every
-/// surface). Never saffron.
+/// The reference button: 55 minimum height, TL 8 / others 28 silhouette,
+/// 15/800 label. Primary is a solid brand fill with `onAccent` content;
+/// outline is a 1.5px ink edge with ink content; danger is a transparent
+/// button with `negativeText` content and a negative edge. Never saffron.
 class AyreButton extends StatelessWidget {
   const AyreButton({
     super.key,
@@ -424,17 +433,19 @@ class AyreButton extends StatelessWidget {
     final t = context.tokens;
     final enabled = onPressed != null && !busy;
 
-    final (Color bg, Color fg, Color edge) = switch (kind) {
-      AyreButtonKind.primary => (t.accent, t.onAccent, t.accent),
+    final (Color bg, Color fg, Color edge, double edgeWidth) = switch (kind) {
+      AyreButtonKind.primary => (t.accent, t.onAccent, t.accent, 1.0),
       AyreButtonKind.outline => (
         AppTheme.transparent,
-        t.accentInk,
-        t.navHairline,
+        t.textPrimary,
+        t.textPrimary,
+        1.5,
       ),
       AyreButtonKind.danger => (
         AppTheme.transparent,
         t.negativeText,
-        t.negative.withValues(alpha: 0.5),
+        t.negative.withValues(alpha: 0.6),
+        1.5,
       ),
     };
 
@@ -442,26 +453,19 @@ class AyreButton extends StatelessWidget {
       opacity: enabled ? 1 : 0.45,
       child: PressableScale(
         onTap: enabled ? onPressed : null,
-        borderRadius: AppRadius.button,
+        shape: AppShape.button,
+        scale: 0.985,
         child: Container(
           width: expand ? double.infinity : null,
-          // Phase 1D (HIG alignment): was a hardcoded 46 — below the app's
-          // own AppSpace.minTarget (48) that every other tappable row
-          // already enforces (_RefreshDot, OfflineBanner's dismiss target).
-          // Still above Apple's 44pt floor
-          // either way; raised for internal consistency, not compliance.
-          constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
+          constraints: const BoxConstraints(minHeight: AppShape.controlHeight),
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpace.lg,
+            horizontal: AppSpace.s21,
             vertical: AppSpace.md,
           ),
           decoration: BoxDecoration(
             color: bg,
-            borderRadius: BorderRadius.circular(AppRadius.button),
-            // Primary's edge matches its fill (deep green on ivory, ivory on
-            // green: both read as a distinct shape on their own); outline and
-            // danger carry their definition in the edge.
-            border: Border.all(color: edge),
+            borderRadius: AppShape.button,
+            border: Border.all(color: edge, width: edgeWidth),
           ),
           child: Row(
             mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
@@ -469,20 +473,20 @@ class AyreButton extends StatelessWidget {
             children: [
               if (busy)
                 SizedBox(
-                  height: 15,
-                  width: 15,
-                  child: CircularProgressIndicator(strokeWidth: 1.6, color: fg),
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: fg),
                 )
               else ...[
                 if (glyph != null) ...[
-                  AyreIcon(glyph!, size: 16, color: fg),
+                  AyreIcon(glyph!, size: 18, color: fg),
                   const SizedBox(width: AppSpace.sm),
                 ],
                 Flexible(
                   child: Text(
                     label,
                     style: AppTypo.button(t, color: fg),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
                   ),
@@ -498,13 +502,10 @@ class AyreButton extends StatelessWidget {
 
 // ─── Switch ────────────────────────────────────────────────────────────────
 
-/// A flat switch. "On" is the brand accent, deliberately never [positive] — a
-/// toggle turning on must never be visually confusable with a security going
-/// up. The knob's slide is driven by the Spec's toggle spring
-/// ([AppSpring.toggleKnob], numerically checked in `spring.dart`) via
-/// [SpringValue] rather than a plain eased tween — this is the one place in
-/// this file a spring actually drives motion, per plan §7 open decision #2's
-/// sibling guidance that springs are reserved for nav/segmented/toggle only.
+/// The reference switch: 44×26 track (radius 13), 20 thumb, 3 inset. "On" is
+/// the brand accent, deliberately never [positive]. The thumb glides on the
+/// calm 150ms ease (no spring, no overshoot); the visual track stays 44×26
+/// while the interactive area is the full 48 minimum target.
 class AyreSwitch extends StatefulWidget {
   const AyreSwitch({
     super.key,
@@ -516,11 +517,6 @@ class AyreSwitch extends StatefulWidget {
   final bool value;
   final ValueChanged<bool>? onChanged;
   final String? semanticLabel;
-
-  static const double _w = 44;
-  static const double _h = 24;
-  static const double _knob = 18;
-  static const double _travel = _w - _knob - 2 * 3; // track minus padding
 
   @override
   State<AyreSwitch> createState() => _AyreSwitchState();
@@ -534,10 +530,10 @@ class _AyreSwitchState extends State<AyreSwitch> {
     final t = context.tokens;
     final enabled = widget.onChanged != null;
     final value = widget.value;
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : AppMotion.buttonPress;
 
-    // The visual track stays 44x24; the interactive area is the full 48x48
-    // minimum target, with a keyboard focus ring around the track.
     return Semantics(
       label: widget.semanticLabel,
       toggled: value,
@@ -557,7 +553,7 @@ class _AyreSwitchState extends State<AyreSwitch> {
           behavior: HitTestBehavior.opaque,
           onTap: enabled ? () => widget.onChanged!(!value) : null,
           child: SizedBox(
-            width: AppSpace.minTarget + 4,
+            width: AppShape.switchWidth + 8,
             height: AppSpace.minTarget,
             child: Center(
               child: Opacity(
@@ -568,45 +564,36 @@ class _AyreSwitchState extends State<AyreSwitch> {
                           borderRadius: BorderRadius.circular(
                             AppRadius.chip + 3,
                           ),
-                          border: Border.all(color: t.accentInk, width: 2),
+                          border: Border.all(color: t.focusRing, width: 2),
                         )
                       : null,
                   child: AnimatedContainer(
-                    duration: reduceMotion ? Duration.zero : AppMotion.buttonPress,
+                    duration: duration,
                     curve: AppMotion.ease,
-                    width: AyreSwitch._w,
-                    height: AyreSwitch._h,
-                    padding: const EdgeInsets.all(3),
+                    width: AppShape.switchWidth,
+                    height: AppShape.switchHeight,
+                    padding: const EdgeInsets.all(AppShape.switchInset),
                     decoration: BoxDecoration(
-                      color: value ? t.accent : t.surfaceSunken,
+                      color: value ? t.accent : t.surfaceRaised,
                       borderRadius: BorderRadius.circular(AppRadius.chip),
                       border: Border.all(
-                        color: value
-                            ? t.accent.withValues(alpha: 0.9)
-                            : t.hairline,
+                        color: value ? t.accent : t.hairline,
                       ),
                     ),
-                    child: SpringValue(
-                      value: value ? AyreSwitch._travel : 0,
-                      spring: AppSpring.toggleKnob,
-                      builder: (context, dx, child) => Transform.translate(
-                        offset: Offset(dx, 0),
-                        child: child,
-                      ),
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: Container(
-                          width: AyreSwitch._knob,
-                          height: AyreSwitch._knob,
-                          decoration: BoxDecoration(
-                            // Off-knob is `foregroundMuted`, not
-                            // `foregroundSubtle`: on the `surfaceSunken`
-                            // off-track the subtle tone measures 2.54:1 in
-                            // light (under the 3:1 non-text floor); muted
-                            // measures 4.68:1 light / 8.6:1 dark.
-                            color: value ? t.onAccent : t.foregroundMuted,
-                            shape: BoxShape.circle,
-                          ),
+                    child: AnimatedAlign(
+                      duration: duration,
+                      curve: AppMotion.ease,
+                      alignment: value
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                      child: Container(
+                        width: AppShape.switchThumb,
+                        height: AppShape.switchThumb,
+                        decoration: BoxDecoration(
+                          // Off thumb is `foregroundMuted` (≥3:1 on the soft
+                          // off-track in both themes).
+                          color: value ? t.onAccent : t.foregroundMuted,
+                          shape: BoxShape.circle,
                         ),
                       ),
                     ),
@@ -651,11 +638,10 @@ class AyreSegmented<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return Container(
-      padding: const EdgeInsets.all(2),
+      padding: const EdgeInsets.all(3),
       decoration: BoxDecoration(
-        color: t.surfaceSunken,
-        borderRadius: BorderRadius.circular(AppRadius.control),
-        border: Border.all(color: t.hairline),
+        color: t.surfaceRaised,
+        borderRadius: AppShape.field,
       ),
       child: Row(
         children: [
@@ -707,7 +693,7 @@ class _Segment<T> extends StatelessWidget {
       label: segment.label,
       child: PressableScale(
         onTap: onTap,
-        borderRadius: AppRadius.control,
+        shape: AppShape.segmentSelected,
         child: AnimatedContainer(
           duration: MediaQuery.disableAnimationsOf(context)
               ? Duration.zero
@@ -718,25 +704,25 @@ class _Segment<T> extends StatelessWidget {
           constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
           alignment: Alignment.center,
           padding: EdgeInsets.symmetric(
-            vertical: compact ? AppSpace.xs : AppSpace.sm,
+            vertical: compact ? AppSpace.xs : 10,
             horizontal: AppSpace.sm,
           ),
           decoration: BoxDecoration(
             color: selected ? t.accent : AppTheme.transparent,
-            borderRadius: BorderRadius.circular(AppRadius.control),
+            borderRadius: AppShape.segmentSelected,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (segment.glyph != null && !compact) ...[
-                AyreIcon(segment.glyph!, size: 16, color: fg, filled: selected),
+                AyreIcon(segment.glyph!, size: 16, color: fg),
                 const SizedBox(height: AppSpace.xs),
               ],
               Text(
                 segment.label,
                 style: AppTypo.ui(
                   fontSize: AppTextScale.hint,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: fg,
                   height: 1.2,
                 ),
@@ -754,7 +740,20 @@ class _Segment<T> extends StatelessWidget {
 
 // ─── Status chips ──────────────────────────────────────────────────────────
 
-enum ChipTone { neutral, attention, brand }
+enum ChipTone {
+  neutral,
+  attention,
+  brand,
+
+  /// Positive / verified: success fill, positive text.
+  success,
+
+  /// Negative outcome: tinted red fill, negative text.
+  negative,
+
+  /// The filled saffron NEW badge (`#2B1600` ink).
+  badge,
+}
 
 /// Small, flat, caps chip for states like NEW or a verification status.
 /// Neutral/attention (muted gold) carries warnings; the brand accent carries
@@ -778,10 +777,13 @@ class AyreChip extends StatelessWidget {
       ChipTone.neutral => (t.foregroundMuted, t.surfaceRaised),
       ChipTone.attention => (t.neutralText, t.neutralSoft),
       ChipTone.brand => (t.accentInk, t.accentSoft),
+      ChipTone.success => (t.positiveText, t.positiveSoft),
+      ChipTone.negative => (t.negativeText, t.negativeSoft),
+      ChipTone.badge => (t.onHighlight, t.highlight),
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(AppRadius.chip),
@@ -797,7 +799,7 @@ class AyreChip extends StatelessWidget {
           Flexible(
             child: Text(
               label.toUpperCase(),
-              style: AppTypo.label(t, color: fg, fontSize: 11),
+              style: AppTypo.chip(t, color: fg),
             ),
           ),
         ],
@@ -832,52 +834,61 @@ class SettingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final tone = danger ? t.negativeText : t.foregroundMuted;
+    final tone = danger ? t.negativeText : t.textPrimary;
 
     final row = Opacity(
       opacity: enabled ? 1 : 0.5,
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
         child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpace.md,
-          vertical: AppSpace.md,
-        ),
-        child: Row(
-          children: [
-            AyreIcon(glyph, size: 18, color: tone),
-            const SizedBox(width: AppSpace.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    title,
-                    style: AppTypo.rowLabel(
-                      t,
-                      color: danger ? t.negativeText : null,
-                    ),
-                  ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
-                    Text(subtitle!, style: AppTypo.meta(t)),
-                  ],
-                ],
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpace.s21,
+            vertical: AppSpace.hairlineRowPadding,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: AppShape.iconTileSize,
+                height: AppShape.iconTileSize,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: danger ? t.negativeSoft : t.surfaceRaised,
+                  borderRadius: AppShape.field,
+                ),
+                child: AyreIcon(glyph, size: 22, color: tone),
               ),
-            ),
-            const SizedBox(width: AppSpace.sm),
-            trailing ??
-                (onTap == null
-                    ? const SizedBox.shrink()
-                    : AyreIcon(
-                        AyreGlyph.forward,
-                        size: 16,
-                        color: t.foregroundMuted,
-                      )),
-          ],
+              const SizedBox(width: AppSpace.s13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      title,
+                      style: AppTypo.rowLabel(
+                        t,
+                        color: danger ? t.negativeText : null,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(subtitle!, style: AppTypo.body(t, color: t.foregroundMuted)),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpace.sm),
+              trailing ??
+                  (onTap == null
+                      ? const SizedBox.shrink()
+                      : AyreIcon(
+                          AyreGlyph.forward,
+                          size: 18,
+                          color: t.foregroundMuted,
+                        )),
+            ],
+          ),
         ),
-      ),
       ),
     );
 
@@ -895,7 +906,7 @@ class SettingRow extends StatelessWidget {
       button: true,
       label: buf.toString(),
       excludeSemantics: true,
-      child: PressableScale(onTap: onTap, borderRadius: 0, child: row),
+      child: PressableScaleRow(onTap: onTap!, child: row),
     );
   }
 }
@@ -910,9 +921,10 @@ class RowGroup extends StatelessWidget {
     this.indent = defaultIndent,
   });
 
-  /// Where the hairlines start: the row padding, an 18px leading icon and the
+  /// Where the hairlines start: the row padding, the 44 icon tile and the
   /// gap after it — the Profile/Settings row grammar.
-  static const double defaultIndent = AppSpace.md + 18 + AppSpace.md;
+  static const double defaultIndent =
+      AppSpace.s21 + AppShape.iconTileSize + AppSpace.s13;
 
   final List<Widget> children;
   final Color? color;
@@ -1035,7 +1047,7 @@ class ProgressRule extends StatelessWidget {
       child: LinearProgressIndicator(
         value: value.clamp(0.0, 1.0),
         minHeight: height,
-        backgroundColor: t.surfaceSunken,
+        backgroundColor: t.surfaceRaised,
         valueColor: AlwaysStoppedAnimation(color ?? t.accent),
       ),
     );
@@ -1044,9 +1056,10 @@ class ProgressRule extends StatelessWidget {
 
 // ─── Skeletons ─────────────────────────────────────────────────────────────
 
-/// A skeleton block shaped like the content it stands in for, with a slow calm
-/// pulse — never a spinner for list or card content.
-class SkeletonBlock extends StatefulWidget {
+/// A soft skeleton block shaped like the content it stands in for. Static by
+/// design: the reference loading state is a calm card silhouette, never a
+/// spinner and never an endless shimmer or pulse.
+class SkeletonBlock extends StatelessWidget {
   const SkeletonBlock({
     super.key,
     this.width,
@@ -1059,91 +1072,13 @@ class SkeletonBlock extends StatefulWidget {
   final double radius;
 
   @override
-  State<SkeletonBlock> createState() => _SkeletonBlockState();
-}
-
-class _SkeletonBlockState extends State<SkeletonBlock>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  /// §14.4: one sweep every 1.7s, eased in and out.
-  static const Duration _sweep = Duration(milliseconds: 1700);
-
-  /// How wide the highlight band is, as a fraction of the sweep's travel. Wide
-  /// enough to read as a soft wash moving across the block rather than a hard
-  /// glint crossing it.
-  static const double _bandWidth = 0.22;
-
-  @override
-  void initState() {
-    super.initState();
-    // Not `reverse: true`. A reversing sweep travels back the way it came,
-    // which reads as something scrubbing rather than loading. Because the band
-    // is fully off-block at both ends of the travel, the restart is invisible.
-    _controller = AnimationController(vsync: this, duration: _sweep)..repeat();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
-    final base = t.skeleton;
-
-    BoxDecoration decoration({Gradient? gradient}) => BoxDecoration(
-      color: gradient == null ? base : null,
-      gradient: gradient,
-      borderRadius: BorderRadius.circular(widget.radius),
-    );
-
-    if (MediaQuery.disableAnimationsOf(context)) {
-      return Container(
-        width: widget.width,
-        height: widget.height,
-        decoration: decoration(),
-      );
-    }
-
-    // A soft foreground-tinted highlight over the skeleton fill (§14.4),
-    // replacing the previous identity's whole-block opacity pulse. A pulse
-    // dims the layout it is standing in for; a sweep leaves the shape at a
-    // constant weight and only moves light across it, which is what keeps a
-    // loading screen calm rather than throbbing.
-    final highlight = Color.alphaBlend(
-      t.textPrimary.withValues(alpha: 0.07),
-      base,
-    );
-
-    // Continuous animation: isolated so it repaints only itself.
-    return RepaintBoundary(
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, _) {
-          final p = AppMotion.easeInOut.transform(_controller.value);
-          // Travel from fully off the left edge to fully off the right, so the
-          // band never pops into or out of existence mid-block.
-          final centre = -_bandWidth + p * (1 + _bandWidth * 2);
-          return Container(
-            width: widget.width,
-            height: widget.height,
-            decoration: decoration(
-              gradient: LinearGradient(
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-                colors: [base, highlight, base],
-                stops: [
-                  (centre - _bandWidth).clamp(0.0, 1.0),
-                  centre.clamp(0.0, 1.0),
-                  (centre + _bandWidth).clamp(0.0, 1.0),
-                ],
-              ),
-            ),
-          );
-        },
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: context.tokens.skeleton,
+        borderRadius: BorderRadius.circular(radius),
       ),
     );
   }
@@ -1162,14 +1097,14 @@ class SkeletonTickerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.symmetric(
-        horizontal: AppSpace.md,
+        horizontal: AppSpace.s21,
         vertical: dense ? AppSpace.sm : AppSpace.row,
       ),
       child: Row(
         children: [
           if (tile) ...const [
-            SkeletonBlock(width: 40, height: 40, radius: AppRadius.iconTile),
-            SizedBox(width: AppSpace.md),
+            SkeletonBlock(width: 44, height: 44, radius: AppRadius.iconTile),
+            SizedBox(width: AppSpace.s13),
           ],
           const Expanded(
             flex: 5,
@@ -1199,15 +1134,15 @@ class SkeletonTickerRow extends StatelessWidget {
 
 // ─── Entrance ──────────────────────────────────────────────────────────────
 
-/// A restrained, single-play, index-delayed staggered entrance (D-8: at most
-/// four stagger steps, ~160 ms of delay, 280 ms duration). Plays once per
+/// A restrained, single-play, index-delayed staggered entrance: 13px rise and
+/// fade, 55ms stagger (at most four steps), 280 ms duration. Plays once per
 /// screen visit and does not replay on tab re-visit or a minor rebuild.
 class Entrance extends StatefulWidget {
   const Entrance({
     super.key,
     required this.child,
     this.index = 0,
-    this.offset = const Offset(0, 10),
+    this.offset = const Offset(0, AppMotion.entranceRise),
   });
 
   final Widget child;
@@ -1340,7 +1275,7 @@ class AyreFilterChip extends StatelessWidget {
       label: label,
       child: PressableScale(
         onTap: onTap,
-        borderRadius: AppRadius.pill,
+        shape: AppShape.field,
         child: AnimatedContainer(
           duration: MediaQuery.disableAnimationsOf(context)
               ? Duration.zero
@@ -1352,11 +1287,8 @@ class AyreFilterChip extends StatelessWidget {
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: selected ? t.accent : t.surface,
-            borderRadius: BorderRadius.circular(AppRadius.pill),
-            border: Border.all(
-              color: selected ? t.accent : t.hairline,
-              width: selected ? 1.5 : 1,
-            ),
+            borderRadius: AppShape.field,
+            border: Border.all(color: selected ? t.accent : t.hairline),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -1369,7 +1301,7 @@ class AyreFilterChip extends StatelessWidget {
                 label,
                 style: AppTypo.ui(
                   fontSize: AppTextScale.body,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                   color: fg,
                 ),
               ),
@@ -1409,14 +1341,14 @@ class TagPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: t.surfaceRaised,
-        borderRadius: BorderRadius.circular(AppRadius.pill),
+        borderRadius: AppShape.field,
       ),
       child: Text(
         label.toUpperCase(),
-        style: AppTypo.label(t, color: t.foregroundMuted, fontSize: 11),
+        style: AppTypo.chip(t, color: t.foregroundMuted),
       ),
     );
   }

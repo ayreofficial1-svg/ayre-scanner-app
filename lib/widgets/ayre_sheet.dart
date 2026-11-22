@@ -17,7 +17,7 @@ Future<T?> showAyreSheet<T>({
     isDismissible: isDismissible,
     enableDrag: isDismissible,
     showDragHandle: false,
-    barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.55),
+    barrierColor: context.tokens.scrim,
     builder: builder,
   );
 }
@@ -31,10 +31,10 @@ class AyreSheet extends StatelessWidget {
     required this.child,
     this.title,
     this.padding = const EdgeInsets.fromLTRB(
-      AppSpace.lg,
+      AppSpace.s21,
       AppSpace.xs,
-      AppSpace.lg,
-      AppSpace.xl,
+      AppSpace.s21,
+      AppSpace.s21,
     ),
   });
 
@@ -65,10 +65,10 @@ class AyreSheet extends StatelessWidget {
                       top: AppSpace.sm,
                       bottom: AppSpace.sm,
                     ),
-                    width: 36,
+                    width: 34,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: t.foregroundSubtle,
+                      color: t.foregroundMuted.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(AppRadius.pill),
                     ),
                   ),
@@ -85,7 +85,7 @@ class AyreSheet extends StatelessWidget {
                         header: true,
                         child: Text(title!, style: AppTypo.sectionTitle(t)),
                       ),
-                      const SizedBox(height: AppSpace.sm),
+                      const SizedBox(height: AppSpace.s13),
                     ],
                     child,
                   ],

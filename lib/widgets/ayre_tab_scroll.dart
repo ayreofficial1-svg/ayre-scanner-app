@@ -21,7 +21,13 @@ class AyreTabScroll extends StatelessWidget {
     this.controller,
     this.maxWidth,
     this.eager = false,
+    this.header,
   });
+
+  /// Full-bleed header (a masthead block) laid out as the first scroll item
+  /// with no side gutter; the [children] keep the gutter. Lets a mast bleed to
+  /// the screen edges without per-screen negative offsets.
+  final Widget? header;
 
   final List<Widget> children;
   final Future<void> Function()? onRefresh;
@@ -35,26 +41,40 @@ class AyreTabScroll extends StatelessWidget {
 
   /// Bottom padding of the list: never less than the real system inset or the
   /// dock clearance, plus one medium step of air.
+  ///
+  /// The dock clearance already includes the system inset, so the two are
+  /// never added together.
   static double bottomPaddingOf(BuildContext context) =>
       math.max(
         MediaQuery.paddingOf(context).bottom,
         AyreNavMetrics.clearanceOf(context),
       ) +
-      AppSpace.md;
+      AppSpace.s21;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final gutter = AppSpace.gutterOf(context);
 
+    final hasHeader = header != null;
     final padding = EdgeInsetsDirectional.fromSTEB(
-      gutter,
-      AppSpace.pageTop,
-      gutter,
+      0,
+      hasHeader ? 0 : AppSpace.pageTop,
+      0,
       bottomPaddingOf(context),
     );
     final physics =
         onRefresh == null ? null : const AlwaysScrollableScrollPhysics();
+
+    // With a full-bleed header the reading measure applies per child, so the
+    // mast still reaches both screen edges on wide windows.
+    Widget gutterWrap(Widget child) {
+      final padded = Padding(
+        padding: EdgeInsets.symmetric(horizontal: gutter),
+        child: child,
+      );
+      return hasHeader ? ContentWidth(maxWidth: maxWidth, child: padded) : padded;
+    }
 
     final Widget list = eager
         ? SingleChildScrollView(
@@ -63,21 +83,29 @@ class AyreTabScroll extends StatelessWidget {
             padding: padding,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: children,
+              children: [
+                ?header,
+                for (final c in children) gutterWrap(c),
+              ],
             ),
           )
         : ListView(
             controller: controller,
             physics: physics,
             padding: padding,
-            children: children,
+            children: [
+              ?header,
+              for (final c in children) gutterWrap(c),
+            ],
           );
 
-    final body = ContentWidth(maxWidth: maxWidth, child: list);
+    final body = hasHeader
+        ? list
+        : ContentWidth(maxWidth: maxWidth, child: list);
     if (onRefresh == null) return body;
 
     return RefreshIndicator(
-      color: t.accentInk,
+      color: t.accent,
       backgroundColor: t.surface,
       onRefresh: onRefresh!,
       edgeOffset: MediaQuery.paddingOf(context).top + AppSpace.xl,

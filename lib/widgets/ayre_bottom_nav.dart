@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,7 +6,6 @@ import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 import 'ayre_icons.dart';
 import 'ayre_nav_metrics.dart';
-import 'spring.dart';
 
 /// A navigation destination. The label is rendered on screen (icon + label on
 /// every item) and is also the accessibility name.
@@ -29,32 +27,16 @@ const List<NavDestination> kNavDestinations = [
 /// tooltip/semantics wiring.
 Key navDestinationKey(String label) => ValueKey('nav-destination-$label');
 
-/// Selected-state indicator: a soft capsule (`accentSoft`) behind the glyph,
-/// with the glyph and label in `accentInk`.
+/// The always-visible bottom navigation: a full-width card dock with a 1px
+/// top border and 26px top corners, flush with the window bottom.
 ///
-/// This is the single place to change if the soft capsule feels too quiet on
-/// device (plan §3.5): return `(fill: t.accent, glyph: t.onAccent)` for the
-/// solid fallback. Geometry, labels, semantics and motion do not change.
-({Color fill, Color glyph}) _indicatorColors(AppThemeTokens t) =>
-    (fill: t.accentSoft, glyph: t.accentInk);
-
-/// Unselected glyph and label. `foregroundMuted` in light (the translucent bar
-/// sits over dark content there), `foregroundSubtle` in dark.
-Color _unselectedColor(AppThemeTokens t, bool dark) =>
-    dark ? t.foregroundSubtle : t.foregroundMuted;
-
-/// The always-visible bottom navigation: a floating dock (plan §3.3).
-///
-/// Four equal slots, each an indicator capsule holding a 24-pt glyph with the
-/// destination's label beneath it. The selected capsule glides between slots on
-/// [AppSpring.navPill]; the glyph crossfades outline to filled and colours lerp
-/// on the same value. Nothing pops, lifts or enlarges.
-///
-/// Surface: iOS/macOS get a light blur, everything else a plain tonal surface.
-/// With high-contrast on, the dock is opaque with a visible border.
+/// Four equally spaced destinations, each an outline glyph in a transparent
+/// 55×34 slot with an 11/700 label. Selection is the brand colour plus one
+/// saffron marker (34×4, skewed −24°) that glides between item centres in
+/// 233ms — no filled capsule and no per-icon bounce.
 ///
 /// [onSelected] fires only for a *new* index (with the selection haptic).
-/// [onReselected] fires when the already-selected item is tapped (A2); it never
+/// [onReselected] fires when the already-selected item is tapped; it never
 /// plays a haptic.
 class AyreBottomNav extends StatelessWidget {
   const AyreBottomNav({
@@ -72,82 +54,58 @@ class AyreBottomNav extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final media = MediaQuery.of(context);
-    final theme = Theme.of(context);
-    final dark = theme.brightness == Brightness.dark;
-    final platform = theme.platform;
-    final apple =
-        platform == TargetPlatform.iOS || platform == TargetPlatform.macOS;
     final highContrast = MediaQuery.highContrastOf(context);
 
     final scale = media.textScaler.scale(100) / 100;
-    final labelSize = AyreNavMetrics.labelSizeFor(platform);
+    final labelSize = AyreNavMetrics.labelSize;
+    final inset = media.viewPadding.bottom;
     final barHeight = AyreNavMetrics.barHeightFor(
       textScale: scale,
       labelSize: labelSize,
+      bottomInset: inset,
     );
-    final margin = AyreNavMetrics.marginFor(media.size.width);
-    final inset = media.viewPadding.bottom;
-    final radius = BorderRadius.circular(AppRadius.pill);
 
-    final alpha = highContrast
-        ? 1.0
-        : apple
-        ? (dark ? 0.82 : 0.88)
-        : (dark ? 0.90 : 0.94);
-
-    Widget surface = DecoratedBox(
+    final surface = DecoratedBox(
       decoration: BoxDecoration(
-        color: t.navBg.withValues(alpha: alpha),
-        borderRadius: radius,
-        border: Border.all(
-          color: highContrast ? t.foregroundSubtle : t.navHairline,
+        color: t.surface,
+        borderRadius: AppShape.sheetTop,
+        border: Border(
+          top: BorderSide(
+            color: highContrast ? t.foregroundMuted : t.hairline,
+          ),
+          left: BorderSide(color: t.hairline),
+          right: BorderSide(color: t.hairline),
         ),
       ),
       child: SizedBox(
         height: barHeight,
-        child: _DockItems(
-          selectedIndex: selectedIndex,
-          onSelected: onSelected,
-          onReselected: onReselected,
-          barHeight: barHeight,
-          labelSize: labelSize,
-          textScale: scale,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AyreNavMetrics.horizontalPadding,
+          ),
+          child: _DockItems(
+            selectedIndex: selectedIndex,
+            onSelected: onSelected,
+            onReselected: onReselected,
+            labelSize: labelSize,
+            textScale: scale,
+          ),
         ),
       ),
     );
-    if (apple && !highContrast) {
-      surface = BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: surface,
-      );
-    }
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        margin,
-        0,
-        margin,
-        AyreNavMetrics.bottomGap + inset,
-      ),
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        heightFactor: 1,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: AyreNavMetrics.maxWidth),
-          child: DecoratedBox(
-            // One ambient layer; the shadow sits outside the clip.
-            decoration: BoxDecoration(
-              borderRadius: radius,
-              boxShadow: [
-                BoxShadow(
-                  color: t.shadowColor.withValues(alpha: dark ? 0.40 : 0.18),
-                  blurRadius: 20,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: ClipRRect(borderRadius: radius, child: surface),
-          ),
+    return Align(
+      alignment: Alignment.bottomCenter,
+      heightFactor: 1,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: media.size.width >= 600
+              ? AyreNavMetrics.maxWidth
+              : double.infinity,
+        ),
+        child: ClipRRect(
+          borderRadius: AppShape.sheetTop,
+          child: surface,
         ),
       ),
     );
@@ -159,7 +117,6 @@ class _DockItems extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelected,
     required this.onReselected,
-    required this.barHeight,
     required this.labelSize,
     required this.textScale,
   });
@@ -167,7 +124,6 @@ class _DockItems extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelected;
   final ValueChanged<int>? onReselected;
-  final double barHeight;
   final double labelSize;
   final double textScale;
 
@@ -175,87 +131,79 @@ class _DockItems extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final count = kNavDestinations.length;
-    final indicator = _indicatorColors(t);
-
-    final labelLine = _labelLineHeight(labelSize, textScale);
-    final contentHeight =
-        AyreNavMetrics.verticalPadding +
-        AyreNavMetrics.capsuleHeight +
-        AyreNavMetrics.labelGap +
-        labelLine +
-        AyreNavMetrics.verticalPadding;
-    final top =
-        AyreNavMetrics.verticalPadding +
-        math.max(0.0, (barHeight - contentHeight) / 2);
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final slotWidth = constraints.maxWidth / count;
-        final capsuleWidth = math.min(
-          AyreNavMetrics.capsuleWidth,
-          slotWidth - 4,
-        );
+        // The marker's left edge, centred on the selected item. The dock is
+        // inset by its own padding, so the marker is positioned in the same
+        // coordinate space as the items.
+        final markerLeft =
+            slotWidth * selectedIndex +
+            (slotWidth - AyreNavMetrics.markerWidth) / 2;
         return FocusTraversalGroup(
           policy: ReadingOrderTraversalPolicy(),
-          child: SpringValue(
-            value: selectedIndex.toDouble(),
-            spring: AppSpring.navPill,
-            builder: (context, position, _) {
-              return Stack(
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Row(
                 children: [
-                  Positioned(
-                    left: slotWidth * position + (slotWidth - capsuleWidth) / 2,
-                    top: top,
-                    width: capsuleWidth,
-                    height: AyreNavMetrics.capsuleHeight,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: indicator.fill,
-                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                  for (var i = 0; i < count; i++)
+                    Expanded(
+                      child: _NavItem(
+                        key: navDestinationKey(kNavDestinations[i].label),
+                        index: i,
+                        destination: kNavDestinations[i],
+                        selected: i == selectedIndex,
+                        onTap: () => _handleTap(
+                          i,
+                          selectedIndex,
+                          onSelected,
+                          onReselected,
+                        ),
+                        labelSize: labelSize,
+                        textScale: textScale,
+                        vertical: false,
+                      ),
+                    ),
+                ],
+              ),
+              AnimatedPositioned(
+                duration: reduceMotion ? Duration.zero : AppMotion.navMarker,
+                curve: AppMotion.ease,
+                left: markerLeft,
+                // On the dock's top edge: the child area starts below the 1px
+                // border, so −1 puts the marker on the border row (y = 0).
+                top: -1,
+                width: AyreNavMetrics.markerWidth,
+                height: AyreNavMetrics.markerHeight,
+                child: ExcludeSemantics(
+                  child: IgnorePointer(
+                    child: Transform(
+                      alignment: Alignment.center,
+                      transform: Matrix4.skewX(
+                        math.tan(
+                          AyreNavMetrics.markerSkewDegrees * math.pi / 180,
+                        ),
+                      ),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: t.notch,
+                          borderRadius: BorderRadius.circular(1),
+                        ),
                       ),
                     ),
                   ),
-                  Row(
-                    children: [
-                      for (var i = 0; i < count; i++)
-                        Expanded(
-                          child: _NavItem(
-                            key: navDestinationKey(kNavDestinations[i].label),
-                            index: i,
-                            destination: kNavDestinations[i],
-                            progress: (1 - (position - i).abs()).clamp(
-                              0.0,
-                              1.0,
-                            ),
-                            selected: i == selectedIndex,
-                            onTap: () => _handleTap(
-                              i,
-                              selectedIndex,
-                              onSelected,
-                              onReselected,
-                            ),
-                            capsuleWidth: capsuleWidth,
-                            topPadding: top,
-                            height: barHeight,
-                            labelSize: labelSize,
-                            textScale: textScale,
-                            ownCapsule: false,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              );
-            },
+                ),
+              ),
+            ],
           ),
         );
       },
     );
   }
 }
-
-double _labelLineHeight(double labelSize, double textScale) =>
-    labelSize * math.min(textScale, AyreNavMetrics.labelScaleCap) * 1.15;
 
 void _handleTap(
   int index,
@@ -264,7 +212,7 @@ void _handleTap(
   ValueChanged<int>? onReselected,
 ) {
   if (index == selectedIndex) {
-    // A2: a re-tap never plays the selection haptic.
+    // A re-tap never plays the selection haptic.
     onReselected?.call(index);
     return;
   }
@@ -272,10 +220,10 @@ void _handleTap(
   onSelected(index);
 }
 
-/// Large-window (at/above [AppBreakpoints.twoColumn]) counterpart to
-/// [AyreBottomNav]: the same item, colours, states and semantics, stacked
-/// vertically in a scrollable column so landscape phones and large text cannot
-/// overflow.
+/// Large-window (at/above the two-column pivot) counterpart to
+/// [AyreBottomNav]: the same items, colours, states and semantics, stacked
+/// vertically in a scrollable column on a card surface with a hairline
+/// divider and a small vertical saffron marker.
 class AyreNavRail extends StatelessWidget {
   const AyreNavRail({
     super.key,
@@ -294,7 +242,7 @@ class AyreNavRail extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final media = MediaQuery.of(context);
-    final labelSize = AyreNavMetrics.labelSizeFor(Theme.of(context).platform);
+    final labelSize = AyreNavMetrics.labelSize;
     final scale = media.textScaler.scale(100) / 100;
 
     return Container(
@@ -305,7 +253,7 @@ class AyreNavRail extends StatelessWidget {
       ),
       child: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(vertical: AppSpace.md),
+          padding: const EdgeInsets.symmetric(vertical: AppSpace.s13),
           child: FocusTraversalGroup(
             policy: ReadingOrderTraversalPolicy(),
             child: Column(
@@ -313,28 +261,20 @@ class AyreNavRail extends StatelessWidget {
                 for (var i = 0; i < kNavDestinations.length; i++)
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: AppSpace.xxs),
-                    child: SpringValue(
-                      value: i == selectedIndex ? 1.0 : 0.0,
-                      spring: AppSpring.navPill,
-                      builder: (context, value, _) => _NavItem(
-                        key: navDestinationKey(kNavDestinations[i].label),
-                        index: i,
-                        destination: kNavDestinations[i],
-                        progress: value.clamp(0.0, 1.0),
-                        selected: i == selectedIndex,
-                        onTap: () => _handleTap(
-                          i,
-                          selectedIndex,
-                          onSelected,
-                          onReselected,
-                        ),
-                        capsuleWidth: AyreNavMetrics.capsuleWidth,
-                        topPadding: AyreNavMetrics.verticalPadding,
-                        height: null,
-                        labelSize: labelSize,
-                        textScale: scale,
-                        ownCapsule: true,
+                    child: _NavItem(
+                      key: navDestinationKey(kNavDestinations[i].label),
+                      index: i,
+                      destination: kNavDestinations[i],
+                      selected: i == selectedIndex,
+                      onTap: () => _handleTap(
+                        i,
+                        selectedIndex,
+                        onSelected,
+                        onReselected,
                       ),
+                      labelSize: labelSize,
+                      textScale: scale,
+                      vertical: true,
                     ),
                   ),
               ],
@@ -353,35 +293,22 @@ class _NavItem extends StatefulWidget {
     super.key,
     required this.index,
     required this.destination,
-    required this.progress,
     required this.selected,
     required this.onTap,
-    required this.capsuleWidth,
-    required this.topPadding,
-    required this.height,
     required this.labelSize,
     required this.textScale,
-    required this.ownCapsule,
+    required this.vertical,
   });
 
   final int index;
   final NavDestination destination;
-
-  /// Selection progress 0..1, driven by the parent's spring.
-  final double progress;
   final bool selected;
   final VoidCallback onTap;
-  final double capsuleWidth;
-  final double topPadding;
-
-  /// Fixed height in the dock; `null` in the rail (min height applies).
-  final double? height;
   final double labelSize;
   final double textScale;
 
-  /// True where the item draws its own selected capsule (the rail); the dock
-  /// draws one sliding capsule behind all items instead.
-  final bool ownCapsule;
+  /// True in the rail: min height applies and a vertical marker is drawn.
+  final bool vertical;
 
   @override
   State<_NavItem> createState() => _NavItemState();
@@ -399,148 +326,132 @@ class _NavItemState extends State<_NavItem> {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    final indicator = _indicatorColors(t);
-    final p = widget.progress;
-    final color = Color.lerp(_unselectedColor(t, dark), indicator.glyph, p)!;
+    final selected = widget.selected;
+    final color = selected ? t.accent : t.foregroundMuted;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final label = widget.destination.label;
-    final radius = BorderRadius.circular(AppRadius.pill);
+    const radius = BorderRadius.all(Radius.circular(AyreNavMetrics.slotRadius));
 
-    // Capsule background: the rail's own selected fill, then press/hover tint
-    // for items that are not selected.
-    var background = widget.ownCapsule
-        ? Color.lerp(const Color(0x00000000), indicator.fill, p)!
-        : const Color(0x00000000);
-    if (_pressed && p < 0.5) {
-      background = Color.alphaBlend(
-        indicator.fill.withValues(alpha: 0.5),
-        background,
-      );
-    } else if (_hovered && p < 0.5) {
-      background = Color.alphaBlend(
-        t.foregroundSubtle.withValues(alpha: 0.08),
-        background,
-      );
+    var background = AppTheme.transparent;
+    if (_pressed) {
+      background = t.surfaceRaised;
+    } else if (_hovered) {
+      background = t.surfaceRaised.withValues(alpha: 0.6);
     }
 
     final labelStyle = AppTypo.navLabel(
       t,
       color: color,
     ).copyWith(fontSize: widget.labelSize, height: 1.15);
-    final labelLine = _labelLineHeight(widget.labelSize, widget.textScale);
+    final labelLine = AyreNavMetrics.labelLineFor(
+      widget.textScale,
+      widget.labelSize,
+    );
 
-    final capsule = SizedBox(
-      width: widget.capsuleWidth,
-      height: AyreNavMetrics.capsuleHeight,
+    final slot = SizedBox(
+      width: AyreNavMetrics.slotWidth,
+      height: AyreNavMetrics.slotHeight,
       child: Stack(
         alignment: Alignment.center,
         clipBehavior: Clip.none,
         children: [
-          if (_focused)
-            Positioned(
-              left: -3,
-              right: -3,
-              top: -3,
-              bottom: -3,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: radius,
-                  border: Border.all(color: t.accentInk, width: 2),
-                ),
-              ),
-            ),
           Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(color: background, borderRadius: radius),
-            ),
-          ),
-          AnimatedScale(
-            scale: _pressed ? 0.94 : 1.0,
-            duration: reduceMotion ? Duration.zero : AppMotion.buttonPress,
-            curve: AppMotion.ease,
-            child: SizedBox(
-              width: AyreNavMetrics.glyphSize,
-              height: AyreNavMetrics.glyphSize,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Opacity(
-                    opacity: 1 - p,
-                    child: AyreIcon(
-                      widget.destination.glyph,
-                      size: AyreNavMetrics.glyphSize,
-                      color: color,
-                    ),
-                  ),
-                  Opacity(
-                    opacity: p,
-                    child: AyreIcon(
-                      widget.destination.glyph,
-                      size: AyreNavMetrics.glyphSize,
-                      filled: true,
-                      color: color,
-                    ),
-                  ),
-                ],
+            child: AnimatedContainer(
+              duration: reduceMotion ? Duration.zero : AppMotion.buttonPress,
+              decoration: BoxDecoration(
+                color: background,
+                borderRadius: radius,
+                border: _focused
+                    ? Border.all(color: t.focusRing, width: 2)
+                    : null,
               ),
             ),
+          ),
+          AyreIcon(
+            widget.destination.glyph,
+            size: AyreNavMetrics.glyphSize,
+            color: color,
           ),
         ],
       ),
     );
 
-    Widget content = Padding(
-      padding: EdgeInsets.only(
-        top: widget.topPadding,
-        bottom: AyreNavMetrics.verticalPadding,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          capsule,
-          const SizedBox(height: AyreNavMetrics.labelGap),
-          // Never ellipsised: the label's scale is capped, then scaled down
-          // as a last resort (documented exception to D-9).
-          SizedBox(
-            height: labelLine,
-            width: double.infinity,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  softWrap: false,
-                  textScaler: TextScaler.linear(
-                    math.min(widget.textScale, AyreNavMetrics.labelScaleCap),
+    Widget content = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        slot,
+        const SizedBox(height: AyreNavMetrics.labelGap),
+        // Never ellipsised: the label's scale is capped, then scaled down as
+        // a last resort.
+        SizedBox(
+          height: labelLine,
+          width: double.infinity,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                maxLines: 1,
+                softWrap: false,
+                textScaler: TextScaler.linear(
+                  math.min(widget.textScale, AyreNavMetrics.labelScaleCap),
+                ),
+                style: labelStyle,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (widget.vertical) {
+      content = ConstrainedBox(
+        constraints: const BoxConstraints(
+          minHeight: AyreNavMetrics.railItemMinHeight,
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned(
+              left: 0,
+              top: 8,
+              child: AnimatedOpacity(
+                duration: reduceMotion ? Duration.zero : AppMotion.navMarker,
+                opacity: selected ? 1 : 0,
+                child: Container(
+                  width: AyreNavMetrics.markerHeight,
+                  height: AyreNavMetrics.slotHeight,
+                  decoration: BoxDecoration(
+                    color: t.notch,
+                    borderRadius: const BorderRadius.horizontal(
+                      right: Radius.circular(2),
+                    ),
                   ),
-                  style: labelStyle,
                 ),
               ),
             ),
-          ),
-        ],
-      ),
-    );
-
-    content = widget.height != null
-        ? SizedBox(
-            height: widget.height,
-            child: Align(alignment: Alignment.topCenter, child: content),
-          )
-        : ConstrainedBox(
-            constraints: const BoxConstraints(
-              minHeight: AyreNavMetrics.railItemMinHeight,
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: content,
             ),
-            child: content,
-          );
+          ],
+        ),
+      );
+    } else {
+      content = Align(
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.only(top: AyreNavMetrics.topPadding),
+          child: content,
+        ),
+      );
+    }
 
     return Semantics(
       container: true,
       button: true,
-      selected: widget.selected,
+      selected: selected,
       label: label,
       hint: 'Tab ${widget.index + 1} of ${kNavDestinations.length}',
       onTap: widget.onTap,

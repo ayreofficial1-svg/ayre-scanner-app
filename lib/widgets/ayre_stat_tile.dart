@@ -39,25 +39,22 @@ class AyreStatTile extends StatelessWidget {
     final t = context.tokens;
 
     return AyreCard(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpace.md,
-        vertical: AppSpace.md,
-      ),
+      padding: const EdgeInsets.all(AppSpace.s21),
       child: MergeSemantics(
         child: Row(
           children: [
             if (glyph != null) ...[
               Container(
-                width: 40,
-                height: 40,
+                width: AppShape.iconTileSize,
+                height: AppShape.iconTileSize,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: t.surfaceRaised,
-                  borderRadius: BorderRadius.circular(AppRadius.iconTile),
+                  borderRadius: AppShape.field,
                 ),
-                child: AyreIcon(glyph!, size: 20, color: t.foregroundMuted),
+                child: AyreIcon(glyph!, size: 22, color: t.textPrimary),
               ),
-              const SizedBox(width: AppSpace.sm),
+              const SizedBox(width: AppSpace.s13),
             ],
             Expanded(
               child: Column(
@@ -71,15 +68,15 @@ class AyreStatTile extends StatelessWidget {
                     alignment: Alignment.centerLeft,
                     child: Figure.static(
                       value,
-                      fontSize: AppTextScale.featuredHeadline,
-                      fontWeight: FontWeight.w600,
+                      fontSize: AppTextScale.stat,
+                      fontWeight: FontWeight.w800,
                       color: t.textPrimary,
                     ),
                   ),
                   const SizedBox(height: AppSpace.xxs),
                   Text(
                     label,
-                    style: AppTypo.meta(t),
+                    style: AppTypo.body(t, color: t.foregroundMuted),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
