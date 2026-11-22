@@ -23,7 +23,10 @@ class AyreCard extends StatelessWidget {
   const AyreCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(AppSpace.cardPadding),
+    this.padding = const EdgeInsets.symmetric(
+      horizontal: AppSpace.cardPadding,
+      vertical: AppSpace.cardVerticalPadding,
+    ),
     this.color,
     this.borderColor,
     this.radius,
@@ -901,9 +904,12 @@ class SettingRow extends StatelessWidget {
                   ],
                 ),
               ),
-              if (trailing != null) ...[
+              if (trailing case final accessory?) ...[
                 const SizedBox(width: AppSpace.s8),
-                Flexible(child: trailing!),
+                if (toggled != null)
+                  accessory
+                else
+                  Flexible(child: accessory),
               ],
               if (onTap != null && (trailing == null || status != null)) ...[
                 const SizedBox(width: AppSpace.s8),

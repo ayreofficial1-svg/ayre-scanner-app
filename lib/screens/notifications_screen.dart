@@ -80,7 +80,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 isToday: true,
               ),
             if (today.isNotEmpty && earlier.isNotEmpty)
-              const SizedBox(height: 26),
+              const SizedBox(height: AppSpace.sectionGap),
             if (earlier.isNotEmpty)
               _NoticeGroup(label: 'Earlier', notices: earlier, today: date),
           ],
@@ -157,7 +157,7 @@ class _NoticeRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpace.s21,
-        vertical: AppSpace.s13,
+        vertical: AppSpace.hairlineRowPadding,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

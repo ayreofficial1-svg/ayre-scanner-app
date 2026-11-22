@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -12,6 +14,7 @@ import 'ayre_sheet.dart';
 import 'ayre_tab_scroll.dart';
 import 'figure.dart';
 import 'pressable_scale.dart';
+import 'responsive.dart';
 
 /// The selected published week, its full summary and its result cards.
 class WeeklyReportCard extends StatefulWidget {
@@ -122,7 +125,7 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
         overlapChild: _ReportSummary(stocks: stocks, animate: animate),
       ),
       children: [
-        const SizedBox(height: AppSpace.s21),
+        const SizedBox(height: AppSpace.s13),
         if (widget.stale) ...[
           Text(
             'Showing the last available reports.',
@@ -198,14 +201,15 @@ class WeeklyReportMast extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final p = t.mastChampagne;
+    const tone = AyreMastTone.reports;
+    final p = tone.paletteOf(t);
     final week = report;
     final status = index == 0 ? 'Latest week' : 'Earlier week';
 
-    return AyreMasthead(
-      tone: AyreMastTone.champagne,
+    return AyreMasthead.tab(
+      tone: tone,
+      height: week == null && !hasSummary ? 116 : AppShape.mastTab,
       overlap: hasSummary ? AppShape.mastOverlap : 0,
-      constrainContent: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -217,7 +221,7 @@ class WeeklyReportMast extends StatelessWidget {
             ),
           ),
           if (week != null) ...[
-            const SizedBox(height: AppSpace.s8),
+            const SizedBox(height: AppSpace.xxs),
             Wrap(
               spacing: AppSpace.s8,
               runSpacing: AppSpace.s8,
@@ -331,7 +335,7 @@ class _ReportSummary extends StatelessWidget {
     ];
     return AyreCard(
       strongShadow: true,
-      padding: const EdgeInsets.symmetric(vertical: AppSpace.s13),
+      padding: const EdgeInsets.symmetric(vertical: AppSpace.s8),
       child: IntrinsicHeight(
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -479,6 +483,7 @@ class _StockCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final outcome = stock.targetHit ? 'Target hit' : 'Stop-loss hit';
+    final outcomeColor = stock.targetHit ? t.positiveText : t.negativeText;
     final name = stock.name?.trim() ?? '';
     final hasName =
         name.isNotEmpty && name.toUpperCase() != stock.symbol.toUpperCase();
@@ -488,29 +493,44 @@ class _StockCard extends StatelessWidget {
     final profitText = pnl != null && pnl.isFinite
         ? _formatSignedRupees(pnl)
         : null;
-    final prices = [
-      if (stock.entryPrice case final price? when price.isFinite)
-        (
-          'Entry',
-          '₹${formatPrice(price)}',
-          stock.dateOfRecommendation == null
-              ? 'Week start ${_shortDate(report.weekStart)}'
-              : _shortDate(stock.dateOfRecommendation!),
-        ),
-      if (stock.exitPrice case final price? when price.isFinite)
-        (
-          'Exit',
-          '₹${formatPrice(price)}',
-          stock.exitDate == null
-              ? 'Week end ${_shortDate(report.weekEnd)}'
-              : _shortDate(stock.exitDate!),
-        ),
-    ];
+    final entry = stock.entryPrice;
+    final exit = stock.exitPrice;
+    final entryPrice = entry != null && entry.isFinite ? entry : null;
+    final exitPrice = exit != null && exit.isFinite ? exit : null;
+    final entryValue = entryPrice == null ? '—' : '₹${formatPrice(entryPrice)}';
+    final exitValue = exitPrice == null ? '—' : '₹${formatPrice(exitPrice)}';
+    final movement = entryPrice != null && exitPrice != null
+        ? '${_compactRupees(entryPrice)} → ${_compactRupees(exitPrice)}'
+        : null;
+
+    String tradeDate(DateTime date) =>
+        _shortDate(date, includeYear: date.year != report.weekEnd.year);
+
+    final entryLabel = entryPrice == null
+        ? 'Entry'
+        : stock.dateOfRecommendation == null
+        ? 'Entry · Week start ${tradeDate(report.weekStart)}'
+        : 'Entry · ${tradeDate(stock.dateOfRecommendation!)}';
+    final exitLabel = exitPrice == null
+        ? 'Exit'
+        : stock.exitDate == null
+        ? 'Exit · Week end ${tradeDate(report.weekEnd)}'
+        : 'Exit · ${tradeDate(stock.exitDate!)}';
 
     Color signedTone(num value) => !value.isFinite || value == 0
         ? t.textPrimary
         : (value > 0 ? t.positiveText : t.negativeText);
 
+    final symbolStyle = AppTypo.rowLabel(
+      t,
+    ).copyWith(fontSize: 17, fontWeight: FontWeight.w800);
+    final returnStyle = AppTypo.ticker(fontSize: 22, color: signedTone(pct));
+    final profitStyle = AppTypo.value(
+      t,
+      color: pnl == null ? null : signedTone(pnl),
+      fontSize: 13,
+    );
+    final profitPerShare = profitText == null ? null : '$profitText /share';
     final identity = Row(
       children: [
         AyreInstrumentTile(
@@ -523,22 +543,21 @@ class _StockCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                stock.symbol,
-                style: AppTypo.rowLabel(
-                  t,
-                ).copyWith(fontSize: 17, fontWeight: FontWeight.w800),
-              ),
-              if (hasName)
-                Text(name, style: AppTypo.meta(t).copyWith(fontSize: 13)),
+              Text(stock.symbol, style: symbolStyle),
+              if (movement != null) Text(movement, style: AppTypo.meta(t)),
+              if (hasName) Text(name, style: AppTypo.meta(t)),
             ],
           ),
         ),
       ],
     );
-    final chip = AyreChip(
-      label: outcome,
-      tone: stock.targetHit ? ChipTone.success : ChipTone.negative,
+    final returns = Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(returnText, style: returnStyle, textAlign: TextAlign.end),
+        if (profitPerShare != null)
+          Text(profitPerShare, style: profitStyle, textAlign: TextAlign.end),
+      ],
     );
 
     return Semantics(
@@ -547,133 +566,202 @@ class _StockCard extends StatelessWidget {
       label: [
         stock.symbol,
         if (hasName) name,
-        outcome,
         if (pct.isFinite) '${pct.toStringAsFixed(2)} percent',
         if (profitText != null) 'Profit per share $profitText',
-        for (final (label, value, date) in prices) '$label $value, $date',
+        if (entryPrice == null)
+          'Entry price unavailable'
+        else
+          '$entryLabel, $entryValue',
+        outcome,
+        if (exitPrice == null)
+          'Exit price unavailable'
+        else
+          '$exitLabel, $exitValue',
       ].join(', '),
-      child: AyreCard(
-        child: LayoutBuilder(
+      child: _ReportStockFrame(
+        outcomeColor: outcomeColor,
+        header: LayoutBuilder(
           builder: (context, constraints) {
-            final scale = MediaQuery.textScalerOf(context).scale(13) / 13;
-            final inline = constraints.maxWidth >= 285 * scale;
+            final identityWidth =
+                44 +
+                AppSpace.s13 +
+                singleLineTextWidth(context, stock.symbol, symbolStyle);
+            final returnWidth = math.max(
+              singleLineTextWidth(context, returnText, returnStyle),
+              profitPerShare == null
+                  ? 0.0
+                  : singleLineTextWidth(context, profitPerShare, profitStyle),
+            );
+            if (identityWidth + AppSpace.s8 + returnWidth <=
+                constraints.maxWidth) {
+              return Row(
+                children: [
+                  Expanded(child: identity),
+                  const SizedBox(width: AppSpace.s8),
+                  returns,
+                ],
+              );
+            }
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (inline)
-                  Row(
-                    children: [
-                      Expanded(flex: 3, child: identity),
-                      const SizedBox(width: AppSpace.s13),
-                      Flexible(flex: 2, child: chip),
-                    ],
-                  )
-                else ...[
-                  identity,
-                  const SizedBox(height: AppSpace.s8),
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: chip,
-                  ),
-                ],
-                const SizedBox(height: AppSpace.s21),
-                Wrap(
-                  spacing: AppSpace.s13,
-                  runSpacing: AppSpace.s8,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  alignment: WrapAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      returnText,
-                      style: AppTypo.reportPercent(t, color: signedTone(pct)),
-                    ),
-                    if (profitText != null)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Profit / share', style: AppTypo.meta(t)),
-                          Text(
-                            profitText,
-                            style: AppTypo.ticker(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                              color: signedTone(pnl!),
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-                if (prices.isNotEmpty) ...[
-                  const SizedBox(height: AppSpace.s21),
-                  InkPanel(
-                    padding: const EdgeInsets.all(AppSpace.s13),
-                    child: _PricePanel(prices: prices, inline: inline),
-                  ),
-                ],
+                identity,
+                const SizedBox(height: AppSpace.s8),
+                returns,
               ],
             );
           },
+        ),
+        details: _StockDetails(
+          fields: [
+            (label: entryLabel, value: entryValue, color: t.textPrimary),
+            (label: 'Outcome', value: outcome, color: outcomeColor),
+            (label: exitLabel, value: exitValue, color: t.textPrimary),
+          ],
         ),
       ),
     );
   }
 }
 
-class _PricePanel extends StatelessWidget {
-  const _PricePanel({required this.prices, required this.inline});
+class _ReportStockFrame extends StatelessWidget {
+  const _ReportStockFrame({
+    required this.header,
+    required this.details,
+    this.outcomeColor,
+  });
 
-  final List<(String, String, String)> prices;
-  final bool inline;
+  final Widget header;
+  final Widget details;
+  final Color? outcomeColor;
+
+  static const double _stripeWidth = 3;
+  static const double _contentStart = AppSpace.md + _stripeWidth + AppSpace.sm;
+  static const _padding = EdgeInsetsDirectional.fromSTEB(
+    _contentStart,
+    AppSpace.s13,
+    AppSpace.md,
+    AppSpace.s13,
+  );
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final cells = [
-      for (final (i, (label, value, date)) in prices.indexed)
-        Column(
-          crossAxisAlignment: inline && i == 1
-              ? CrossAxisAlignment.end
-              : CrossAxisAlignment.start,
-          children: [
-            Text(
-              '$label · $date',
-              style: AppTypo.meta(t),
-              textAlign: inline && i == 1 ? TextAlign.end : TextAlign.start,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              value,
-              style: AppTypo.ticker(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: t.textPrimary,
-              ),
-            ),
-          ],
-        ),
-    ];
-    return inline && cells.length > 1
-        ? Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+
+    return AyreCard(
+      radius: AppRadius.control,
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Stack(
             children: [
-              Expanded(child: cells.first),
-              const SizedBox(width: AppSpace.s13),
-              Expanded(child: cells.last),
+              Padding(padding: _padding, child: header),
+              if (outcomeColor != null)
+                PositionedDirectional(
+                  start: AppSpace.md,
+                  top: AppSpace.s13,
+                  bottom: AppSpace.s13,
+                  width: _stripeWidth,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: outcomeColor,
+                      borderRadius: BorderRadius.circular(_stripeWidth),
+                    ),
+                  ),
+                ),
             ],
-          )
-        : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          ),
+          const HairlineDivider(),
+          ColoredBox(
+            color: Color.alphaBlend(
+              t.background.withValues(alpha: 0.45),
+              t.surface,
+            ),
+            child: Padding(padding: _padding, child: details),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StockDetails extends StatelessWidget {
+  const _StockDetails({required this.fields});
+
+  final List<({String label, String value, Color color})> fields;
+
+  @override
+  Widget build(BuildContext context) {
+    final labelStyle = AppTypo.meta(context.tokens).copyWith(fontSize: 13);
+    final valueStyle = AppTypo.ticker(fontSize: 16);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const gap = AppSpace.s8;
+        final width =
+            (constraints.maxWidth - gap * (fields.length - 1)) / fields.length;
+        final inline = fields.indexed.every(
+          (item) =>
+              item.$1 == 1 ||
+              singleLineTextWidth(context, item.$2.value, valueStyle) <= width,
+        );
+
+        if (!inline) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              cells.first,
-              if (cells.length > 1) ...[
-                const SizedBox(height: AppSpace.s13),
-                const HairlineDivider(),
-                const SizedBox(height: AppSpace.s13),
-                cells.last,
+              for (final (i, field) in fields.indexed) ...[
+                if (i > 0) const SizedBox(height: AppSpace.s8),
+                Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  spacing: gap,
+                  runSpacing: AppSpace.xxs,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(field.label, style: labelStyle),
+                    Text(
+                      field.value,
+                      style: valueStyle.copyWith(color: field.color),
+                    ),
+                  ],
+                ),
               ],
             ],
           );
+        }
+
+        Widget row({required bool labels}) => Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final (i, field) in fields.indexed) ...[
+              if (i > 0) const SizedBox(width: gap),
+              Expanded(
+                child: Text(
+                  labels ? field.label : field.value,
+                  style: labels
+                      ? labelStyle
+                      : valueStyle.copyWith(color: field.color),
+                  textAlign: switch (i) {
+                    0 => TextAlign.start,
+                    1 => TextAlign.center,
+                    _ => TextAlign.end,
+                  },
+                ),
+              ),
+            ],
+          ],
+        );
+
+        return Column(
+          children: [
+            row(labels: true),
+            const SizedBox(height: 3),
+            row(labels: false),
+          ],
+        );
+      },
+    );
   }
 }
 
@@ -730,7 +818,7 @@ class WeeklyReportSummarySkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return AyreCard(
       strongShadow: true,
-      padding: const EdgeInsets.symmetric(vertical: AppSpace.s13),
+      padding: const EdgeInsets.symmetric(vertical: AppSpace.s8),
       child: Row(
         children: [
           for (var i = 0; i < 3; i++)
@@ -759,18 +847,48 @@ class WeeklyReportSkeleton extends StatelessWidget {
       children: [
         for (var i = 0; i < 2; i++) ...[
           if (i > 0) const SizedBox(height: AppSpace.cardGap),
-          const AyreCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+          _ReportStockFrame(
+            header: const Row(
               children: [
-                SkeletonTickerRow(),
-                SizedBox(height: AppSpace.s21),
-                Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  child: SkeletonBlock(width: 89, height: 34),
+                SkeletonBlock(
+                  width: 44,
+                  height: 44,
+                  radius: AppRadius.iconTile,
                 ),
-                SizedBox(height: AppSpace.s21),
-                InkPanel(child: SkeletonBlock(height: 34)),
+                SizedBox(width: AppSpace.s13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SkeletonBlock(width: 85, height: 16),
+                      SizedBox(height: AppSpace.xxs),
+                      SkeletonBlock(width: 96, height: 12),
+                    ],
+                  ),
+                ),
+                SizedBox(width: AppSpace.s8),
+                SkeletonBlock(width: 60, height: 22),
+              ],
+            ),
+            details: Row(
+              children: [
+                for (final alignment in [
+                  AlignmentDirectional.centerStart,
+                  AlignmentDirectional.center,
+                  AlignmentDirectional.centerEnd,
+                ])
+                  Expanded(
+                    child: Align(
+                      alignment: alignment,
+                      child: const Column(
+                        children: [
+                          SkeletonBlock(width: 45, height: 12),
+                          SizedBox(height: AppSpace.xxs),
+                          SkeletonBlock(width: 60, height: 16),
+                        ],
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -857,16 +975,18 @@ String _ordinalSuffix(int day) {
   }
 }
 
-/// "23 Sep 2026" — the detail's compact date format, always with the year.
-String _shortDate(DateTime date) =>
-    '${date.day} ${_monthAbbrev[date.month - 1]} ${date.year}';
+String _shortDate(DateTime date, {bool includeYear = true}) =>
+    '${date.day} ${_monthAbbrev[date.month - 1]}${includeYear ? ' ${date.year}' : ''}';
+
+String _compactRupees(num value) {
+  final decimals = value == value.roundToDouble() ? 0 : 2;
+  return '₹${formatPrice(value, decimals: decimals)}';
+}
 
 /// A signed rupee amount — "+₹4,200" / "−₹700". Whole-rupee amounts render
 /// without decimals; anything with a fractional part keeps two, same
 /// rounding [formatPrice] itself uses everywhere else.
 String _formatSignedRupees(num value) {
   final sign = value >= 0 ? '+' : '−';
-  final abs = value.abs();
-  final decimals = abs == abs.roundToDouble() ? 0 : 2;
-  return '$sign₹${formatPrice(abs, decimals: decimals)}';
+  return '$sign${_compactRupees(value.abs())}';
 }

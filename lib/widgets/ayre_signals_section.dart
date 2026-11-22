@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../services/app_lifecycle.dart';
@@ -165,8 +167,7 @@ class _SignalsSectionState extends State<SignalsSection> {
       children: [
         const SectionLabel(
           label: 'Recommendations',
-          subtitle: 'Stock ideas with entry, exit and stop levels.',
-          padding: EdgeInsets.only(bottom: AppSpace.s21),
+          padding: EdgeInsets.only(bottom: AppSpace.sm),
         ),
         ..._board(columns),
       ],
@@ -184,7 +185,10 @@ class _SignalsSectionState extends State<SignalsSection> {
       ];
     }
 
-    if (_result!.isFailed) {
+    final result = _result!;
+    final signals = result.value ?? const <Signal>[];
+    final current = !result.stale && !_lastLoadFailed;
+    if (result.isFailed || (signals.isEmpty && !current)) {
       return [
         StatePanel.failed(
           headline: "The scanner couldn't refresh",
@@ -194,15 +198,8 @@ class _SignalsSectionState extends State<SignalsSection> {
       ];
     }
 
-    final signals = _result!.value ?? const <Signal>[];
-    final current = !_result!.stale && !_lastLoadFailed;
     if (signals.isEmpty) {
-      return const [
-        StatePanel.empty(
-          headline: 'No fresh setups right now',
-          message: 'Published recommendations will appear here.',
-        ),
-      ];
+      return const [_CaughtUp()];
     }
 
     // The backend returns every published signal in one neutral order, so
@@ -232,7 +229,6 @@ class _SignalsSectionState extends State<SignalsSection> {
           signal.addedOn,
         )),
       ),
-      if (current) ...[const SizedBox(height: AppSpace.s26), const _CaughtUp()],
     ];
   }
 }
@@ -334,7 +330,7 @@ class _SignalCard extends StatelessWidget {
       if (signal.stop case final stop? when stop.isFinite)
         _Level('Stop', stop, change: range?.stopPct, tone: t.negativeText),
       if (signal.entry case final entry? when entry.isFinite)
-        _Level('Entry', entry, flex: 3),
+        _Level('Entry', entry),
       if (signal.exitPrice case final exit? when exit.isFinite)
         _Level('Exit', exit, change: range?.exitPct, tone: t.positiveText),
     ];
@@ -388,7 +384,7 @@ class _SignalCard extends StatelessWidget {
               },
             ),
             if (range != null) ...[
-              const SizedBox(height: AppSpace.s26),
+              const SizedBox(height: AppSpace.s13),
               _RangeTrack(
                 key: ValueKey((
                   signal.symbol,
@@ -403,7 +399,7 @@ class _SignalCard extends StatelessWidget {
               ),
             ],
             if (prices.isNotEmpty) ...[
-              const SizedBox(height: AppSpace.s21),
+              const SizedBox(height: AppSpace.s8),
               Semantics(
                 label: range == null
                     ? null
@@ -412,9 +408,9 @@ class _SignalCard extends StatelessWidget {
               ),
             ],
             if (range != null) ...[
-              const SizedBox(height: AppSpace.s21),
-              const HairlineDivider(),
               const SizedBox(height: AppSpace.s13),
+              const HairlineDivider(),
+              const SizedBox(height: AppSpace.s8),
               SizedBox(
                 width: double.infinity,
                 child: Wrap(
@@ -433,13 +429,8 @@ class _SignalCard extends StatelessWidget {
               ),
             ],
             if (signal.rationale.trim().isNotEmpty) ...[
-              const SizedBox(height: AppSpace.s21),
-              Text(signal.rationale, style: AppTypo.body(t)),
-            ],
-            if (signal.addedOn case final date?
-                when date.trim().isNotEmpty) ...[
               const SizedBox(height: AppSpace.s13),
-              Text('Added $date', style: AppTypo.meta(t)),
+              Text(signal.rationale, style: AppTypo.body(t)),
             ],
           ],
         ),
@@ -557,21 +548,53 @@ class _RangeTrackState extends State<_RangeTrack>
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return ExcludeSemantics(
-      child: AnimatedBuilder(
-        animation: _controller,
-        builder: (context, child) => CustomPaint(
-          painter: _RangePainter(
-            position: widget.position,
-            progress: AppMotion.ease.transform(_controller.value),
-            loss: t.negative,
-            gain: t.positive,
-            entry: t.highlight,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: _RangePainter.endpointInset,
           ),
-          child: child,
+          child: Row(
+            textDirection: TextDirection.ltr,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(
+                  'Strong sell',
+                  textAlign: TextAlign.left,
+                  style: AppTypo.meta(t, color: t.negativeText),
+                ),
+              ),
+              const SizedBox(width: AppSpace.s8),
+              Expanded(
+                child: Text(
+                  'Strong buy',
+                  textAlign: TextAlign.right,
+                  style: AppTypo.meta(t, color: t.positiveText),
+                ),
+              ),
+            ],
+          ),
         ),
-        child: const SizedBox(width: double.infinity, height: 20),
-      ),
+        const SizedBox(height: AppSpace.xxs),
+        ExcludeSemantics(
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) => CustomPaint(
+              painter: _RangePainter(
+                position: widget.position,
+                progress: AppMotion.ease.transform(_controller.value),
+                loss: t.negative,
+                gain: t.positive,
+                entry: t.highlight,
+              ),
+              child: child,
+            ),
+            child: const SizedBox(height: 20),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -585,6 +608,8 @@ class _RangePainter extends CustomPainter {
     required this.entry,
   });
 
+  static const double endpointInset = 10;
+
   final double position;
   final double progress;
   final Color loss;
@@ -593,8 +618,8 @@ class _RangePainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (size.width <= 20 || progress <= 0) return;
-    const start = 10.0;
+    if (size.width <= 2 * endpointInset || progress <= 0) return;
+    const start = endpointInset;
     final end = size.width - start;
     final x = start + (end - start) * position;
     final center = size.height / 2;
@@ -647,52 +672,43 @@ class _Levels extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = context.tokens;
     return LayoutBuilder(
       builder: (context, constraints) {
-        final gap = AppSpace.s8 * (prices.length - 1);
-        final totalFlex = prices.fold(0, (sum, level) => sum + level.flex);
-        final scaler = MediaQuery.textScalerOf(context);
-        final fits = prices.every((level) {
-          final painter = TextPainter(
-            text: TextSpan(text: level.price, style: AppTypo.levelPrice(t)),
-            textDirection: Directionality.of(context),
-            textScaler: scaler,
-          )..layout();
-          final available =
-              (constraints.maxWidth - gap) * level.flex / totalFlex;
-          final fits = available >= painter.width;
-          painter.dispose();
-          return fits;
-        });
-        if (!fits) {
+        const gap = AppSpace.s8;
+        final widths = [
+          for (final level in prices) level.minimumWidth(context),
+        ];
+        final requiredWidth =
+            widths.reduce((a, b) => a + b) + gap * (widths.length - 1);
+        if (requiredWidth > constraints.maxWidth) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               for (var i = 0; i < prices.length; i++) ...[
-                if (i > 0) const SizedBox(height: AppSpace.s13),
+                if (i > 0) const SizedBox(height: AppSpace.s8),
                 prices[i],
               ],
             ],
           );
         }
 
+        final extra = (constraints.maxWidth - requiredWidth) / widths.length;
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (var i = 0; i < prices.length; i++) ...[
-              if (i > 0) const SizedBox(width: AppSpace.s8),
-              Expanded(
-                flex: prices[i].flex,
+              if (i > 0) const SizedBox(width: gap),
+              SizedBox(
+                width: widths[i] + extra,
                 child: _Level(
                   prices[i].label,
                   prices[i].value,
                   change: prices[i].change,
                   tone: prices[i].tone,
                   alignment: switch (i) {
-                    1 when prices.length == 3 => CrossAxisAlignment.center,
-                    2 => CrossAxisAlignment.end,
-                    _ => CrossAxisAlignment.start,
+                    0 => CrossAxisAlignment.start,
+                    _ when i == prices.length - 1 => CrossAxisAlignment.end,
+                    _ => CrossAxisAlignment.center,
                   },
                 ),
               ),
@@ -710,7 +726,6 @@ class _Level extends StatelessWidget {
     this.value, {
     this.change,
     this.tone,
-    this.flex = 2,
     this.alignment = CrossAxisAlignment.start,
   });
 
@@ -718,10 +733,28 @@ class _Level extends StatelessWidget {
   final num value;
   final double? change;
   final Color? tone;
-  final int flex;
   final CrossAxisAlignment alignment;
 
   String get price => '₹${formatPrice(value)}';
+
+  double minimumWidth(BuildContext context) {
+    final t = context.tokens;
+    final labelWidth = singleLineTextWidth(context, label, AppTypo.hint(t));
+    final priceWidth = singleLineTextWidth(
+      context,
+      price,
+      AppTypo.levelPrice(t),
+    );
+    if (change case final change?) {
+      final changeWidth = singleLineTextWidth(
+        context,
+        formatDelta(change),
+        AppTypo.value(t, color: tone, fontSize: 12),
+      );
+      return math.max(math.max(labelWidth, priceWidth), changeWidth);
+    }
+    return math.max(labelWidth, priceWidth);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -772,7 +805,11 @@ class _CaughtUp extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpace.s13),
-            Text('You’re all caught up', style: AppTypo.sectionHeading(t)),
+            Text(
+              'You’re all caught up',
+              style: AppTypo.sectionHeading(t),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 3),
             Text(
               'New ideas appear here as soon as they’re published.',

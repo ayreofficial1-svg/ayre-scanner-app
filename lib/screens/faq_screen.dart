@@ -22,7 +22,7 @@ class FaqScreen extends StatelessWidget {
           'Answers to the questions we hear most often.',
           style: AppTypo.reading(t),
         ),
-        const SizedBox(height: AppSpace.xl),
+        const SizedBox(height: AppSpace.sectionGap),
         RowGroup(
           children: [for (final entry in kLegalFaqs) _FaqTile(entry: entry)],
         ),
@@ -68,7 +68,7 @@ class _FaqTileState extends State<_FaqTile> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpace.s21,
-                  vertical: AppSpace.s13,
+                  vertical: AppSpace.hairlineRowPadding,
                 ),
                 child: Row(
                   children: [

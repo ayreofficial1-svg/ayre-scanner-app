@@ -37,6 +37,8 @@ flutter:
     # The authoritative brand mark, used as-is rather than recreated.
     - assets/brand/ayre_logo.png
     - assets/brand/ayre_logo_light.png
+    - assets/brand/investee_mark_on_dark.png
+    - assets/brand/investee_mark_on_light.png
     # Bundled company logos for AyreInstrumentTile (see
     # lib/services/stock_logo_service.dart), one PNG per NSE trading symbol
     # covering Nifty 500 + Sensex 30 + Bank Nifty. Declaring the directory

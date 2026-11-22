@@ -228,7 +228,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
 
           // ── Notifications ────────────────────────────────────────────
-          const SizedBox(height: 26),
+          const SizedBox(height: AppSpace.sectionGap),
           const _SettingsGroupLabel('Notifications'),
           KeyedSubtree(
             key: TourKeys.settingsNotifications,
@@ -318,7 +318,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // ── Account ──────────────────────────────────────────────────
           if (_user != null) ...[
-            const SizedBox(height: 26),
+            const SizedBox(height: AppSpace.sectionGap),
             const _SettingsGroupLabel('Account'),
             KeyedSubtree(
               key: TourKeys.settingsAccount,
@@ -351,7 +351,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ],
 
           // ── About ────────────────────────────────────────────────────
-          const SizedBox(height: 26),
+          const SizedBox(height: AppSpace.sectionGap),
           const _SettingsGroupLabel('About'),
           RowGroup(
             children: [

@@ -156,7 +156,8 @@ class _LearnTabState extends State<LearnTab> {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final p = t.mast;
+    const tone = AyreMastTone.learn;
+    final p = tone.paletteOf(t);
     final courses = _result?.value ?? const <Course>[];
     final subjects = _subjects;
     final columns = AppBreakpoints.columns(context);
@@ -176,9 +177,9 @@ class _LearnTabState extends State<LearnTab> {
       onRefresh: _load,
       maxWidth: columns > 1 ? 960 : null,
       header: AyreMastScaffold(
-        mast: AyreMasthead(
+        mast: AyreMasthead.tab(
+          tone: tone,
           overlap: AppShape.mastOverlap,
-          constrainContent: true,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -189,7 +190,7 @@ class _LearnTabState extends State<LearnTab> {
                   style: AppTypo.pageTitle(t, color: p.ink),
                 ),
               ),
-              const SizedBox(height: AppSpace.s8),
+              const SizedBox(height: AppSpace.xxs),
               Text(
                 'Understand the stock market better.',
                 style: AppTypo.subtitle(t, color: p.muted),
@@ -226,13 +227,13 @@ class _LearnTabState extends State<LearnTab> {
           Text('Showing the last available lessons.', style: AppTypo.meta(t)),
         ],
         if (resume != null) ...[
-          const SizedBox(height: AppSpace.s21),
+          const SizedBox(height: AppSpace.s13),
           Entrance(
             animate: _animateCourses,
             child: _ContinueCard(course: resume, onTap: () => _open(resume)),
           ),
         ],
-        const SizedBox(height: AppSpace.s21),
+        const SizedBox(height: AppSpace.s13),
         if (showLibrary) const SectionLabel(label: 'Library'),
         if (showLibrary && subjects.length > 1) ...[
           _SubjectFilter(
@@ -240,7 +241,7 @@ class _LearnTabState extends State<LearnTab> {
             selected: _category,
             onSelected: _selectSubject,
           ),
-          const SizedBox(height: AppSpace.s13),
+          const SizedBox(height: AppSpace.s8),
         ],
         AnimatedSize(
           alignment: Alignment.topCenter,
@@ -264,7 +265,7 @@ class _LearnTabState extends State<LearnTab> {
             ),
           ),
         ),
-        const SizedBox(height: AppSpace.s34),
+        const SizedBox(height: AppSpace.sectionGap),
         const _LearnFooter(),
       ],
     );
@@ -554,9 +555,13 @@ class _LibraryIllustration extends StatelessWidget {
     final t = context.tokens;
     return ExcludeSemantics(
       child: SizedBox(
-        width: 105,
-        height: 89,
-        child: CustomPaint(painter: _LibraryOutline(t.accentInk, t.highlight)),
+        height: 64,
+        child: FittedBox(
+          child: CustomPaint(
+            size: const Size(105, 89),
+            painter: _LibraryOutline(t.accentInk, t.highlight),
+          ),
+        ),
       ),
     );
   }

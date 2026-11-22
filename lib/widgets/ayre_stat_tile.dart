@@ -39,7 +39,6 @@ class AyreStatTile extends StatelessWidget {
     final count = int.tryParse(value);
 
     return AyreCard(
-      padding: const EdgeInsets.all(AppSpace.s21),
       child: MergeSemantics(
         child: Row(
           children: [
@@ -78,7 +77,7 @@ class AyreStatTile extends StatelessWidget {
                         color: t.textPrimary,
                       ),
                     ),
-                  const SizedBox(height: AppSpace.xxs),
+                  const SizedBox(height: 2),
                   Text(label, style: AppTypo.body(t, color: t.foregroundMuted)),
                 ],
               ),

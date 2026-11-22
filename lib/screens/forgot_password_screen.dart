@@ -94,7 +94,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       subtitle:
           "Enter your email and we'll send you a link to set a new password.",
       tone: AyreMastTone.standard,
-      mastHeight: AppShape.mastTab,
+      mastHeight: AppShape.mastRegister,
       bodyTop: AppSpace.s21,
       children: [
         AuthField(

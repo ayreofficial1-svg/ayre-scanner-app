@@ -300,7 +300,7 @@ class StatePanel extends StatelessWidget {
       child: AyreCard(
         padding: EdgeInsets.symmetric(
           horizontal: AppSpace.s21,
-          vertical: compact ? AppSpace.s21 : AppSpace.s34,
+          vertical: compact ? AppSpace.s13 : AppSpace.md,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -319,7 +319,7 @@ class StatePanel extends StatelessWidget {
                 color: tone,
               ),
             ),
-            SizedBox(height: AppSpace.s21),
+            const SizedBox(height: AppSpace.s13),
             Text(
               headline,
               textAlign: TextAlign.center,
@@ -328,7 +328,7 @@ class StatePanel extends StatelessWidget {
             const SizedBox(height: AppSpace.xs),
             Text(message, textAlign: TextAlign.center, style: AppTypo.body(t)),
             if (onRetry != null) ...[
-              SizedBox(height: compact ? AppSpace.md : AppSpace.lg),
+              const SizedBox(height: AppSpace.s13),
               AyreButton(
                 label: resolvedActionLabel,
                 // The refresh glyph belongs to states that re-fetch. An expired
@@ -418,7 +418,7 @@ class CalmStatePanel extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpace.lg,
-          vertical: AppSpace.xxl,
+          vertical: AppSpace.s13,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -433,13 +433,13 @@ class CalmStatePanel extends StatelessWidget {
                   ),
                   child: AyreIcon(preset.glyph, size: 24, color: tone),
                 ),
-            const SizedBox(height: AppSpace.lg),
+            const SizedBox(height: AppSpace.s8),
             Text(
               headline,
               textAlign: TextAlign.center,
               style: AppTypo.sectionTitle(t),
             ),
-            const SizedBox(height: AppSpace.xs),
+            const SizedBox(height: AppSpace.xxs),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 233),
               child: Text(
@@ -449,7 +449,7 @@ class CalmStatePanel extends StatelessWidget {
               ),
             ),
             if (onRetry != null) ...[
-              const SizedBox(height: AppSpace.lg),
+              const SizedBox(height: AppSpace.s13),
               _RefreshDot(
                 label: preset == StatePreset.empty
                     ? 'Refresh'
@@ -484,7 +484,7 @@ class _RefreshDot extends StatelessWidget {
         message: label,
         child: PressableScale(
           onTap: onTap,
-          borderRadius: AppRadius.circle,
+          shape: AppShape.field,
           child: Container(
             width: AppSpace.minTarget,
             height: AppSpace.minTarget,

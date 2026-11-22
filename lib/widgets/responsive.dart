@@ -1,5 +1,17 @@
 import 'package:flutter/material.dart';
 
+double singleLineTextWidth(BuildContext context, String text, TextStyle style) {
+  final painter = TextPainter(
+    text: TextSpan(text: text, style: style),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+    maxLines: 1,
+  )..layout();
+  final width = painter.width.ceilToDouble();
+  painter.dispose();
+  return width;
+}
+
 /// Material window size classes (Spec §13.2). Additive: the 720/1120 pivots
 /// below are test-locked and unchanged.
 enum AppWindowClass { compact, medium, expanded }

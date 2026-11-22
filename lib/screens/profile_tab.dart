@@ -115,7 +115,8 @@ class _ProfileTabState extends State<ProfileTab> {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final p = t.mast;
+    const tone = AyreMastTone.profile;
+    final p = tone.paletteOf(t);
     final auth = AuthService.instance;
     final verification = EmailVerificationService.instance;
 
@@ -123,9 +124,9 @@ class _ProfileTabState extends State<ProfileTab> {
       controller: widget.scrollController,
       eager: true,
       header: AyreMastScaffold(
-        mast: AyreMasthead(
+        mast: AyreMasthead.tab(
+          tone: tone,
           overlap: AppShape.mastOverlap,
-          constrainContent: true,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -136,7 +137,7 @@ class _ProfileTabState extends State<ProfileTab> {
                   style: AppTypo.pageTitle(t, color: p.ink),
                 ),
               ),
-              const SizedBox(height: AppSpace.s8),
+              const SizedBox(height: AppSpace.xxs),
               Text(
                 'Your account, alerts and help.',
                 style: AppTypo.subtitle(t, color: p.muted),
@@ -209,7 +210,7 @@ class _ProfileTabState extends State<ProfileTab> {
             );
           },
         ),
-        const SizedBox(height: AppSpace.s13),
+        const SizedBox(height: AppSpace.s8),
         ListenableBuilder(
           listenable: NotificationLog.instance,
           builder: (context, _) {
@@ -238,12 +239,8 @@ class _ProfileTabState extends State<ProfileTab> {
             );
           },
         ),
-        const SizedBox(height: 26),
-        const SectionLabel(
-          label: 'Help',
-          eyebrow: true,
-          padding: EdgeInsets.only(bottom: AppSpace.s8),
-        ),
+        const SizedBox(height: AppSpace.sectionGap),
+        const SectionLabel(label: 'Help', eyebrow: true),
         RowGroup(
           children: [
             SettingRow(
@@ -269,7 +266,7 @@ class _ProfileTabState extends State<ProfileTab> {
             ),
           ],
         ),
-        const SizedBox(height: AppSpace.s13),
+        const SizedBox(height: AppSpace.s8),
         RowGroup(
           children: [
             SettingRow(
@@ -281,7 +278,7 @@ class _ProfileTabState extends State<ProfileTab> {
             ),
           ],
         ),
-        const SizedBox(height: AppSpace.s13),
+        const SizedBox(height: AppSpace.s8),
         RowGroup(
           children: [
             SettingRow(
@@ -343,7 +340,6 @@ class _IdentityCard extends StatelessWidget {
       ].join(', '),
       child: AyreCard(
         onTap: onTap,
-        padding: const EdgeInsets.all(AppSpace.s21),
         strongShadow: true,
         notch: true,
         child: Row(
@@ -366,7 +362,7 @@ class _IdentityCard extends StatelessWidget {
                     Text(email!, style: AppTypo.caption(t)),
                   ],
                   if (verified != null) ...[
-                    const SizedBox(height: AppSpace.s8),
+                    const SizedBox(height: AppSpace.xxs),
                     AyreChip(
                       label: verified! ? 'Verified' : 'Unverified',
                       tone: verified! ? ChipTone.success : ChipTone.attention,

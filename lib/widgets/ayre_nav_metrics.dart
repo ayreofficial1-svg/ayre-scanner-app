@@ -7,18 +7,18 @@ import '../theme/app_theme.dart';
 import 'responsive.dart';
 
 /// Single source of truth for the bottom dock and the navigation rail
-/// geometry (reference: full-width dock, 89 logical px at the 390×844 board).
+/// geometry.
 /// The nav itself, scrolling tabs and pushed detail screens all read their
 /// clearance from here so the numbers cannot drift.
 abstract final class AyreNavMetrics {
-  /// Reference dock height at baseline (no inset, default text scale).
-  static const double minHeight = 89;
+  /// Dock height at baseline (no inset, default text scale).
+  static const double minHeight = 76;
 
-  /// Padding above the destinations (reference 13).
-  static const double topPadding = 13;
+  /// Padding above the destinations.
+  static const double topPadding = 8;
 
-  /// Smallest breathing room kept under the label (89 − 13 − 34 − 5 − label).
-  static const double minBottomPadding = 24;
+  /// Minimum space below the destination labels.
+  static const double minBottomPadding = 16;
 
   /// Extra air kept between the system inset and the label when an inset
   /// exists.

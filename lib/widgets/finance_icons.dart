@@ -174,18 +174,12 @@ class _FinanceIconPainter extends CustomPainter {
       case FinanceGlyph.moon:
         return [
           Path()
-            ..moveTo(20, 14.5)
-            ..arcToPoint(
-              const Offset(9.5, 4),
-              radius: const Radius.circular(8),
-              largeArc: true,
-              clockwise: false,
-            )
-            ..arcToPoint(
-              const Offset(20, 14.5),
-              radius: const Radius.circular(6.5),
-              clockwise: true,
-            )
+            ..moveTo(20, 15.6)
+            ..cubicTo(18.5, 18.6, 15.5, 20.4, 12.1, 20.4)
+            ..cubicTo(7.4, 20.4, 3.7, 16.6, 3.7, 12)
+            ..cubicTo(3.7, 8.4, 5.8, 5.4, 8.9, 4.1)
+            ..cubicTo(8.0, 7.3, 9.1, 10.6, 11.4, 12.9)
+            ..cubicTo(13.7, 15.2, 17, 16.3, 20, 15.6)
             ..close(),
         ];
       case FinanceGlyph.sun:

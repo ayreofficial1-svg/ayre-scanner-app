@@ -47,7 +47,7 @@ class SupportScreen extends StatelessWidget {
           'instead. Including the version below usually saves a round trip.',
           style: AppTypo.reading(t),
         ),
-        const SizedBox(height: AppSpace.xl),
+        const SizedBox(height: AppSpace.sectionGap),
         const SectionLabel(label: 'Tutorials', eyebrow: true),
         RowGroup(
           children: [

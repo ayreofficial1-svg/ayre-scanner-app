@@ -37,7 +37,7 @@ class AyrePageHeader extends StatelessWidget {
     final t = context.tokens;
     final top = MediaQuery.paddingOf(context).top;
     final gutter = AppSpace.gutterOf(context);
-    final topPad = (55 - top) < AppSpace.s13 ? AppSpace.s13 : 55 - top;
+    final topPad = (42 - top).clamp(AppSpace.s8, 42.0);
 
     final VoidCallback? back = !backEnabled
         ? null
@@ -50,7 +50,7 @@ class AyrePageHeader extends StatelessWidget {
         gutter,
         top + topPad,
         gutter,
-        AppSpace.s8,
+        AppSpace.xxs,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -139,7 +139,12 @@ class AyrePageScaffold extends StatelessWidget {
                 backEnabled: backEnabled,
               ),
               Padding(
-                padding: EdgeInsets.fromLTRB(gutter, 13, gutter, 34),
+                padding: EdgeInsets.fromLTRB(
+                  gutter,
+                  AppSpace.s8,
+                  gutter,
+                  AppSpace.s21,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: children,

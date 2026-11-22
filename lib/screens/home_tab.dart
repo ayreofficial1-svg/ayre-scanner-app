@@ -13,7 +13,6 @@ import '../widgets/ayre_avatar.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
 import '../widgets/ayre_insight_carousel.dart';
-import '../widgets/ayre_logo.dart';
 import '../widgets/ayre_masthead.dart';
 import '../widgets/ayre_signals_section.dart';
 import '../widgets/ayre_tab_scroll.dart';
@@ -170,18 +169,17 @@ class _HomeTabState extends State<HomeTab> {
     return AyreTabScroll(
       controller: widget.scrollController,
       eager: true,
-      header: AyreMasthead(
+      header: AyreMasthead.tab(
         tone: AyreMastTone.home,
         height: AppShape.mastHome,
-        contentBottomClearance: AppSpace.s34,
-        constrainContent: true,
+        contentBottomClearance: AppSpace.s26,
         child: _Header(name: displayName, onOpenProfile: widget.onOpenProfile),
       ),
       // One network pass per surface; the signals reload is silent.
       onRefresh: () =>
           Future.wait([_load(), _signalsController.reload(silent: true)]),
       children: [
-        const SizedBox(height: AppSpace.s21),
+        const SizedBox(height: AppSpace.s13),
         KeyedSubtree(
           key: _signalsKey,
           child: Entrance(
@@ -278,27 +276,11 @@ class _Header extends StatelessWidget {
     final resolved = name.trim();
     final now = DateTime.now();
     final date = _dateFor(now);
-    final brand = Wrap(
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: AppSpace.s8,
-      children: [
-        LogoMark(placement: LogoPlacement.home, color: mast.ink),
-        Text(
-          'Scanner',
-          style: AppTypo.ui(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: mast.muted,
-          ),
-        ),
-      ],
-    );
-    final controls = Wrap(
-      spacing: 4,
-      runSpacing: 4,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    final controls = Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         const _ThemeToggle(key: TourKeys.homeTheme),
+        const SizedBox(width: AppSpace.xxs),
         ListenableBuilder(
           key: TourKeys.homeAlerts,
           listenable: NotificationLog.instance,
@@ -336,6 +318,7 @@ class _Header extends StatelessWidget {
             );
           },
         ),
+        const SizedBox(width: AppSpace.xxs),
         _AccountControl(name: resolved, onTap: onOpenProfile),
       ],
     );
@@ -344,35 +327,50 @@ class _Header extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final scale = MediaQuery.textScalerOf(context).scale(13) / 13;
-            if (constraints.maxWidth < 280 + 52 * scale) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  brand,
-                  const SizedBox(height: AppSpace.s8),
-                  controls,
-                ],
-              );
-            }
-            return Row(
-              children: [
-                Expanded(child: brand),
-                const SizedBox(width: AppSpace.s8),
-                controls,
-              ],
-            );
-          },
+        Row(
+          children: [
+            Expanded(
+              child: Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset(
+                        'assets/brand/investee_mark_on_dark.png',
+                        width: 23,
+                        height: 17,
+                        fit: BoxFit.contain,
+                        excludeFromSemantics: true,
+                      ),
+                      const SizedBox(width: AppSpace.s8),
+                      Text(
+                        'investee',
+                        semanticsLabel: 'Investee',
+                        textScaler: TextScaler.noScaling,
+                        style: AppTypo.display(
+                          fontSize: 22,
+                          height: 1,
+                          color: mast.ink,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpace.s8),
+            controls,
+          ],
         ),
-        const SizedBox(height: AppSpace.s34),
+        const SizedBox(height: AppSpace.s13),
         Text(_greetingFor(now), style: AppTypo.subtitle(t, color: mast.muted)),
         if (resolved.isNotEmpty) ...[
           const SizedBox(height: 3),
           Text(resolved, style: AppTypo.homeName(t, color: mast.ink)),
         ],
-        const SizedBox(height: AppSpace.s8),
+        SizedBox(height: resolved.isNotEmpty ? AppSpace.s8 : AppSpace.xxs),
         FractionallySizedBox(
           alignment: AlignmentDirectional.centerStart,
           widthFactor: 0.72,

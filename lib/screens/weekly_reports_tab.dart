@@ -106,7 +106,7 @@ class _WeeklyReportsTabState extends State<WeeklyReportsTab> {
             )
           : const WeeklyReportMast(),
       children: [
-        const SizedBox(height: AppSpace.s21),
+        const SizedBox(height: AppSpace.s13),
         if (_loading)
           Semantics(
             label: 'Loading weekly reports',

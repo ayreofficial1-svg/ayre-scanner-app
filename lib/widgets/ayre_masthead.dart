@@ -13,11 +13,14 @@ enum AyreMastTone {
   /// Default sage (light) / dark-green (dark) mast.
   standard,
 
-  /// Champagne variant (Reports, register).
+  /// Champagne variant for registration.
   champagne,
 
-  /// Home: deep green in light, the default dark mast in dark.
+  /// Tab palettes, progressively lighter in light mode.
   home,
+  reports,
+  learn,
+  profile,
 }
 
 extension AyreMastToneX on AyreMastTone {
@@ -25,44 +28,49 @@ extension AyreMastToneX on AyreMastTone {
     AyreMastTone.standard => t.mast,
     AyreMastTone.champagne => t.mastChampagne,
     AyreMastTone.home => t.mastHome,
+    AyreMastTone.reports => t.mastReports,
+    AyreMastTone.learn => t.mastLearn,
+    AyreMastTone.profile => t.mastProfile,
   };
 }
 
-/// The shared masthead: a flat fill clipped to the polygon
-/// `(0,0) (w,0) (w,h−55) (0,h)` with a low-opacity block watermark at its
-/// bottom-right. Content (title, header actions, logo) is laid out *over* it
-/// and is never clipped.
+/// A diagonal masthead with a watermark and room for its content to grow.
 ///
-/// [height] is the reference mast height (233 tabs, 267 Home, 322 sign-in);
-/// the mast grows with the top safe inset and with [child] so text always
-/// stays above the diagonal. The first overlapping card should use
-/// [AyreMastScaffold] so it occupies real layout space.
+/// Use [AyreMastScaffold] when the first card overlaps the mast.
 class AyreMasthead extends StatelessWidget {
   const AyreMasthead({
     super.key,
     this.tone = AyreMastTone.standard,
-    this.height = AppShape.mastTab,
+    this.height = AppShape.mastRegister,
     this.child,
     this.palette,
     this.padding,
     this.overlap = 0,
     this.contentBottomClearance,
-    this.constrainContent = false,
-  });
+  }) : _tab = false;
+
+  const AyreMasthead.tab({
+    super.key,
+    this.tone = AyreMastTone.standard,
+    this.height = AppShape.mastTab,
+    required this.child,
+    this.overlap = 0,
+    this.contentBottomClearance,
+  }) : _tab = true,
+       palette = null,
+       padding = null;
 
   final AyreMastTone tone;
 
-  /// How far the first card overlaps the mast bottom (34 on tabs). The mast
+  /// How far the first card overlaps the mast bottom. The mast
   /// *paints* [overlap] below its layout box, so the card that follows
   /// occupies real layout space, stays hit-testable and paints over it.
   final double overlap;
   final double? contentBottomClearance;
 
-  /// Aligns tab headings with their standard reading column.
-  final bool constrainContent;
+  final bool _tab;
 
-  /// Reference height at 390 width, measured from the top of the window (the
-  /// safe inset is *included*, not added on top).
+  /// Minimum height from the top of the window, including the safe inset.
   final double height;
 
   /// Overrides [tone] with an explicit palette.
@@ -71,8 +79,7 @@ class AyreMasthead extends StatelessWidget {
   /// Content laid over the backdrop.
   final Widget? child;
 
-  /// Content padding; defaults to the gutter and a top that places the first
-  /// line at the reference y = 55 once the safe inset is counted.
+  /// Optional padding inside the system insets.
   final EdgeInsetsGeometry? padding;
 
   /// Reference y of the first content line (inset included).
@@ -85,9 +92,10 @@ class AyreMasthead extends StatelessWidget {
     final safe = MediaQuery.paddingOf(context);
     final top = safe.top;
     final gutter = AppSpace.gutterOf(context);
-    // Never add a second 55 on top of the inset: reserve what is left of 55
-    // after the inset, with at least 13 of air on tall cutouts.
-    final topPad = math.max(AppSpace.s13, contentTop - top);
+    final targetTop = _tab ? 42.0 : contentTop;
+    final minimumTopPad = _tab ? AppSpace.s8 : AppSpace.s13;
+    final topPad = math.max(minimumTopPad, targetTop - top);
+    final diagonal = _tab ? AppShape.tabMastDiagonal : AppShape.mastDiagonal;
     final resolved =
         padding ?? EdgeInsetsDirectional.fromSTEB(gutter, topPad, gutter, 0);
 
@@ -101,25 +109,25 @@ class AyreMasthead extends StatelessWidget {
             Theme.of(context).brightness,
           ),
           child: CustomPaint(
-            painter: _MastPainter(palette: p, overlap: overlap),
+            painter: _MastPainter(
+              palette: p,
+              overlap: overlap,
+              diagonal: diagonal,
+            ),
             child: ConstrainedBox(
               constraints: BoxConstraints(
                 minHeight:
-                    height -
-                    overlap +
-                    math.max(0, top - contentTop + AppSpace.s13),
+                    height - overlap + math.max(0, top + topPad - targetTop),
               ),
               child: Padding(
                 padding: EdgeInsets.only(
                   left: safe.left,
                   right: safe.right,
                   top: top,
-                  // Keep content above the diagonal: it rises 55 at the right.
                   bottom:
-                      contentBottomClearance ??
-                      math.max(0, AppShape.mastDiagonal - overlap),
+                      contentBottomClearance ?? math.max(0, diagonal - overlap),
                 ).add(resolved),
-                child: constrainContent
+                child: _tab
                     ? Align(
                         alignment: Alignment.topCenter,
                         child: ConstrainedBox(
@@ -141,10 +149,15 @@ class AyreMasthead extends StatelessWidget {
 }
 
 class _MastPainter extends CustomPainter {
-  const _MastPainter({required this.palette, required this.overlap});
+  const _MastPainter({
+    required this.palette,
+    required this.overlap,
+    required this.diagonal,
+  });
 
   final MastPalette palette;
   final double overlap;
+  final double diagonal;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -153,16 +166,16 @@ class _MastPainter extends CustomPainter {
     final shape = Path()
       ..moveTo(0, 0)
       ..lineTo(w, 0)
-      ..lineTo(w, h - AppShape.mastDiagonal)
+      ..lineTo(w, h - diagonal)
       ..lineTo(0, h)
       ..close();
     canvas.drawPath(shape, Paint()..color = palette.fill);
 
-    // Watermark: 233×178 polygon, bottom-right, clipped by the mast shape.
+    // Scale the watermark down for shorter masts to keep it out of the header.
     canvas.save();
     canvas.clipPath(shape);
-    const mw = 233.0;
-    const mh = 178.0;
+    final mh = math.min(178.0, h * 0.78);
+    final mw = 233 * mh / 178;
     final ox = w - mw;
     final oy = h - mh;
     Offset pt(double fx, double fy) => Offset(ox + fx * mw, oy + fy * mh);
@@ -182,10 +195,12 @@ class _MastPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_MastPainter old) =>
-      old.palette != palette || old.overlap != overlap;
+      old.palette != palette ||
+      old.overlap != overlap ||
+      old.diagonal != diagonal;
 }
 
-/// A mast plus the card that overlaps it by [overlap] (34), as real scroll
+/// A mast plus the card that overlaps it, as real scroll
 /// content: build the [mast] with the same `overlap` so it paints that far
 /// below its layout box; the card then occupies actual layout space (no
 /// Stack-only height, nothing clipped or overflowing) and stays tappable.

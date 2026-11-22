@@ -19,83 +19,41 @@ enum LogoPlacement {
   home,
 }
 
-/// The approved Investee mark, cropped tightly to the artwork.
-///
-/// Brand-asset decision (plan D01): the HTML's flat-topped block "in" is *not*
-/// geometrically identical to the approved asset, so it is never traced. The
-/// approved sloped mark is used exactly as supplied. Only opaque variants
-/// exist (`assets/brand/ayre_logo*.png`, deep-green and ivory fields baked
-/// in), so the mark is shown on its own matching field as a rounded tile —
-/// never stretched, recoloured or isolated without permission. When a
-/// transparent approved variant is supplied, only [LogoGlyph] needs to change.
-///
-/// The source is 2048×2048 with the mark occupying x 436–1612 / y 592–1456.
-/// The crop below adds 120px of field on every side and is centred on the
-/// image (centre 1024,1024), so it is a plain centred window.
+/// Transparent Investee artwork with spacing before the wordmark.
 class LogoGlyph extends StatelessWidget {
-  const LogoGlyph({super.key, required this.height});
+  const LogoGlyph({super.key, required this.height, this.wordmarkGap});
 
-  /// Rendered tile height; the width follows the crop's aspect ratio.
+  /// Rendered height of the square image.
   final double height;
+  final double? wordmarkGap;
 
   static const String assetPathDark = 'assets/brand/ayre_logo.png';
   static const String assetPathLight = 'assets/brand/ayre_logo_light.png';
-
-  static const double _source = 2048;
-  static const double _cropW = 1416; // 1176 mark + 2×120 field
-  static const double _cropH = 1104; // 864 mark + 2×120 field
-
-  /// Tile width/height ratio.
-  static const double aspect = _cropW / _cropH;
-
-  double get width => height * aspect;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final assetPath = dark ? assetPathDark : assetPathLight;
-    // The artwork carries its own field: brand deep green in the dark variant
-    // and brand ivory in the light one, so a matching ColoredBox keeps
-    // anti-aliased corners free of any other tone.
-    final field = dark ? const Color(0xFF0F3D2E) : const Color(0xFFF7F5EF);
-    final side = height * (_source / _cropH);
-    final w = width;
-    return ExcludeSemantics(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(
-          (height * 0.3).clamp(4.0, AppRadius.inset),
-        ),
-        child: ColoredBox(
-          color: field,
-          child: SizedBox(
-            width: w,
-            height: height,
-            child: OverflowBox(
-              minWidth: 0,
-              minHeight: 0,
-              maxWidth: side,
-              maxHeight: side,
-              child: Image.asset(
-                assetPath,
-                width: side,
-                height: side,
-                fit: BoxFit.fill,
-                filterQuality: FilterQuality.medium,
-                cacheWidth:
-                    (side * MediaQuery.devicePixelRatioOf(context)).round(),
-                errorBuilder: (context, _, _) => SizedBox(
-                  width: w,
-                  height: height,
-                  child: Center(
-                    child: Text(
-                      'in',
-                      style: AppTypo.display(
-                        fontSize: height * 0.6,
-                        color: t.textPrimary,
-                      ),
-                    ),
-                  ),
+    return Padding(
+      padding: EdgeInsetsDirectional.only(end: wordmarkGap ?? height * 0.3),
+      child: Image.asset(
+        assetPath,
+        width: height,
+        height: height,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+        cacheWidth: (height * MediaQuery.devicePixelRatioOf(context)).round(),
+        excludeFromSemantics: true,
+        errorBuilder: (context, _, _) => ExcludeSemantics(
+          child: SizedBox.square(
+            dimension: height,
+            child: Center(
+              child: Text(
+                'in',
+                style: AppTypo.display(
+                  fontSize: height * 0.6,
+                  color: t.textPrimary,
                 ),
               ),
             ),
@@ -111,7 +69,11 @@ class LogoGlyph extends StatelessWidget {
 /// scale-down fit so the text is never clipped, and independent of the OS /
 /// in-app text scale (a logo does not reflow with reading size).
 class LogoMark extends StatelessWidget {
-  const LogoMark({super.key, this.placement = LogoPlacement.header, this.color});
+  const LogoMark({
+    super.key,
+    this.placement = LogoPlacement.header,
+    this.color,
+  });
 
   final LogoPlacement placement;
 
@@ -134,6 +96,7 @@ class LogoMark extends StatelessWidget {
     final t = context.tokens;
     final s = size;
     final h = s.height;
+    final isSplash = placement == LogoPlacement.splash;
     return Semantics(
       label: 'Investee',
       image: true,
@@ -143,13 +106,15 @@ class LogoMark extends StatelessWidget {
           height: h,
           child: FittedBox(
             fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
+            alignment: isSplash ? Alignment.center : Alignment.centerLeft,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                LogoGlyph(height: h),
-                SizedBox(width: h * 0.3),
+                LogoGlyph(
+                  height: h,
+                  wordmarkGap: isSplash ? AppSpace.s8 : null,
+                ),
                 Text(
                   'investee',
                   textScaler: TextScaler.noScaling,

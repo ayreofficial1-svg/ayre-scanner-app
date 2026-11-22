@@ -50,7 +50,7 @@ class AyreTabScroll extends StatelessWidget {
         AyreTabHost.maybeClearanceOf(context) ??
             AyreNavMetrics.clearanceOf(context),
       ) +
-      AppSpace.s21;
+      AppSpace.s13;
 
   @override
   Widget build(BuildContext context) {

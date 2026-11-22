@@ -34,6 +34,12 @@ class MastPalette {
     required this.motif,
   });
 
+  const MastPalette._lightTab(this.fill)
+    : ink = const Color(0xFFF7F5EF),
+      muted = const Color(0xFFDEE8E1),
+      glass = const Color(0x1AF7F5EF),
+      motif = const Color(0x0DF7F5EF);
+
   /// `--mb` — the mast backdrop.
   final Color fill;
 
@@ -114,6 +120,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     required this.mast,
     required this.mastChampagne,
     required this.mastHome,
+    required this.mastReports,
+    required this.mastLearn,
+    required this.mastProfile,
     required this.notch,
     required this.homeAvatarFill,
     required this.homeAvatarInk,
@@ -220,14 +229,19 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   /// Saffron-family text that clears 4.5:1 on its theme's surfaces.
   final Color highlightText;
 
-  /// Default sage mast (`.L` / `.D`) — most tabs and every secondary mast.
+  /// Default sage or dark-green mast.
   final MastPalette mast;
 
-  /// Champagne mast (`.t2`) — Reports, Create account.
+  /// Champagne mast for Create account and dark-mode Reports.
   final MastPalette mastChampagne;
 
-  /// Home mast: deep green in light (`.L.hg`); in dark the default dark mast.
+  /// Home mast in the two app themes.
   final MastPalette mastHome;
+
+  /// The other tab mastheads, ordered from darkest to lightest in light mode.
+  final MastPalette mastReports;
+  final MastPalette mastLearn;
+  final MastPalette mastProfile;
 
   /// The saffron card notch / dock marker (same as [highlight], kept as its
   /// own role so it can diverge from text uses of saffron).
@@ -285,6 +299,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     MastPalette? mast,
     MastPalette? mastChampagne,
     MastPalette? mastHome,
+    MastPalette? mastReports,
+    MastPalette? mastLearn,
+    MastPalette? mastProfile,
     Color? notch,
     Color? homeAvatarFill,
     Color? homeAvatarInk,
@@ -328,6 +345,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       mast: mast ?? this.mast,
       mastChampagne: mastChampagne ?? this.mastChampagne,
       mastHome: mastHome ?? this.mastHome,
+      mastReports: mastReports ?? this.mastReports,
+      mastLearn: mastLearn ?? this.mastLearn,
+      mastProfile: mastProfile ?? this.mastProfile,
       notch: notch ?? this.notch,
       homeAvatarFill: homeAvatarFill ?? this.homeAvatarFill,
       homeAvatarInk: homeAvatarInk ?? this.homeAvatarInk,
@@ -377,6 +397,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       mast: MastPalette.lerp(mast, other.mast, t),
       mastChampagne: MastPalette.lerp(mastChampagne, other.mastChampagne, t),
       mastHome: MastPalette.lerp(mastHome, other.mastHome, t),
+      mastReports: MastPalette.lerp(mastReports, other.mastReports, t),
+      mastLearn: MastPalette.lerp(mastLearn, other.mastLearn, t),
+      mastProfile: MastPalette.lerp(mastProfile, other.mastProfile, t),
       notch: c(notch, other.notch),
       homeAvatarFill: c(homeAvatarFill, other.homeAvatarFill),
       homeAvatarInk: c(homeAvatarInk, other.homeAvatarInk),
@@ -481,15 +504,16 @@ abstract final class AppShape {
   static const double switchThumb = 20;
   static const double switchInset = 3;
 
-  /// Mast heights at the 390 reference width and the shared right-edge rise.
-  static const double mastHome = 267;
-  static const double mastTab = 233;
+  /// Minimum mast heights and the rise at the right edge.
+  static const double mastHome = 214;
+  static const double mastTab = 146;
   static const double mastLogin = 322;
   static const double mastRegister = 233;
   static const double mastDiagonal = 55;
+  static const double tabMastDiagonal = 34;
 
   /// Summary / identity cards overlap the mast bottom by this much.
-  static const double mastOverlap = 34;
+  static const double mastOverlap = 21;
 
   /// A card surface: fill, opaque 1px line and the asymmetric radius.
   static BoxDecoration cardDecoration(
@@ -666,23 +690,24 @@ abstract final class AppSpace {
   }
 
   /// Gap above a section label / between major sections.
-  static const double sectionGap = s26;
+  static const double sectionGap = md;
 
   /// Gap between sibling cards and rows.
   static const double cardGap = 13;
 
   /// Card internal padding.
   static const double cardPadding = 21;
+  static const double cardVerticalPadding = s13;
 
   /// Gap between elements inside a card.
   static const double inCardGap = 13;
 
   /// Vertical padding of a hairline-divided row.
-  static const double hairlineRowPadding = 13;
+  static const double hairlineRowPadding = s8;
   static const double row = hairlineRowPadding;
 
   /// Section label gap below.
-  static const double sectionLabelBelow = 8;
+  static const double sectionLabelBelow = 6;
 
   /// Minimum tappable dimension.
   static const double minTarget = 48;
@@ -1073,6 +1098,22 @@ abstract final class AppTheme {
     );
   }
 
+  static const _darkStandardMast = MastPalette(
+    fill: Color(0xFF1B2B22),
+    ink: Color(0xFFF2EFE6),
+    muted: Color(0xFFB3C0B8),
+    glass: Color(0x1AF2EFE6),
+    motif: Color(0x0DF2EFE6),
+  );
+
+  static const _darkChampagneMast = MastPalette(
+    fill: Color(0xFF2C2819),
+    ink: Color(0xFFF2EFE6),
+    muted: Color(0xFFCFC6A4),
+    glass: Color(0x1AF2EFE6),
+    motif: Color(0x0DF2EFE6),
+  );
+
   // Dark — near-black green canvas, charcoal-green cards, leaf accent.
   static const _dark = AppThemeTokens(
     background: Color(0xFF0F1512),
@@ -1112,30 +1153,19 @@ abstract final class AppTheme {
     onHighlight: Color(0xFF2B1600),
     highlightSoft: Color(0x33FF9933),
     highlightText: Color(0xFFFF9933),
-    // `.D` default mast.
-    mast: MastPalette(
-      fill: Color(0xFF1B2B22),
-      ink: Color(0xFFF2EFE6),
-      muted: Color(0xFFB3C0B8),
-      glass: Color(0x1AF2EFE6),
-      motif: Color(0x0DF2EFE6),
-    ),
-    // `.D.t2` champagne.
-    mastChampagne: MastPalette(
-      fill: Color(0xFF2C2819),
-      ink: Color(0xFFF2EFE6),
-      muted: Color(0xFFCFC6A4),
-      glass: Color(0x1AF2EFE6),
-      motif: Color(0x0DF2EFE6),
-    ),
-    // The dark Home board uses the default dark mast, not deep green.
+    mast: _darkStandardMast,
+    mastChampagne: _darkChampagneMast,
+    // Home uses a lighter green than the other dark tab masts.
     mastHome: MastPalette(
-      fill: Color(0xFF1B2B22),
+      fill: Color(0xFF244132),
       ink: Color(0xFFF2EFE6),
       muted: Color(0xFFB3C0B8),
       glass: Color(0x1AF2EFE6),
       motif: Color(0x0DF2EFE6),
     ),
+    mastReports: _darkChampagneMast,
+    mastLearn: _darkStandardMast,
+    mastProfile: _darkStandardMast,
     notch: Color(0xFFFF9933),
     homeAvatarFill: Color(0xFFF7F5EF),
     homeAvatarInk: Color(0xFF0F3D2E),
@@ -1207,6 +1237,10 @@ abstract final class AppTheme {
       glass: Color(0x1FF7F5EF),
       motif: Color(0x12F7F5EF),
     ),
+    // Home green blended toward ivory at 7%, 14%, and 21%.
+    mastReports: MastPalette._lightTab(Color(0xFF1F4A3C)),
+    mastLearn: MastPalette._lightTab(Color(0xFF2F5749)),
+    mastProfile: MastPalette._lightTab(Color(0xFF406457)),
     notch: Color(0xFFFF9933),
     homeAvatarFill: Color(0xFFF7F5EF),
     homeAvatarInk: Color(0xFF0F3D2E),
