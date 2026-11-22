@@ -395,7 +395,7 @@ class _ThemeToggle extends StatelessWidget {
 
 /// Header controls (v5 §2A, "Circular header icon buttons"): flat 40pt
 /// circles inside a 48pt hit area — `surface` (white) in light, `surfaceRaised` in dark — with a
-/// `textPrimary` glyph and, for the bell, a `negative` unread dot. A circle
+/// `textPrimary` glyph and, for the bell, a saffron (`highlight`) unread dot. A circle
 /// is the spec'd exception to the rounded-square icon-tile rule here;
 /// no gradient, no shadow.
 class _HeaderControl extends StatelessWidget {
@@ -448,10 +448,10 @@ class _HeaderControl extends StatelessWidget {
                     height: 8,
                     width: 8,
                     decoration: BoxDecoration(
-                      // An unread marker is an alert: the true-red `negative`
-                      // token, ringed in the button's own fill so it reads as
-                      // a dot sitting on the circle.
-                      color: t.negative,
+                      // An unread marker is an attention cue, not a data cue:
+                      // saffron, ringed in the button's own fill so it reads
+                      // as a dot sitting on the circle.
+                      color: t.highlight,
                       shape: BoxShape.circle,
                       border: Border.all(color: fill, width: 1.5),
                     ),

@@ -90,7 +90,10 @@ class _SplashMark extends StatelessWidget {
       children: [
         const LogoMark(placement: LogoPlacement.splash),
         const SizedBox(height: AppSpace.md),
-        Text('MARKET TERMINAL', style: AppTypo.label(t)),
+        Text(
+          'MARKET TERMINAL',
+          style: AppTypo.label(t, color: t.foregroundMuted),
+        ),
       ],
     );
   }

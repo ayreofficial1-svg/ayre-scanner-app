@@ -65,7 +65,7 @@ class _AyreInstrumentTileState extends State<AyreInstrumentTile> {
   /// marks get a dark plate instead. These are image backings, not UI
   /// surfaces, so they deliberately do not follow the theme.
   static const Color _lightPlate = Color(0xFFFFFFFF);
-  static const Color _darkPlate = Color(0xFF111614);
+  static const Color _darkPlate = Color(0xFF061D16);
 
   /// `null` = not yet resolved this session (monogram shown meanwhile), `''`
   /// = confidently no logo, anything else = a display URL.

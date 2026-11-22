@@ -93,7 +93,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
             const SizedBox(height: AppSpace.sm),
             Text(
               email.isEmpty
-                  ? 'This permanently deletes your Ayre account.'
+                  ? 'This permanently deletes your Investee account.'
                   : 'This permanently deletes the account for $email.',
               style: AppTypo.body(t),
             ),
@@ -113,7 +113,7 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
                 _Consequence(
                   glyph: AyreGlyph.close,
                   title: 'This can’t be undone',
-                  subtitle: 'To use Ayre again you will need to create a new '
+                  subtitle: 'To use Investee again you will need to create a new '
                       'account.',
                 ),
               ],

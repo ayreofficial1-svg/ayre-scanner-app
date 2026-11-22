@@ -17,6 +17,7 @@ Future<T?> showAyreSheet<T>({
     isDismissible: isDismissible,
     enableDrag: isDismissible,
     showDragHandle: false,
+    barrierColor: Theme.of(context).colorScheme.scrim.withValues(alpha: 0.55),
     builder: builder,
   );
 }
@@ -67,7 +68,7 @@ class AyreSheet extends StatelessWidget {
                     width: 36,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: t.foregroundSubtle.withValues(alpha: 0.5),
+                      color: t.foregroundSubtle,
                       borderRadius: BorderRadius.circular(AppRadius.pill),
                     ),
                   ),

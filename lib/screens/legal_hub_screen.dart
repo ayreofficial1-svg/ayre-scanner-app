@@ -50,7 +50,7 @@ class LegalHubScreen extends StatelessWidget {
             AppSpace.xxl,
           ),
           children: [
-            const SectionLabel(label: 'Using Ayre'),
+            const SectionLabel(label: 'Using Investee'),
             RowGroup(
               children: [
                 SettingRow(

@@ -26,7 +26,7 @@ class MainActivity : FlutterActivity() {
             "Signals and alerts",
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
-            description = "New scanner picks and messages from Ayre"
+            description = "New scanner picks and messages from Investee"
         }
         getSystemService(NotificationManager::class.java)
             .createNotificationChannel(channel)

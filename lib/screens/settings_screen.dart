@@ -45,6 +45,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'https://www.allinvestview.com/tools/ticker-logos/',
   );
 
+  static final Uri _logoDesignerAppUri = Uri.parse(
+    'instagram://user?username=guricreates',
+  );
+  static final Uri _logoDesignerWebUri = Uri.parse(
+    'https://www.instagram.com/guricreates/',
+  );
+
   /// True while this screen's own tutorial is showing, so only that one is
   /// dismissed when the screen goes away.
   bool _ownsTour = false;
@@ -120,9 +127,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _openLogoCredit() async {
     HapticFeedback.selectionClick();
-    if (await canLaunchUrl(_logoCreditUrl)) {
+    try {
       await launchUrl(_logoCreditUrl, mode: LaunchMode.externalApplication);
-    }
+    } catch (_) {}
+  }
+
+  /// Opens the logo designer's Instagram profile: the Instagram app when it is
+  /// installed, otherwise the profile page in the browser.
+  Future<void> _openLogoDesigner() async {
+    HapticFeedback.selectionClick();
+    try {
+      final opened = await launchUrl(
+        _logoDesignerAppUri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (opened) return;
+    } catch (_) {}
+    try {
+      await launchUrl(
+        _logoDesignerWebUri,
+        mode: LaunchMode.externalApplication,
+      );
+    } catch (_) {}
   }
 
   @override
@@ -174,8 +200,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       switch (theme.themeMode) {
                         ThemeMode.system =>
                           'Follows your device’s light or dark setting.',
-                        ThemeMode.light => 'Ayre always uses the light theme.',
-                        ThemeMode.dark => 'Ayre always uses the dark theme.',
+                        ThemeMode.light => 'Investee always uses the light theme.',
+                        ThemeMode.dark => 'Investee always uses the dark theme.',
                       },
                       style: AppTypo.caption(t),
                     ),
@@ -235,7 +261,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               subtitle:
                                   push.permissionDenied && settings.pushEnabled
                                   ? 'Blocked by your device. Allow notifications '
-                                        'for Ayre in your device settings.'
+                                        'for Investee in your device settings.'
                                   : 'Get alerts on this device, even when the '
                                         'app is closed.',
                               value: settings.pushEnabled,
@@ -332,9 +358,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   ),
                   SettingRow(
+                    glyph: AyreGlyph.account,
+                    title: 'App logo',
+                    subtitle: 'Designed by @guricreates on Instagram.',
+                    trailing: const SizedBox.shrink(),
+                    onTap: _openLogoDesigner,
+                  ),
+                  SettingRow(
                     glyph: AyreGlyph.equity,
                     title: 'Logo credits',
                     subtitle: 'Ticker logos by AllInvestView.',
+                    trailing: const SizedBox.shrink(),
                     onTap: _openLogoCredit,
                   ),
                 ],

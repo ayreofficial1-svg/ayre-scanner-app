@@ -5,17 +5,22 @@ import '../theme/app_theme.dart';
 import 'ayre_components.dart';
 
 /// Page dots for the onboarding flow: the active page is a 22px pill in
-/// `accent`, the others 6px circles. The dots are decoration; the page
+/// saffron (the one permitted highlight), the others 6px circles. The dots are decoration; the page
 /// position is announced once as "Step N of M" on the wrapper.
 class OnboardingPageIndicator extends StatelessWidget {
   const OnboardingPageIndicator({
     super.key,
     required this.page,
     required this.total,
+    this.activeColor,
   });
 
   final int page;
   final int total;
+
+  /// Overrides the active dot's colour (default: saffron). The spotlight tour
+  /// passes a non-saffron colour because its highlight ring already is saffron.
+  final Color? activeColor;
 
   static const double _dot = 6;
   static const double _activeWidth = 22;
@@ -42,7 +47,7 @@ class OnboardingPageIndicator extends StatelessWidget {
                 height: _dot,
                 decoration: BoxDecoration(
                   color: i == page
-                      ? t.accent
+                      ? (activeColor ?? t.highlight)
                       : t.foregroundSubtle.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(AppRadius.pill),
                 ),
@@ -54,8 +59,8 @@ class OnboardingPageIndicator extends StatelessWidget {
   }
 }
 
-/// A soft radial wash of `accent` behind the illustration. Same alphas the
-/// hills already use; no new colour.
+/// A soft radial wash of the brand-green tint (`accentSoft`) behind the
+/// illustration.
 class OnboardingWash extends StatelessWidget {
   const OnboardingWash({super.key, this.size = 320});
 
@@ -74,8 +79,8 @@ class OnboardingWash extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: RadialGradient(
                 colors: [
-                  t.accent.withValues(alpha: dark ? 0.14 : 0.10),
-                  t.accent.withValues(alpha: 0),
+                  t.accentSoft.withValues(alpha: dark ? 0.6 : 0.9),
+                  t.accentSoft.withValues(alpha: 0),
                 ],
               ),
             ),

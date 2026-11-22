@@ -102,7 +102,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       children: [
         Text('Create account', style: AppTypo.pageTitle(t)),
         const SizedBox(height: AppSpace.xxs),
-        Text('Set up your Ayre Scanner account.', style: AppTypo.body(t)),
+        Text('Set up your Investee account.', style: AppTypo.body(t)),
         const SizedBox(height: AppSpace.xl),
         AutofillGroup(
           child: Column(

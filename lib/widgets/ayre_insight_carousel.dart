@@ -549,33 +549,38 @@ class _InsightPalette {
   /// The "01/04" text; also the arrow glyphs.
   final Color pager;
 
+  // Both variants are built from the brand greens. The eyebrow is mint, not
+  // saffron: Home's bell dot is the one saffron element in that viewport.
+  // Text pairings: headline ivory (>= 11:1), description ivory @ 82 %
+  // (>= 8:1), eyebrow/pager >= 8:1 on the darkest stop.
   static const _InsightPalette light = _InsightPalette(
-    gradient: [Color(0xFF0F1D15), Color(0xFF16281C)],
+    // A deep-green card on the ivory page.
+    gradient: [Color(0xFF0F3D2E), Color(0xFF0A2A20)],
     border: null,
-    glowStart: Color(0x402E9E5B),
-    glowEnd: Color(0x002E9E5B),
-    bars: Color(0xFF2E9E5B),
-    eyebrow: Color(0xFFB4EBC6),
-    headline: Color(0xFFFFFFFF),
-    description: Color(0xFFDCE7E0),
-    pill: Color(0xFF24382C),
-    pillText: Color(0xFFFFFFFF),
-    arrowFill: Color(0x1FFFFFFF),
-    pager: Color(0xFFCBD8CF),
+    glowStart: Color(0x661E5A45),
+    glowEnd: Color(0x001E5A45),
+    bars: Color(0xFFBFE6CF),
+    eyebrow: Color(0xFFBFE6CF),
+    headline: Color(0xFFF7F5EF),
+    description: Color(0xD1F7F5EF),
+    pill: Color(0x24F7F5EF),
+    pillText: Color(0xFFF7F5EF),
+    arrowFill: Color(0x1FF7F5EF),
+    pager: Color(0xFFCBD5CD),
   );
 
   static const _InsightPalette dark = _InsightPalette(
-    gradient: [Color(0xFF060B07), Color(0xFF0D1710)],
-    border: Color(0x333FCB7A),
-    glowStart: Color(0x554ED892),
-    glowEnd: Color(0x004ED892),
-    bars: Color(0xFF4ED892),
-    eyebrow: Color(0xFF8FE0AE),
-    headline: Color(0xFFF5FFF8),
-    description: Color(0xFFD3E0D7),
-    pill: Color(0xFF1E3B29),
-    pillText: Color(0xFFEDF5EE),
-    arrowFill: Color(0x1FFFFFFF),
-    pager: Color(0xFFB3C4B8),
+    gradient: [Color(0xFF0A2A20), Color(0xFF061D16)],
+    border: Color(0x33BFE6CF),
+    glowStart: Color(0x661E5A45),
+    glowEnd: Color(0x001E5A45),
+    bars: Color(0xFFBFE6CF),
+    eyebrow: Color(0xFFBFE6CF),
+    headline: Color(0xFFF7F5EF),
+    description: Color(0xD1F7F5EF),
+    pill: Color(0x24F7F5EF),
+    pillText: Color(0xFFF7F5EF),
+    arrowFill: Color(0x1FF7F5EF),
+    pager: Color(0xFFCBD5CD),
   );
 }

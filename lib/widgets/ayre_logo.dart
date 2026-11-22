@@ -15,17 +15,16 @@ enum LogoPlacement {
   header,
 }
 
-/// The brand mark, rendered from `assets/brand/ayre_logo.png`.
+/// The Investee brand mark, rendered from `assets/brand/ayre_logo.png` (dark)
+/// or `assets/brand/ayre_logo_light.png` (light).
 ///
 /// The asset is authoritative and is used as-is: never recoloured, stretched,
 /// rotated or otherwise distorted. Only three sizes exist, one per placement.
 ///
-/// The source image is a square with its own near-black field and generous
-/// internal padding. [LogoMark] compensates for that padding so the *mark* reads
-/// at the intended size, and — because the artwork's field would otherwise show
-/// as a dark square on a light background — the light theme composites it onto
-/// the ink panel tone, which is a surface the design system already uses. That is
-/// a placement decision, not a recolour of the asset.
+/// The source image is a square with its own field (deep green in the dark
+/// variant, ivory in the light one) and generous internal padding. [LogoMark]
+/// compensates for that padding so the *mark* reads at the intended size and
+/// backs the artwork with the matching field colour so no seam shows.
 class LogoMark extends StatelessWidget {
   const LogoMark({super.key, this.placement = LogoPlacement.header});
 
@@ -48,12 +47,11 @@ class LogoMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final assetPath = Theme.of(context).brightness == Brightness.dark
-        ? assetPathDark
-        : assetPathLight;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final assetPath = dark ? assetPathDark : assetPathLight;
 
     return Semantics(
-      label: 'Ayre',
+      label: 'Investee',
       image: true,
       child: Padding(
         padding: EdgeInsets.all(clearSpace),
@@ -74,15 +72,11 @@ class LogoMark extends StatelessWidget {
                 : AppRadius.card,
           ),
           child: ColoredBox(
-            // The artwork carries its own dark field; this matches it so no
-            // seam shows, in either theme. `inkPanel` was the v3 terminal
-            // readout tone and is retired — `surfaceSunken` is v4's recessed
-            // fill and is the closest match in job, though in light theme it
-            // is a warm paper tone rather than near-black. **Flag for visual
-            // QA:** if the asset's own dark field shows a seam against it in
-            // light mode, the fix is a transparent-background asset, not a
-            // new token (§19).
-            color: t.surfaceSunken,
+            // The artwork carries its own field: brand deep green in the dark
+            // variant (`surface` is that exact colour) and brand ivory in the
+            // light one (`background` is that exact colour), so antialiased
+            // corners never show a different tone.
+            color: dark ? t.surface : t.background,
             child: Image.asset(
               assetPath,
               width: size,
@@ -119,7 +113,7 @@ class _Fallback extends StatelessWidget {
       height: size,
       child: Center(
         child: Text(
-          'ayre',
+          'investee',
           style: AppTypo.display(
             fontSize: size * 0.26,
             fontWeight: FontWeight.w700,
@@ -143,9 +137,9 @@ class LogoWordmark extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     return Semantics(
-      label: 'Ayre',
+      label: 'Investee',
       child: Text(
-        'ayre',
+        'investee',
         style: AppTypo.display(
           fontSize: fontSize,
           fontWeight: FontWeight.w700,

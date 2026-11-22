@@ -1,4 +1,5 @@
-import 'package:flutter/cupertino.dart' show CupertinoPageRoute;
+import 'package:flutter/cupertino.dart'
+    show CupertinoPageRoute, NoDefaultCupertinoThemeData;
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,21 +7,23 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../widgets/ayre_tab_host.dart';
 
-// ─── "v5" — forest-green, emerald, mint-paper ──────────────────────────────
+// ─── Investee identity — deep green, ivory, saffron ────────────────────────
 //
-// v5 retires v4's warm clay/terracotta identity for a cool, deep
-// forest-green ink and a bright, saturated emerald accent. The light theme's
-// canvas is a pale, cool mint-white paper (never pure white/gray); the dark
-// theme's canvas is near-black with a green cast (never pure black/gray).
-// Positive (gain) and negative (loss) are genuine saturated green/red again
-// — not v4's muted sage/rose — reserved for actual gain/loss figures and
-// glyphs; neutral/attention stays a muted gold/amber, never a button fill,
-// never navigation, never brand.
+// Three brand colours: deep green `#0F3D2E`, ivory `#F7F5EF`, saffron
+// `#FF9933`. Every other colour is a derived tint/shade of those three.
+// Light: ivory canvas, deep-green ink and actions. Dark: the brand green is
+// literally the card colour (`surface`), the canvas a deeper shade of it, and
+// primary fills invert to ivory.
 //
-// Two structural surfaces still sit either side of `surface`: `surfaceRaised`
-// (a tile lifted slightly off the card) and `surfaceSunken` (an inset
-// track/fill recessed into the card). The soft, two-layer shadows v4
-// introduced are kept — flat/no-shadow is not a v5 rule either.
+// Saffron is a rare highlight (`highlight*` tokens): graphics and attention
+// cues only, never gain/loss, never body text on ivory (use `highlightText`),
+// never a primary button fill. Saffron fills always carry `onHighlight`.
+// Positive (gain) / negative (loss) / neutral (attention, a yellow-gold that
+// cannot be mistaken for saffron) stay separate semantic data colours.
+//
+// Surface model: `background` → `surface` (cards) → `surfaceRaised` (chips,
+// snackbar) → `surfaceSunken` (inputs, tracks). Flat, hairline-bordered; no
+// Material surface tint. Dark mode gets depth from lightness steps, not shadow.
 @immutable
 class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   const AppThemeTokens({
@@ -52,11 +55,14 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     required this.positiveText,
     required this.negativeText,
     required this.neutralText,
+    required this.highlight,
+    required this.onHighlight,
+    required this.highlightSoft,
+    required this.highlightText,
   });
 
-  /// App canvas: pale, cool mint-white paper in light; near-black with a
-  /// green cast in dark. Never pure white/gray (light) or pure black/gray
-  /// (dark).
+  /// App canvas: brand ivory in light; a deeper shade of the brand green in
+  /// dark. Never pure white/gray (light) or pure black/gray (dark).
   final Color background;
 
   /// The default card/panel fill, one step off [background].
@@ -71,11 +77,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   /// readout region). Sibling of [surfaceRaised] — see that field's note.
   final Color surfaceSunken;
 
-  /// The primary brand/identity accent: forest-green/emerald. Not
-  /// theme-invariant — brighter and more saturated in dark mode so it still
-  /// reads as the loudest color against a near-black field. Used for
-  /// "Bullish" text, up-arrows, the NIFTY trace, primary buttons, active nav
-  /// elements, and links.
+  /// The primary action/identity colour. Light: brand deep green. Dark:
+  /// brand ivory (primary fills invert). Used for primary buttons, selected
+  /// states, switches and active nav elements.
   final Color accent;
 
   /// A darkened (light theme) / lightened (dark theme) accent variant for
@@ -88,10 +92,8 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   /// Accent held back for large, low-emphasis fills.
   final Color accentSoft;
 
-  /// Text/icon on an [accent] fill — white in light (accent is mid-dark
-  /// there), near-black ink in dark (accent is bright/mid-light there);
-  /// verified numerically per theme, not assumed to be the same choice in
-  /// both.
+  /// Text/icon on an [accent] fill — ivory on deep green in light, deep green
+  /// on ivory in dark; 11.15:1 in both themes.
   final Color onAccent;
 
   /// Positive/gain. Same hue family as [accent] — a genuine saturated
@@ -107,8 +109,9 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   final Color negative;
   final Color negativeSoft;
 
-  /// Neutral/attention (e.g. a flat/unchanged badge). Muted gold/amber —
-  /// never a button fill, never navigation, never brand. (The LIVE
+  /// Neutral/attention (e.g. a flat/unchanged badge). Yellow-gold, kept
+  /// distinct from saffron — never a button fill, never navigation, never
+  /// brand. (The LIVE
   /// indicator itself moved to [positive] in v5 — see the LIVE-chip spec.)
   final Color neutral;
   final Color neutralSoft;
@@ -151,26 +154,42 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   /// base fill, not the highlight.
   final Color skeleton;
 
-  /// Avatar / identity-chip fill (Phase 6, §2A "Avatar / identity chip" row)
-  /// — a deliberate lavender/plum secondary accent, distinct from brand
-  /// green. Used only for personal/identity chips (the Profile initials
-  /// circle), never for market data.
+  /// Avatar / identity-chip fill — a brand-green tint. Used only for
+  /// personal/identity chips (the Profile initials circle), never for market
+  /// data.
   final Color avatarFill;
 
   /// Initials text on [avatarFill].
   final Color avatarInk;
 
-  /// Gain text and glyphs (A4, D-12). Light: [accentInk]'s hex. Dark: the
-  /// existing [positive]. Fills, bars, dots and chart marks keep [positive].
+  /// Gain text and glyphs. Light: a deep market green clearing 4.5:1 on every
+  /// light surface. Dark: [positive]. Fills, bars, dots and chart marks keep
+  /// [positive].
   final Color positiveText;
 
   /// Loss text and glyphs. Light: a darker red that clears 4.5:1 on every
   /// light surface; dark: the existing [negative].
   final Color negativeText;
 
-  /// Neutral/flat text and chip text. Light: a darker amber that clears
-  /// 4.5:1; dark: the existing [neutral].
+  /// Neutral/flat text and chip text. Light: a darker yellow-gold that clears
+  /// 4.5:1; dark: [neutral].
   final Color neutralText;
+
+  /// Saffron highlight (`#FF9933`). Graphics and attention cues only — a
+  /// dot, a ring, an underline. Never gain/loss, never a primary fill, and in
+  /// light mode never text (1.95:1 on ivory; use [highlightText]).
+  final Color highlight;
+
+  /// Content on a [highlight] fill — deep green (5.71:1 on saffron). Never
+  /// ivory/white.
+  final Color onHighlight;
+
+  /// Low-emphasis saffron tint for an attention wash behind [highlightText].
+  final Color highlightSoft;
+
+  /// Saffron-family text. Light: a dark burnt orange that clears 4.5:1 on
+  /// ivory/white/[highlightSoft]; dark: saffron itself (5.71:1 on surface).
+  final Color highlightText;
 
   @override
   AppThemeTokens copyWith({
@@ -202,6 +221,10 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     Color? positiveText,
     Color? negativeText,
     Color? neutralText,
+    Color? highlight,
+    Color? onHighlight,
+    Color? highlightSoft,
+    Color? highlightText,
   }) {
     return AppThemeTokens(
       background: background ?? this.background,
@@ -232,6 +255,10 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       positiveText: positiveText ?? this.positiveText,
       negativeText: negativeText ?? this.negativeText,
       neutralText: neutralText ?? this.neutralText,
+      highlight: highlight ?? this.highlight,
+      onHighlight: onHighlight ?? this.onHighlight,
+      highlightSoft: highlightSoft ?? this.highlightSoft,
+      highlightText: highlightText ?? this.highlightText,
     );
   }
 
@@ -268,6 +295,10 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       positiveText: c(positiveText, other.positiveText),
       negativeText: c(negativeText, other.negativeText),
       neutralText: c(neutralText, other.neutralText),
+      highlight: c(highlight, other.highlight),
+      onHighlight: c(onHighlight, other.onHighlight),
+      highlightSoft: c(highlightSoft, other.highlightSoft),
+      highlightText: c(highlightText, other.highlightText),
     );
   }
 }
@@ -761,114 +792,109 @@ abstract final class AppTheme {
     );
   }
 
-  // Dark — near-black-green canvas (`#0B120D`), soft off-white text with a
-  // faint green cast. Not a re-tint of v4's warm `#100F14` dark theme; every
-  // surface, text and accent value below is authored fresh from the v5 spec
-  // (redesign plan §2A).
+  // Dark — brand-green canvas. `surface` is the exact brand green `#0F3D2E`;
+  // `background` is a deeper shade of it. Primary fills invert to ivory.
+  // Contrast ratios noted per token are against the stated surface.
   static const _dark = AppThemeTokens(
-    background: Color(0xFF0B120D),
-    surface: Color(0xFF121A14),
-    surfaceRaised: Color(0xFF1B261E),
-    surfaceSunken: Color(0xFF080D09),
-    accent: Color(0xFF3FCB7A),
-    // Raw accent already clears 4.5:1 as small text on both `background`
-    // and `surface` in dark mode (~10.6:1 / ~9.9:1 numerically) — no
-    // contrast-driven ink swap needed; `accentInk` below is still a
-    // distinct, lighter value per the spec table for link/selected-label
-    // use, not a failure fix.
-    accentInk: Color(0xFF59D98C),
-    accentSoft: Color(0xFF1E3B29),
-    // Dark ink text: accent sits at a bright/mid-light lightness in dark
-    // mode, so an inverted near-black ink clears ~9.1:1 where white would
-    // under-perform.
-    onAccent: Color(0xFF06130A),
+    background: Color(0xFF0A2A20),
+    surface: Color(0xFF0F3D2E),
+    surfaceRaised: Color(0xFF174B39),
+    surfaceSunken: Color(0xFF061D16),
+    // Ivory primary fill; `onAccent` on it is 11.15:1.
+    accent: Color(0xFFF7F5EF),
+    // 8.94:1 on surface, 7.34:1 on raised.
+    accentInk: Color(0xFFBFE6CF),
+    // `accentInk` on it 5.93:1, ivory 7.40:1.
+    accentSoft: Color(0xFF1E5A45),
+    onAccent: Color(0xFF0F3D2E),
+    // 6.69:1 on surface, 5.50:1 on raised.
     positive: Color(0xFF4ED892),
-    positiveSoft: Color(0xFF16301F),
-    negative: Color(0xFFF0685F),
-    negativeSoft: Color(0xFF3A1917),
-    neutral: Color(0xFFE0B563),
-    neutralSoft: Color(0x24E0B563),
-    textPrimary: Color(0xFFEDF5EE),
-    // Brightened so section eyebrows ("TOP GAINERS"), their descriptions and
-    // all other secondary text read clearly on the near-black canvas. The
-    // three-step ladder is kept: textPrimary (#EDF5EE) > muted > subtle.
-    foregroundMuted: Color(0xFFD0DCD3),
-    foregroundSubtle: Color(0xFFB4C3B9),
-    // Disabled stays deliberately dim — it must not be lifted with the two
-    // tokens above, or a disabled control would read as enabled.
-    textDisabled: Color(0x8067766C),
-    hairline: Color(0x14CFE8D5),
-    navHairline: Color(0x1FCFE8D5),
+    // `positive` on it 5.63:1.
+    positiveSoft: Color(0xFF134A33),
+    negative: Color(0xFFFF7F76),
+    // `negativeText` on it 6.30:1.
+    negativeSoft: Color(0xFF4A2A2A),
+    neutral: Color(0xFFE3B94F),
+    neutralSoft: Color(0x24E3B94F),
+    // 14.11:1 on background, 11.15:1 on surface, 9.16:1 on raised.
+    textPrimary: Color(0xFFF7F5EF),
+    // 8.07:1 on surface, 6.63:1 on raised.
+    foregroundMuted: Color(0xFFCBD5CD),
+    // 6.61:1 on surface, 5.43:1 on raised.
+    foregroundSubtle: Color(0xFFB3C3B9),
+    // Deliberately dim (WCAG-exempt); must not read as enabled.
+    textDisabled: Color(0x73B3C3B9),
+    hairline: Color(0x1AF7F5EF),
+    navHairline: Color(0x29F7F5EF),
     shadowColor: Color(0xFF000000),
-    navBg: Color(0xFF101911),
-    skeleton: Color(0xFF1B261E),
-    // Phase 6 — deliberate lavender/plum secondary accent for the Profile
-    // avatar/identity chip only; never brand green, never market data.
-    avatarFill: Color(0xFF241F38),
-    avatarInk: Color(0xFFC9BFEA),
-    // A4 status-text tokens: dark reuses the existing values.
+    navBg: Color(0xFF0B3024),
+    skeleton: Color(0xFF174B39),
+    // 6.45:1.
+    avatarFill: Color(0xFF1E5A45),
+    avatarInk: Color(0xFFD6EBDD),
     positiveText: Color(0xFF4ED892),
-    negativeText: Color(0xFFF0685F),
-    neutralText: Color(0xFFE0B563),
+    // 6.04:1 on surface, 4.96:1 on raised.
+    negativeText: Color(0xFFFF9C94),
+    // 6.55:1 on surface.
+    neutralText: Color(0xFFE3B94F),
+    // Saffron: 5.71:1 on surface, 4.69:1 on raised, 7.22:1 on background —
+    // usable as text on dark.
+    highlight: Color(0xFFFF9933),
+    onHighlight: Color(0xFF0F3D2E),
+    highlightSoft: Color(0x33FF9933),
+    highlightText: Color(0xFFFF9933),
   );
 
-  // Light — pale, cool mint-white paper canvas (`#F1F7F1`), deep
-  // near-black forest-green ink text. Not a re-tint of v4's warm `#F6F0E6`
-  // light theme; every surface, text and accent value below is authored
-  // fresh from the v5 spec (redesign plan §2A).
+  // Light — brand ivory canvas, brand deep green ink and actions.
   static const _light = AppThemeTokens(
-    background: Color(0xFFF1F7F1),
+    background: Color(0xFFF7F5EF),
     surface: Color(0xFFFFFFFF),
-    surfaceRaised: Color(0xFFE9F2E9),
-    surfaceSunken: Color(0xFFE1EDE1),
-    accent: Color(0xFF1E8749),
-    // Raw accent measures ~4.0:1 / ~4.4:1 as small text on
-    // `background`/`surface` in light mode — fails AA. `accentInk` is a
-    // darkened variant of the same hue that clears ~6.0:1 / ~6.6:1,
-    // verified numerically for Phase 0.
-    accentInk: Color(0xFF166B3A),
-    accentSoft: Color(0xFFCFE8D8),
-    // Phase 1B (HIG alignment): white on the original `#1F8A4B` measured
-    // ~4.38:1 — a hair under the 4.5:1 AA threshold for normal-size text.
-    // (Button labels render at 14px/700, below the ~18.66px-bold
-    // "large text" cutoff, so the 3:1 large-text allowance doesn't apply
-    // either.) White is already the maximum achievable luminance for this
-    // role, so the fix had to come from `accent` itself: deepened ~2%
-    // lightness, same hue/saturation (hue still 144.6°, inside the
-    // identity test's 130-165° green band) from `#1F8A4B` to `#1E8749`.
-    // `onAccent`-on-`accent` now measures ~4.55:1, clearing the floor —
-    // see `test/identity_test.dart`'s `light onAccent clears 4.5:1`,
-    // which already asserted this and would fail against the old value.
-    // `positive` (separate token, still `#1F8A4B`) is intentionally
-    // unchanged — no white-on-fill usage is flagged against it, out of
-    // this item's scope.
-    onAccent: Color(0xFFFFFFFF),
-    positive: Color(0xFF1F8A4B),
-    positiveSoft: Color(0xFFDCEEE0),
+    surfaceRaised: Color(0xFFEFEDE3),
+    surfaceSunken: Color(0xFFE7E4D8),
+    accent: Color(0xFF0F3D2E),
+    // Ivory on deep green: 11.15:1 (the previous emerald pairing was 4.38:1).
+    onAccent: Color(0xFFF7F5EF),
+    accentInk: Color(0xFF0F3D2E),
+    // `accentInk` on it 9.73:1.
+    accentSoft: Color(0xFFDDE9E0),
+    // 4.63:1 on background (graphic use, >= 3:1).
+    positive: Color(0xFF1A7F44),
+    // `positiveText` on it 5.32:1.
+    positiveSoft: Color(0xFFDDEBDD),
     negative: Color(0xFFD64545),
+    // `negativeText` on it 4.58:1.
     negativeSoft: Color(0xFFF7DCDC),
-    neutral: Color(0xFFC98A2D),
-    neutralSoft: Color(0x24C98A2D),
-    textPrimary: Color(0xFF16211B),
-    // "Brighter" has no meaning on paper, so the light theme gets the
-    // equivalent: more contrast against the pale canvas (muted ~7:1, subtle
-    // ~4.5:1) with the same three-step ladder.
-    foregroundMuted: Color(0xFF465549),
-    foregroundSubtle: Color(0xFF66746A),
-    textDisabled: Color(0x808B968E),
-    hairline: Color(0x141A2E22),
-    navHairline: Color(0x1F1A2E22),
-    shadowColor: Color(0xFFB9CBBB),
+    // Yellow-gold, shifted from orange-gold so it cannot read as saffron.
+    neutral: Color(0xFFA67C00),
+    neutralSoft: Color(0x24A67C00),
+    // 11.15:1 on background, 12.16:1 on surface, 10.36:1 on raised.
+    textPrimary: Color(0xFF0F3D2E),
+    // 6.92:1 on background, 6.43:1 on raised.
+    foregroundMuted: Color(0xFF3F5A4E),
+    // 5.90:1 on background, 5.48:1 on raised, 5.05:1 on sunken.
+    foregroundSubtle: Color(0xFF506358),
+    textDisabled: Color(0x80506358),
+    hairline: Color(0x1A0F3D2E),
+    navHairline: Color(0x290F3D2E),
+    shadowColor: Color(0xFFD2CFC0),
     navBg: Color(0xFFFFFFFF),
-    skeleton: Color(0xFFE7EEE8),
-    // Phase 6 — deliberate lavender/plum secondary accent for the Profile
-    // avatar/identity chip only; never brand green, never market data.
-    avatarFill: Color(0xFFE1DDF5),
-    avatarInk: Color(0xFF4B3F73),
-    // A4 status-text tokens (>= 4.5:1 on surface/background/sunken/soft).
-    positiveText: Color(0xFF166B3A),
+    skeleton: Color(0xFFE9E6DA),
+    // 9.73:1.
+    avatarFill: Color(0xFFDDE9E0),
+    avatarInk: Color(0xFF0F3D2E),
+    // 6.03:1 on background, 5.60:1 on raised.
+    positiveText: Color(0xFF156B3A),
+    // 5.44:1 on background, 5.93:1 on white, 5.05:1 on raised.
     negativeText: Color(0xFFB83232),
-    neutralText: Color(0xFF855A10),
+    // 5.85:1 on background.
+    neutralText: Color(0xFF7A5A00),
+    // Saffron is graphics-only on ivory (1.95:1); text uses `highlightText`.
+    highlight: Color(0xFFFF9933),
+    // 5.71:1 on saffron.
+    onHighlight: Color(0xFF0F3D2E),
+    highlightSoft: Color(0x29FF9933),
+    // 6.57:1 on ivory, 7.16:1 on white, 6.05:1 on `highlightSoft`.
+    highlightText: Color(0xFF8A4500),
   );
 
   static AppThemeTokens get lightTokens => _light;
@@ -880,18 +906,44 @@ abstract final class AppTheme {
   static ThemeData _build(Brightness brightness, AppThemeTokens t) {
     final isDark = brightness == Brightness.dark;
 
+    // `error` must carry a >= 4.5:1 `onError`: white on the light glyph red
+    // (`#D64545`) is 4.38:1, so light uses the text red (5.93:1 with white).
     final scheme = ColorScheme(
       brightness: brightness,
       primary: t.accent,
       onPrimary: t.onAccent,
-      secondary: t.neutral,
-      onSecondary: isDark ? t.background : const Color(0xFFFFFFFF),
-      tertiary: t.neutral,
-      onTertiary: isDark ? t.background : const Color(0xFFFFFFFF),
-      error: t.negative,
+      secondary: t.accentSoft,
+      onSecondary: t.accentInk,
+      tertiary: t.highlight,
+      onTertiary: t.onHighlight,
+      error: isDark ? t.negative : t.negativeText,
       onError: isDark ? t.background : const Color(0xFFFFFFFF),
       surface: t.surface,
       onSurface: t.textPrimary,
+      onSurfaceVariant: t.foregroundMuted,
+      outline: t.hairline,
+      outlineVariant: t.navHairline,
+      shadow: t.shadowColor,
+      scrim: const Color(0xFF04140F),
+      surfaceTint: transparent,
+      surfaceDim: t.background,
+      surfaceBright: t.surface,
+      surfaceContainerLowest: t.surfaceSunken,
+      surfaceContainerLow: t.background,
+      surfaceContainer: t.surface,
+      surfaceContainerHigh: t.surfaceRaised,
+      surfaceContainerHighest: t.surfaceRaised,
+      inverseSurface: t.textPrimary,
+      onInverseSurface: t.background,
+      inversePrimary: t.accentInk,
+      primaryContainer: t.accentSoft,
+      onPrimaryContainer: t.accentInk,
+      secondaryContainer: t.accentSoft,
+      onSecondaryContainer: t.accentInk,
+      tertiaryContainer: t.highlightSoft,
+      onTertiaryContainer: t.highlightText,
+      errorContainer: t.negativeSoft,
+      onErrorContainer: t.negativeText,
     );
 
     // Headings and body share the display/UI face (Hanken Grotesk); numerals
@@ -1047,8 +1099,111 @@ abstract final class AppTheme {
       ),
       textSelectionTheme: TextSelectionThemeData(
         cursorColor: t.accentInk,
-        selectionColor: t.accent.withValues(alpha: 0.3),
+        selectionColor: t.accent.withValues(alpha: 0.24),
         selectionHandleColor: t.accentInk,
+      ),
+      splashColor: t.accent.withValues(alpha: 0.08),
+      highlightColor: t.accent.withValues(alpha: 0.05),
+      iconTheme: IconThemeData(color: t.textPrimary),
+      primaryIconTheme: IconThemeData(color: t.textPrimary),
+      dialogTheme: DialogThemeData(
+        backgroundColor: t.surface,
+        surfaceTintColor: transparent,
+        elevation: 0,
+        shadowColor: transparent,
+        titleTextStyle: AppTypo.sectionTitle(t),
+        contentTextStyle: AppTypo.body(t),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          side: BorderSide(color: t.hairline),
+        ),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: t.surface,
+        surfaceTintColor: transparent,
+        elevation: 0,
+        shadowColor: transparent,
+        textStyle: AppTypo.bodyStrong(t),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.control),
+          side: BorderSide(color: t.hairline),
+        ),
+      ),
+      menuTheme: MenuThemeData(
+        style: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(t.surface),
+          surfaceTintColor: const WidgetStatePropertyAll(transparent),
+          elevation: const WidgetStatePropertyAll(0),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppRadius.control),
+              side: BorderSide(color: t.hairline),
+            ),
+          ),
+        ),
+      ),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: t.surfaceRaised,
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+          border: Border.all(color: t.hairline),
+        ),
+        textStyle: AppTypo.ui(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: t.textPrimary,
+        ),
+      ),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? t.onAccent
+              : t.foregroundSubtle,
+        ),
+        trackColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? t.accent
+              : t.surfaceSunken,
+        ),
+        trackOutlineColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? transparent
+              : t.hairline,
+        ),
+      ),
+      checkboxTheme: CheckboxThemeData(
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) =>
+              states.contains(WidgetState.selected) ? t.accent : transparent,
+        ),
+        checkColor: WidgetStatePropertyAll(t.onAccent),
+        side: BorderSide(color: t.foregroundSubtle, width: 1.5),
+      ),
+      radioTheme: RadioThemeData(
+        fillColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? t.accent
+              : t.foregroundSubtle,
+        ),
+      ),
+      listTileTheme: ListTileThemeData(
+        iconColor: t.textPrimary,
+        textColor: t.textPrimary,
+        tileColor: transparent,
+        selectedColor: t.accentInk,
+        selectedTileColor: t.accentSoft,
+      ),
+      scrollbarTheme: ScrollbarThemeData(
+        thumbColor: WidgetStatePropertyAll(
+          t.foregroundSubtle.withValues(alpha: 0.5),
+        ),
+        trackColor: const WidgetStatePropertyAll(transparent),
+      ),
+      cupertinoOverrideTheme: NoDefaultCupertinoThemeData(
+        brightness: brightness,
+        primaryColor: t.accent,
+        scaffoldBackgroundColor: t.background,
+        barBackgroundColor: t.navBg,
       ),
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {

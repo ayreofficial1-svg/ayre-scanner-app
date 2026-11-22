@@ -1,11 +1,11 @@
 {
-    "name": "ayre_scanner",
-    "short_name": "ayre_scanner",
+    "name": "Investee",
+    "short_name": "Investee",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#F7F5EF",
+    "theme_color": "#0F3D2E",
+    "description": "Investee: market research and signals.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

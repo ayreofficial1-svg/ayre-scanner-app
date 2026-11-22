@@ -67,7 +67,7 @@ final LegalDocument kTermsDocument = LegalDocument(
             'the Securities and Exchange Board of India (SEBI) as a Research '
             'Analyst under the SEBI (Research Analysts) Regulations, 2014, '
             'registration number $kRaRegistrationNumber. In these Terms, '
-            '“the Research Analyst”, “the RA” and “Ayre” mean that individual '
+            '“the Research Analyst”, “the RA” and “$kBrandName” mean that individual '
             'acting as sole proprietor of the $kBrandName service. '
             'No company, LLP or partnership is involved.',
         'Registered address: $kRaAddress. Contact: $kRaEmail, $kRaPhone.',
@@ -888,8 +888,8 @@ class LegalFaq {
 
 final List<LegalFaq> kLegalFaqs = [
   const LegalFaq(
-    'What is Ayre?',
-    'Ayre is a research service run by an individual SEBI-registered '
+    'What is $kBrandName?',
+    '$kBrandName is a research service run by an individual SEBI-registered '
         'Research Analyst. It publishes research recommendations on listed '
         'Indian stocks, a record of closed recommendations, market notes '
         'and learning articles.',
@@ -902,7 +902,7 @@ final List<LegalFaq> kLegalFaqs = [
   ),
   const LegalFaq(
     'Can I buy or sell stocks in the app?',
-    'No. Ayre only publishes research. It does not place orders or hold '
+    'No. $kBrandName only publishes research. It does not place orders or hold '
         'your money or securities. You place any trade yourself through '
         'your own broker.',
   ),
@@ -939,7 +939,7 @@ final List<LegalFaq> kLegalFaqs = [
         'before placing any order.',
   ),
   const LegalFaq(
-    'Does Ayre use artificial intelligence?',
+    'Does $kBrandName use artificial intelligence?',
     'See Legal > Research Analyst information for the Research Analyst’s '
         'disclosure on the use of AI tools.',
   ),

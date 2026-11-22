@@ -292,7 +292,9 @@ class _SpotlightOverlayState extends State<_SpotlightOverlay>
       bottom = padding.bottom + AppSpace.md;
     }
 
-    final scrim = Colors.black.withValues(alpha: dark ? 0.72 : 0.58);
+    final scrim = Theme.of(context).colorScheme.scrim.withValues(
+      alpha: dark ? 0.72 : 0.58,
+    );
 
     return BlockSemantics(
       child: Material(
@@ -337,7 +339,7 @@ class _SpotlightOverlayState extends State<_SpotlightOverlay>
                         child: DecoratedBox(
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(radius),
-                            border: Border.all(color: t.accent, width: 2),
+                            border: Border.all(color: t.highlight, width: 2),
                           ),
                         ),
                       ),
@@ -475,7 +477,11 @@ class _Card extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppSpace.md),
-            OnboardingPageIndicator(page: index, total: total),
+            OnboardingPageIndicator(
+              page: index,
+              total: total,
+              activeColor: t.accentInk,
+            ),
             const SizedBox(height: AppSpace.sm),
             Wrap(
               alignment: WrapAlignment.spaceBetween,

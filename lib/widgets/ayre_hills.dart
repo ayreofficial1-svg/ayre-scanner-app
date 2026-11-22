@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 /// Header ornament (v5 §2A, "Header decorative hill shapes"): three soft,
 /// overlapping translucent silhouettes anchored to the top-right corner of
-/// the box they're given, in `accent` at low alpha, furthest-back shape
+/// the box they're given, in brand green / ivory at low alpha, furthest-back shape
 /// faintest.
 ///
 /// **Purely decorative — not a chart.** It carries no data, is excluded from
@@ -15,10 +15,9 @@ import 'package:flutter/material.dart';
 /// Shared by the Home header (Phase 2) and the Profile header (Phase 6,
 /// "same soft layered shape device").
 ///
-/// The alpha values are §2A's literal component-table colors. They are
-/// `accent` (`#1F8A4B` light / `#3FCB7A` dark) at ~4/8/12% (light) and
-/// ~5/9/13% (dark), written out as ARGB so the layering stays exactly as
-/// specified rather than being re-derived from float alphas.
+/// Light: brand deep green (`#0F3D2E`) at ~4/8/12 %. Dark: brand ivory
+/// (`#F7F5EF`) at ~5/9/13 %. Written out as ARGB so the layering stays exactly
+/// as specified rather than being re-derived from float alphas.
 class AyreHills extends StatelessWidget {
   const AyreHills({super.key, this.width = 260, this.height = 170});
 
@@ -27,14 +26,14 @@ class AyreHills extends StatelessWidget {
 
   // Outermost (back) → innermost (front).
   static const List<Color> _light = [
-    Color(0x0A1F8A4B),
-    Color(0x141F8A4B),
-    Color(0x1F1F8A4B),
+    Color(0x0A0F3D2E),
+    Color(0x140F3D2E),
+    Color(0x1F0F3D2E),
   ];
   static const List<Color> _dark = [
-    Color(0x0C3FCB7A),
-    Color(0x163FCB7A),
-    Color(0x203FCB7A),
+    Color(0x0DF7F5EF),
+    Color(0x17F7F5EF),
+    Color(0x21F7F5EF),
   ];
 
   @override

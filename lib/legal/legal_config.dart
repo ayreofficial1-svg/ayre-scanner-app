@@ -15,9 +15,9 @@ library;
 /// Full name exactly as it appears on the SEBI registration certificate.
 const String kRaName = '[RA FULL NAME AS ON SEBI CERTIFICATE]';
 
-/// The name the service is offered under. "Ayre" is the name used in the app;
-/// confirm it is the name you are entitled to use as the RA's trade name.
-const String kBrandName = 'Ayre';
+/// The name the service is offered under. "Investee" is the name used in the
+/// app; confirm it is the name you are entitled to use as the RA's trade name.
+const String kBrandName = 'Investee';
 
 /// SEBI registration number (INH…). The Research Analyst screen shows the value
 /// served by the backend (`RA_REG_NUMBER` environment variable); keep both

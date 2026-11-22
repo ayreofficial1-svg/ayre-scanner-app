@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 
 /// The personal-identity chip (v5 §2A, "Avatar / identity chip"): a circle of ff
-/// initials in a lavender/plum tone.
+/// initials in a brand-green tint.
 ///
-/// **A deliberate secondary accent, distinct from brand green.** It exists
+/// **A quiet identity tint of the brand green.** It exists
 /// only for personal-identity chips — the Home header avatar and (Phase 6) the
 /// Profile identity circle — and must never be reused for market data,
 /// buttons or navigation.

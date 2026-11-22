@@ -396,11 +396,11 @@ class HairlineDivider extends StatelessWidget {
 
 enum AyreButtonKind { primary, outline, danger }
 
-/// A fully-rounded pill (Spec §11.1 — buttons are pills, not rounded rects, in
-/// v5). Primary is a solid accent fill: white text in light (`onAccent`), near-
-/// black ink in dark. The light pairing measures ~4.38:1, just under AA for
-/// normal-size text — see the Phase 0 contrast note on
-/// [AppThemeTokens.onAccent].
+/// A fully-rounded pill. Primary is a solid accent fill with `onAccent`
+/// content: ivory on deep green in light, deep green on ivory in dark (11.15:1
+/// in both). Outline is a stronger hairline edge with `accentInk` content.
+/// Danger is a transparent pill with `negativeText` content (>= 4.5:1 on every
+/// surface). Never saffron.
 class AyreButton extends StatelessWidget {
   const AyreButton({
     super.key,
@@ -424,12 +424,12 @@ class AyreButton extends StatelessWidget {
     final t = context.tokens;
     final enabled = onPressed != null && !busy;
 
-    final (Color bg, Color fg, Color? edge) = switch (kind) {
-      AyreButtonKind.primary => (t.accent, t.onAccent, null),
+    final (Color bg, Color fg, Color edge) = switch (kind) {
+      AyreButtonKind.primary => (t.accent, t.onAccent, t.accent),
       AyreButtonKind.outline => (
         AppTheme.transparent,
-        t.textPrimary,
-        t.hairline,
+        t.accentInk,
+        t.navHairline,
       ),
       AyreButtonKind.danger => (
         AppTheme.transparent,
@@ -458,13 +458,10 @@ class AyreButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: bg,
             borderRadius: BorderRadius.circular(AppRadius.button),
-            // An accent fill against mint paper/near-black is a mid-lightness
-            // fill in both themes, so a hairline still carries the
-            // component's edge definition rather than relying on the fill
-            // alone to read as a distinct shape.
-            border: Border.all(
-              color: edge ?? t.textPrimary.withValues(alpha: 0.18),
-            ),
+            // Primary's edge matches its fill (deep green on ivory, ivory on
+            // green: both read as a distinct shape on their own); outline and
+            // danger carry their definition in the edge.
+            border: Border.all(color: edge),
           ),
           child: Row(
             mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
@@ -780,7 +777,7 @@ class AyreChip extends StatelessWidget {
     final (Color fg, Color bg) = switch (tone) {
       ChipTone.neutral => (t.foregroundMuted, t.surfaceRaised),
       ChipTone.attention => (t.neutralText, t.neutralSoft),
-      ChipTone.brand => (t.accentInk, t.accent.withValues(alpha: 0.16)),
+      ChipTone.brand => (t.accentInk, t.accentSoft),
     };
 
     return Container(

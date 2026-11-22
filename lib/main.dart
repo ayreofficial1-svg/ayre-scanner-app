@@ -40,11 +40,17 @@ class AyreScannerApp extends StatefulWidget {
 class _AyreScannerAppState extends State<AyreScannerApp> {
   static const _themeModeKey = 'theme_mode';
 
-  // Phase 1A (HIG alignment): `system` is a valid, selectable third option
-  // again (Settings' Appearance tiles). Default for a fresh install stays
-  // `dark`, unchanged, so existing users see no silent shift — `system` is
-  // only ever reached by an explicit user choice now.
-  ThemeMode _themeMode = ThemeMode.dark;
+  // One-time flag: the Investee theme makes `system` the default. Older
+  // builds defaulted to a forced `dark` and could store a resolved value that
+  // is indistinguishable from a deliberate choice, so an existing stored value
+  // is reset to `system` exactly once. Never touches `theme_mode`'s name, and
+  // never overrides a choice made after the migration.
+  static const _systemDefaultMigratedKey = 'theme_mode_system_default_v1';
+
+  // `system` is the default: the app follows the phone's light/dark setting
+  // (including live changes) until the user picks Light or Dark explicitly in
+  // Settings' Appearance tiles.
+  ThemeMode _themeMode = ThemeMode.system;
   bool _splashComplete = false;
   AuthPhase? _lastPhase;
 
@@ -121,23 +127,28 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
   Future<void> _loadThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
     final value = prefs.getString(_themeModeKey);
+    final migrated = prefs.getBool(_systemDefaultMigratedKey) ?? false;
+
+    if (!migrated) {
+      // First launch after the update: reset any stored value to `system`
+      // once, then mark the flag so later explicit choices are respected.
+      await prefs.setBool(_systemDefaultMigratedKey, true);
+      if (value != null) {
+        await prefs.setString(_themeModeKey, ThemeMode.system.name);
+      }
+      return;
+    }
     if (!mounted) return;
 
-    // No stored preference yet: keep the app's existing default (`dark`)
-    // rather than defaulting a fresh install to `system` — 1A widens the
-    // picker, it doesn't change what a new user sees first.
+    // No stored preference: stay on `system`.
     if (value == null) return;
 
-    // Phase 1A: `system` is restored as a real, persisted choice — no more
-    // migrating it away to a resolved light/dark value on load. A value
-    // stored by an older build that no longer matches a known mode name
-    // falls back to `dark`, same as before.
     setState(() {
       _themeMode = switch (value) {
         'light' => ThemeMode.light,
         'dark' => ThemeMode.dark,
         'system' => ThemeMode.system,
-        _ => ThemeMode.dark,
+        _ => ThemeMode.system,
       };
     });
   }
@@ -159,7 +170,7 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
       themeMode: _themeMode,
       setThemeMode: setThemeMode,
       child: MaterialApp(
-        title: 'Ayre Scanner',
+        title: 'Investee',
         debugShowCheckedModeBanner: false,
         // Owned by PushService so a notification tap can return to the tab
         // shell, and a foreground push can show its banner.
