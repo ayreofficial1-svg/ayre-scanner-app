@@ -31,7 +31,8 @@ class LogoMark extends StatelessWidget {
 
   final LogoPlacement placement;
 
-  static const String assetPath = 'assets/brand/ayre_logo.png';
+  static const String assetPathDark = 'assets/brand/ayre_logo.png';
+  static const String assetPathLight = 'assets/brand/ayre_logo_light.png';
 
   /// The rendered edge length for each placement.
   double get size => switch (placement) {
@@ -47,6 +48,9 @@ class LogoMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final assetPath = Theme.of(context).brightness == Brightness.dark
+        ? assetPathDark
+        : assetPathLight;
 
     return Semantics(
       label: 'Ayre',
