@@ -2,94 +2,102 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// Where the mark is being used. Each placement has one fixed size, so the logo
-/// never appears at an ad-hoc dimension invented per screen.
+/// Where the brand lockup is being used. Each placement has one fixed visible
+/// size (at the 390 reference), so the logo never appears at an ad-hoc
+/// dimension invented per screen.
 enum LogoPlacement {
-  /// The primary placement: centred, generously sized, with clear breathing room.
+  /// Splash: ~208×52 visible lockup.
   splash,
 
-  /// A secondary header mark above auth/onboarding content.
+  /// Auth / onboarding header: 96×24.
   auth,
 
-  /// A small, unobtrusive mark in a top-level header.
+  /// Top-level headers: 104×26.
   header,
+
+  /// Home mast: 104×26.
+  home,
 }
 
-/// The Investee brand mark, rendered from `assets/brand/ayre_logo.png` (dark)
-/// or `assets/brand/ayre_logo_light.png` (light).
+/// The approved Investee mark, cropped tightly to the artwork.
 ///
-/// The asset is authoritative and is used as-is: never recoloured, stretched,
-/// rotated or otherwise distorted. Only three sizes exist, one per placement.
+/// Brand-asset decision (plan D01): the HTML's flat-topped block "in" is *not*
+/// geometrically identical to the approved asset, so it is never traced. The
+/// approved sloped mark is used exactly as supplied. Only opaque variants
+/// exist (`assets/brand/ayre_logo*.png`, deep-green and ivory fields baked
+/// in), so the mark is shown on its own matching field as a rounded tile —
+/// never stretched, recoloured or isolated without permission. When a
+/// transparent approved variant is supplied, only [LogoGlyph] needs to change.
 ///
-/// The source image is a square with its own field (deep green in the dark
-/// variant, ivory in the light one) and generous internal padding. [LogoMark]
-/// compensates for that padding so the *mark* reads at the intended size and
-/// backs the artwork with the matching field colour so no seam shows.
-class LogoMark extends StatelessWidget {
-  const LogoMark({super.key, this.placement = LogoPlacement.header});
+/// The source is 2048×2048 with the mark occupying x 436–1612 / y 592–1456.
+/// The crop below adds 120px of field on every side and is centred on the
+/// image (centre 1024,1024), so it is a plain centred window.
+class LogoGlyph extends StatelessWidget {
+  const LogoGlyph({super.key, required this.height});
 
-  final LogoPlacement placement;
+  /// Rendered tile height; the width follows the crop's aspect ratio.
+  final double height;
 
   static const String assetPathDark = 'assets/brand/ayre_logo.png';
   static const String assetPathLight = 'assets/brand/ayre_logo_light.png';
 
-  /// The rendered edge length for each placement.
-  double get size => switch (placement) {
-    LogoPlacement.splash => 200,
-    LogoPlacement.auth => 104,
-    LogoPlacement.header => 34,
-  };
+  static const double _source = 2048;
+  static const double _cropW = 1416; // 1176 mark + 2×120 field
+  static const double _cropH = 1104; // 864 mark + 2×120 field
 
-  /// Minimum clear space around the mark, kept proportional to its size rather
-  /// than a fixed pixel value.
-  double get clearSpace => size * 0.18;
+  /// Tile width/height ratio.
+  static const double aspect = _cropW / _cropH;
+
+  double get width => height * aspect;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final dark = Theme.of(context).brightness == Brightness.dark;
     final assetPath = dark ? assetPathDark : assetPathLight;
-
-    return Semantics(
-      label: 'Investee',
-      image: true,
-      child: Padding(
-        padding: EdgeInsets.all(clearSpace),
-        child: ClipRRect(
-          // A rounded field, matching the app's card language, so the mark
-          // reads as a placed brand element rather than a pasted rectangle.
-          //
-          // Phase 5 owns this file, closing plan §7 open decision #8: it was
-          // flagged unowned in Phases 1–4 because no phase's file list claimed
-          // it, and Home is where the brand mark is actually placed. The old
-          // `AppRadius.panel`/`hero` pair was retired in Phase 0 and has no
-          // 1:1 successor — v4 has one card radius and one inner radius, so
-          // the header mark takes the inner radius (it sits inline with text)
-          // and a standalone placement takes the card radius.
-          borderRadius: BorderRadius.circular(
-            placement == LogoPlacement.header
-                ? AppRadius.inset
-                : AppRadius.card,
-          ),
-          child: ColoredBox(
-            // The artwork carries its own field: brand deep green in the dark
-            // variant (`surface` is that exact colour) and brand ivory in the
-            // light one (`background` is that exact colour), so antialiased
-            // corners never show a different tone.
-            color: dark ? t.surface : t.background,
-            child: Image.asset(
-              assetPath,
-              width: size,
-              height: size,
-              // The source is square with generous padding baked in; cover keeps
-              // the mark centred and correctly proportioned without stretching.
-              fit: BoxFit.cover,
-              filterQuality: FilterQuality.medium,
-              // The asset is large; cache it at the size actually drawn so the
-              // decode cost matches the placement rather than the source.
-              cacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
-                  .round(),
-              errorBuilder: (context, _, _) => _Fallback(size: size),
+    // The artwork carries its own field: brand deep green in the dark variant
+    // and brand ivory in the light one, so a matching ColoredBox keeps
+    // anti-aliased corners free of any other tone.
+    final field = dark ? const Color(0xFF0F3D2E) : const Color(0xFFF7F5EF);
+    final side = height * (_source / _cropH);
+    final w = width;
+    return ExcludeSemantics(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(
+          (height * 0.3).clamp(4.0, AppRadius.inset),
+        ),
+        child: ColoredBox(
+          color: field,
+          child: SizedBox(
+            width: w,
+            height: height,
+            child: OverflowBox(
+              minWidth: 0,
+              minHeight: 0,
+              maxWidth: side,
+              maxHeight: side,
+              child: Image.asset(
+                assetPath,
+                width: side,
+                height: side,
+                fit: BoxFit.fill,
+                filterQuality: FilterQuality.medium,
+                cacheWidth:
+                    (side * MediaQuery.devicePixelRatioOf(context)).round(),
+                errorBuilder: (context, _, _) => SizedBox(
+                  width: w,
+                  height: height,
+                  child: Center(
+                    child: Text(
+                      'in',
+                      style: AppTypo.display(
+                        fontSize: height * 0.6,
+                        color: t.textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         ),
@@ -98,26 +106,63 @@ class LogoMark extends StatelessWidget {
   }
 }
 
-/// If the asset is ever missing from a build, show the wordmark rather than a
-/// broken-image box.
-class _Fallback extends StatelessWidget {
-  const _Fallback({required this.size});
+/// The Investee brand lockup: approved mark + Manrope 800 `investee`
+/// wordmark, laid out at the placement's fixed visible size. Sized with a
+/// scale-down fit so the text is never clipped, and independent of the OS /
+/// in-app text scale (a logo does not reflow with reading size).
+class LogoMark extends StatelessWidget {
+  const LogoMark({super.key, this.placement = LogoPlacement.header, this.color});
 
-  final double size;
+  final LogoPlacement placement;
+
+  /// Wordmark colour; defaults to the primary ink.
+  final Color? color;
+
+  static const String assetPathDark = LogoGlyph.assetPathDark;
+  static const String assetPathLight = LogoGlyph.assetPathLight;
+
+  /// Visible lockup size for each placement.
+  Size get size => switch (placement) {
+    LogoPlacement.splash => const Size(208, 52),
+    LogoPlacement.auth => const Size(96, 24),
+    LogoPlacement.header => const Size(104, 26),
+    LogoPlacement.home => const Size(104, 26),
+  };
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return SizedBox(
-      width: size,
-      height: size,
-      child: Center(
-        child: Text(
-          'investee',
-          style: AppTypo.display(
-            fontSize: size * 0.26,
-            fontWeight: FontWeight.w700,
-            color: t.textPrimary,
+    final s = size;
+    final h = s.height;
+    return Semantics(
+      label: 'Investee',
+      image: true,
+      child: ExcludeSemantics(
+        child: SizedBox(
+          width: s.width,
+          height: h,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                LogoGlyph(height: h),
+                SizedBox(width: h * 0.3),
+                Text(
+                  'investee',
+                  textScaler: TextScaler.noScaling,
+                  softWrap: false,
+                  style: AppTypo.display(
+                    fontSize: h * 0.64,
+                    color: color ?? t.textPrimary,
+                    height: 1.0,
+                    letterSpacing: -h * 0.02,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -125,8 +170,8 @@ class _Fallback extends StatelessWidget {
   }
 }
 
-/// The wordmark alone, for places where the full mark would be too heavy — a
-/// header beside live content, for instance.
+/// The wordmark alone, for places where the full lockup would be too heavy —
+/// a header beside live content, for instance. Manrope 800.
 class LogoWordmark extends StatelessWidget {
   const LogoWordmark({super.key, this.fontSize = 19, this.color});
 
@@ -138,13 +183,16 @@ class LogoWordmark extends StatelessWidget {
     final t = context.tokens;
     return Semantics(
       label: 'Investee',
-      child: Text(
-        'investee',
-        style: AppTypo.display(
-          fontSize: fontSize,
-          fontWeight: FontWeight.w700,
-          color: color ?? t.textPrimary,
-          letterSpacing: -0.6,
+      child: ExcludeSemantics(
+        child: Text(
+          'investee',
+          softWrap: false,
+          style: AppTypo.display(
+            fontSize: fontSize,
+            color: color ?? t.textPrimary,
+            height: 1.1,
+            letterSpacing: -fontSize * 0.03,
+          ),
         ),
       ),
     );

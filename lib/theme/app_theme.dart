@@ -3,27 +3,79 @@ import 'package:flutter/cupertino.dart'
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../widgets/ayre_tab_host.dart';
 
-// ─── Investee identity — deep green, ivory, saffron ────────────────────────
+// ─── Investee design system — the HTML "Visual Overhaul" is the source ────
 //
-// Three brand colours: deep green `#0F3D2E`, ivory `#F7F5EF`, saffron
-// `#FF9933`. Every other colour is a derived tint/shade of those three.
-// Light: ivory canvas, deep-green ink and actions. Dark: the brand green is
-// literally the card colour (`surface`), the canvas a deeper shade of it, and
-// primary fills invert to ivory.
+// Semantic roles map 1:1 to the reference CSS variables (`.L` light, `.D`
+// dark):
+//   --bg → background · --card → surface · --ink → textPrimary
+//   --brand → accent · --mut → foregroundMuted · --line → hairline
+//   --soft → surfaceRaised/surfaceSunken · --gs → positiveSoft
+//   --up → positive · --dn → negative
+//   --mb/--mi/--mm/--gb/--gh → [AppThemeTokens.mast] (sage mast palette)
+// Saffron `#FF9933` is the notch / logo / unread cue only: never gain/loss,
+// never body text on ivory (use `highlightText`).
 //
-// Saffron is a rare highlight (`highlight*` tokens): graphics and attention
-// cues only, never gain/loss, never body text on ivory (use `highlightText`),
-// never a primary button fill. Saffron fills always carry `onHighlight`.
-// Positive (gain) / negative (loss) / neutral (attention, a yellow-gold that
-// cannot be mistaken for saffron) stay separate semantic data colours.
-//
-// Surface model: `background` → `surface` (cards) → `surfaceRaised` (chips,
-// snackbar) → `surfaceSunken` (inputs, tracks). Flat, hairline-bordered; no
-// Material surface tint. Dark mode gets depth from lightness steps, not shadow.
+// Surface model: `background` → `surface` (cards) → `surfaceRaised` (tiles,
+// segmented tracks) → `surfaceSunken` (tracks, skeletons). Cards are flat and
+// opaque-bordered; shadows appear only on the explicitly raised hero surfaces.
+
+/// One mast variant: fill plus the ink, muted ink, translucent glass plate and
+/// watermark-motif colours that sit on it.
+@immutable
+class MastPalette {
+  const MastPalette({
+    required this.fill,
+    required this.ink,
+    required this.muted,
+    required this.glass,
+    required this.motif,
+  });
+
+  /// `--mb` — the mast backdrop.
+  final Color fill;
+
+  /// `--mi` — title ink.
+  final Color ink;
+
+  /// `--mm` — secondary text on the mast.
+  final Color muted;
+
+  /// `--gb` — header icon plates and pills.
+  final Color glass;
+
+  /// `--gh` — the decorative block watermark.
+  final Color motif;
+
+  MastPalette copyWith({
+    Color? fill,
+    Color? ink,
+    Color? muted,
+    Color? glass,
+    Color? motif,
+  }) => MastPalette(
+    fill: fill ?? this.fill,
+    ink: ink ?? this.ink,
+    muted: muted ?? this.muted,
+    glass: glass ?? this.glass,
+    motif: motif ?? this.motif,
+  );
+
+  static MastPalette lerp(MastPalette a, MastPalette b, double t) =>
+      MastPalette(
+        fill: Color.lerp(a.fill, b.fill, t)!,
+        ink: Color.lerp(a.ink, b.ink, t)!,
+        muted: Color.lerp(a.muted, b.muted, t)!,
+        glass: Color.lerp(a.glass, b.glass, t)!,
+        motif: Color.lerp(a.motif, b.motif, t)!,
+      );
+
+  /// Whether text/icons drawn *over* [fill] should be light (the fill is dark).
+  bool get isDark => fill.computeLuminance() < 0.4;
+}
+
 @immutable
 class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   const AppThemeTokens({
@@ -59,137 +111,142 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     required this.onHighlight,
     required this.highlightSoft,
     required this.highlightText,
+    required this.mast,
+    required this.mastChampagne,
+    required this.mastHome,
+    required this.notch,
+    required this.homeAvatarFill,
+    required this.homeAvatarInk,
+    required this.focusRing,
+    required this.scrim,
+    required this.splashTrack,
   });
 
-  /// App canvas: brand ivory in light; a deeper shade of the brand green in
-  /// dark. Never pure white/gray (light) or pure black/gray (dark).
+  /// `--bg` — page canvas / scaffold.
   final Color background;
 
-  /// The default card/panel fill, one step off [background].
+  /// `--card` — cards, dialogs, sheets, the dock, input fields.
   final Color surface;
 
-  /// A tile lifted slightly off its parent surface (e.g. a nested tonal
-  /// block, an icon tile). Not a ladder step — a sibling of [surfaceSunken],
-  /// chosen by the element's job, not by how "elevated" it should look.
+  /// `--soft` — icon tiles, insets, segmented tracks, subordinate data.
   final Color surfaceRaised;
 
-  /// A tonal fill recessed into its parent surface (e.g. a track, an inset
-  /// readout region). Sibling of [surfaceRaised] — see that field's note.
+  /// A tonal fill recessed into its parent (progress tracks, skeletons).
   final Color surfaceSunken;
 
-  /// The primary action/identity colour. Light: brand deep green. Dark:
-  /// brand ivory (primary fills invert). Used for primary buttons, selected
-  /// states, switches and active nav elements.
+  /// `--brand` — primary fills, selected nav / segments, switches.
   final Color accent;
 
-  /// A darkened (light theme) / lightened (dark theme) accent variant for
-  /// small type-weight use (links, selected labels) where the raw [accent]
-  /// value doesn't clear 4.5:1 as text on its theme's surfaces — verified
-  /// numerically in the v5 Phase 0 contrast pass; only populated where the
-  /// raw accent actually differs from a passing value.
+  /// Brand colour for small text and glyphs (links, selected labels).
   final Color accentInk;
 
-  /// Accent held back for large, low-emphasis fills.
+  /// Low-emphasis brand wash.
   final Color accentSoft;
 
-  /// Text/icon on an [accent] fill — ivory on deep green in light, deep green
-  /// on ivory in dark; 11.15:1 in both themes.
+  /// Content on an [accent] fill: the page background of the same theme
+  /// (ivory on deep green, near-black on leaf).
   final Color onAccent;
 
-  /// Positive/gain. Same hue family as [accent] — a genuine saturated
-  /// market green, kept as its own field per the token contract (a screen
-  /// may want brand-accent and gain-color to diverge later), and no longer
-  /// v4's muted sage.
+  /// `--up` — gain fills, bars and glyphs.
   final Color positive;
+
+  /// `--gs` — success chip / verification background.
   final Color positiveSoft;
 
-  /// Negative/loss. A clear, saturated red — distinct from any card's own
-  /// warm identity tint (e.g. the SENSEX card's coral, which is never a
-  /// loss signal), and no longer v4's muted rose.
+  /// `--dn` — loss and destructive actions only.
   final Color negative;
+
+  /// Outcome / destructive tint (12% negative over the card in light).
   final Color negativeSoft;
 
-  /// Neutral/attention (e.g. a flat/unchanged badge). Yellow-gold, kept
-  /// distinct from saffron — never a button fill, never navigation, never
-  /// brand. (The LIVE
-  /// indicator itself moved to [positive] in v5 — see the LIVE-chip spec.)
+  /// Stale / attention foreground: subdued amber-brown. Never market red.
   final Color neutral;
+
+  /// Champagne fill behind [neutral] text (stale plate, offline banner).
   final Color neutralSoft;
 
-  /// Primary reading text. Clears 4.5:1 on [background] and [surface] in
-  /// both themes.
+  /// `--ink` — primary text and default icon colour.
   final Color textPrimary;
 
-  /// Secondary text — captions, timestamps, supporting copy. Body copy must
-  /// never drop to [foregroundSubtle]; only true micro-copy may.
+  /// `--mut` — captions and secondary copy.
   final Color foregroundMuted;
 
-  /// Tertiary text — eyebrows, micro-labels only. See [foregroundMuted]'s
-  /// discipline note.
+  /// Tertiary text. The reference defines no lighter tier, so this equals
+  /// [foregroundMuted]; information must never rely on anything fainter.
   final Color foregroundSubtle;
 
-  /// Disabled text. The Spec has no explicit disabled-text token, so this is
-  /// derived from [foregroundSubtle] at reduced opacity rather than a
-  /// standalone authored value.
+  /// Disabled text: muted at 60% over the surface.
   final Color textDisabled;
 
-  /// 1px structure: the card edge and divider hairline.
+  /// `--line` — opaque 1px card/field/divider border.
   final Color hairline;
 
-  /// A slightly stronger hairline reserved for the bottom-nav's top edge,
-  /// which needs to read against a blurred, semi-transparent bar rather than
-  /// a flat surface.
+  /// The dock's top edge (same opaque line).
   final Color navHairline;
 
-  /// New in v4 — the previous identity had no shadows at all. Used for the
-  /// two-layer soft card shadow.
+  /// Base colour for the reference shadows (alpha applied at use).
   final Color shadowColor;
 
-  /// Base fill for the glass bottom nav, composited with alpha + blur at the
-  /// call site (see `AyreBottomNav`, Phase 2) rather than baked in here.
+  /// Dock / rail fill (the card colour).
   final Color navBg;
 
-  /// Base tone for the shimmer sweep on loading skeletons. Retinted to a
-  /// soft foreground-tinted gradient at the widget (Phase 4); this is the
-  /// base fill, not the highlight.
+  /// Skeleton base fill (`--soft`).
   final Color skeleton;
 
-  /// Avatar / identity-chip fill — a brand-green tint. Used only for
-  /// personal/identity chips (the Profile initials circle), never for market
-  /// data.
+  /// Profile identity tile fill (`--soft`).
   final Color avatarFill;
 
-  /// Initials text on [avatarFill].
+  /// Initials on [avatarFill].
   final Color avatarInk;
 
-  /// Gain text and glyphs. Light: a deep market green clearing 4.5:1 on every
-  /// light surface. Dark: [positive]. Fills, bars, dots and chart marks keep
-  /// [positive].
+  /// Gain text and glyphs (`--up`).
   final Color positiveText;
 
-  /// Loss text and glyphs. Light: a darker red that clears 4.5:1 on every
-  /// light surface; dark: the existing [negative].
+  /// Loss text and glyphs (`--dn`).
   final Color negativeText;
 
-  /// Neutral/flat text and chip text. Light: a darker yellow-gold that clears
-  /// 4.5:1; dark: [neutral].
+  /// Stale / attention text on [neutralSoft].
   final Color neutralText;
 
-  /// Saffron highlight (`#FF9933`). Graphics and attention cues only — a
-  /// dot, a ring, an underline. Never gain/loss, never a primary fill, and in
-  /// light mode never text (1.95:1 on ivory; use [highlightText]).
+  /// Saffron `#FF9933` — logo, notch, unread dot, active-tab cue.
   final Color highlight;
 
-  /// Content on a [highlight] fill — deep green (5.71:1 on saffron). Never
-  /// ivory/white.
+  /// Content on a [highlight] fill (the reference NEW badge `#2B1600`).
   final Color onHighlight;
 
-  /// Low-emphasis saffron tint for an attention wash behind [highlightText].
+  /// Low-emphasis saffron tint.
   final Color highlightSoft;
 
-  /// Saffron-family text. Light: a dark burnt orange that clears 4.5:1 on
-  /// ivory/white/[highlightSoft]; dark: saffron itself (5.71:1 on surface).
+  /// Saffron-family text that clears 4.5:1 on its theme's surfaces.
   final Color highlightText;
+
+  /// Default sage mast (`.L` / `.D`) — most tabs and every secondary mast.
+  final MastPalette mast;
+
+  /// Champagne mast (`.t2`) — Reports, Create account.
+  final MastPalette mastChampagne;
+
+  /// Home mast: deep green in light (`.L.hg`); in dark the default dark mast.
+  final MastPalette mastHome;
+
+  /// The saffron card notch / dock marker (same as [highlight], kept as its
+  /// own role so it can diverge from text uses of saffron).
+  final Color notch;
+
+  /// Home account-initials circle fill (ivory in both themes).
+  final Color homeAvatarFill;
+
+  /// Initials on [homeAvatarFill] (deep green in both themes).
+  final Color homeAvatarInk;
+
+  /// Focus outline for keyboard / pointer focus.
+  final Color focusRing;
+
+  /// Modal barrier (ink / black at 50–60%).
+  final Color scrim;
+
+  /// Splash indicator track.
+  final Color splashTrack;
 
   @override
   AppThemeTokens copyWith({
@@ -225,6 +282,15 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
     Color? onHighlight,
     Color? highlightSoft,
     Color? highlightText,
+    MastPalette? mast,
+    MastPalette? mastChampagne,
+    MastPalette? mastHome,
+    Color? notch,
+    Color? homeAvatarFill,
+    Color? homeAvatarInk,
+    Color? focusRing,
+    Color? scrim,
+    Color? splashTrack,
   }) {
     return AppThemeTokens(
       background: background ?? this.background,
@@ -259,6 +325,15 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       onHighlight: onHighlight ?? this.onHighlight,
       highlightSoft: highlightSoft ?? this.highlightSoft,
       highlightText: highlightText ?? this.highlightText,
+      mast: mast ?? this.mast,
+      mastChampagne: mastChampagne ?? this.mastChampagne,
+      mastHome: mastHome ?? this.mastHome,
+      notch: notch ?? this.notch,
+      homeAvatarFill: homeAvatarFill ?? this.homeAvatarFill,
+      homeAvatarInk: homeAvatarInk ?? this.homeAvatarInk,
+      focusRing: focusRing ?? this.focusRing,
+      scrim: scrim ?? this.scrim,
+      splashTrack: splashTrack ?? this.splashTrack,
     );
   }
 
@@ -299,6 +374,15 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
       onHighlight: c(onHighlight, other.onHighlight),
       highlightSoft: c(highlightSoft, other.highlightSoft),
       highlightText: c(highlightText, other.highlightText),
+      mast: MastPalette.lerp(mast, other.mast, t),
+      mastChampagne: MastPalette.lerp(mastChampagne, other.mastChampagne, t),
+      mastHome: MastPalette.lerp(mastHome, other.mastHome, t),
+      notch: c(notch, other.notch),
+      homeAvatarFill: c(homeAvatarFill, other.homeAvatarFill),
+      homeAvatarInk: c(homeAvatarInk, other.homeAvatarInk),
+      focusRing: c(focusRing, other.focusRing),
+      scrim: c(scrim, other.scrim),
+      splashTrack: c(splashTrack, other.splashTrack),
     );
   }
 }
@@ -308,163 +392,255 @@ extension AppThemeContext on BuildContext {
 }
 
 // ─── Radii ─────────────────────────────────────────────────────────────────
-// Smaller and flatter than the previous identity's "chunky, generous" 20–26px
-// cards: 18px reads as rounded-not-bubbly per the Spec's own reasoning (24px+
-// starts to read toy-like). Inner elements (chips, insets, icon tiles) step
-// down to 12px. Circles are reserved for avatars and the toggle knob only —
-// icon tiles are rounded squares, never circles.
+// The scalar constants remain for existing consumers (and now carry the new
+// values); the asymmetric card/button silhouettes live in [AppShape].
 abstract final class AppRadius {
-  static const double card = 18;
-  static const double chip = 12;
-  static const double inset = 12;
-  static const double control = 12;
+  /// Large corner of the card silhouette (the small TL corner is [small]).
+  static const double card = 26;
 
-  /// Rounded-square icon tiles sit in a 12–16px band; this is the default —
-  /// individual call sites may pick within the band deliberately, not
-  /// arbitrarily.
-  static const double iconTile = 14;
+  /// The small top-left corner shared by cards and buttons.
+  static const double small = 8;
 
-  /// Not respecified by the Spec; kept from the previous identity unless
-  /// visual QA against the new 18px card radius says otherwise (flagged for
-  /// Phase 5).
-  static const double sheet = 28;
+  /// Large corners of the button silhouette.
+  static const double buttonLarge = 28;
+
+  /// Chips, fields, segments, tiles and compact icon controls.
+  static const double chip = 13;
+  static const double inset = 13;
+  static const double control = 13;
+  static const double iconTile = 13;
+
+  /// Selected segment inside a segmented track.
+  static const double segmentSelected = 10;
+
+  /// Sheet top corners.
+  static const double sheet = 26;
 
   static const double pill = 999;
   static const double circle = 999;
-  static const double button = pill;
+
+  /// Retained scalar for legacy `BorderRadius.circular(AppRadius.button)`
+  /// call sites: [buttonLarge] (visually a pill at the 55px height).
+  static const double button = buttonLarge;
+}
+
+/// Asymmetric silhouettes and geometry from the reference. A single scalar
+/// radius cannot express them, so shapes are encoded explicitly.
+abstract final class AppShape {
+  /// Card: TL 8, TR/BR/BL 26.
+  static const BorderRadius card = BorderRadius.only(
+    topLeft: Radius.circular(AppRadius.small),
+    topRight: Radius.circular(AppRadius.card),
+    bottomRight: Radius.circular(AppRadius.card),
+    bottomLeft: Radius.circular(AppRadius.card),
+  );
+
+  /// Button: TL 8, TR/BR/BL 28.
+  static const BorderRadius button = BorderRadius.only(
+    topLeft: Radius.circular(AppRadius.small),
+    topRight: Radius.circular(AppRadius.buttonLarge),
+    bottomRight: Radius.circular(AppRadius.buttonLarge),
+    bottomLeft: Radius.circular(AppRadius.buttonLarge),
+  );
+
+  /// Fields, segments, tiles, compact icon controls.
+  static const BorderRadius field = BorderRadius.all(
+    Radius.circular(AppRadius.control),
+  );
+
+  /// Selected segment inside the soft track.
+  static const BorderRadius segmentSelected = BorderRadius.all(
+    Radius.circular(AppRadius.segmentSelected),
+  );
+
+  /// Bottom sheet and dock top corners.
+  static const BorderRadius sheetTop = BorderRadius.vertical(
+    top: Radius.circular(AppRadius.sheet),
+  );
+
+  /// Saffron notch: 21 from the card's left edge, y = −1, 21×5, bottom
+  /// corners 2.
+  static const double notchInset = 21;
+  static const double notchWidth = 21;
+  static const double notchHeight = 5;
+  static const double notchOffsetY = -1;
+  static const BorderRadius notch = BorderRadius.vertical(
+    bottom: Radius.circular(2),
+  );
+
+  /// Minimum visual height of buttons and inputs.
+  static const double controlHeight = 55;
+
+  /// Standard icon tile edge (44) and prominent tile edge (55).
+  static const double iconTileSize = 44;
+  static const double prominentTileSize = 55;
+
+  /// Switch track 44×26, thumb 20, inset 3.
+  static const double switchWidth = 44;
+  static const double switchHeight = 26;
+  static const double switchThumb = 20;
+  static const double switchInset = 3;
+
+  /// Mast heights at the 390 reference width and the shared right-edge rise.
+  static const double mastHome = 267;
+  static const double mastTab = 233;
+  static const double mastLogin = 322;
+  static const double mastRegister = 233;
+  static const double mastDiagonal = 55;
+
+  /// Summary / identity cards overlap the mast bottom by this much.
+  static const double mastOverlap = 34;
+
+  /// A card surface: fill, opaque 1px line and the asymmetric radius.
+  static BoxDecoration cardDecoration(
+    AppThemeTokens t, {
+    Color? color,
+    List<BoxShadow>? shadows,
+    BorderRadius radius = card,
+  }) => BoxDecoration(
+    color: color ?? t.surface,
+    borderRadius: radius,
+    border: Border.all(color: t.hairline),
+    boxShadow: shadows,
+  );
+
+  /// The same silhouette as a [ShapeBorder] (Material `shape:` slots).
+  static RoundedRectangleBorder cardBorder(
+    AppThemeTokens t, {
+    BorderRadius radius = card,
+  }) => RoundedRectangleBorder(
+    borderRadius: radius,
+    side: BorderSide(color: t.hairline),
+  );
 }
 
 // ─── Motion ────────────────────────────────────────────────────────────────
-// The Spec's easing is a specific cubic-bezier, not a generic ease-out —
-// implemented as an explicit `Cubic`, not `Curves.easeOutCubic`. Springs are
-// reintroduced (the previous identity was critically damped everywhere, no
-// bounce anywhere) but only for the nav pill, segmented control and toggle,
-// and are still non-bouncy — "glides smoothly" per the Spec, not elastic.
+// Calm and non-bouncy: cards rise 13px and fade with a 55ms stagger, the dock
+// marker slides 233ms, the range draws 377ms once, figures count up once.
 abstract final class AppMotion {
-  /// `cubic-bezier(0.22, 1, 0.36, 1)` — used for almost everything.
+  /// `cubic-bezier(0.22, 1, 0.36, 1)` — an ease-out with no overshoot.
   static const Curve ease = Cubic(0.22, 1, 0.36, 1);
   static const Curve easeIn = Curves.easeInCubic;
   static const Curve easeInOut = Curves.easeInOutCubic;
 
+  /// Press feedback (opacity / scale).
   static const Duration buttonPress = Duration(milliseconds: 150);
   static const Duration pageTransition = Duration(milliseconds: 280);
 
-  /// Tab-to-tab fade in the shell (D-8: routine motion <= 200 ms).
+  /// Tab-to-tab content fade in the shell.
   static const Duration tabFade = Duration(milliseconds: 200);
+
+  /// Sheets and modals (280–340ms).
   static const Duration overlaySlide = Duration(milliseconds: 340);
-  static const Duration cardEntrance = Duration(milliseconds: 450);
-  static const Duration entranceStagger = Duration(milliseconds: 40);
+
+  /// Card entrance: [entranceRise] px up + fade.
+  static const Duration cardEntrance = Duration(milliseconds: 280);
+  static const double entranceRise = 13;
+  static const Duration entranceStagger = Duration(milliseconds: 55);
   static const Duration entranceDelay = Duration(milliseconds: 30);
+
+  /// Count-up on first real data only.
   static const Duration countUp = Duration(milliseconds: 400);
   static const Duration refreshRotation = Duration(milliseconds: 900);
 
-  /// Chart draw-on (D-8): 700 ms, first reveal only. Reduce-motion snaps.
-  static const Duration chartDraw = Duration(milliseconds: 700);
+  /// The selected-destination marker glides between item centres.
+  static const Duration navMarker = Duration(milliseconds: 233);
 
-  // `traceDraw` (620ms) lived here as the line trace's own pre-v4 draw-on,
-  // pending Phase 3's decision on whether the line and radial families need
-  // separate timings. They don't: Phase 3 confirmed one parametrized painter
-  // serves Sparkline and AreaTrend, and every chart in the app now draws on
-  // over [chartDraw]. Two chart durations would only have meant two places to
-  // drift. Deleted rather than aliased — 620ms was the previous identity's
-  // "feed ticking in" pace and is not a v4 value worth keeping reachable.
+  /// Theme switch interpolation.
+  static const Duration themeSwitch = Duration(milliseconds: 233);
 
-  /// Generic fallback duration, unchanged from before v4 — kept for call
-  /// sites not yet reconciled against a named v4 duration above.
+  /// Recommendation range reveal, once per new valid content.
+  static const Duration rangeDraw = Duration(milliseconds: 377);
+
+  /// Chart draw-on; shares the range timing.
+  static const Duration chartDraw = rangeDraw;
+
+  /// Expand / fold / filter size changes (150–280ms).
+  static const Duration expand = Duration(milliseconds: 233);
+
+  /// Generic fallback for call sites not yet reconciled.
   static const Duration slow = Duration(milliseconds: 400);
 
-  /// A changed figure settling to its new value. Retired as the *hero*-metric
-  /// animation (superseded by [countUp], Spec §12.3/§15.2) but kept as a
-  /// duration in case digit-roll survives for live-updating secondary
-  /// tickers per plan §4 — resolve in Phase 3/5 whether any such ticker
-  /// exists.
+  /// Retained for the one existing digit-settle call site.
   static const Duration digitRoll = Duration(milliseconds: 420);
 
-  /// Retained aliases so components not yet migrated in Phase 0 still resolve
-  /// a duration; callers should move onto the named constants above during
-  /// their own phase rather than relying on these.
+  // Retained aliases for components not yet migrated.
   static const Duration fast = buttonPress;
   static const Duration medium = pageTransition;
-  /// D-8: entrance <= 280 ms; with the 4-step stagger the total stays
-  /// within ~250 ms of delay.
-  static const Duration entrance = Duration(milliseconds: 280);
+  static const Duration entrance = cardEntrance;
   static const Duration stagger = entranceStagger;
-
-  // Plan §7 open decision #9: Phase 0 put a literal carry-over of the Spec's
-  // nav/toggle spring numbers here; Phase 1 numerically verified the same
-  // values and moved the checked, documented version onto `AppSpring.navPill`
-  // / `AppSpring.toggleKnob` in `spring.dart` (which is what `AyreSwitch` and,
-  // as of this phase, `AyreBottomNav` actually animate with). Consolidated on
-  // that single location now that both call sites exist — the copies that
-  // used to live here (`navSpring`/`toggleSpring`) are deleted rather than
-  // kept as unused duplicates.
 }
 
-/// The type scale.
-///
-/// A straight legibility-tuned scale, not a derived one — the previous
-/// identity's φ/Fibonacci rationale doesn't carry forward: v4's step sizes
-/// (hero 34–44, page 26–28, card title 17–20, body 13.5–15.5) don't land on
-/// φ multiples of a 14px base, so keeping that doc comment next to new
-/// numbers would be actively misleading. Each named constant below picks one
-/// value from the Spec's given range; where the Spec gives a range rather
-/// than a single figure, the choice is noted so a later pass can special-case
-/// within the range deliberately rather than treating the pick as fixed.
+/// The type scale (logical px at the 390 reference).
 abstract final class AppTextScale {
-  /// Nav label. New in v4 — the previous nav had no labels.
-  static const double navLabel = 12;
-
-  /// Apple's minimum; used for the nav label on iOS/macOS only.
+  /// Dock label.
+  static const double navLabel = 11;
   static const double navLabelApple = 11;
 
-  /// Eyebrow/label — uppercase micro-heading.
-  static const double eyebrow = 12;
+  /// Eyebrow / section label / chip.
+  static const double eyebrow = 11;
+  static const double chip = 11;
 
-  /// List-row hint / secondary micro-copy.
+  /// Field label, date/detail, notice, secondary caption.
+  static const double fieldLabel = 12;
+  static const double notice = 12;
+
+  /// Hint / body copy.
   static const double hint = 13;
+  static const double body = 13;
 
-  /// Body / subtitle. Spec range 13.5–15.5; this is the base body size.
-  static const double body = 14;
+  /// Subtitle, greeting.
+  static const double subtitle = 15;
 
-  /// List row label.
+  /// Row label, button, auth field content.
   static const double rowLabel = 15;
+  static const double button = 15;
 
-  /// Card title. Spec range 17–20; this is the default — featured cards may
-  /// pick higher in the range deliberately.
-  static const double cardTitle = 18;
-
-  /// Featured headline (e.g. the Insights featured article). No direct
-  /// equivalent existed before v4.
-  static const double featuredHeadline = 22;
-
-  /// Page title. Spec range 26–28.
-  static const double page = 28;
-
-  /// Section heading (D-2): sits between page title and content.
+  /// Small heading, profit/share.
   static const double sectionHeading = 17;
 
-  /// Home's time-of-day salutation ("Good morning"). Deliberately larger than
-  /// [page]: it is the first thing on the app's first screen.
-  static const double greeting = 34;
+  /// Signal level price.
+  static const double levelPrice = 20;
 
-  /// The user's name, on its own line under the greeting.
+  /// Section title / card ticker.
+  static const double cardTitle = 21;
+  static const double featuredHeadline = 21;
+
+  /// Main title / stat count / report percentage.
+  static const double page = 34;
+  static const double stat = 34;
+
+  /// Reference Home greeting (15) and name (40). Used by the new `homeName` /
+  /// subtitle roles in Phase 4.
+  static const double homeGreeting = 15;
+  static const double homeName = 40;
+
+  /// Legacy salutation sizes, retained unchanged for the current Home and
+  /// onboarding call sites until their phases migrate them.
+  static const double greeting = 34;
   static const double greetingName = 24;
 
-  /// Hero metric. Spec range 34–44; this is the base — [heroXL] takes the top
-  /// of the range for the single largest reading on a screen.
-  static const double hero = 40;
-  static const double heroXL = 44;
+  /// Sign-in title.
+  static const double signInTitle = 44;
+
+  /// Display financial hero.
+  static const double hero = 55;
+  static const double heroXL = 55;
 }
 
-/// The spacing scale.
-///
-/// A plain 4px base grid (Spec §6.1), replacing the previous identity's
-/// Fibonacci steps outright — the two scales diverge at almost every step
-/// (13/21/34 vs. 12/16/20/24), so this is a full scale replacement, not a
-/// value-for-value substitution into layouts tuned for the old ratios. Named
-/// spacing roles below map directly to the Spec's own named quantities;
-/// `xxs`–`xxl` are the generic 4px-grid ladder for anything not named.
+/// Spacing: golden-ratio-inspired sequence (8, 13, 21, 34, 55, 89) for named
+/// roles, with the 4px ladder retained for micro-spacing and existing call
+/// sites.
 abstract final class AppSpace {
+  // The reference sequence.
+  static const double s8 = 8;
+  static const double s13 = 13;
+  static const double s21 = 21;
+  static const double s34 = 34;
+  static const double s55 = 55;
+  static const double s89 = 89;
+
+  // Micro / generic ladder.
   static const double xxs = 4;
   static const double xs = 8;
   static const double sm = 12;
@@ -473,83 +649,94 @@ abstract final class AppSpace {
   static const double xl = 24;
   static const double xxl = 32;
 
-  /// Page horizontal padding.
-  static const double pageHorizontal = 20;
+  /// Page horizontal padding / gutter at the reference width.
+  static const double pageHorizontal = 21;
 
-  /// Page top padding.
-  static const double pageTop = 12;
+  /// Page top padding for headerless pages.
+  static const double pageTop = 13;
 
-  /// Horizontal page gutter by viewport width (D-10): 20 from 360 pt up,
-  /// 16 below.
-  static double gutterOf(BuildContext context) =>
-      MediaQuery.sizeOf(context).width < 360 ? 16 : pageHorizontal;
+  /// Gutter by viewport width: 21 from 360 up, 16 below, 13 on very narrow
+  /// windows.
+  static double gutterOf(BuildContext context) {
+    final w = MediaQuery.sizeOf(context).width;
+    if (w < 340) return 13;
+    if (w < 360) return 16;
+    return pageHorizontal;
+  }
 
-  /// Gap between major sections on a screen. Spec range 16–24; this is the
-  /// default.
-  static const double sectionGap = 20;
+  /// Gap above a section label / between major sections.
+  static const double sectionGap = 26;
 
-  /// Gap between sibling cards.
-  static const double cardGap = 12;
+  /// Gap between sibling cards and rows.
+  static const double cardGap = 13;
 
-  /// Card internal padding. Spec range 16–20; this is the default — hero/
-  /// featured cards may pick higher in the range deliberately.
-  static const double cardPadding = 16;
+  /// Card internal padding.
+  static const double cardPadding = 21;
 
-  /// Gap between elements inside a card. Spec range 12–16; this is the
-  /// default.
-  static const double inCardGap = 12;
+  /// Gap between elements inside a card.
+  static const double inCardGap = 13;
 
-  /// Vertical padding for a hairline-divided list row.
-  static const double hairlineRowPadding = 14;
-
-  /// Retained alias for call sites (`ayre_components.dart`'s
-  /// `SkeletonTickerRow`) not yet migrated onto the named constant above —
-  /// identical to [hairlineRowPadding].
+  /// Vertical padding of a hairline-divided row.
+  static const double hairlineRowPadding = 13;
   static const double row = hairlineRowPadding;
 
-  /// The minimum tappable dimension. Already at/above the Apple HIG 44pt
-  /// floor the Spec's own button/chip minimums fall under — kept unchanged
-  /// (44pt+ enforcement across buttons/chips is a Phase 7 whole-app pass, not
-  /// a token change).
+  /// Section label gap below.
+  static const double sectionLabelBelow = 8;
+
+  /// Minimum tappable dimension.
   static const double minTarget = 48;
 }
 
-// ─── Typography ────────────────────────────────────────────────────────────
-// Two faces, not three: Hanken Grotesk carries body, heading and UI text —
-// replacing both Manrope (UI) and Space Grotesk's previous heading job.
-// Space Grotesk survives, but its job narrows to numbers and display
-// headings only. JetBrains Mono is dropped entirely.
+// ─── Typography: Manrope everywhere ────────────────────────────────────────
+// Bundled static weights 500/600/700/800 (assets/fonts, SIL OFL). No network
+// at first launch. Glyphs Manrope lacks (e.g. Devanagari) fall back to the
+// platform font via Flutter's normal fallback.
 abstract final class AppTypo {
-  /// Converts the Spec's CSS `em` tracking values (relative to font size)
-  /// into Flutter's absolute logical-pixel `letterSpacing`. Must be used for
-  /// every tracking value carried over from the Spec — copying an `em`
-  /// number as if it were already pixels reads either cramped or absurdly
-  /// wide depending on the size it's applied at.
+  static const String family = 'Manrope';
+
+  /// Converts a CSS `em` tracking value into Flutter's absolute px.
   static double tracking(double fontSize, double em) => em * fontSize;
 
-  /// Body, heading and UI text — one face, replacing Manrope + Space
-  /// Grotesk's previous heading role.
-  static TextStyle display({
-    double fontSize = 24,
-    FontWeight fontWeight = FontWeight.w700,
+  static TextStyle _m({
+    required double fontSize,
+    required FontWeight fontWeight,
     Color? color,
     double? height,
     double? letterSpacing,
-  }) => GoogleFonts.hankenGrotesk(
+    bool tabular = false,
+  }) => TextStyle(
+    fontFamily: family,
     fontSize: fontSize,
     fontWeight: fontWeight,
     color: color,
     height: height,
-    letterSpacing: letterSpacing ?? -0.4,
+    letterSpacing: letterSpacing,
+    fontFeatures: tabular ? const [FontFeature.tabularFigures()] : null,
   );
 
+  /// Headings and display text (default 800, tight tracking).
+  static TextStyle display({
+    double fontSize = 24,
+    FontWeight fontWeight = FontWeight.w800,
+    Color? color,
+    double? height,
+    double? letterSpacing,
+  }) => _m(
+    fontSize: fontSize,
+    fontWeight: fontWeight,
+    color: color,
+    height: height,
+    letterSpacing: letterSpacing ?? -0.3,
+  );
+
+  /// Body and UI text.
   static TextStyle ui({
-    double fontSize = 14,
+    double fontSize = 13,
     FontWeight fontWeight = FontWeight.w500,
     Color? color,
     double? height,
     double? letterSpacing,
-  }) => GoogleFonts.hankenGrotesk(
+  }) => _m(
     fontSize: fontSize,
     fontWeight: fontWeight,
     color: color,
@@ -557,30 +744,28 @@ abstract final class AppTypo {
     letterSpacing: letterSpacing,
   );
 
-  /// Every numeric market value, without exception — tabular figures so a
-  /// live value never reflows its neighbours when it updates. Space Grotesk
-  /// replaces JetBrains Mono; the tabular-figures discipline is unchanged.
+  /// Every financial figure, date and count: Manrope with tabular figures so
+  /// values never reflow. Signed minus, ₹ and Indian grouping are formatting
+  /// concerns of the callers and render from the bundled glyphs.
   static TextStyle num({
     double fontSize = 14,
-    FontWeight fontWeight = FontWeight.w500,
+    FontWeight fontWeight = FontWeight.w700,
     Color? color,
     double? height,
     double? letterSpacing,
-  }) => GoogleFonts.spaceGrotesk(
+  }) => _m(
     fontSize: fontSize,
     fontWeight: fontWeight,
     color: color,
     height: height,
-    letterSpacing: letterSpacing ?? -0.3,
-    fontFeatures: const [FontFeature.tabularFigures()],
+    letterSpacing: letterSpacing,
+    tabular: true,
   );
 
-  /// Retained alias for call sites (`figure.dart`) not yet migrated off the
-  /// old name in Phase 0 — identical to [num]. Migrate callers to [num]
-  /// directly in the phase that touches them, then delete this.
+  /// Retained alias of [num] for existing call sites.
   static TextStyle ticker({
     double fontSize = 14,
-    FontWeight fontWeight = FontWeight.w500,
+    FontWeight fontWeight = FontWeight.w700,
     Color? color,
     double? height,
     double? letterSpacing,
@@ -594,170 +779,248 @@ abstract final class AppTypo {
 
   // ── Display roles ────────────────────────────────────────────────────────
 
+  /// Main title / stat count: 34 / 800 / 1.1 / −0.8.
   static TextStyle pageTitle(AppThemeTokens t, {Color? color}) => display(
     fontSize: AppTextScale.page,
-    fontWeight: FontWeight.w700,
     color: color ?? t.textPrimary,
-    height: 1.14,
-    letterSpacing: -0.7,
+    height: 1.1,
+    letterSpacing: -0.8,
   );
 
+  /// Sign-in title: 44 / 800 / 1.1 / −0.8.
+  static TextStyle signInTitle(AppThemeTokens t, {Color? color}) => display(
+    fontSize: AppTextScale.signInTitle,
+    color: color ?? t.textPrimary,
+    height: 1.1,
+    letterSpacing: -0.8,
+  );
+
+  /// Home name: 40 / 800 / 1.1 / −0.8.
+  static TextStyle homeName(AppThemeTokens t, {Color? color}) => display(
+    fontSize: AppTextScale.homeName,
+    color: color ?? t.textPrimary,
+    height: 1.1,
+    letterSpacing: -0.8,
+  );
+
+  /// Stat count: 34 / 800 / 1.1 / −0.8, tabular.
+  static TextStyle stat(AppThemeTokens t, {Color? color}) => num(
+    fontSize: AppTextScale.stat,
+    fontWeight: FontWeight.w800,
+    color: color ?? t.textPrimary,
+    height: 1.1,
+    letterSpacing: -0.8,
+  );
+
+  /// Report percentage: 34 / 800 / 1.0 / −0.8, tabular.
+  static TextStyle reportPercent(AppThemeTokens t, {Color? color}) => num(
+    fontSize: AppTextScale.stat,
+    fontWeight: FontWeight.w800,
+    color: color ?? t.textPrimary,
+    height: 1.0,
+    letterSpacing: -0.8,
+  );
+
+  /// Section title / card ticker: 21 / 800 / 1.2 / −0.3.
   static TextStyle featuredHeadline(AppThemeTokens t, {Color? color}) =>
       display(
         fontSize: AppTextScale.featuredHeadline,
-        fontWeight: FontWeight.w700,
         color: color ?? t.textPrimary,
-        height: 1.22,
-        letterSpacing: -0.4,
+        height: 1.2,
+        letterSpacing: -0.3,
       );
 
-  /// No separate section-title size is given by the Spec; this reuses
-  /// [AppTextScale.featuredHeadline] deliberately (flag if visual QA in
-  /// Phase 5 wants a distinct step).
   static TextStyle sectionTitle(AppThemeTokens t, {Color? color}) =>
       featuredHeadline(t, color: color);
 
-  static TextStyle cardTitle(AppThemeTokens t, {Color? color}) => display(
-    fontSize: AppTextScale.cardTitle,
-    fontWeight: FontWeight.w600,
-    color: color ?? t.textPrimary,
-    height: 1.25,
-    letterSpacing: -0.2,
-  );
+  static TextStyle cardTitle(AppThemeTokens t, {Color? color}) =>
+      featuredHeadline(t, color: color);
 
   // ── Numeric roles ────────────────────────────────────────────────────────
 
-  /// The largest data text in the app — index and equity levels.
+  /// Display financial hero: 55 / 800 / 1.0 / −1.5.
   static TextStyle heroValue(AppThemeTokens t, {Color? color}) => num(
     fontSize: AppTextScale.hero,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w800,
     color: color ?? t.textPrimary,
     height: 1.0,
-    letterSpacing: -1.2,
+    letterSpacing: -1.5,
+  );
+
+  /// Signal level price: 20 / 800 / −0.4, tabular.
+  static TextStyle levelPrice(AppThemeTokens t, {Color? color}) => num(
+    fontSize: AppTextScale.levelPrice,
+    fontWeight: FontWeight.w800,
+    color: color ?? t.textPrimary,
+    letterSpacing: -0.4,
   );
 
   static TextStyle value(
     AppThemeTokens t, {
     Color? color,
     double fontSize = 14,
-  }) => num(fontSize: fontSize, fontWeight: FontWeight.w500, color: color ?? t.textPrimary);
+  }) => num(
+    fontSize: fontSize,
+    fontWeight: FontWeight.w700,
+    color: color ?? t.textPrimary,
+  );
 
   static TextStyle valueSmall(AppThemeTokens t, {Color? color}) => num(
     fontSize: 12,
-    fontWeight: FontWeight.w400,
-    color: color ?? t.foregroundSubtle,
+    fontWeight: FontWeight.w500,
+    color: color ?? t.foregroundMuted,
     letterSpacing: 0,
   );
 
   // ── UI roles ─────────────────────────────────────────────────────────────
 
+  /// Body: 13 / 500 / 1.4.
   static TextStyle body(AppThemeTokens t, {Color? color}) => ui(
     fontSize: AppTextScale.body,
-    fontWeight: FontWeight.w400,
+    fontWeight: FontWeight.w500,
     color: color ?? t.foregroundMuted,
-    height: 1.45,
+    height: 1.4,
   );
 
+  /// Emphasised body / subtitle strong: 14 / 700.
   static TextStyle bodyStrong(AppThemeTokens t, {Color? color}) => ui(
-    fontSize: AppTextScale.body,
-    fontWeight: FontWeight.w600,
+    fontSize: 14,
+    fontWeight: FontWeight.w700,
     color: color ?? t.textPrimary,
     height: 1.4,
   );
 
+  /// Subtitle / greeting: 15 / 500 / 1.4, muted.
+  static TextStyle subtitle(AppThemeTokens t, {Color? color}) => ui(
+    fontSize: AppTextScale.subtitle,
+    fontWeight: FontWeight.w500,
+    color: color ?? t.foregroundMuted,
+    height: 1.4,
+  );
+
+  /// Reading copy (legal, lessons, notes): 15 / 500 / 1.55.
+  static TextStyle reading(AppThemeTokens t, {Color? color}) => ui(
+    fontSize: AppTextScale.subtitle,
+    fontWeight: FontWeight.w500,
+    color: color ?? t.textPrimary,
+    height: 1.55,
+  );
+
+  /// Row label: 15 / 700.
   static TextStyle rowLabel(AppThemeTokens t, {Color? color}) => ui(
     fontSize: AppTextScale.rowLabel,
-    fontWeight: FontWeight.w600,
+    fontWeight: FontWeight.w700,
     color: color ?? t.textPrimary,
-    letterSpacing: -0.1,
   );
 
-  /// List-row hint / secondary micro-copy.
+  /// Hint / secondary line: 13 / 500 / 1.4, muted.
   static TextStyle hint(AppThemeTokens t, {Color? color}) => ui(
     fontSize: AppTextScale.hint,
-    fontWeight: FontWeight.w400,
-    color: color ?? t.foregroundSubtle,
-    height: 1.35,
+    fontWeight: FontWeight.w500,
+    color: color ?? t.foregroundMuted,
+    height: 1.4,
   );
 
-  /// Retained name for existing call sites; identical to [hint].
   static TextStyle caption(AppThemeTokens t, {Color? color}) =>
       hint(t, color: color);
 
-  /// Eyebrow / chip / badge overline: small, uppercase, subtle (D-1: 12 sp,
-  /// 0.04 em tracking; no longer used for section headers — see
-  /// [sectionHeading]). Sits above every data
-  /// value and heads every section. Tracking is the Spec's "+0.08em"
-  /// converted via [tracking] at this role's own font size, not a raw number
-  /// carried over from a different size.
+  /// Eyebrow / section label: 11 / 800 / +1.2 tracking (px). Callers apply
+  /// upper-casing.
   static TextStyle label(
     AppThemeTokens t, {
     Color? color,
     double fontSize = AppTextScale.eyebrow,
   }) => ui(
     fontSize: fontSize,
-    fontWeight: FontWeight.w700,
-    color: color ?? t.foregroundSubtle,
-    letterSpacing: tracking(fontSize, 0.04),
+    fontWeight: FontWeight.w800,
+    color: color ?? t.foregroundMuted,
+    letterSpacing: 1.2,
   );
 
-  /// Section heading (D-2): sentence case, 17 sp, w700, primary text.
-  static TextStyle sectionHeading(AppThemeTokens t, {Color? color}) => ui(
-    fontSize: AppTextScale.sectionHeading,
+  /// Field label: 12 / 700.
+  static TextStyle fieldLabel(AppThemeTokens t, {Color? color}) => ui(
+    fontSize: AppTextScale.fieldLabel,
     fontWeight: FontWeight.w700,
+    color: color ?? t.textPrimary,
+  );
+
+  /// Auth field content: 15 / 600.
+  static TextStyle fieldValue(AppThemeTokens t, {Color? color}) => ui(
+    fontSize: AppTextScale.rowLabel,
+    fontWeight: FontWeight.w600,
+    color: color ?? t.textPrimary,
+  );
+
+  /// Chip: 11 / 800.
+  static TextStyle chip(AppThemeTokens t, {Color? color}) => ui(
+    fontSize: AppTextScale.chip,
+    fontWeight: FontWeight.w800,
+    color: color ?? t.textPrimary,
+  );
+
+  /// Small heading / profit per share: 17 / 800.
+  static TextStyle sectionHeading(AppThemeTokens t, {Color? color}) => display(
+    fontSize: AppTextScale.sectionHeading,
     color: color ?? t.textPrimary,
     height: 1.25,
     letterSpacing: -0.2,
   );
 
-  /// Supporting metadata: 12 sp, muted.
+  /// Supporting metadata / notice: 12 / 500 / 1.4, muted.
   static TextStyle meta(AppThemeTokens t, {Color? color}) => ui(
-    fontSize: 12,
-    fontWeight: FontWeight.w400,
+    fontSize: AppTextScale.notice,
+    fontWeight: FontWeight.w500,
     color: color ?? t.foregroundMuted,
-    height: 1.35,
+    height: 1.4,
   );
 
-  /// Bottom-nav label: 12 sp (11 on iOS/macOS), constant w600 so selection
+  /// Dock label: 11 / 700 on every platform, constant weight so selection
   /// never changes the width.
-  static TextStyle navLabel(AppThemeTokens t, {Color? color}) {
-    final size = switch (defaultTargetPlatform) {
-      TargetPlatform.iOS ||
-      TargetPlatform.macOS => AppTextScale.navLabelApple,
-      _ => AppTextScale.navLabel,
-    };
-    return ui(
-      fontSize: size,
-      fontWeight: FontWeight.w600,
-      color: color,
-      letterSpacing: tracking(size, 0.01),
-    );
-  }
-
-  static TextStyle button(AppThemeTokens t, {Color? color}) => ui(
-    fontSize: 14,
+  static TextStyle navLabel(AppThemeTokens t, {Color? color}) => ui(
+    fontSize: AppTextScale.navLabel,
     fontWeight: FontWeight.w700,
     color: color,
-    letterSpacing: 0.1,
+  );
+
+  /// Button: 15 / 800.
+  static TextStyle button(AppThemeTokens t, {Color? color}) => ui(
+    fontSize: AppTextScale.button,
+    fontWeight: FontWeight.w800,
+    color: color,
   );
 }
 
-// ─── Elevation ladder (D-3) ────────────────────────────────────────────────
-/// `flat` = hairline only; `raised` = hairline + one soft shadow, light theme
-/// only (dark uses tone, not shadow); `overlay` = nav, sheets.
+// ─── Elevation ─────────────────────────────────────────────────────────────
+/// Most cards are flat with a border. Shadows appear only on the explicitly
+/// raised hero surfaces (Home card; report summary / profile identity at a
+/// slightly stronger alpha).
 abstract final class AppElevation {
   static const List<BoxShadow> flat = <BoxShadow>[];
 
-  static List<BoxShadow> raised(AppThemeTokens t, Brightness brightness) {
-    if (brightness == Brightness.dark) return flat;
-    return [
-      BoxShadow(
-        color: t.shadowColor.withValues(alpha: 0.06),
-        blurRadius: 12,
-        offset: const Offset(0, 4),
+  /// Reference: offset (0, 13), blur 34, `rgba(7,34,25,.10)`.
+  static List<BoxShadow> raised(AppThemeTokens t, Brightness brightness) => [
+    BoxShadow(
+      color: t.shadowColor.withValues(
+        alpha: brightness == Brightness.dark ? 0.32 : 0.10,
       ),
-    ];
-  }
+      blurRadius: 34,
+      offset: const Offset(0, 13),
+    ),
+  ];
+
+  /// Report summary / profile identity: `.13`.
+  static List<BoxShadow> raisedStrong(
+    AppThemeTokens t,
+    Brightness brightness,
+  ) => [
+    BoxShadow(
+      color: t.shadowColor.withValues(
+        alpha: brightness == Brightness.dark ? 0.40 : 0.13,
+      ),
+      blurRadius: 34,
+      offset: const Offset(0, 13),
+    ),
+  ];
 
   static List<BoxShadow> overlay(AppThemeTokens t, Brightness brightness) => [
     BoxShadow(
@@ -774,16 +1037,18 @@ abstract final class AppElevation {
 abstract final class AppTheme {
   static const Color transparent = Color(0x00000000);
 
-  /// System-bar style for [brightness] (the *effective* theme brightness).
-  /// Bars are transparent, icons contrast with the canvas, and the nav-bar
-  /// contrast scrim is off so the floating dock never sits on a scrim.
+  /// System-bar style for [brightness] (the *effective* theme brightness):
+  /// transparent status bar with icons contrasting the page canvas; the
+  /// Android navigation bar takes the dock/page colour so the dock meets the
+  /// window edge without a seam.
   static SystemUiOverlayStyle overlayStyle(Brightness brightness) {
     final dark = brightness == Brightness.dark;
+    final t = dark ? _dark : _light;
     return SystemUiOverlayStyle(
       statusBarColor: transparent,
       statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
       statusBarBrightness: dark ? Brightness.dark : Brightness.light,
-      systemNavigationBarColor: transparent,
+      systemNavigationBarColor: t.navBg,
       systemNavigationBarDividerColor: transparent,
       systemNavigationBarIconBrightness:
           dark ? Brightness.light : Brightness.dark,
@@ -792,109 +1057,161 @@ abstract final class AppTheme {
     );
   }
 
-  // Dark — brand-green canvas. `surface` is the exact brand green `#0F3D2E`;
-  // `background` is a deeper shade of it. Primary fills invert to ivory.
-  // Contrast ratios noted per token are against the stated surface.
+  /// Like [overlayStyle], but status-bar icons contrast [statusSurface] (a
+  /// mast fill, e.g. light icons over the deep-green Home mast).
+  static SystemUiOverlayStyle overlayStyleOver(
+    Color statusSurface,
+    Brightness brightness,
+  ) {
+    final base = overlayStyle(brightness);
+    final darkSurface = statusSurface.computeLuminance() < 0.4;
+    return base.copyWith(
+      statusBarIconBrightness: darkSurface ? Brightness.light : Brightness.dark,
+      statusBarBrightness: darkSurface ? Brightness.dark : Brightness.light,
+    );
+  }
+
+  // Dark — near-black green canvas, charcoal-green cards, leaf accent.
   static const _dark = AppThemeTokens(
-    background: Color(0xFF0A2A20),
-    surface: Color(0xFF0F3D2E),
-    surfaceRaised: Color(0xFF174B39),
-    surfaceSunken: Color(0xFF061D16),
-    // Ivory primary fill; `onAccent` on it is 11.15:1.
-    accent: Color(0xFFF7F5EF),
-    // 8.94:1 on surface, 7.34:1 on raised.
-    accentInk: Color(0xFFBFE6CF),
-    // `accentInk` on it 5.93:1, ivory 7.40:1.
-    accentSoft: Color(0xFF1E5A45),
-    onAccent: Color(0xFF0F3D2E),
-    // 6.69:1 on surface, 5.50:1 on raised.
-    positive: Color(0xFF4ED892),
-    // `positive` on it 5.63:1.
-    positiveSoft: Color(0xFF134A33),
-    negative: Color(0xFFFF7F76),
-    // `negativeText` on it 6.30:1.
-    negativeSoft: Color(0xFF4A2A2A),
-    neutral: Color(0xFFE3B94F),
-    neutralSoft: Color(0x24E3B94F),
-    // 14.11:1 on background, 11.15:1 on surface, 9.16:1 on raised.
-    textPrimary: Color(0xFFF7F5EF),
-    // 8.07:1 on surface, 6.63:1 on raised.
-    foregroundMuted: Color(0xFFCBD5CD),
-    // 6.61:1 on surface, 5.43:1 on raised.
-    foregroundSubtle: Color(0xFFB3C3B9),
-    // Deliberately dim (WCAG-exempt); must not read as enabled.
-    textDisabled: Color(0x73B3C3B9),
-    hairline: Color(0x1AF7F5EF),
-    navHairline: Color(0x29F7F5EF),
+    background: Color(0xFF0F1512),
+    surface: Color(0xFF18211C),
+    surfaceRaised: Color(0xFF202C26),
+    surfaceSunken: Color(0xFF202C26),
+    accent: Color(0xFF3FAE7C),
+    accentInk: Color(0xFF3FAE7C),
+    accentSoft: Color(0xFF202C26),
+    // The reference page background: near-black on leaf.
+    onAccent: Color(0xFF0F1512),
+    positive: Color(0xFF5FD39A),
+    positiveSoft: Color(0xFF1C3B2D),
+    negative: Color(0xFFF08A77),
+    // 16% of the dark negative over the card (the literal 12% is too faint).
+    negativeSoft: Color(0x29F08A77),
+    // Stale / attention: champagne foreground on the dark champagne fill.
+    neutral: Color(0xFFCFC6A4),
+    neutralSoft: Color(0xFF2C2819),
+    textPrimary: Color(0xFFF2EFE6),
+    foregroundMuted: Color(0xFFA3B0A8),
+    foregroundSubtle: Color(0xFFA3B0A8),
+    // Muted at 60% over the surface.
+    textDisabled: Color(0x99A3B0A8),
+    hairline: Color(0xFF27342D),
+    navHairline: Color(0xFF27342D),
     shadowColor: Color(0xFF000000),
-    navBg: Color(0xFF0B3024),
-    skeleton: Color(0xFF174B39),
-    // 6.45:1.
-    avatarFill: Color(0xFF1E5A45),
-    avatarInk: Color(0xFFD6EBDD),
-    positiveText: Color(0xFF4ED892),
-    // 6.04:1 on surface, 4.96:1 on raised.
-    negativeText: Color(0xFFFF9C94),
-    // 6.55:1 on surface.
-    neutralText: Color(0xFFE3B94F),
-    // Saffron: 5.71:1 on surface, 4.69:1 on raised, 7.22:1 on background —
-    // usable as text on dark.
+    navBg: Color(0xFF18211C),
+    skeleton: Color(0xFF202C26),
+    avatarFill: Color(0xFF202C26),
+    avatarInk: Color(0xFFF2EFE6),
+    positiveText: Color(0xFF5FD39A),
+    negativeText: Color(0xFFF08A77),
+    neutralText: Color(0xFFCFC6A4),
     highlight: Color(0xFFFF9933),
-    onHighlight: Color(0xFF0F3D2E),
+    // Filled NEW badge foreground, as shown in the reference.
+    onHighlight: Color(0xFF2B1600),
     highlightSoft: Color(0x33FF9933),
     highlightText: Color(0xFFFF9933),
+    // `.D` default mast.
+    mast: MastPalette(
+      fill: Color(0xFF1B2B22),
+      ink: Color(0xFFF2EFE6),
+      muted: Color(0xFFB3C0B8),
+      glass: Color(0x1AF2EFE6),
+      motif: Color(0x0DF2EFE6),
+    ),
+    // `.D.t2` champagne.
+    mastChampagne: MastPalette(
+      fill: Color(0xFF2C2819),
+      ink: Color(0xFFF2EFE6),
+      muted: Color(0xFFCFC6A4),
+      glass: Color(0x1AF2EFE6),
+      motif: Color(0x0DF2EFE6),
+    ),
+    // The dark Home board uses the default dark mast, not deep green.
+    mastHome: MastPalette(
+      fill: Color(0xFF1B2B22),
+      ink: Color(0xFFF2EFE6),
+      muted: Color(0xFFB3C0B8),
+      glass: Color(0x1AF2EFE6),
+      motif: Color(0x0DF2EFE6),
+    ),
+    notch: Color(0xFFFF9933),
+    homeAvatarFill: Color(0xFFF7F5EF),
+    homeAvatarInk: Color(0xFF0F3D2E),
+    focusRing: Color(0xFF3FAE7C),
+    // Black at 60%.
+    scrim: Color(0x99000000),
+    splashTrack: Color(0xFF27342D),
   );
 
-  // Light — brand ivory canvas, brand deep green ink and actions.
+  // Light — ivory canvas, white cards, deep-green brand.
   static const _light = AppThemeTokens(
     background: Color(0xFFF7F5EF),
     surface: Color(0xFFFFFFFF),
-    surfaceRaised: Color(0xFFEFEDE3),
-    surfaceSunken: Color(0xFFE7E4D8),
+    surfaceRaised: Color(0xFFECF1E6),
+    surfaceSunken: Color(0xFFECF1E6),
     accent: Color(0xFF0F3D2E),
-    // Ivory on deep green: 11.15:1 (the previous emerald pairing was 4.38:1).
-    onAccent: Color(0xFFF7F5EF),
     accentInk: Color(0xFF0F3D2E),
-    // `accentInk` on it 9.73:1.
-    accentSoft: Color(0xFFDDE9E0),
-    // 4.63:1 on background (graphic use, >= 3:1).
-    positive: Color(0xFF1A7F44),
-    // `positiveText` on it 5.32:1.
+    accentSoft: Color(0xFFECF1E6),
+    onAccent: Color(0xFFF7F5EF),
+    positive: Color(0xFF1B7A4E),
     positiveSoft: Color(0xFFDDEBDD),
-    negative: Color(0xFFD64545),
-    // `negativeText` on it 4.58:1.
-    negativeSoft: Color(0xFFF7DCDC),
-    // Yellow-gold, shifted from orange-gold so it cannot read as saffron.
-    neutral: Color(0xFFA67C00),
-    neutralSoft: Color(0x24A67C00),
-    // 11.15:1 on background, 12.16:1 on surface, 10.36:1 on raised.
-    textPrimary: Color(0xFF0F3D2E),
-    // 6.92:1 on background, 6.43:1 on raised.
-    foregroundMuted: Color(0xFF3F5A4E),
-    // 5.90:1 on background, 5.48:1 on raised, 5.05:1 on sunken.
-    foregroundSubtle: Color(0xFF506358),
-    textDisabled: Color(0x80506358),
-    hairline: Color(0x1A0F3D2E),
-    navHairline: Color(0x290F3D2E),
-    shadowColor: Color(0xFFD2CFC0),
+    negative: Color(0xFFB23A2A),
+    // `rgba(178,58,42,.12)` over the card, as in the reference outcome pill.
+    negativeSoft: Color(0x1FB23A2A),
+    // Stale / attention: `#6B6130` on the champagne fill.
+    neutral: Color(0xFF6B6130),
+    neutralSoft: Color(0xFFF0E6C8),
+    textPrimary: Color(0xFF15211B),
+    foregroundMuted: Color(0xFF5A6660),
+    foregroundSubtle: Color(0xFF5A6660),
+    textDisabled: Color(0x995A6660),
+    hairline: Color(0xFFE3E3D6),
+    navHairline: Color(0xFFE3E3D6),
+    // `rgba(7,34,25,…)` base for the reference shadows.
+    shadowColor: Color(0xFF072219),
     navBg: Color(0xFFFFFFFF),
-    skeleton: Color(0xFFE9E6DA),
-    // 9.73:1.
-    avatarFill: Color(0xFFDDE9E0),
+    skeleton: Color(0xFFECF1E6),
+    avatarFill: Color(0xFFECF1E6),
     avatarInk: Color(0xFF0F3D2E),
-    // 6.03:1 on background, 5.60:1 on raised.
-    positiveText: Color(0xFF156B3A),
-    // 5.44:1 on background, 5.93:1 on white, 5.05:1 on raised.
-    negativeText: Color(0xFFB83232),
-    // 5.85:1 on background.
-    neutralText: Color(0xFF7A5A00),
-    // Saffron is graphics-only on ivory (1.95:1); text uses `highlightText`.
+    positiveText: Color(0xFF1B7A4E),
+    negativeText: Color(0xFFB23A2A),
+    neutralText: Color(0xFF6B6130),
+    // Saffron is accent-only on ivory (graphics, notch, dots).
     highlight: Color(0xFFFF9933),
-    // 5.71:1 on saffron.
-    onHighlight: Color(0xFF0F3D2E),
+    onHighlight: Color(0xFF2B1600),
     highlightSoft: Color(0x29FF9933),
-    // 6.57:1 on ivory, 7.16:1 on white, 6.05:1 on `highlightSoft`.
     highlightText: Color(0xFF8A4500),
+    // `.L` default mast.
+    mast: MastPalette(
+      fill: Color(0xFFDDE7D5),
+      ink: Color(0xFF0F3D2E),
+      muted: Color(0xFF4A6A57),
+      glass: Color(0x140F3D2E),
+      motif: Color(0x120F3D2E),
+    ),
+    // `.L.t2` champagne.
+    mastChampagne: MastPalette(
+      fill: Color(0xFFF0E6C8),
+      ink: Color(0xFF0F3D2E),
+      muted: Color(0xFF6B6130),
+      glass: Color(0x142B2A12),
+      motif: Color(0x120F3D2E),
+    ),
+    // `.L.hg` deep-green Home mast.
+    mastHome: MastPalette(
+      fill: Color(0xFF0F3D2E),
+      ink: Color(0xFFF7F5EF),
+      muted: Color(0xFFA9C2B3),
+      glass: Color(0x1FF7F5EF),
+      motif: Color(0x12F7F5EF),
+    ),
+    notch: Color(0xFFFF9933),
+    homeAvatarFill: Color(0xFFF7F5EF),
+    homeAvatarInk: Color(0xFF0F3D2E),
+    focusRing: Color(0xFF0F3D2E),
+    // Ink at 50%.
+    scrim: Color(0x8015211B),
+    splashTrack: Color(0xFFE4E0D4),
   );
 
   static AppThemeTokens get lightTokens => _light;
@@ -906,8 +1223,6 @@ abstract final class AppTheme {
   static ThemeData _build(Brightness brightness, AppThemeTokens t) {
     final isDark = brightness == Brightness.dark;
 
-    // `error` must carry a >= 4.5:1 `onError`: white on the light glyph red
-    // (`#D64545`) is 4.38:1, so light uses the text red (5.93:1 with white).
     final scheme = ColorScheme(
       brightness: brightness,
       primary: t.accent,
@@ -916,7 +1231,7 @@ abstract final class AppTheme {
       onSecondary: t.accentInk,
       tertiary: t.highlight,
       onTertiary: t.onHighlight,
-      error: isDark ? t.negative : t.negativeText,
+      error: t.negativeText,
       onError: isDark ? t.background : const Color(0xFFFFFFFF),
       surface: t.surface,
       onSurface: t.textPrimary,
@@ -924,11 +1239,11 @@ abstract final class AppTheme {
       outline: t.hairline,
       outlineVariant: t.navHairline,
       shadow: t.shadowColor,
-      scrim: const Color(0xFF04140F),
+      scrim: t.scrim,
       surfaceTint: transparent,
       surfaceDim: t.background,
       surfaceBright: t.surface,
-      surfaceContainerLowest: t.surfaceSunken,
+      surfaceContainerLowest: t.background,
       surfaceContainerLow: t.background,
       surfaceContainer: t.surface,
       surfaceContainerHigh: t.surfaceRaised,
@@ -946,64 +1261,58 @@ abstract final class AppTheme {
       onErrorContainer: t.negativeText,
     );
 
-    // Headings and body share the display/UI face (Hanken Grotesk); numerals
-    // never come from the TextTheme — they route through `Figure` so the
-    // Space Grotesk tabular-numeral rule cannot be bypassed.
     final text = TextTheme(
       displayLarge: AppTypo.display(
-        fontSize: 34,
+        fontSize: 44,
         color: t.textPrimary,
-        letterSpacing: -1.0,
+        height: 1.1,
+        letterSpacing: -0.8,
       ),
       displayMedium: AppTypo.display(
-        fontSize: 29,
+        fontSize: 40,
         color: t.textPrimary,
+        height: 1.1,
         letterSpacing: -0.8,
       ),
       displaySmall: AppTypo.display(
-        fontSize: 26,
+        fontSize: 34,
         color: t.textPrimary,
-        letterSpacing: -0.7,
+        height: 1.1,
+        letterSpacing: -0.8,
       ),
       headlineLarge: AppTypo.display(
-        fontSize: 22,
+        fontSize: 21,
         color: t.textPrimary,
-        letterSpacing: -0.5,
+        height: 1.2,
       ),
       headlineMedium: AppTypo.display(
-        fontSize: 19,
+        fontSize: 21,
         color: t.textPrimary,
-        letterSpacing: -0.4,
+        height: 1.2,
       ),
       headlineSmall: AppTypo.display(
         fontSize: 17,
         color: t.textPrimary,
-        letterSpacing: -0.3,
-      ),
-      titleLarge: AppTypo.display(
-        fontSize: 16,
-        color: t.textPrimary,
+        height: 1.25,
         letterSpacing: -0.2,
       ),
-      titleMedium: AppTypo.ui(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
+      titleLarge: AppTypo.display(
+        fontSize: 17,
         color: t.textPrimary,
+        height: 1.25,
+        letterSpacing: -0.2,
       ),
+      titleMedium: AppTypo.rowLabel(t),
       titleSmall: AppTypo.ui(
         fontSize: 13,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
         color: t.textPrimary,
       ),
-      bodyLarge: AppTypo.ui(fontSize: 15, color: t.textPrimary, height: 1.5),
+      bodyLarge: AppTypo.reading(t),
       bodyMedium: AppTypo.body(t),
       bodySmall: AppTypo.hint(t),
       labelLarge: AppTypo.button(t, color: t.textPrimary),
-      labelMedium: AppTypo.ui(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: t.foregroundMuted,
-      ),
+      labelMedium: AppTypo.fieldLabel(t, color: t.foregroundMuted),
       labelSmall: AppTypo.label(t),
     );
 
@@ -1013,7 +1322,15 @@ abstract final class AppTheme {
       useMaterial3: true,
       extensions: [t],
       scaffoldBackgroundColor: t.background,
+      fontFamily: AppTypo.family,
     );
+
+    const buttonShape = RoundedRectangleBorder(borderRadius: AppShape.button);
+    const buttonPadding = EdgeInsets.symmetric(
+      horizontal: AppSpace.s21,
+      vertical: AppSpace.sm,
+    );
+    const buttonMin = Size(64, AppShape.controlHeight);
 
     return base.copyWith(
       textTheme: text,
@@ -1027,10 +1344,7 @@ abstract final class AppTheme {
         shadowColor: transparent,
         surfaceTintColor: transparent,
         margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          side: BorderSide(color: t.hairline),
-        ),
+        shape: AppShape.cardBorder(t),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: t.background,
@@ -1038,7 +1352,7 @@ abstract final class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        titleSpacing: AppSpace.sm,
+        titleSpacing: AppSpace.s13,
         titleTextStyle: AppTypo.sectionTitle(t),
         surfaceTintColor: transparent,
         systemOverlayStyle: overlayStyle(brightness),
@@ -1048,62 +1362,143 @@ abstract final class AppTheme {
         surfaceTintColor: transparent,
         elevation: 0,
         modalElevation: 0,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppRadius.sheet),
-          ),
-        ),
+        modalBackgroundColor: t.surface,
+        modalBarrierColor: t.scrim,
+        dragHandleColor: t.foregroundMuted,
+        dragHandleSize: const Size(34, 4),
+        shape: const RoundedRectangleBorder(borderRadius: AppShape.sheetTop),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: t.surfaceSunken,
-        hintStyle: AppTypo.body(t, color: t.foregroundSubtle),
-        labelStyle: AppTypo.body(t),
-        floatingLabelStyle: AppTypo.body(t, color: t.accentInk),
+        fillColor: t.surface,
+        hintStyle: AppTypo.fieldValue(t, color: t.foregroundMuted),
+        labelStyle: AppTypo.fieldLabel(t),
+        floatingLabelStyle: AppTypo.fieldLabel(t, color: t.accentInk),
+        helperStyle: AppTypo.meta(t),
+        errorStyle: AppTypo.meta(t, color: t.negativeText),
+        prefixIconColor: t.foregroundMuted,
+        suffixIconColor: t.foregroundMuted,
+        iconColor: t.foregroundMuted,
+        constraints: const BoxConstraints(minHeight: AppShape.controlHeight),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSpace.md,
-          vertical: AppSpace.lg,
+          vertical: AppSpace.md,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.control),
+          borderRadius: AppShape.field,
+          borderSide: BorderSide(color: t.hairline),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: AppShape.field,
           borderSide: BorderSide(color: t.hairline),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.control),
-          borderSide: BorderSide(color: t.accentInk, width: 1.5),
+          borderRadius: AppShape.field,
+          borderSide: BorderSide(color: t.focusRing, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.control),
+          borderRadius: AppShape.field,
           borderSide: BorderSide(color: t.negative),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppRadius.control),
-          borderSide: BorderSide(color: t.negative, width: 1.5),
+          borderRadius: AppShape.field,
+          borderSide: BorderSide(color: t.negative, width: 2),
         ),
       ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: t.accent,
+          foregroundColor: t.onAccent,
+          disabledBackgroundColor: t.surfaceRaised,
+          disabledForegroundColor: t.textDisabled,
+          surfaceTintColor: transparent,
+          elevation: 0,
+          minimumSize: buttonMin,
+          padding: buttonPadding,
+          shape: buttonShape,
+          textStyle: AppTypo.button(t),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: t.accent,
+          foregroundColor: t.onAccent,
+          disabledBackgroundColor: t.surfaceRaised,
+          disabledForegroundColor: t.textDisabled,
+          surfaceTintColor: transparent,
+          shadowColor: transparent,
+          elevation: 0,
+          minimumSize: buttonMin,
+          padding: buttonPadding,
+          shape: buttonShape,
+          textStyle: AppTypo.button(t),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: t.textPrimary,
+          disabledForegroundColor: t.textDisabled,
+          backgroundColor: transparent,
+          surfaceTintColor: transparent,
+          elevation: 0,
+          minimumSize: buttonMin,
+          padding: buttonPadding,
+          shape: buttonShape,
+          side: BorderSide(color: t.textPrimary, width: 1.5),
+          textStyle: AppTypo.button(t),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: t.accentInk,
+          disabledForegroundColor: t.textDisabled,
+          surfaceTintColor: transparent,
+          minimumSize: const Size(AppSpace.minTarget, AppSpace.minTarget),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
+          shape: const RoundedRectangleBorder(borderRadius: AppShape.field),
+          textStyle: AppTypo.ui(fontSize: 13, fontWeight: FontWeight.w800),
+        ),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: t.surfaceRaised,
+        selectedColor: t.accent,
+        disabledColor: t.surfaceRaised,
+        surfaceTintColor: transparent,
+        labelStyle: AppTypo.chip(t),
+        secondaryLabelStyle: AppTypo.chip(t, color: t.onAccent),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        shape: RoundedRectangleBorder(
+          borderRadius: AppShape.field,
+          side: BorderSide(color: t.hairline),
+        ),
+        side: BorderSide(color: t.hairline),
+        checkmarkColor: t.onAccent,
+      ),
       progressIndicatorTheme: ProgressIndicatorThemeData(
-        color: t.accentInk,
-        circularTrackColor: t.surfaceSunken,
-        linearTrackColor: t.surfaceSunken,
+        color: t.accent,
+        circularTrackColor: t.surfaceRaised,
+        linearTrackColor: t.surfaceRaised,
+        refreshBackgroundColor: t.surface,
         linearMinHeight: 3,
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: t.surfaceRaised,
+        backgroundColor: t.surface,
         contentTextStyle: AppTypo.bodyStrong(t),
+        actionTextColor: t.accentInk,
         elevation: 0,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          side: BorderSide(color: t.hairline),
-        ),
+        shape: AppShape.cardBorder(t, radius: AppShape.field),
       ),
       textSelectionTheme: TextSelectionThemeData(
         cursorColor: t.accentInk,
         selectionColor: t.accent.withValues(alpha: 0.24),
         selectionHandleColor: t.accentInk,
       ),
-      splashColor: t.accent.withValues(alpha: 0.08),
-      highlightColor: t.accent.withValues(alpha: 0.05),
+      splashFactory: InkRipple.splashFactory,
+      splashColor: t.accent.withValues(alpha: 0.06),
+      highlightColor: t.accent.withValues(alpha: 0.04),
+      hoverColor: t.accent.withValues(alpha: 0.05),
+      focusColor: t.focusRing.withValues(alpha: 0.14),
       iconTheme: IconThemeData(color: t.textPrimary),
       primaryIconTheme: IconThemeData(color: t.textPrimary),
       dialogTheme: DialogThemeData(
@@ -1111,12 +1506,10 @@ abstract final class AppTheme {
         surfaceTintColor: transparent,
         elevation: 0,
         shadowColor: transparent,
+        barrierColor: t.scrim,
         titleTextStyle: AppTypo.sectionTitle(t),
         contentTextStyle: AppTypo.body(t),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          side: BorderSide(color: t.hairline),
-        ),
+        shape: AppShape.cardBorder(t),
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: t.surface,
@@ -1124,10 +1517,7 @@ abstract final class AppTheme {
         elevation: 0,
         shadowColor: transparent,
         textStyle: AppTypo.bodyStrong(t),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadius.control),
-          side: BorderSide(color: t.hairline),
-        ),
+        shape: AppShape.cardBorder(t, radius: AppShape.field),
       ),
       menuTheme: MenuThemeData(
         style: MenuStyle(
@@ -1135,22 +1525,19 @@ abstract final class AppTheme {
           surfaceTintColor: const WidgetStatePropertyAll(transparent),
           elevation: const WidgetStatePropertyAll(0),
           shape: WidgetStatePropertyAll(
-            RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(AppRadius.control),
-              side: BorderSide(color: t.hairline),
-            ),
+            AppShape.cardBorder(t, radius: AppShape.field),
           ),
         ),
       ),
       tooltipTheme: TooltipThemeData(
         decoration: BoxDecoration(
-          color: t.surfaceRaised,
-          borderRadius: BorderRadius.circular(AppRadius.chip),
+          color: t.surface,
+          borderRadius: AppShape.field,
           border: Border.all(color: t.hairline),
         ),
         textStyle: AppTypo.ui(
           fontSize: 12,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
           color: t.textPrimary,
         ),
       ),
@@ -1158,12 +1545,12 @@ abstract final class AppTheme {
         thumbColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
               ? t.onAccent
-              : t.foregroundSubtle,
+              : t.foregroundMuted,
         ),
         trackColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
               ? t.accent
-              : t.surfaceSunken,
+              : t.surfaceRaised,
         ),
         trackOutlineColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
@@ -1177,13 +1564,13 @@ abstract final class AppTheme {
               states.contains(WidgetState.selected) ? t.accent : transparent,
         ),
         checkColor: WidgetStatePropertyAll(t.onAccent),
-        side: BorderSide(color: t.foregroundSubtle, width: 1.5),
+        side: BorderSide(color: t.foregroundMuted, width: 1.5),
       ),
       radioTheme: RadioThemeData(
         fillColor: WidgetStateProperty.resolveWith(
           (states) => states.contains(WidgetState.selected)
               ? t.accent
-              : t.foregroundSubtle,
+              : t.foregroundMuted,
         ),
       ),
       listTileTheme: ListTileThemeData(
@@ -1195,7 +1582,7 @@ abstract final class AppTheme {
       ),
       scrollbarTheme: ScrollbarThemeData(
         thumbColor: WidgetStatePropertyAll(
-          t.foregroundSubtle.withValues(alpha: 0.5),
+          t.foregroundMuted.withValues(alpha: 0.5),
         ),
         trackColor: const WidgetStatePropertyAll(transparent),
       ),

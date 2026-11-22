@@ -49,7 +49,9 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
 
   // `system` is the default: the app follows the phone's light/dark setting
   // (including live changes) until the user picks Light or Dark explicitly in
-  // Settings' Appearance tiles.
+  // Settings' Appearance segments. Every screen (auth and secondary routes
+  // included) inherits this effective brightness; nothing switches theme
+  // per screen.
   ThemeMode _themeMode = ThemeMode.system;
   bool _splashComplete = false;
   AuthPhase? _lastPhase;
@@ -179,7 +181,9 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
         theme: AppTheme.light,
         darkTheme: AppTheme.dark,
         themeMode: _themeMode,
-        themeAnimationDuration: AppMotion.medium,
+        // Colours (including the mast palettes) interpolate via
+        // AppThemeTokens.lerp; calm, non-bouncing ease.
+        themeAnimationDuration: AppMotion.themeSwitch,
         themeAnimationCurve: AppMotion.ease,
         builder: (context, child) {
           // Two pieces of app-wide chrome, applied once here rather than
@@ -211,26 +215,28 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
               return AnnotatedRegion<SystemUiOverlayStyle>(
                 value: AppTheme.overlayStyle(brightness),
                 child: MediaQuery(
-                data: media.copyWith(textScaler: TextScaler.linear(effective)),
-                child: Column(
-                  children: [
-                    // Scoped listener: only this banner rebuilds when
-                    // reachability changes, not the whole app tree.
-                    ListenableBuilder(
-                      listenable: ReachabilityStore.instance,
-                      builder: (context, _) {
-                        final store = ReachabilityStore.instance;
-                        if (!store.offline || store.dismissed) {
-                          return const SizedBox.shrink();
-                        }
-                        return OfflineBanner(
-                          onDismiss: ReachabilityStore.instance.dismiss,
-                        );
-                      },
-                    ),
-                    Expanded(child: child ?? const SizedBox.shrink()),
-                  ],
-                ),
+                  data: media.copyWith(
+                    textScaler: TextScaler.linear(effective),
+                  ),
+                  child: Column(
+                    children: [
+                      // Scoped listener: only this banner rebuilds when
+                      // reachability changes, not the whole app tree.
+                      ListenableBuilder(
+                        listenable: ReachabilityStore.instance,
+                        builder: (context, _) {
+                          final store = ReachabilityStore.instance;
+                          if (!store.offline || store.dismissed) {
+                            return const SizedBox.shrink();
+                          }
+                          return OfflineBanner(
+                            onDismiss: ReachabilityStore.instance.dismiss,
+                          );
+                        },
+                      ),
+                      Expanded(child: child ?? const SizedBox.shrink()),
+                    ],
+                  ),
                 ),
               );
             },

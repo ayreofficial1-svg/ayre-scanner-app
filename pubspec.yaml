@@ -42,3 +42,18 @@ flutter:
     # covering Nifty 500 + Sensex 30 + Bank Nifty. Declaring the directory
     # (trailing slash) bundles every file inside it.
     - assets/logos/
+
+  # Manrope (SIL OFL 1.1, see assets/fonts/OFL.txt): static instances cut from
+  # the official variable font so all four weights render offline, including
+  # the rupee sign and the true minus.
+  fonts:
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Manrope-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Manrope-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Manrope-ExtraBold.ttf
+          weight: 800
