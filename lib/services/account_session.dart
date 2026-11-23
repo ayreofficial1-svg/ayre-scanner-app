@@ -8,6 +8,7 @@ import 'email_verification.dart';
 import 'market_data_cache.dart';
 import 'push_service.dart';
 import 'settings_store.dart';
+import 'subscription_service.dart';
 
 /// Ties sign-in and sign-out to the things that must happen around them, so one
 /// account's data never shows up under another.
@@ -58,6 +59,9 @@ class AccountSession {
       await clearLocalData();
     }
     await prefs.setString(_ownerKey, uid);
+    // After the owner key is set, so a different account's cached entitlement
+    // is never read.
+    await SubscriptionService.instance.attachUser(uid);
   }
 
   /// Removes data that belongs to the previous account: cached content, the
@@ -71,5 +75,6 @@ class AccountSession {
     await NotificationLog.instance.clear();
     await SeenSignalsStore.clear();
     EmailVerificationService.instance.reset();
+    SubscriptionService.instance.detachUser();
   }
 }

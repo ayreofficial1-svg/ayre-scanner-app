@@ -15,9 +15,13 @@ import 'services/auth_service.dart';
 import 'services/email_verification.dart';
 import 'services/legacy_cache_purge.dart';
 import 'services/onboarding_store.dart';
+// TEMPORARY (paywall test toggle) — remove before production
+import 'services/paywall_test_switch.dart';
 import 'services/push_service.dart';
 import 'services/reachability.dart';
 import 'services/settings_store.dart';
+import 'services/store_subscription_gateway.dart';
+import 'services/subscription_service.dart';
 import 'services/tour_service.dart';
 import 'theme/app_theme.dart';
 import 'widgets/ayre_components.dart';
@@ -107,7 +111,15 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
       NotificationLog.instance.load(),
       ApiService.purgeLegacyCookie(),
       LegacyCachePurge.run(),
+      // TEMPORARY (paywall test toggle) — remove before production
+      PaywallTestSwitch.instance.load(),
     ]);
+    // Subscribed at start-up, not when the paywall opens, so purchases that
+    // finish while the app was closed, pending approvals and renewals are
+    // received. Not awaited: first paint never waits on the store, and
+    // failures are contained inside the service.
+    SubscriptionService.instance.useGateway(StoreSubscriptionGateway());
+    unawaited(SubscriptionService.instance.init());
     await authReady;
     // Deliberately not awaited into the UI path: the permission prompt and
     // token fetch must never hold up first paint. Failures are contained

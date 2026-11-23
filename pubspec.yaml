@@ -24,6 +24,9 @@ dependencies:
   # AllInvestView" service the bundled assets/logos/ images were sourced
   # from (see lib/screens/settings_screen.dart).
   url_launcher: ^6.3.0
+  # Subscriptions through the App Store and Google Play. Only
+  # lib/services/store_subscription_gateway.dart talks to this package.
+  in_app_purchase: ^3.2.3
 
 dev_dependencies:
   flutter_test:

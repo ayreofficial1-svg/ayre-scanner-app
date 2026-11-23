@@ -16,6 +16,8 @@ import '../widgets/spotlight_tour.dart';
 import 'change_password_screen.dart';
 import 'delete_account_screen.dart';
 import 'support_screen.dart' show kAppVersion, kAppBuild;
+// TEMPORARY (paywall test toggle) — remove before production
+import 'testing/paywall_toggle_row.dart';
 
 /// Settings — what you can change, grouped by what you are trying to change:
 ///
@@ -349,6 +351,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             _GroupNote('Signed in as ${_user!.email}.'),
           ],
+
+          // TEMPORARY (paywall test toggle) — remove before production
+          const PaywallTestingGroup(),
 
           // ── About ────────────────────────────────────────────────────
           const SizedBox(height: AppSpace.sectionGap),
