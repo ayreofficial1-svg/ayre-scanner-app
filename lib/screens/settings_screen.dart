@@ -7,14 +7,19 @@ import '../onboarding/tour_content.dart';
 import '../services/auth_service.dart';
 import '../services/push_service.dart';
 import '../services/settings_store.dart';
+import '../services/subscription_models.dart';
+import '../services/subscription_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/ayre_components.dart';
 import '../widgets/ayre_icons.dart';
 import '../widgets/ayre_page_header.dart';
 import '../widgets/clear_alert_history.dart';
+import '../widgets/paywall_widgets.dart' show restoreOutcomeMessage;
 import '../widgets/spotlight_tour.dart';
 import 'change_password_screen.dart';
 import 'delete_account_screen.dart';
+import 'paywall_screen.dart';
+import 'subscription_status_screen.dart';
 import 'support_screen.dart' show kAppVersion, kAppBuild;
 // TEMPORARY (paywall test toggle) — remove before production
 import 'testing/paywall_toggle_row.dart';
@@ -24,7 +29,8 @@ import 'testing/paywall_toggle_row.dart';
 /// 1. Appearance — theme and text size
 /// 2. Notifications — where alerts reach you, and which ones
 /// 3. Account — password and deletion (only while signed in)
-/// 4. About — version and credits (not part of the Settings tutorial)
+/// 4. Subscription — plan status and restoring a purchase
+/// 5. About — version and credits (not part of the Settings tutorial)
 ///
 /// Identity, email verification, help (including the tutorials), legal and
 /// sign out live on Profile, so
@@ -112,6 +118,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (changed == true && mounted) _toast('Password updated');
   }
 
+  String _subscriptionStatus(EntitlementState state) => switch (state) {
+    EntitlementState.active => 'Active',
+    EntitlementState.pending => 'Pending approval',
+    EntitlementState.unknown => 'Checking…',
+    EntitlementState.inactive => 'Not subscribed',
+  };
+
+  void _openSubscription() {
+    HapticFeedback.selectionClick();
+    if (SubscriptionService.instance.entitlement == EntitlementState.active) {
+      Navigator.of(
+        context,
+      ).push(terminalRoute(builder: (_) => const SubscriptionStatusScreen()));
+    } else {
+      PaywallScreen.open(context);
+    }
+  }
+
+  Future<void> _restorePurchases() async {
+    final service = SubscriptionService.instance;
+    if (service.busy) return;
+    HapticFeedback.selectionClick();
+    final outcome = await service.restore();
+    if (!mounted) return;
+    if (outcome.kind == SubscriptionOutcomeKind.success) {
+      HapticFeedback.mediumImpact();
+    }
+    final message = restoreOutcomeMessage(outcome);
+    if (message != null) _toast(message);
+  }
+
   Future<void> _clearAlertHistory() async {
     if (await confirmClearAlertHistory(context) && mounted) {
       _toast('Alert history cleared');
@@ -170,7 +207,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final theme = AppThemeController.of(context);
 
     return ListenableBuilder(
-      listenable: Listenable.merge([settings, AuthService.instance.user]),
+      listenable: Listenable.merge([
+        settings,
+        AuthService.instance.user,
+        SubscriptionService.instance,
+      ]),
       builder: (context, _) => AyrePageScaffold(
         title: 'Settings',
         children: [
@@ -351,6 +392,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             _GroupNote('Signed in as ${_user!.email}.'),
           ],
+
+          // ── Subscription ─────────────────────────────────────────────
+          const SizedBox(height: AppSpace.sectionGap),
+          const _SettingsGroupLabel('Subscription'),
+          Builder(
+            builder: (context) {
+              final service = SubscriptionService.instance;
+              final status = _subscriptionStatus(service.entitlement);
+              final restoring =
+                  service.operation == SubscriptionOperation.restoring;
+              return RowGroup(
+                children: [
+                  SettingRow(
+                    glyph: AyreGlyph.lock,
+                    title: 'Subscription',
+                    status: status,
+                    trailing: Text(
+                      status,
+                      style: AppTypo.hint(t),
+                      textAlign: TextAlign.end,
+                    ),
+                    onTap: _openSubscription,
+                  ),
+                  SettingRow(
+                    glyph: AyreGlyph.refresh,
+                    title: 'Restore purchases',
+                    subtitle: restoring
+                        ? 'Restoring…'
+                        : 'Get back a subscription you already bought.',
+                    enabled: !service.busy,
+                    onTap: service.busy ? null : _restorePurchases,
+                  ),
+                ],
+              );
+            },
+          ),
 
           // TEMPORARY (paywall test toggle) — remove before production
           const PaywallTestingGroup(),
