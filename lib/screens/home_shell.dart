@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 
 import '../services/auth_service.dart';
 import '../services/market_data_service.dart';
@@ -54,6 +55,7 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
+  double _tabSwipeDistance = 0;
   String _accountName = '';
 
   /// Bumped each time a signal notification asks to see Signals; Home scrolls
@@ -179,7 +181,28 @@ class _HomeShellState extends State<HomeShell> {
 
   void _select(int index) {
     if (index == _index) return;
+    _tabSwipeDistance = 0;
     setState(() => _index = index);
+  }
+
+  void _finishTabSwipe(DragEndDetails details) {
+    const swipeDistance = 48.0;
+    const flingVelocity = 450.0;
+    final distance = _tabSwipeDistance;
+    _tabSwipeDistance = 0;
+    final velocity = details.primaryVelocity ?? 0;
+    if (distance.abs() < swipeDistance && velocity.abs() < flingVelocity) {
+      return;
+    }
+
+    final swipedLeft =
+        (distance.abs() >= swipeDistance ? distance : velocity) < 0;
+    final leftToRight = Directionality.of(context) == TextDirection.ltr;
+    final next = _index + (swipedLeft == leftToRight ? 1 : -1);
+    if (next < 0 || next >= kNavDestinations.length) return;
+
+    HapticFeedback.selectionClick();
+    _select(next);
   }
 
   /// A2: a tap on the already-selected destination. Pops that tab to its root;
@@ -404,6 +427,20 @@ class _HomeShellState extends State<HomeShell> {
           tickered(i, _tabNavigator(i)),
       ],
     );
+    final tabContent = VerificationBannerHost(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
+        onHorizontalDragStart: keyboardOpen
+            ? null
+            : (_) => _tabSwipeDistance = 0,
+        onHorizontalDragUpdate: keyboardOpen
+            ? null
+            : (details) => _tabSwipeDistance += details.primaryDelta ?? 0,
+        onHorizontalDragEnd: keyboardOpen ? null : _finishTabSwipe,
+        child: _TabFade(index: _index, child: tabs),
+      ),
+    );
 
     final body = _ShellScope(
       index: _index,
@@ -419,16 +456,10 @@ class _HomeShellState extends State<HomeShell> {
                     onSelected: _select,
                     onReselected: _onReselected,
                   ),
-                  Expanded(
-                    child: VerificationBannerHost(
-                      child: _TabFade(index: _index, child: tabs),
-                    ),
-                  ),
+                  Expanded(child: tabContent),
                 ],
               )
-            : VerificationBannerHost(
-                child: _TabFade(index: _index, child: tabs),
-              ),
+            : tabContent,
       ),
     );
 

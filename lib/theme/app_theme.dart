@@ -40,6 +40,11 @@ class MastPalette {
       glass = const Color(0x1AF7F5EF),
       motif = const Color(0x0DF7F5EF);
 
+  const MastPalette._darkTab(this.fill, this.muted)
+    : ink = const Color(0xFFF2EFE6),
+      glass = const Color(0x1AF2EFE6),
+      motif = const Color(0x0DF2EFE6);
+
   /// `--mb` — the mast backdrop.
   final Color fill;
 
@@ -232,13 +237,13 @@ class AppThemeTokens extends ThemeExtension<AppThemeTokens> {
   /// Default sage or dark-green mast.
   final MastPalette mast;
 
-  /// Champagne mast for Create account and dark-mode Reports.
+  /// Champagne mast for Create account.
   final MastPalette mastChampagne;
 
   /// Home mast in the two app themes.
   final MastPalette mastHome;
 
-  /// The other tab mastheads, ordered from darkest to lightest in light mode.
+  /// The remaining tab mastheads, in order of increasing lightness after Home.
   final MastPalette mastReports;
   final MastPalette mastLearn;
   final MastPalette mastProfile;
@@ -1098,12 +1103,9 @@ abstract final class AppTheme {
     );
   }
 
-  static const _darkStandardMast = MastPalette(
-    fill: Color(0xFF1B2B22),
-    ink: Color(0xFFF2EFE6),
-    muted: Color(0xFFB3C0B8),
-    glass: Color(0x1AF2EFE6),
-    motif: Color(0x0DF2EFE6),
+  static const _darkStandardMast = MastPalette._darkTab(
+    Color(0xFF1B2B22),
+    Color(0xFFB3C0B8),
   );
 
   static const _darkChampagneMast = MastPalette(
@@ -1155,17 +1157,11 @@ abstract final class AppTheme {
     highlightText: Color(0xFFFF9933),
     mast: _darkStandardMast,
     mastChampagne: _darkChampagneMast,
-    // Home uses a lighter green than the other dark tab masts.
-    mastHome: MastPalette(
-      fill: Color(0xFF244132),
-      ink: Color(0xFFF2EFE6),
-      muted: Color(0xFFB3C0B8),
-      glass: Color(0x1AF2EFE6),
-      motif: Color(0x0DF2EFE6),
-    ),
-    mastReports: _darkChampagneMast,
-    mastLearn: _darkStandardMast,
-    mastProfile: _darkStandardMast,
+    // The standard green starts the progression from Home to Profile.
+    mastHome: _darkStandardMast,
+    mastReports: MastPalette._darkTab(Color(0xFF24382D), Color(0xFFB9C6BE)),
+    mastLearn: MastPalette._darkTab(Color(0xFF2D4538), Color(0xFFBFCCC4)),
+    mastProfile: MastPalette._darkTab(Color(0xFF365243), Color(0xFFC5D2CA)),
     notch: Color(0xFFFF9933),
     homeAvatarFill: Color(0xFFF7F5EF),
     homeAvatarInk: Color(0xFF0F3D2E),

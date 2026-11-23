@@ -245,7 +245,7 @@ class AyreMastScaffold extends StatelessWidget {
   }
 }
 
-/// Header icon plate on a mast: 44×44, radius 13, glass fill, ≥48 hit area.
+/// Header icon plate on a mast with a glass or solid fill and a ≥48 hit area.
 class MastIconButton extends StatelessWidget {
   const MastIconButton({
     super.key,
@@ -254,6 +254,7 @@ class MastIconButton extends StatelessWidget {
     required this.semanticLabel,
     this.palette,
     this.tone = AyreMastTone.standard,
+    this.filled = false,
   });
 
   final Widget child;
@@ -261,11 +262,15 @@ class MastIconButton extends StatelessWidget {
   final String semanticLabel;
   final MastPalette? palette;
   final AyreMastTone tone;
+  final bool filled;
 
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final p = palette ?? tone.paletteOf(t);
+    final plateColor = filled
+        ? Color.alphaBlend(p.ink.withValues(alpha: 0.16), p.fill)
+        : p.glass;
     return Semantics(
       button: true,
       enabled: onTap != null,
@@ -289,11 +294,11 @@ class MastIconButton extends StatelessWidget {
                   height: AppShape.iconTileSize,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: p.glass,
+                    color: plateColor,
                     borderRadius: AppShape.field,
                   ),
                   child: IconTheme.merge(
-                    data: IconThemeData(color: p.ink),
+                    data: IconThemeData(color: filled ? p.muted : p.ink),
                     child: child,
                   ),
                 ),

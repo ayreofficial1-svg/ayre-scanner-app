@@ -513,9 +513,7 @@ class _StockCard extends StatelessWidget {
         : 'Entry · ${tradeDate(stock.dateOfRecommendation!)}';
     final exitLabel = exitPrice == null
         ? 'Exit'
-        : stock.exitDate == null
-        ? 'Exit · Week end ${tradeDate(report.weekEnd)}'
-        : 'Exit · ${tradeDate(stock.exitDate!)}';
+        : 'Exit · ${tradeDate(stock.exitDate ?? report.weekEnd)}';
 
     Color signedTone(num value) => !value.isFinite || value == 0
         ? t.textPrimary
@@ -524,7 +522,7 @@ class _StockCard extends StatelessWidget {
     final symbolStyle = AppTypo.rowLabel(
       t,
     ).copyWith(fontSize: 17, fontWeight: FontWeight.w800);
-    final returnStyle = AppTypo.ticker(fontSize: 22, color: signedTone(pct));
+    final returnStyle = AppTypo.ticker(fontSize: 18, color: signedTone(pct));
     final profitStyle = AppTypo.value(
       t,
       color: pnl == null ? null : signedTone(pnl),
@@ -544,6 +542,7 @@ class _StockCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(stock.symbol, style: symbolStyle),
+              if (movement != null || hasName) const SizedBox(height: 2),
               if (movement != null) Text(movement, style: AppTypo.meta(t)),
               if (hasName) Text(name, style: AppTypo.meta(t)),
             ],
@@ -555,8 +554,10 @@ class _StockCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         Text(returnText, style: returnStyle, textAlign: TextAlign.end),
-        if (profitPerShare != null)
+        if (profitPerShare != null) ...[
+          const SizedBox(height: 2),
           Text(profitPerShare, style: profitStyle, textAlign: TextAlign.end),
+        ],
       ],
     );
 
@@ -693,18 +694,23 @@ class _StockDetails extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelStyle = AppTypo.meta(context.tokens).copyWith(fontSize: 13);
+    final labelStyle = AppTypo.meta(context.tokens);
     final valueStyle = AppTypo.ticker(fontSize: 16);
 
     return LayoutBuilder(
       builder: (context, constraints) {
         const gap = AppSpace.s8;
-        final width =
-            (constraints.maxWidth - gap * (fields.length - 1)) / fields.length;
+        const priceFlex = 5;
+        const outcomeFlex = 6;
+        final widthPerFlex =
+            (constraints.maxWidth - gap * (fields.length - 1)) /
+            (priceFlex * 2 + outcomeFlex);
+        int flexFor(int index) => index == 1 ? outcomeFlex : priceFlex;
+
         final inline = fields.indexed.every(
           (item) =>
-              item.$1 == 1 ||
-              singleLineTextWidth(context, item.$2.value, valueStyle) <= width,
+              singleLineTextWidth(context, item.$2.value, valueStyle) <=
+              widthPerFlex * flexFor(item.$1),
         );
 
         if (!inline) {
@@ -737,6 +743,7 @@ class _StockDetails extends StatelessWidget {
             for (final (i, field) in fields.indexed) ...[
               if (i > 0) const SizedBox(width: gap),
               Expanded(
+                flex: flexFor(i),
                 child: Text(
                   labels ? field.label : field.value,
                   style: labels
@@ -867,7 +874,7 @@ class WeeklyReportSkeleton extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: AppSpace.s8),
-                SkeletonBlock(width: 60, height: 22),
+                SkeletonBlock(width: 60, height: 18),
               ],
             ),
             details: Row(

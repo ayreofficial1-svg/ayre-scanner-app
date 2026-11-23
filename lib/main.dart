@@ -41,19 +41,7 @@ class AyreScannerApp extends StatefulWidget {
 class _AyreScannerAppState extends State<AyreScannerApp> {
   static const _themeModeKey = 'theme_mode';
 
-  // One-time flag: the Investee theme makes `system` the default. Older
-  // builds defaulted to a forced `dark` and could store a resolved value that
-  // is indistinguishable from a deliberate choice, so an existing stored value
-  // is reset to `system` exactly once. Never touches `theme_mode`'s name, and
-  // never overrides a choice made after the migration.
-  static const _systemDefaultMigratedKey = 'theme_mode_system_default_v1';
-
-  // `system` is the default: the app follows the phone's light/dark setting
-  // (including live changes) until the user picks Light or Dark explicitly in
-  // Settings' Appearance segments. Every screen (auth and secondary routes
-  // included) inherits this effective brightness; nothing switches theme
-  // per screen.
-  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode _themeMode = ThemeMode.light;
   bool _splashComplete = false;
   AuthPhase? _lastPhase;
 
@@ -129,31 +117,13 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
 
   Future<void> _loadThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
-    final value = prefs.getString(_themeModeKey);
-    final migrated = prefs.getBool(_systemDefaultMigratedKey) ?? false;
-
-    if (!migrated) {
-      // First launch after the update: reset any stored value to `system`
-      // once, then mark the flag so later explicit choices are respected.
-      await prefs.setBool(_systemDefaultMigratedKey, true);
-      if (value != null) {
-        await prefs.setString(_themeModeKey, ThemeMode.system.name);
-      }
-      return;
-    }
-    if (!mounted) return;
-
-    // No stored preference: stay on `system`.
-    if (value == null) return;
-
-    setState(() {
-      _themeMode = switch (value) {
-        'light' => ThemeMode.light,
-        'dark' => ThemeMode.dark,
-        'system' => ThemeMode.system,
-        _ => ThemeMode.system,
-      };
-    });
+    final mode = switch (prefs.getString(_themeModeKey)) {
+      'dark' => ThemeMode.dark,
+      'system' => ThemeMode.system,
+      _ => ThemeMode.light,
+    };
+    if (!mounted || mode == _themeMode) return;
+    setState(() => _themeMode = mode);
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {

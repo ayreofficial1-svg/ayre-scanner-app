@@ -6,7 +6,6 @@ import '../widgets/ayre_bottom_nav.dart' show navDestinationKey;
 /// attached with a `KeyedSubtree` at the widget's own call site, so the
 /// highlight always lands on the live element rather than a hand-measured box.
 abstract final class TourKeys {
-  static const homeTheme = ValueKey<String>('tour-home-theme');
   static const homeAlerts = ValueKey<String>('tour-home-alerts');
 
   static const settingsAppearance = ValueKey<String>(
@@ -92,13 +91,7 @@ List<AppTourStep> buildAppTourSteps() => [
     title: 'Home',
     body:
         'Recommendations with Entry, Exit and Stop levels, and the analyst\'s '
-        'desk notes.',
-  ),
-  const AppTourStep(
-    tab: 0,
-    target: TourKeys.homeTheme,
-    title: 'Theme switch',
-    body: 'Switch between light and dark any time, for example at night.',
+        'desk notes. Swipe left or right to move between tabs.',
   ),
   const AppTourStep(
     tab: 0,

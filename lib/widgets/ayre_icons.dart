@@ -179,7 +179,8 @@ class AyreIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mapped = financeMap[glyph];
+    // The shared bell is an outline. Use the bell painter for the solid form.
+    final mapped = glyph == AyreGlyph.bell && filled ? null : financeMap[glyph];
     if (mapped != null) {
       return FinanceIcon(
         mapped,

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../main.dart' show AppThemeController;
 import '../services/auth_service.dart';
 import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
@@ -279,8 +278,6 @@ class _Header extends StatelessWidget {
     final controls = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const _ThemeToggle(key: TourKeys.homeTheme),
-        const SizedBox(width: AppSpace.xxs),
         ListenableBuilder(
           key: TourKeys.homeAlerts,
           listenable: NotificationLog.instance,
@@ -288,6 +285,7 @@ class _Header extends StatelessWidget {
             final unread = NotificationLog.instance.hasUnread;
             return MastIconButton(
               tone: AyreMastTone.home,
+              filled: true,
               semanticLabel: unread ? 'Alerts, unread' : 'Alerts',
               onTap: () {
                 HapticFeedback.selectionClick();
@@ -299,7 +297,7 @@ class _Header extends StatelessWidget {
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    const AyreIcon(AyreGlyph.bell, size: 20),
+                    const AyreIcon(AyreGlyph.bell, size: 20, filled: true),
                     if (unread)
                       PositionedDirectional(
                         top: 9,
@@ -384,25 +382,6 @@ class _Header extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ThemeToggle extends StatelessWidget {
-  const _ThemeToggle({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = AppThemeController.of(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return MastIconButton(
-      tone: AyreMastTone.home,
-      semanticLabel: isDark ? 'Switch to light theme' : 'Switch to dark theme',
-      onTap: () {
-        HapticFeedback.selectionClick();
-        controller.setThemeMode(isDark ? ThemeMode.light : ThemeMode.dark);
-      },
-      child: AyreIcon(isDark ? AyreGlyph.sun : AyreGlyph.moon, size: 20),
     );
   }
 }
