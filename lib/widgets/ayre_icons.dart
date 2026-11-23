@@ -143,11 +143,7 @@ class AyreIcon extends StatelessWidget {
     return filled ? 2.1 : 1.7;
   }
 
-  /// Glyphs that now render through the supplied [FinanceIcon] vocabulary
-  /// (Phase 2 compatibility adapter). `filled` is ignored for these: selection
-  /// is colour plus marker, never a solid variant. Every other glyph keeps its
-  /// original outline drawing (documented gaps: close, copy, search, sort,
-  /// filter, signOut, status and market glyphs).
+  /// Glyphs drawn by [FinanceIcon]. The Home bell uses its solid variant.
   static const Map<AyreGlyph, FinanceGlyph> financeMap = {
     AyreGlyph.home: FinanceGlyph.home,
     AyreGlyph.report: FinanceGlyph.reports,
@@ -179,8 +175,7 @@ class AyreIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // The shared bell is an outline. Use the bell painter for the solid form.
-    final mapped = glyph == AyreGlyph.bell && filled ? null : financeMap[glyph];
+    final mapped = financeMap[glyph];
     if (mapped != null) {
       return FinanceIcon(
         mapped,
@@ -188,6 +183,7 @@ class AyreIcon extends StatelessWidget {
         color: color,
         strokeWidth: strokeWidth ?? navStroke,
         semanticLabel: semanticLabel,
+        filled: glyph == AyreGlyph.bell && filled,
       );
     }
     final resolved =
@@ -244,6 +240,7 @@ class _AyreIconPainter extends CustomPainter {
 
   void _draw(Canvas c, Paint s, Paint f) {
     switch (glyph) {
+      case AyreGlyph.bell:
       case AyreGlyph.sliders:
       case AyreGlyph.shield:
       case AyreGlyph.mail:
@@ -424,21 +421,6 @@ class _AyreIconPainter extends CustomPainter {
         }
 
       // ── Header and chrome ──────────────────────────────────────────────────
-      case AyreGlyph.bell:
-        final path = Path()
-          ..moveTo(6.5, 16.5)
-          ..lineTo(6.5, 10.5)
-          ..cubicTo(6.5, 7.2, 8.9, 5, 12, 5)
-          ..cubicTo(15.1, 5, 17.5, 7.2, 17.5, 10.5)
-          ..lineTo(17.5, 16.5)
-          ..close();
-        if (filled) {
-          c.drawPath(path, f);
-        } else {
-          c.drawPath(path, s);
-        }
-        c.drawLine(const Offset(4.5, 16.5), const Offset(19.5, 16.5), s);
-        c.drawLine(const Offset(10.5, 19.5), const Offset(13.5, 19.5), s);
       case AyreGlyph.back:
         _chevron(c, s, 14, -1);
       case AyreGlyph.forward:

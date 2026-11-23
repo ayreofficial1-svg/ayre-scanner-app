@@ -2,10 +2,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// The Investee icon vocabulary: 24 outline glyphs on a 24-unit grid, no
-/// fills, square caps and miter joins. One stroke weight (1.75) everywhere —
-/// selection is expressed by colour and the saffron marker, never by a filled
-/// variant.
+/// The Investee icon vocabulary on a 24-unit grid, with the supplied artwork
+/// and additional glyphs for existing controls.
 enum FinanceGlyph {
   home,
   reports,
@@ -44,6 +42,7 @@ class FinanceIcon extends StatelessWidget {
     this.strokeWidth = 1.75,
     this.semanticLabel,
     this.quarterTurns = 0,
+    this.filled = false,
   });
 
   final FinanceGlyph glyph;
@@ -55,6 +54,9 @@ class FinanceIcon extends StatelessWidget {
   /// Clockwise quarter turns, e.g. a right-pointing chevron rotated to point
   /// down (1), left (2) or up (3).
   final int quarterTurns;
+
+  /// Uses the solid variant of the bell.
+  final bool filled;
 
   @override
   Widget build(BuildContext context) {
@@ -68,6 +70,7 @@ class FinanceIcon extends StatelessWidget {
           glyph: glyph,
           color: resolved,
           strokeWidth: strokeWidth,
+          filled: filled,
         ),
       ),
     );
@@ -84,240 +87,295 @@ class _FinanceIconPainter extends CustomPainter {
     required this.glyph,
     required this.color,
     required this.strokeWidth,
+    required this.filled,
   });
 
   final FinanceGlyph glyph;
   final Color color;
   final double strokeWidth;
+  final bool filled;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final scale = size.shortestSide / 24;
     canvas.save();
-    canvas.scale(scale);
-    final p = Paint()
+    canvas.scale(size.shortestSide / 24);
+    final paint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.square
       ..strokeJoin = StrokeJoin.miter
-      ..strokeMiterLimit = 4;
-    for (final path in _paths(glyph)) {
-      canvas.drawPath(path, p);
+      ..strokeMiterLimit = 4
+      ..isAntiAlias = true;
+
+    void line(double x1, double y1, double x2, double y2) =>
+        canvas.drawLine(Offset(x1, y1), Offset(x2, y2), paint);
+
+    void poly(List<double> points, {bool close = false}) {
+      final path = Path()..moveTo(points[0], points[1]);
+      for (var i = 2; i < points.length; i += 2) {
+        path.lineTo(points[i], points[i + 1]);
+      }
+      if (close) path.close();
+      canvas.drawPath(path, paint);
+    }
+
+    void rect(double x, double y, double w, double h) =>
+        canvas.drawRect(Rect.fromLTWH(x, y, w, h), paint);
+    void circle(double cx, double cy, double r) =>
+        canvas.drawCircle(Offset(cx, cy), r, paint);
+    void bezier(void Function(Path) build) {
+      final path = Path();
+      build(path);
+      canvas.drawPath(path, paint);
+    }
+
+    switch (glyph) {
+      case FinanceGlyph.home:
+        // Door is an upward squared U cut into the house's lower wall.
+        poly([
+          3,
+          10.0,
+          12,
+          3.0,
+          21,
+          10.0,
+          21,
+          21,
+          14.7,
+          21,
+          14.7,
+          15.1,
+          9.3,
+          15.1,
+          9.3,
+          21,
+          3,
+          21,
+        ], close: true);
+      case FinanceGlyph.reports:
+        rect(2.7, 14.6, 4.2, 6.4);
+        rect(9.9, 9.8, 4.2, 11.2);
+        rect(17.1, 4.1, 4.2, 16.9);
+      case FinanceGlyph.learn:
+        // Folded book has an angular central crease.
+        poly([
+          2,
+          5,
+          8.8,
+          5,
+          12,
+          7,
+          15.2,
+          5,
+          22,
+          5,
+          22,
+          18.6,
+          15.5,
+          18.6,
+          12,
+          21,
+          8.5,
+          18.6,
+          2,
+          18.6,
+        ], close: true);
+        line(12, 7, 12, 21);
+      case FinanceGlyph.profile:
+        circle(12, 7.5, 4.4);
+        bezier((p) {
+          p.moveTo(9, 13);
+          p.lineTo(4.3, 15.5);
+          p.lineTo(2.6, 18.2);
+          p.lineTo(2.6, 21);
+          p.lineTo(21.4, 21);
+          p.lineTo(21.4, 18.2);
+          p.lineTo(19.7, 15.5);
+          p.lineTo(15, 13);
+        });
+      case FinanceGlyph.bell:
+        // Flared base, flat bottom, and a rectangular clapper.
+        if (filled) paint.style = PaintingStyle.fill;
+        bezier((p) {
+          p.moveTo(4.7, 17.7);
+          p.lineTo(5.8, 15.6);
+          p.lineTo(6.1, 9.2);
+          p.cubicTo(6.1, 5.4, 8.6, 3.5, 12, 3.5);
+          p.cubicTo(15.4, 3.5, 17.9, 5.4, 17.9, 9.2);
+          p.lineTo(18.2, 15.6);
+          p.lineTo(19.3, 17.7);
+          p.close();
+        });
+        rect(10.7, 17.7, 2.6, 2.3);
+        paint.style = PaintingStyle.stroke;
+        line(12, 2.2, 12, 3.4);
+      case FinanceGlyph.moon:
+        // Pointed crescent, matching the intentional sharp ends.
+        bezier((p) {
+          p.moveTo(16.2, 2.8);
+          p.cubicTo(9.5, 3.0, 5.1, 7.4, 5.1, 13.2);
+          p.cubicTo(5.1, 18.2, 8.8, 21.1, 13.1, 21.1);
+          p.cubicTo(16.0, 21.1, 18.5, 20.0, 20.5, 17.8);
+          p.cubicTo(13.3, 19.4, 9.1, 14.2, 11.0, 8.0);
+          p.cubicTo(11.5, 5.9, 13.1, 4.1, 16.2, 2.8);
+          p.close();
+        });
+      case FinanceGlyph.sun:
+        // Octagonal center with eight rays.
+        poly([
+          9.4,
+          7.2,
+          14.6,
+          7.2,
+          16.8,
+          9.4,
+          16.8,
+          14.6,
+          14.6,
+          16.8,
+          9.4,
+          16.8,
+          7.2,
+          14.6,
+          7.2,
+          9.4,
+        ], close: true);
+        for (var i = 0; i < 8; i++) {
+          final angle = i * math.pi / 4;
+          final dx = math.sin(angle);
+          final dy = -math.cos(angle);
+          line(12 + dx * 9, 12 + dy * 9, 12 + dx * 11, 12 + dy * 11);
+        }
+
+      case FinanceGlyph.chevron:
+        poly([8.3, 4, 16.3, 12, 8.3, 20]);
+      case FinanceGlyph.back:
+        poly([10, 4.5, 2.5, 12, 10, 19.5]);
+        line(3, 12, 21, 12);
+      case FinanceGlyph.sliders:
+        line(3, 8, 6, 8);
+        rect(6, 5.9, 3.8, 4.2);
+        line(9.8, 8, 21, 8);
+        line(3, 16.2, 13.1, 16.2);
+        rect(13.1, 14.1, 3.8, 4.2);
+        line(16.9, 16.2, 21, 16.2);
+      case FinanceGlyph.help:
+        circle(12, 12, 9.0);
+        poly([
+          9,
+          9.1,
+          9,
+          7.7,
+          10.3,
+          6.6,
+          13.6,
+          6.6,
+          15,
+          8,
+          15,
+          10.4,
+          12,
+          13.3,
+          12,
+          15,
+        ]);
+        line(12, 18.1, 12, 18.3);
+      case FinanceGlyph.info:
+        circle(12, 12, 9.0);
+        line(12, 10.5, 12, 17.8);
+        line(12, 6.4, 12, 6.6);
+      case FinanceGlyph.pulse:
+        poly([
+          2,
+          12.5,
+          7,
+          12.5,
+          9.5,
+          6.4,
+          13.1,
+          18.4,
+          16.1,
+          10.0,
+          18,
+          12.5,
+          22,
+          12.5,
+        ]);
+      case FinanceGlyph.shield:
+        bezier((p) {
+          p.moveTo(12, 2.8);
+          p.lineTo(20, 5.8);
+          p.lineTo(20, 13.8);
+          p.cubicTo(20, 16.8, 16.2, 19.7, 12, 22);
+          p.cubicTo(7.8, 19.7, 4, 16.8, 4, 13.8);
+          p.lineTo(4, 5.8);
+          p.close();
+        });
+
+      case FinanceGlyph.lock:
+        // Round shackle but square-sided body, as pictured.
+        bezier((p) {
+          p.moveTo(7.2, 10);
+          p.lineTo(7.2, 7);
+          p.cubicTo(7.2, 0.9, 16.8, 0.9, 16.8, 7);
+          p.lineTo(16.8, 10);
+        });
+        rect(4.1, 10, 15.8, 11.7);
+        line(12, 15.1, 12, 18.0);
+      case FinanceGlyph.mail:
+        rect(2.5, 5.2, 19, 13.6);
+        poly([2.7, 6, 12, 13.4, 21.3, 6]);
+      case FinanceGlyph.trash:
+        poly([4.8, 7, 19.2, 7]);
+        rect(9, 3.2, 6, 3.8);
+        poly([6.2, 7.4, 6.2, 21, 17.8, 21, 17.8, 7.4]);
+        line(10, 11.1, 10, 17.8);
+        line(14, 11.1, 14, 17.8);
+      case FinanceGlyph.refresh:
+        // C-shaped circular arrow, deliberately open at the right.
+        bezier((p) {
+          p.moveTo(19.1, 10.1);
+          p.cubicTo(18.2, 6, 14.9, 3.4, 10.8, 3.4);
+          p.cubicTo(5.8, 3.4, 2.7, 7.4, 2.7, 12.4);
+          p.cubicTo(2.7, 17.4, 6.6, 21, 11.6, 21);
+          p.cubicTo(16.7, 21, 20, 17.9, 20, 13.9);
+        });
+        poly([19.1, 5.9, 19.1, 10.1, 14.7, 10.1]);
+      case FinanceGlyph.trend:
+        poly([2.2, 19.7, 8.7, 12.0, 12.1, 15.2, 20.3, 5.4]);
+        poly([15.8, 5.4, 20.3, 5.4, 20.3, 10.0]);
+      case FinanceGlyph.check:
+        poly([3.2, 12.7, 9.2, 18.5, 20.8, 5.6]);
+      case FinanceGlyph.eye:
+      case FinanceGlyph.eyeOff:
+        // Almond outline with a square pupil.
+        bezier((p) {
+          p.moveTo(2.0, 12);
+          p.cubicTo(5.1, 7.2, 8.0, 5.0, 12, 5.0);
+          p.cubicTo(16.0, 5.0, 18.9, 7.2, 22, 12);
+          p.cubicTo(18.9, 16.8, 16.0, 19, 12, 19);
+          p.cubicTo(8.0, 19, 5.1, 16.8, 2.0, 12);
+          p.close();
+        });
+        rect(9.7, 9.7, 4.6, 4.6);
+        if (glyph == FinanceGlyph.eyeOff) poly([4, 4, 20, 20]);
+      case FinanceGlyph.edit:
+        poly([4, 20, 5, 15, 16, 4, 20, 8, 9, 19], close: true);
+        poly([14, 6, 18, 10]);
+      case FinanceGlyph.document:
+        poly([6, 3, 14, 3, 19, 8, 19, 21, 6, 21], close: true);
+        poly([14, 3, 14, 8, 19, 8]);
+        line(9, 13, 16, 13);
+        line(9, 17, 16, 17);
     }
     canvas.restore();
   }
 
-  static Path _poly(List<double> pts, {bool close = false}) {
-    final path = Path()..moveTo(pts[0], pts[1]);
-    for (var i = 2; i < pts.length; i += 2) {
-      path.lineTo(pts[i], pts[i + 1]);
-    }
-    if (close) path.close();
-    return path;
-  }
-
-  static Path _circle(double cx, double cy, double r) =>
-      Path()..addOval(Rect.fromCircle(center: Offset(cx, cy), radius: r));
-
-  static Path _rect(double l, double t, double w, double h) =>
-      Path()..addRect(Rect.fromLTWH(l, t, w, h));
-
-  static List<Path> _paths(FinanceGlyph g) {
-    switch (g) {
-      case FinanceGlyph.home:
-        return [
-          _poly([3, 11, 12, 3, 21, 11]),
-          _poly([5, 9.5, 5, 21, 19, 21, 19, 9.5]),
-          _poly([10, 21, 10, 14, 14, 14, 14, 21]),
-        ];
-      case FinanceGlyph.reports:
-        return [
-          _poly([5, 3, 19, 3, 19, 21, 5, 21], close: true),
-          _poly([9, 17, 9, 13]),
-          _poly([12, 17, 12, 10]),
-          _poly([15, 17, 15, 7]),
-        ];
-      case FinanceGlyph.learn:
-        return [
-          Path()
-            ..moveTo(12, 6)
-            ..cubicTo(10, 4.5, 7, 4, 3, 4.5)
-            ..lineTo(3, 18)
-            ..cubicTo(7, 17.5, 10, 18, 12, 20)
-            ..cubicTo(14, 18, 17, 17.5, 21, 18)
-            ..lineTo(21, 4.5)
-            ..cubicTo(17, 4, 14, 4.5, 12, 6)
-            ..close(),
-          _poly([12, 6, 12, 20]),
-        ];
-      case FinanceGlyph.profile:
-        return [
-          _circle(12, 8, 4),
-          Path()
-            ..moveTo(4, 21)
-            ..cubicTo(4, 16.5, 7.5, 14, 12, 14)
-            ..cubicTo(16.5, 14, 20, 16.5, 20, 21),
-        ];
-      case FinanceGlyph.bell:
-        return [
-          Path()
-            ..moveTo(6, 17)
-            ..lineTo(6, 11)
-            ..cubicTo(6, 7.5, 8.5, 5, 12, 5)
-            ..cubicTo(15.5, 5, 18, 7.5, 18, 11)
-            ..lineTo(18, 17),
-          _poly([4, 17, 20, 17]),
-          _poly([10, 20.5, 14, 20.5]),
-          _poly([12, 3, 12, 5]),
-        ];
-      case FinanceGlyph.moon:
-        return [
-          Path()
-            ..moveTo(20, 15.6)
-            ..cubicTo(18.5, 18.6, 15.5, 20.4, 12.1, 20.4)
-            ..cubicTo(7.4, 20.4, 3.7, 16.6, 3.7, 12)
-            ..cubicTo(3.7, 8.4, 5.8, 5.4, 8.9, 4.1)
-            ..cubicTo(8.0, 7.3, 9.1, 10.6, 11.4, 12.9)
-            ..cubicTo(13.7, 15.2, 17, 16.3, 20, 15.6)
-            ..close(),
-        ];
-      case FinanceGlyph.sun:
-        final rays = <Path>[];
-        for (var i = 0; i < 8; i++) {
-          final a = i * math.pi / 4;
-          final c = math.cos(a), s = math.sin(a);
-          rays.add(_poly([12 + c * 7, 12 + s * 7, 12 + c * 9.5, 12 + s * 9.5]));
-        }
-        return [_circle(12, 12, 4), ...rays];
-      case FinanceGlyph.chevron:
-        return [
-          _poly([9, 5, 16, 12, 9, 19]),
-        ];
-      case FinanceGlyph.back:
-        return [
-          _poly([19, 12, 5, 12]),
-          _poly([11, 6, 5, 12, 11, 18]),
-        ];
-      case FinanceGlyph.sliders:
-        return [
-          _poly([4, 7, 20, 7]),
-          _poly([4, 17, 20, 17]),
-          _poly([9, 4, 9, 10]),
-          _poly([15, 14, 15, 20]),
-        ];
-      case FinanceGlyph.help:
-        return [
-          _circle(12, 12, 9),
-          Path()
-            ..moveTo(9.5, 9.5)
-            ..cubicTo(9.5, 8, 10.7, 7, 12, 7)
-            ..cubicTo(13.3, 7, 14.5, 8, 14.5, 9.5)
-            ..cubicTo(14.5, 11.2, 12, 11.5, 12, 13.5),
-          _poly([12, 16.5, 12, 17]),
-        ];
-      case FinanceGlyph.info:
-        return [
-          _circle(12, 12, 9),
-          _poly([12, 11, 12, 17]),
-          _poly([12, 7, 12, 7.5]),
-        ];
-      case FinanceGlyph.pulse:
-        return [
-          _poly([3, 12, 7, 12, 9.5, 5, 13.5, 19, 16, 12, 21, 12]),
-        ];
-      case FinanceGlyph.shield:
-        return [
-          Path()
-            ..moveTo(12, 3)
-            ..lineTo(20, 6)
-            ..lineTo(20, 12)
-            ..cubicTo(20, 16.5, 16.5, 19.5, 12, 21)
-            ..cubicTo(7.5, 19.5, 4, 16.5, 4, 12)
-            ..lineTo(4, 6)
-            ..close(),
-        ];
-      case FinanceGlyph.lock:
-        return [
-          _rect(5, 11, 14, 10),
-          Path()
-            ..moveTo(8, 11)
-            ..lineTo(8, 7.5)
-            ..arcToPoint(
-              const Offset(16, 7.5),
-              radius: const Radius.circular(4),
-              clockwise: true,
-            )
-            ..lineTo(16, 11),
-        ];
-      case FinanceGlyph.mail:
-        return [
-          _rect(3, 5, 18, 14),
-          _poly([3, 6, 12, 13, 21, 6]),
-        ];
-      case FinanceGlyph.trash:
-        return [
-          _poly([4, 7, 20, 7]),
-          _poly([9, 7, 9, 4, 15, 4, 15, 7]),
-          _poly([6, 7, 7, 21, 17, 21, 18, 7]),
-          _poly([10, 11, 10, 17]),
-          _poly([14, 11, 14, 17]),
-        ];
-      case FinanceGlyph.refresh:
-        return [
-          Path()
-            ..moveTo(20, 12)
-            ..arcToPoint(
-              const Offset(17.66, 6.34),
-              radius: const Radius.circular(8),
-              largeArc: true,
-              clockwise: true,
-            ),
-          _poly([20, 3.5, 20, 7.5, 16, 7.5]),
-        ];
-      case FinanceGlyph.trend:
-        return [
-          _poly([3, 17, 9, 11, 13, 15, 21, 7]),
-          _poly([15, 7, 21, 7, 21, 13]),
-        ];
-      case FinanceGlyph.check:
-        return [
-          _poly([5, 12.5, 10, 17.5, 19, 7]),
-        ];
-      case FinanceGlyph.eye:
-        return [_eye(), _circle(12, 12, 3)];
-      case FinanceGlyph.eyeOff:
-        return [
-          _eye(),
-          _circle(12, 12, 3),
-          _poly([4, 4, 20, 20]),
-        ];
-      case FinanceGlyph.edit:
-        return [
-          _poly([4, 20, 5, 15, 16, 4, 20, 8, 9, 19], close: true),
-          _poly([14, 6, 18, 10]),
-        ];
-      case FinanceGlyph.document:
-        return [
-          _poly([6, 3, 14, 3, 19, 8, 19, 21, 6, 21], close: true),
-          _poly([14, 3, 14, 8, 19, 8]),
-          _poly([9, 13, 16, 13]),
-          _poly([9, 17, 16, 17]),
-        ];
-    }
-  }
-
-  static Path _eye() => Path()
-    ..moveTo(2, 12)
-    ..cubicTo(5, 6.5, 8.5, 5, 12, 5)
-    ..cubicTo(15.5, 5, 19, 6.5, 22, 12)
-    ..cubicTo(19, 17.5, 15.5, 19, 12, 19)
-    ..cubicTo(8.5, 19, 5, 17.5, 2, 12)
-    ..close();
-
   @override
-  bool shouldRepaint(_FinanceIconPainter old) =>
-      old.glyph != glyph ||
-      old.color != color ||
-      old.strokeWidth != strokeWidth;
+  bool shouldRepaint(covariant _FinanceIconPainter oldDelegate) =>
+      oldDelegate.glyph != glyph ||
+      oldDelegate.color != color ||
+      oldDelegate.strokeWidth != strokeWidth ||
+      oldDelegate.filled != filled;
 }
