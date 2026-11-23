@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../services/app_lifecycle.dart';
 import '../services/market_data_service.dart';
 import '../services/settings_store.dart';
+import '../services/subscription_service.dart';
 import '../services/market_models.dart';
 import '../onboarding/tour_content.dart' show TourKeys;
 import '../theme/app_theme.dart';
@@ -16,6 +17,7 @@ import '../widgets/ayre_masthead.dart';
 import '../widgets/ayre_signals_section.dart';
 import '../widgets/ayre_tab_scroll.dart';
 import '../widgets/pressable_scale.dart';
+import '../widgets/recommendations_gate.dart';
 import '../widgets/state_views.dart';
 import 'home_shell.dart' show initialsFor;
 import 'insight_note_screen.dart';
@@ -35,6 +37,7 @@ class HomeTab extends StatefulWidget {
     required this.marketData,
     this.onAccountResolved,
     this.onOpenProfile,
+    this.onOpenReports,
     this.active = true,
     this.signalsFocusToken = 0,
     this.scrollController,
@@ -43,6 +46,10 @@ class HomeTab extends StatefulWidget {
   final MarketDataService marketData;
   final ValueChanged<String>? onAccountResolved;
   final VoidCallback? onOpenProfile;
+
+  /// Switches the shell to the Reports tab (the locked Recommendations area
+  /// links to the Weekly Report).
+  final VoidCallback? onOpenReports;
 
   /// Whether this tab is the one currently showing in the shell's
   /// [IndexedStack]. The tab stays mounted (and its state preserved) while on
@@ -175,19 +182,25 @@ class _HomeTabState extends State<HomeTab> {
         child: _Header(name: displayName, onOpenProfile: widget.onOpenProfile),
       ),
       // One network pass per surface; the signals reload is silent.
-      onRefresh: () =>
-          Future.wait([_load(), _signalsController.reload(silent: true)]),
+      // While locked the signals controller is detached, so its reload is a
+      // no-op; the entitlement is re-checked instead.
+      onRefresh: () => Future.wait([
+        _load(),
+        _signalsController.reload(silent: true),
+        SubscriptionService.instance.refresh().catchError((Object _) {}),
+      ]),
       children: [
         const SizedBox(height: AppSpace.s13),
         KeyedSubtree(
           key: _signalsKey,
           child: Entrance(
             index: 1,
-            child: SignalsSection(
+            child: RecommendationsGate(
               marketData: widget.marketData,
               active: widget.active,
               controller: _signalsController,
               forceColumns: 1,
+              onOpenReports: widget.onOpenReports,
             ),
           ),
         ),

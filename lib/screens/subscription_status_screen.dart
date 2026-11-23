@@ -65,7 +65,10 @@ class _SubscriptionStatusScreenState extends State<SubscriptionStatusScreen> {
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(
+        SnackBar(content: Text(message)),
+        snackBarAnimationStyle: AppMotion.snackBarStyleOf(context),
+      );
   }
 
   Future<void> _manage() async {

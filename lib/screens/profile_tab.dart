@@ -89,9 +89,10 @@ class _ProfileTabState extends State<ProfileTab> {
     );
     if (updated == null || !mounted) return;
     HapticFeedback.mediumImpact();
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Profile updated')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Profile updated')),
+      snackBarAnimationStyle: AppMotion.snackBarStyleOf(context),
+    );
   }
 
   Future<void> _confirmSignOut() async {

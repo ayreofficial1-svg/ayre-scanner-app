@@ -31,9 +31,10 @@ class SupportScreen extends StatelessWidget {
     HapticFeedback.selectionClick();
     await Clipboard.setData(ClipboardData(text: text));
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(confirmation)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(confirmation)),
+      snackBarAnimationStyle: AppMotion.snackBarStyleOf(context),
+    );
   }
 
   @override

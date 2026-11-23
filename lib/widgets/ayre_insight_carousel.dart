@@ -44,7 +44,7 @@ class _AyreInsightCarouselState extends State<AyreInsightCarousel> {
     final index = _resolved(count);
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
-        : AppMotion.pageTransition;
+        : AppMotion.expand;
 
     return AyreCard(
       padding: EdgeInsets.zero,
@@ -77,6 +77,7 @@ class _AyreInsightCarouselState extends State<AyreInsightCarousel> {
                       for (var i = 0; i < count; i++)
                         AnimatedOpacity(
                           duration: duration,
+                          curve: AppMotion.easeInOut,
                           opacity: i == index ? 1 : 0,
                           child: ExcludeFocus(
                             excluding: i != index,
@@ -110,6 +111,7 @@ class _AyreInsightCarouselState extends State<AyreInsightCarousel> {
                               for (var i = 0; i < count; i++)
                                 AnimatedContainer(
                                   duration: duration,
+                                  curve: AppMotion.easeInOut,
                                   width: i == index ? 34 : 8,
                                   height: 8,
                                   margin: const EdgeInsetsDirectional.only(

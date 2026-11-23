@@ -15,7 +15,7 @@ class PressableScale extends StatefulWidget {
     this.onTap,
     this.borderRadius = AppRadius.card,
     this.shape,
-    this.scale = 0.985,
+    this.scale = 0.99,
     this.hoverTint = true,
     this.focusColor,
   });
@@ -54,6 +54,7 @@ class _PressableScaleState extends State<PressableScale> {
     final radius = widget.shape ?? BorderRadius.circular(widget.borderRadius);
     final enabled = widget.onTap != null;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final pressed = enabled && _pressed;
 
     // The ring only shows for keyboard / switch-access focus, never after a
     // touch or mouse press.
@@ -62,9 +63,11 @@ class _PressableScaleState extends State<PressableScale> {
         FocusManager.instance.highlightMode == FocusHighlightMode.traditional;
 
     return AnimatedScale(
-      scale: (_pressed && !reduceMotion) ? widget.scale : 1,
-      duration: reduceMotion ? Duration.zero : AppMotion.buttonPress,
-      curve: AppMotion.ease,
+      scale: pressed && !reduceMotion ? widget.scale : 1,
+      duration: reduceMotion
+          ? Duration.zero
+          : (pressed ? AppMotion.pressIn : AppMotion.buttonPress),
+      curve: pressed ? AppMotion.ease : AppMotion.easeInOut,
       child: Container(
         foregroundDecoration: showRing
             ? BoxDecoration(

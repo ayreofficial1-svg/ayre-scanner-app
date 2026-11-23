@@ -167,7 +167,7 @@ class _DockItems extends StatelessWidget {
               ),
               AnimatedPositionedDirectional(
                 duration: reduceMotion ? Duration.zero : AppMotion.navMarker,
-                curve: AppMotion.ease,
+                curve: AppMotion.easeInOut,
                 start: markerLeft,
                 top: 0,
                 width: AyreNavMetrics.markerWidth,
@@ -299,7 +299,7 @@ class AyreNavRail extends StatelessWidget {
                 ),
                 AnimatedPositionedDirectional(
                   duration: duration,
-                  curve: AppMotion.ease,
+                  curve: AppMotion.easeInOut,
                   start: 0,
                   top:
                       railTop +
@@ -398,6 +398,7 @@ class _NavItemState extends State<_NavItem> {
           Positioned.fill(
             child: AnimatedContainer(
               duration: reduceMotion ? Duration.zero : AppMotion.buttonPress,
+              curve: AppMotion.easeInOut,
               decoration: BoxDecoration(
                 color: background,
                 borderRadius: radius,

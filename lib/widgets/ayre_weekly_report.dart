@@ -105,7 +105,7 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
     final visible = _showAll ? stocks : stocks.take(widget.collapsedCount);
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
-        : AppMotion.pageTransition;
+        : AppMotion.expand;
     final animate = !_changedWeek && report.id == _firstWeek && !widget.stale;
 
     return AyreTabScroll(
@@ -135,14 +135,19 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
         ],
         AnimatedSize(
           duration: duration,
-          curve: AppMotion.ease,
+          curve: AppMotion.easeInOut,
           alignment: Alignment.topCenter,
           child: AnimatedSwitcher(
             duration: duration,
+            switchInCurve: AppMotion.easeInOut,
+            switchOutCurve: AppMotion.easeInOut,
             layoutBuilder: (current, previous) => Stack(
               alignment: Alignment.topCenter,
               children: [
-                for (final child in previous) ExcludeSemantics(child: child),
+                for (final child in previous)
+                  ExcludeFocus(
+                    child: ExcludeSemantics(child: IgnorePointer(child: child)),
+                  ),
                 ?current,
               ],
             ),

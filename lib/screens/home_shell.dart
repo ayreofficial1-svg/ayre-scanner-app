@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show HapticFeedback;
 
 import '../services/auth_service.dart';
+import '../services/gated_market_data_service.dart';
 import '../services/market_data_service.dart';
 import '../services/persistent_market_data_service.dart';
 import '../services/push_service.dart';
@@ -24,7 +25,7 @@ import 'profile_tab.dart';
 import 'weekly_reports_tab.dart';
 
 /// The signed-in shell: four destinations, each hosting **its own
-/// [Navigator]** inside an [IndexedStack] (plan A3), so the dock (or rail)
+/// [Navigator]** kept mounted in a stack, so the dock (or rail)
 /// stays visible on in-tab detail screens and every tab keeps its own back
 /// stack while another tab is shown.
 ///
@@ -42,9 +43,14 @@ class HomeShell extends StatefulWidget {
   // `PersistentMarketDataService` so the published research content (signals,
   // courses, notes, reports) falls back to the last on-device saved copy when
   // the backend is unreachable or the app was relaunched after being closed.
+  // `GatedMarketDataService` sits outside it, so while recommendations are
+  // locked nothing is requested, read from the saved copy, or written to it.
   HomeShell({super.key, MarketDataService? marketData})
     : marketData =
-          marketData ?? PersistentMarketDataService(RemoteMarketDataService());
+          marketData ??
+          GatedMarketDataService(
+            PersistentMarketDataService(RemoteMarketDataService()),
+          );
 
   /// Injected so every screen can be rendered with known data in tests.
   final MarketDataService marketData;
@@ -364,6 +370,7 @@ class _HomeShellState extends State<HomeShell> {
             marketData: widget.marketData,
             onAccountResolved: _onAccountResolved,
             onOpenProfile: () => _select(3),
+            onOpenReports: () => _select(1),
             active: scope.index == 0,
             signalsFocusToken: scope.signalsFocusToken,
             scrollController: controller,
@@ -412,21 +419,6 @@ class _HomeShellState extends State<HomeShell> {
     final showDock = !wide && !keyboardOpen;
     final clearance = showDock ? AyreNavMetrics.clearanceOf(context) : 0.0;
 
-    // IndexedStack keeps all four tabs mounted for the life of the app, and
-    // TickerMode mutes every ticker (animations) in an inactive tab's subtree
-    // without touching the widgets that own them.
-    Widget tickered(int index, Widget child) => ExcludeFocus(
-      excluding: index != _index,
-      child: TickerMode(enabled: index == _index, child: child),
-    );
-
-    final tabs = IndexedStack(
-      index: _index,
-      children: [
-        for (var i = 0; i < kNavDestinations.length; i++)
-          tickered(i, _tabNavigator(i)),
-      ],
-    );
     final tabContent = VerificationBannerHost(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
@@ -438,7 +430,12 @@ class _HomeShellState extends State<HomeShell> {
             ? null
             : (details) => _tabSwipeDistance += details.primaryDelta ?? 0,
         onHorizontalDragEnd: keyboardOpen ? null : _finishTabSwipe,
-        child: _TabFade(index: _index, child: tabs),
+        child: _TabFade(
+          index: _index,
+          tabs: [
+            for (var i = 0; i < kNavDestinations.length; i++) _tabNavigator(i),
+          ],
+        ),
       ),
     );
 
@@ -536,18 +533,12 @@ class _StackObserver extends NavigatorObserver {
       _onChanged();
 }
 
-/// The incoming tab's already-built content fades **and shifts** in — per
-/// Spec §15.4, tab-to-tab switches inside this shell are a fade+shift, not
-/// the route-level slide `TerminalPageTransitions` uses for overlay pushes
-/// (Settings, detail screens). A small upward settle (8px, [AppSpace.xs])
-/// reads as "the new content arrives" rather than a hard cut, without the
-/// directional left/right implication a full slide would give two
-/// same-level tabs.
+/// Crossfades the two visible tabs while keeping every navigator mounted.
 class _TabFade extends StatefulWidget {
-  const _TabFade({required this.index, required this.child});
+  const _TabFade({required this.index, required this.tabs});
 
   final int index;
-  final Widget child;
+  final List<Widget> tabs;
 
   @override
   State<_TabFade> createState() => _TabFadeState();
@@ -556,14 +547,27 @@ class _TabFade extends StatefulWidget {
 class _TabFadeState extends State<_TabFade>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _curved;
+  late final Animation<double> _opacity;
+  int? _outgoingIndex;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(vsync: this, duration: AppMotion.tabFade)
-      ..value = 1.0;
-    _curved = CurvedAnimation(parent: _controller, curve: AppMotion.ease);
+      ..value = 1.0
+      ..addStatusListener(_onFadeStatus);
+    _opacity = _controller.drive(CurveTween(curve: AppMotion.easeInOut));
+  }
+
+  void _onFadeStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed && _outgoingIndex != null) {
+      setState(() => _outgoingIndex = null);
+    }
+  }
+
+  void _finishFade() {
+    _outgoingIndex = null;
+    _controller.value = 1;
   }
 
   @override
@@ -571,16 +575,24 @@ class _TabFadeState extends State<_TabFade>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.index == widget.index) return;
     if (MediaQuery.disableAnimationsOf(context)) {
-      _controller.value = 1.0;
-    } else {
-      _controller.forward(from: 0);
+      _finishFade();
+      return;
     }
+
+    final progress = _controller.value;
+    final returning = widget.index == _outgoingIndex;
+    // Reversing a fade preserves its blend. For a third tab, start over the
+    // more visible of the two screens.
+    if (returning || progress >= 0.5 || _outgoingIndex == null) {
+      _outgoingIndex = oldWidget.index;
+    }
+    _controller.forward(from: returning ? 1 - progress : 0);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) _controller.value = 1;
+    if (MediaQuery.disableAnimationsOf(context)) _finishFade();
   }
 
   @override
@@ -590,8 +602,48 @@ class _TabFadeState extends State<_TabFade>
   }
 
   @override
-  Widget build(BuildContext context) =>
-      FadeTransition(opacity: _curved, child: widget.child);
+  Widget build(BuildContext context) {
+    final active = widget.index;
+    final outgoing = _outgoingIndex;
+    final background = context.tokens.background;
+
+    Widget tab(int index) {
+      final selected = index == active;
+      return Offstage(
+        key: ValueKey(index),
+        offstage: !selected && index != outgoing,
+        child: IgnorePointer(
+          ignoring: !selected,
+          child: ExcludeSemantics(
+            excluding: !selected,
+            child: ExcludeFocus(
+              excluding: !selected,
+              child: TickerMode(
+                enabled: selected,
+                child: FadeTransition(
+                  opacity: selected ? _opacity : kAlwaysCompleteAnimation,
+                  child: ColoredBox(
+                    color: background,
+                    child: widget.tabs[index],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        for (var i = 0; i < widget.tabs.length; i++)
+          if (i != active && i != outgoing) tab(i),
+        if (outgoing != null) tab(outgoing),
+        tab(active),
+      ],
+    );
+  }
 }
 
 /// Initials for the account, used by the Fold's Profile slot and Profile's own

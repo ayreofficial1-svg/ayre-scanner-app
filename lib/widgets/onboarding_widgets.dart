@@ -42,8 +42,8 @@ class OnboardingPageIndicator extends StatelessWidget {
         children: [
           for (var i = 0; i < total; i++)
             AnimatedContainer(
-              duration: reduce ? Duration.zero : AppMotion.buttonPress,
-              curve: AppMotion.ease,
+              duration: reduce ? Duration.zero : AppMotion.controlChange,
+              curve: AppMotion.easeInOut,
               width: i == page ? _activeWidth : _dot,
               height: _dot,
               decoration: BoxDecoration(

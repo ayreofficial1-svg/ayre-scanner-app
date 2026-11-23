@@ -544,60 +544,69 @@ abstract final class AppShape {
 }
 
 // ─── Motion ────────────────────────────────────────────────────────────────
-// Calm and non-bouncy: cards rise 13px and fade with a 55ms stagger, the dock
-// marker slides 233ms, the range draws 377ms once, figures count up once.
 abstract final class AppMotion {
-  /// `cubic-bezier(0.22, 1, 0.36, 1)` — an ease-out with no overshoot.
-  static const Curve ease = Cubic(0.22, 1, 0.36, 1);
-  static const Curve easeIn = Curves.easeInCubic;
-  static const Curve easeInOut = Curves.easeInOutCubic;
+  /// A gentle deceleration for entrances and one-way reveals.
+  static const Curve ease = Cubic(0.22, 0.61, 0.36, 1);
 
-  /// Press feedback (opacity / scale).
-  static const Duration buttonPress = Duration(milliseconds: 150);
-  static const Duration pageTransition = Duration(milliseconds: 280);
+  /// A soft start and finish for changes between two visible states.
+  static const Curve easeInOut = Curves.easeInOutSine;
+
+  static const Duration pressIn = Duration(milliseconds: 100);
+  static const Duration buttonPress = Duration(milliseconds: 170);
+  static const Duration controlChange = Duration(milliseconds: 220);
+  static const Duration pageTransition = Duration(milliseconds: 330);
+  static const Duration pageDismiss = Duration(milliseconds: 300);
 
   /// Tab-to-tab content fade in the shell.
-  static const Duration tabFade = Duration(milliseconds: 200);
+  static const Duration tabFade = Duration(milliseconds: 240);
 
-  /// Sheets and modals (280–340ms).
-  static const Duration overlaySlide = Duration(milliseconds: 340);
+  /// Opening a sheet or modal.
+  static const Duration overlaySlide = Duration(milliseconds: 380);
 
   /// Card entrance: [entranceRise] px up + fade.
-  static const Duration cardEntrance = Duration(milliseconds: 280);
-  static const double entranceRise = 13;
-  static const Duration entranceStagger = Duration(milliseconds: 55);
+  static const Duration cardEntrance = Duration(milliseconds: 330);
+  static const double entranceRise = 7;
+  static const Duration entranceStagger = Duration(milliseconds: 35);
   static const Duration entranceDelay = Duration(milliseconds: 30);
 
   /// Count-up on first real data only.
-  static const Duration countUp = Duration(milliseconds: 400);
+  static const Duration countUp = Duration(milliseconds: 460);
   static const Duration refreshRotation = Duration(milliseconds: 900);
 
   /// The selected-destination marker glides between item centres.
-  static const Duration navMarker = Duration(milliseconds: 233);
+  static const Duration navMarker = Duration(milliseconds: 270);
 
   /// Theme switch interpolation.
-  static const Duration themeSwitch = Duration(milliseconds: 233);
+  static const Duration themeSwitch = Duration(milliseconds: 320);
 
   /// Recommendation range reveal, once per new valid content.
-  static const Duration rangeDraw = Duration(milliseconds: 377);
+  static const Duration rangeDraw = Duration(milliseconds: 430);
 
   /// Chart draw-on; shares the range timing.
   static const Duration chartDraw = rangeDraw;
 
-  /// Expand / fold / filter size changes (150–280ms).
-  static const Duration expand = Duration(milliseconds: 233);
+  /// Expand, collapse, and filter size changes.
+  static const Duration expand = Duration(milliseconds: 280);
 
   /// Generic fallback for call sites not yet reconciled.
   static const Duration slow = Duration(milliseconds: 400);
 
   /// Retained for the one existing digit-settle call site.
-  static const Duration digitRoll = Duration(milliseconds: 420);
+  static const Duration digitRoll = Duration(milliseconds: 340);
 
   // Retained aliases for components not yet migrated.
   static const Duration fast = buttonPress;
   static const Duration medium = pageTransition;
   static const Duration entrance = cardEntrance;
   static const Duration stagger = entranceStagger;
+
+  static AnimationStyle snackBarStyleOf(BuildContext context) =>
+      MediaQuery.disableAnimationsOf(context)
+      ? AnimationStyle.noAnimation
+      : const AnimationStyle(
+          duration: pageDismiss,
+          reverseDuration: controlChange,
+        );
 }
 
 /// The type scale (logical px at the 390 reference).
@@ -1628,14 +1637,16 @@ abstract final class AppTheme {
         scaffoldBackgroundColor: t.background,
         barBackgroundColor: t.navBg,
       ),
-      pageTransitionsTheme: const PageTransitionsTheme(
+      pageTransitionsTheme: PageTransitionsTheme(
         builders: {
-          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(),
-          TargetPlatform.iOS: TerminalPageTransitions(),
-          TargetPlatform.macOS: TerminalPageTransitions(),
-          TargetPlatform.windows: TerminalPageTransitions(),
-          TargetPlatform.linux: TerminalPageTransitions(),
-          TargetPlatform.fuchsia: TerminalPageTransitions(),
+          TargetPlatform.android: PredictiveBackPageTransitionsBuilder(
+            fallbackColor: t.background,
+          ),
+          TargetPlatform.iOS: const TerminalPageTransitions(),
+          TargetPlatform.macOS: const TerminalPageTransitions(),
+          TargetPlatform.windows: const TerminalPageTransitions(),
+          TargetPlatform.linux: const TerminalPageTransitions(),
+          TargetPlatform.fuchsia: const TerminalPageTransitions(),
         },
       ),
     );
@@ -1649,13 +1660,7 @@ abstract final class AppTheme {
       );
 }
 
-/// Route-level push/pop transition, used for overlay pushes (Settings, the
-/// state gallery, detail screens) at [AppMotion.overlaySlide]. Tab-to-tab
-/// switches inside the bottom-nav shell do NOT use this — per Spec §15.4
-/// they're a fade+shift living in `home_shell.dart`, not a `Navigator` push
-/// (Phase 2). The name is retained from the previous identity for now;
-/// consider renaming once the nav rewrite lands in Phase 2 so it no longer
-/// reads as "terminal"-branded.
+/// A short slide and fade for routes using the app's page transition.
 class TerminalPageTransitions extends PageTransitionsBuilder {
   const TerminalPageTransitions();
 
@@ -1663,7 +1668,7 @@ class TerminalPageTransitions extends PageTransitionsBuilder {
   Duration get transitionDuration => AppMotion.pageTransition;
 
   @override
-  Duration get reverseTransitionDuration => AppMotion.pageTransition;
+  Duration get reverseTransitionDuration => AppMotion.pageDismiss;
 
   @override
   Widget buildTransitions<T>(
@@ -1675,27 +1680,23 @@ class TerminalPageTransitions extends PageTransitionsBuilder {
   ) {
     if (MediaQuery.disableAnimationsOf(context)) return child;
 
-    final incoming = CurvedAnimation(
-      parent: animation,
-      curve: AppMotion.ease,
-      reverseCurve: AppMotion.easeIn,
-    );
-    final outgoing = CurvedAnimation(
-      parent: secondaryAnimation,
-      curve: AppMotion.ease,
-      reverseCurve: AppMotion.easeIn,
-    );
+    final curve = CurveTween(curve: AppMotion.easeInOut);
+    final incoming = animation.drive(curve);
+    final outgoing = secondaryAnimation.drive(curve);
+    final direction = Directionality.of(context);
 
     return SlideTransition(
+      textDirection: direction,
       position: Tween<Offset>(
         begin: Offset.zero,
-        end: const Offset(-0.16, 0),
+        end: const Offset(-0.025, 0),
       ).animate(outgoing),
       child: FadeTransition(
         opacity: incoming,
         child: SlideTransition(
+          textDirection: direction,
           position: Tween<Offset>(
-            begin: const Offset(1, 0),
+            begin: const Offset(0.06, 0),
             end: Offset.zero,
           ).animate(incoming),
           child: child,
@@ -1749,13 +1750,13 @@ Route<T> terminalRoute<T>({
   };
 }
 
-Duration _routeDuration(NavigatorState? navigator) {
+Duration _routeDuration(NavigatorState? navigator, Duration duration) {
   final context = navigator?.context;
   final reduce = context
       ?.getInheritedWidgetOfExactType<MediaQuery>()
       ?.data
       .disableAnimations;
-  return reduce == true ? Duration.zero : AppMotion.pageTransition;
+  return reduce == true ? Duration.zero : duration;
 }
 
 class _AyreMaterialRoute<T> extends MaterialPageRoute<T> {
@@ -1766,10 +1767,12 @@ class _AyreMaterialRoute<T> extends MaterialPageRoute<T> {
   });
 
   @override
-  Duration get transitionDuration => _routeDuration(navigator);
+  Duration get transitionDuration =>
+      _routeDuration(navigator, AppMotion.pageTransition);
 
   @override
-  Duration get reverseTransitionDuration => _routeDuration(navigator);
+  Duration get reverseTransitionDuration =>
+      _routeDuration(navigator, AppMotion.pageDismiss);
 }
 
 class _AyreCupertinoRoute<T> extends CupertinoPageRoute<T> {
@@ -1780,8 +1783,10 @@ class _AyreCupertinoRoute<T> extends CupertinoPageRoute<T> {
   });
 
   @override
-  Duration get transitionDuration => _routeDuration(navigator);
+  Duration get transitionDuration =>
+      _routeDuration(navigator, AppMotion.pageTransition);
 
   @override
-  Duration get reverseTransitionDuration => _routeDuration(navigator);
+  Duration get reverseTransitionDuration =>
+      _routeDuration(navigator, AppMotion.pageDismiss);
 }

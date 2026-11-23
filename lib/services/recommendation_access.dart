@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 // TEMPORARY (paywall test toggle) — remove before production
 import 'paywall_test_switch.dart';
+import 'recommendation_purge.dart';
 import 'subscription_config.dart';
 import 'subscription_models.dart';
 import 'subscription_service.dart';
@@ -37,6 +38,10 @@ class RecommendationAccess extends ChangeNotifier {
     SubscriptionService.instance.addListener(_onInputsChanged);
     _last = access;
     _syncTimer();
+    // Locked from the very first answer: clear anything left from earlier.
+    if (_last == RecommendationAccessState.locked) {
+      unawaited(RecommendationPurge.run());
+    }
   }
 
   static final RecommendationAccess instance = RecommendationAccess._();
@@ -76,6 +81,11 @@ class RecommendationAccess extends ChangeNotifier {
     if (next == _last) return;
     _last = next;
     notifyListeners();
+    // Every move into a definitive lock removes the local traces. Never while
+    // still resolving.
+    if (next == RecommendationAccessState.locked) {
+      unawaited(RecommendationPurge.run());
+    }
   }
 
   /// The resolve timeout runs only while the answer is genuinely awaited.

@@ -169,7 +169,7 @@ class _LearnTabState extends State<LearnTab> {
         : courses.where((course) => course.category == _category).toList();
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
-        : AppMotion.pageTransition;
+        : AppMotion.expand;
 
     return AyreTabScroll(
       eager: true,
@@ -246,9 +246,11 @@ class _LearnTabState extends State<LearnTab> {
         AnimatedSize(
           alignment: Alignment.topCenter,
           duration: duration,
-          curve: AppMotion.ease,
+          curve: AppMotion.easeInOut,
           child: AnimatedSwitcher(
             duration: duration,
+            switchInCurve: AppMotion.easeInOut,
+            switchOutCurve: AppMotion.easeInOut,
             layoutBuilder: (current, previous) => Stack(
               alignment: Alignment.topCenter,
               children: [

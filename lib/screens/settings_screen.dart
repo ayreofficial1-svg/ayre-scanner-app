@@ -6,6 +6,7 @@ import '../main.dart';
 import '../onboarding/tour_content.dart';
 import '../services/auth_service.dart';
 import '../services/push_service.dart';
+import '../services/recommendation_access.dart';
 import '../services/settings_store.dart';
 import '../services/subscription_models.dart';
 import '../services/subscription_service.dart';
@@ -107,7 +108,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _toast(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+      ..showSnackBar(
+        SnackBar(content: Text(message)),
+        snackBarAnimationStyle: AppMotion.snackBarStyleOf(context),
+      );
   }
 
   Future<void> _changePassword() async {
@@ -282,6 +286,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               listenable: Listenable.merge([
                 PushService.instance,
                 NotificationLog.instance,
+                RecommendationAccess.instance,
               ]),
               builder: (context, _) {
                 final push = PushService.instance;
@@ -291,6 +296,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final anyChannel =
                     settings.inAppAlerts ||
                     (push.available && settings.pushEnabled);
+                // Signal alerts are part of the subscription. The stored
+                // choice is kept and comes back when recommendations unlock.
+                final recommendationsLocked =
+                    RecommendationAccess.instance.isLocked;
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -329,11 +338,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         _SwitchRow(
                           glyph: AyreGlyph.trendUp,
                           title: 'Signal alerts',
-                          subtitle: 'New signals and changes to them.',
+                          subtitle: recommendationsLocked
+                              ? 'Available with a subscription.'
+                              : 'New signals and changes to them.',
                           value: settings.newSignalAlerts,
                           // Governs both the in-app list and push, so it
                           // stays usable while either of them is on.
-                          enabled: anyChannel,
+                          enabled: anyChannel && !recommendationsLocked,
                           onChanged: settings.setNewSignalAlerts,
                         ),
                         SettingRow(

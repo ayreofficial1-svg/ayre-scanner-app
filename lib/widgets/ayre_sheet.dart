@@ -21,8 +21,10 @@ Future<T?> showAyreSheet<T>({
     sheetAnimationStyle: MediaQuery.disableAnimationsOf(context)
         ? AnimationStyle.noAnimation
         : const AnimationStyle(
+            curve: AppMotion.easeInOut,
             duration: AppMotion.overlaySlide,
-            reverseDuration: AppMotion.pageTransition,
+            reverseCurve: AppMotion.easeInOut,
+            reverseDuration: AppMotion.pageDismiss,
           ),
     builder: builder,
   );

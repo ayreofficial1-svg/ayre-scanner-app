@@ -537,7 +537,7 @@ class _AyreSwitchState extends State<AyreSwitch> {
     final value = widget.value;
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
-        : AppMotion.buttonPress;
+        : AppMotion.controlChange;
 
     return Semantics(
       label: widget.semanticLabel,
@@ -574,7 +574,7 @@ class _AyreSwitchState extends State<AyreSwitch> {
                       : null,
                   child: AnimatedContainer(
                     duration: duration,
-                    curve: AppMotion.ease,
+                    curve: AppMotion.easeInOut,
                     width: AppShape.switchWidth,
                     height: AppShape.switchHeight,
                     padding: const EdgeInsets.all(AppShape.switchInset),
@@ -585,11 +585,13 @@ class _AyreSwitchState extends State<AyreSwitch> {
                     ),
                     child: AnimatedAlign(
                       duration: duration,
-                      curve: AppMotion.ease,
+                      curve: AppMotion.easeInOut,
                       alignment: value
                           ? Alignment.centerRight
                           : Alignment.centerLeft,
-                      child: Container(
+                      child: AnimatedContainer(
+                        duration: duration,
+                        curve: AppMotion.easeInOut,
                         width: AppShape.switchThumb,
                         height: AppShape.switchThumb,
                         decoration: BoxDecoration(
@@ -686,15 +688,7 @@ class _Segment<T> extends StatelessWidget {
   final bool compact;
   final VoidCallback onTap;
 
-  // Note (plan §7 open decision #2 sibling item, resolved in Phase 1): this
-  // toggles each segment's own fill rather than sliding one shared pill
-  // behind the row (a `layoutId`-equivalent shared-element transition, which
-  // Flutter has no direct primitive for outside `Hero` — wrong tool here per
-  // the plan's own note). Kept as-is: with only 2–3 segments and every
-  // segment animating its own fill on the same `AppMotion.buttonPress`
-  // timing, the visual result reads as one control changing state, not three
-  // separate ones — a sliding-pill rebuild is not warranted by the Spec's
-  // "glides smoothly" description, which this already satisfies.
+  // Each segment fades its own fill using the same timing.
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
@@ -713,8 +707,8 @@ class _Segment<T> extends StatelessWidget {
         child: AnimatedContainer(
           duration: MediaQuery.disableAnimationsOf(context)
               ? Duration.zero
-              : AppMotion.buttonPress,
-          curve: AppMotion.ease,
+              : AppMotion.controlChange,
+          curve: AppMotion.easeInOut,
           // 48 pt hit height in both sizes (Spec §9.5); the label wraps
           // rather than shrinking (D-9).
           constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
@@ -906,10 +900,7 @@ class SettingRow extends StatelessWidget {
               ),
               if (trailing case final accessory?) ...[
                 const SizedBox(width: AppSpace.s8),
-                if (toggled != null)
-                  accessory
-                else
-                  Flexible(child: accessory),
+                if (toggled != null) accessory else Flexible(child: accessory),
               ],
               if (onTap != null && (trailing == null || status != null)) ...[
                 const SizedBox(width: AppSpace.s8),
@@ -1166,9 +1157,8 @@ class SkeletonTickerRow extends StatelessWidget {
 
 // ─── Entrance ──────────────────────────────────────────────────────────────
 
-/// A restrained, single-play, index-delayed staggered entrance: 13px rise and
-/// fade, 55ms stagger (at most four steps), 280 ms duration. Plays once per
-/// screen visit and does not replay on tab re-visit or a minor rebuild.
+/// A short rise and fade, staggered across the first few cards on a screen.
+/// Plays once per screen visit.
 class Entrance extends StatefulWidget {
   const Entrance({
     super.key,
@@ -1342,8 +1332,8 @@ class AyreFilterChip extends StatelessWidget {
         child: AnimatedContainer(
           duration: MediaQuery.disableAnimationsOf(context)
               ? Duration.zero
-              : AppMotion.buttonPress,
-          curve: AppMotion.ease,
+              : AppMotion.controlChange,
+          curve: AppMotion.easeInOut,
           // 48 pt minimum hit height (Phase 3); grows with text scale.
           constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
           padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),

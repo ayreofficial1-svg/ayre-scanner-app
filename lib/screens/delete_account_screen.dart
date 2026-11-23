@@ -99,6 +99,13 @@ class _DeleteAccountScreenState extends State<DeleteAccountScreen> {
               subtitle: 'Saved alerts are cleared from this phone.',
             ),
             _Consequence(
+              glyph: AyreGlyph.lock,
+              title: 'Your subscription is not cancelled',
+              subtitle:
+                  'A subscription bought through the store keeps going until '
+                  'you cancel it there.',
+            ),
+            _Consequence(
               glyph: AyreGlyph.close,
               title: 'This can’t be undone',
               subtitle:

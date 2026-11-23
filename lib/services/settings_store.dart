@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'recommendation_access.dart';
+
 /// Persisted user preferences.
 ///
 /// Every value here changes something the app actually does, and every Settings
@@ -164,6 +166,14 @@ class NotificationLog extends ChangeNotifier {
   static const _maxEntries = 40;
   static const _dedupeWindow = Duration(minutes: 10);
 
+  /// The kinds of entry that name a pick, its levels or an exit. They are kept
+  /// out of the list, and removed from it, while recommendations are locked.
+  static const Set<NoticeKind> recommendationKinds = {
+    NoticeKind.signal,
+    NoticeKind.revised,
+    NoticeKind.exit,
+  };
+
   List<Notice> _entries = const [];
   DateTime? _lastSeen;
 
@@ -194,6 +204,11 @@ class NotificationLog extends ChangeNotifier {
   }
 
   bool _allows(NoticeKind kind) {
+    // Nothing that names a pick is recorded while recommendations are locked.
+    if (recommendationKinds.contains(kind) &&
+        RecommendationAccess.instance.isLocked) {
+      return false;
+    }
     final settings = SettingsStore.instance;
     if (!settings.inAppAlerts) return false;
     return switch (kind) {
@@ -233,6 +248,44 @@ class NotificationLog extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_key);
     await prefs.remove(_seenKey);
+  }
+
+  /// Removes every entry of the given [kinds] and saves the result; other
+  /// entries stay. Works on the saved list as well as the loaded one, so it is
+  /// correct even if called before [load] has finished.
+  Future<void> removeKinds(Set<NoticeKind> kinds) async {
+    final kept = _entries.where((e) => !kinds.contains(e.kind)).toList();
+    final changed = kept.length != _entries.length;
+    _entries = kept;
+    // The unread marker only means something while entries exist.
+    if (changed && _entries.isEmpty) _lastSeen = null;
+    if (changed) notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final names = kinds.map((k) => k.name).toSet();
+      final raw = prefs.getString(_key);
+      var storedEmpty = raw == null;
+      if (raw != null) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          final storedKept = decoded
+              .where((e) => !(e is Map && names.contains(e['kind'])))
+              .toList();
+          if (storedKept.length != decoded.length) {
+            if (storedKept.isEmpty) {
+              await prefs.remove(_key);
+            } else {
+              await prefs.setString(_key, jsonEncode(storedKept));
+            }
+          }
+          storedEmpty = storedKept.isEmpty;
+        }
+      }
+      if (storedEmpty) await prefs.remove(_seenKey);
+    } catch (_) {
+      // Best-effort, like the other clean-up helpers.
+    }
   }
 
   Future<void> markAllSeen() async {

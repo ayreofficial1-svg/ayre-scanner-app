@@ -48,7 +48,10 @@ class VerificationBannerHost extends StatelessWidget {
 void _toast(BuildContext context, String message) {
   ScaffoldMessenger.maybeOf(context)
     ?..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(message)));
+    ..showSnackBar(
+      SnackBar(content: Text(message)),
+      snackBarAnimationStyle: AppMotion.snackBarStyleOf(context),
+    );
 }
 
 /// Runs "Resend" with the shared cooldown and tells the user what happened.

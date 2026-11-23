@@ -25,9 +25,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _clear() async {
     if (!await confirmClearAlertHistory(context) || !mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Alert history cleared')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Alert history cleared')),
+      snackBarAnimationStyle: AppMotion.snackBarStyleOf(context),
+    );
   }
 
   @override

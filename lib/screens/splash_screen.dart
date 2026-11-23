@@ -65,11 +65,14 @@ class _AyreSplashScreenState extends State<AyreSplashScreen>
                     (_controller.value / 0.45).clamp(0.0, 1.0),
                   );
                   final exit =
-                      1 - ((_controller.value - 0.88) / 0.12).clamp(0.0, 1.0);
+                      1 -
+                      AppMotion.easeInOut.transform(
+                        ((_controller.value - 0.81) / 0.19).clamp(0.0, 1.0),
+                      );
                   return Opacity(
                     opacity: enter * exit,
                     child: Transform.translate(
-                      offset: Offset(0, 10 * (1 - enter)),
+                      offset: Offset(0, 6 * (1 - enter)),
                       child: child,
                     ),
                   );
@@ -161,7 +164,7 @@ class _SplashTrack extends StatelessWidget {
                 animation: animation!,
                 builder: (context, _) => Stack(
                   children: [
-                    segment(AppMotion.ease.transform(animation!.value)),
+                    segment(AppMotion.easeInOut.transform(animation!.value)),
                   ],
                 ),
               ),

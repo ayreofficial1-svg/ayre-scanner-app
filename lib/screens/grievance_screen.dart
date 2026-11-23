@@ -53,9 +53,10 @@ class GrievanceScreen extends StatelessWidget {
     HapticFeedback.selectionClick();
     await Clipboard.setData(ClipboardData(text: value));
     if (!context.mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Copied')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Copied')),
+      snackBarAnimationStyle: AppMotion.snackBarStyleOf(context),
+    );
   }
 
   @override

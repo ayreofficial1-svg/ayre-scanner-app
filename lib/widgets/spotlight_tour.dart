@@ -247,7 +247,7 @@ class _SpotlightOverlayState extends State<_SpotlightOverlay>
       if (current != target) setState(() => _display = target);
       return;
     }
-    final k = 1 - math.exp(-dt * 16);
+    final k = 1 - math.exp(-dt * 12);
     var next = Rect.lerp(current, target, k)!;
     if ((next.left - target.left).abs() < 0.5 &&
         (next.top - target.top).abs() < 0.5 &&
@@ -454,10 +454,14 @@ class _Card extends StatelessWidget {
           children: [
             AnimatedSwitcher(
               duration: reduce ? Duration.zero : AppMotion.pageTransition,
-              switchInCurve: AppMotion.ease,
+              switchInCurve: AppMotion.easeInOut,
+              switchOutCurve: AppMotion.easeInOut,
               layoutBuilder: (current, previous) => Stack(
                 alignment: Alignment.topLeft,
-                children: [...previous, ?current],
+                children: [
+                  for (final child in previous) ExcludeSemantics(child: child),
+                  ?current,
+                ],
               ),
               child: Column(
                 key: ValueKey<int>(index),

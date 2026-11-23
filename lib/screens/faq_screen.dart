@@ -49,7 +49,7 @@ class _FaqTileState extends State<_FaqTile> {
     final t = context.tokens;
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
-        : AppMotion.buttonPress;
+        : AppMotion.expand;
     void toggle() => setState(() => _open = !_open);
 
     return Column(
@@ -82,7 +82,7 @@ class _FaqTileState extends State<_FaqTile> {
                     AnimatedRotation(
                       turns: _open ? 0.75 : 0.25,
                       duration: duration,
-                      curve: AppMotion.ease,
+                      curve: AppMotion.easeInOut,
                       child: AyreIcon(
                         AyreGlyph.forward,
                         size: 16,
@@ -110,7 +110,9 @@ class _FaqTileState extends State<_FaqTile> {
               ? CrossFadeState.showSecond
               : CrossFadeState.showFirst,
           duration: duration,
-          sizeCurve: AppMotion.ease,
+          firstCurve: AppMotion.easeInOut,
+          secondCurve: AppMotion.easeInOut,
+          sizeCurve: AppMotion.easeInOut,
           alignment: Alignment.topLeft,
         ),
       ],

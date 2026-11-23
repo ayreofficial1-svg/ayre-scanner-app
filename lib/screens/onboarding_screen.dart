@@ -54,7 +54,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       _controller.animateToPage(
         page,
         duration: AppMotion.pageTransition,
-        curve: AppMotion.ease,
+        curve: AppMotion.easeInOut,
       );
     }
   }
@@ -106,7 +106,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             body: AnimatedOpacity(
               opacity: _opacity,
               duration: _reduce ? Duration.zero : AppMotion.pageTransition,
-              curve: AppMotion.ease,
+              curve: AppMotion.easeInOut,
               child: SafeArea(
                 child: ContentWidth(
                   maxWidth: 480,

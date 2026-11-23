@@ -170,7 +170,7 @@ class _AyreScannerAppState extends State<AyreScannerApp> {
             MediaQuery.maybeOf(context)?.disableAnimations == true
             ? Duration.zero
             : AppMotion.themeSwitch,
-        themeAnimationCurve: AppMotion.ease,
+        themeAnimationCurve: AppMotion.easeInOut,
         builder: (context, child) {
           // Two pieces of app-wide chrome, applied once here rather than
           // re-implemented per screen: the offline notice, and the user's chosen

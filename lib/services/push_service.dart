@@ -11,6 +11,7 @@ import 'app_lifecycle.dart';
 import 'auth_service.dart';
 import 'firebase_bootstrap.dart';
 import 'notification_copy.dart';
+import 'recommendation_access.dart';
 import 'settings_store.dart';
 
 /// Push notifications (Firebase Cloud Messaging).
@@ -38,6 +39,10 @@ import 'settings_store.dart';
 ///    the backend. "Push notifications" off unregisters the device; "New
 ///    signal alerts" off keeps the device registered but opts it out of
 ///    signal pushes (see `signals` in the register call).
+///
+///  * **Locked recommendations** — while the paywall applies and there is no
+///    subscription, the device registers with `signals: false`, pick and exit
+///    pushes leave no banner or log entry, and an exit tap opens Home.
 ///
 /// Everything here degrades to a no-op. If Firebase isn't configured for this
 /// build (no `google-services.json` / `GoogleService-Info.plist`), or the
@@ -126,6 +131,9 @@ class PushService extends ChangeNotifier {
     });
 
     SettingsStore.instance.addListener(_onSettingsChanged);
+    // Whether this device is registered for pick pushes follows the access to
+    // recommendations, so a change re-registers.
+    RecommendationAccess.instance.addListener(_onAccessChanged);
     // A registration that failed offline is retried whenever the app returns.
     AppLifecycleService.instance.addListener(_onResumed);
 
@@ -194,6 +202,13 @@ class PushService extends ChangeNotifier {
     }
   }
 
+  void _onAccessChanged() {
+    if (_signedIn) unawaited(_sync());
+  }
+
+  /// True while recommendations are locked on this device.
+  bool get _recommendationsLocked => RecommendationAccess.instance.isLocked;
+
   void _onResumed() {
     if (_signedIn) unawaited(_sync());
   }
@@ -207,7 +222,13 @@ class PushService extends ChangeNotifier {
 
     final settings = SettingsStore.instance;
     final wantPush = settings.pushEnabled && !_denied;
-    final signature = wantPush ? '$token|${settings.newSignalAlerts}' : 'off|$token';
+    final access = RecommendationAccess.instance;
+    // While the entitlement is still being worked out, keep whatever is
+    // registered; the access listener syncs again once it is known.
+    if (wantPush && access.isResolving) return;
+    // New-pick and revised-pick pushes only for devices that may have them.
+    final signals = settings.newSignalAlerts && access.isUnlocked;
+    final signature = wantPush ? '$token|$signals' : 'off|$token';
     if (signature == _lastSynced) return;
 
     final ok = wantPush
@@ -216,7 +237,7 @@ class PushService extends ChangeNotifier {
             platform: defaultTargetPlatform == TargetPlatform.iOS
                 ? 'ios'
                 : 'android',
-            signals: settings.newSignalAlerts,
+            signals: signals,
           )
         : await ApiService.unregisterDevice(token);
     if (ok) _lastSynced = signature;
@@ -239,6 +260,13 @@ class PushService extends ChangeNotifier {
     final title = message.notification?.title?.trim() ?? '';
     final body = message.notification?.body?.trim() ?? '';
     final symbol = (data['symbol'] ?? '').toString().trim().toUpperCase();
+
+    // While recommendations are locked, a pick or exit push leaves no notice,
+    // no banner and no log entry. Custom messages are unaffected.
+    if (_recommendationsLocked &&
+        (type == _typeSignal || type == _typeRevised || type == _typeExit)) {
+      return null;
+    }
 
     switch (type) {
       case _typeSignal:
@@ -304,7 +332,7 @@ class PushService extends ChangeNotifier {
     if (isSignalKind && !settings.newSignalAlerts) return;
 
     await NotificationLog.instance.add(notice);
-    if (notice.kind == NoticeKind.signal) {
+    if (notice.kind == NoticeKind.signal && !_recommendationsLocked) {
       // Already recorded above; stop Signals from recording it a second time
       // when it next loads.
       await SeenSignalsStore.markSeen([
@@ -329,6 +357,12 @@ class PushService extends ChangeNotifier {
         // Retired type: nothing to record or open.
         return;
       case _typeExit:
+        if (_recommendationsLocked) {
+          // Nothing about the exit is shown or recorded while locked; land on
+          // Home, where the locked panel is, rather than an empty Alerts list.
+          _requestOpenSignals();
+          return;
+        }
         _recordFromTap(message);
         _requestOpenAlerts();
       default:
@@ -402,6 +436,9 @@ class PushService extends ChangeNotifier {
                   textColor: tokens?.accentInk,
                   onPressed: onView,
                 ),
+        ),
+        snackBarAnimationStyle: AppMotion.snackBarStyleOf(
+          context ?? messenger.context,
         ),
       );
   }
