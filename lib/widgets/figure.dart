@@ -104,11 +104,11 @@ class _FigureState extends State<Figure> with SingleTickerProviderStateMixin {
         style: style,
         textAlign: widget.textAlign,
         semanticsLabel: widget.semanticsLabel,
-        maxLines: 1,
       );
     }
 
-    final lineHeight = widget.fontSize * 1.15;
+    final lineHeight =
+        MediaQuery.textScalerOf(context).scale(widget.fontSize) * 1.15;
     return Semantics(
       label: widget.semanticsLabel ?? _to,
       excludeSemantics: true,
@@ -299,7 +299,6 @@ class _CountUpFigureState extends State<CountUpFigure>
           widget.format(_current),
           style: style,
           textAlign: widget.textAlign,
-          maxLines: 1,
         ),
       ),
     );
@@ -334,8 +333,6 @@ class LabelledFigure extends StatelessWidget {
         Text(
           label.toUpperCase(),
           style: AppTypo.label(t, color: t.foregroundMuted),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: AppSpace.xxs),
         Figure(value, fontSize: fontSize, color: color),

@@ -325,6 +325,7 @@ class _SignalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final name = signal.name?.trim();
+    final symbolStyle = AppTypo.cardTitle(t);
     final range = _RecommendationRange.fromSignal(signal);
     final prices = <_Level>[
       if (signal.stop case final stop? when stop.isFinite)
@@ -343,7 +344,7 @@ class _SignalCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(signal.symbol, style: AppTypo.cardTitle(t)),
+              Text(signal.symbol, style: symbolStyle),
               if (name != null && name.isNotEmpty)
                 Text(name, style: AppTypo.hint(t)),
             ],
@@ -363,8 +364,13 @@ class _SignalCard extends StatelessWidget {
             LayoutBuilder(
               builder: (context, constraints) {
                 if (!current) return identity;
-                final scale = MediaQuery.textScalerOf(context).scale(13) / 13;
-                if (constraints.maxWidth < 130 + 120 * scale) {
+                final tickerWidth =
+                    AyreInstrumentTile.defaultSize +
+                    AppSpace.s13 +
+                    singleLineTextWidth(context, signal.symbol, symbolStyle);
+                final badgeWidth = active.singleLineWidth(context);
+                if (constraints.maxWidth <
+                    tickerWidth + AppSpace.s8 + badgeWidth) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -378,14 +384,14 @@ class _SignalCard extends StatelessWidget {
                   children: [
                     Expanded(child: identity),
                     const SizedBox(width: AppSpace.s8),
-                    active,
+                    SizedBox(width: badgeWidth, child: active),
                   ],
                 );
               },
             ),
             if (range != null) ...[
               const SizedBox(height: AppSpace.s13),
-              _RangeTrack(
+              _RangeGauge(
                 key: ValueKey((
                   signal.symbol,
                   signal.stop,
@@ -492,8 +498,8 @@ class _RecommendationRange {
   }
 }
 
-class _RangeTrack extends StatefulWidget {
-  const _RangeTrack({
+class _RangeGauge extends StatefulWidget {
+  const _RangeGauge({
     super.key,
     required this.position,
     required this.claimDraw,
@@ -505,10 +511,10 @@ class _RangeTrack extends StatefulWidget {
   final bool animate;
 
   @override
-  State<_RangeTrack> createState() => _RangeTrackState();
+  State<_RangeGauge> createState() => _RangeGaugeState();
 }
 
-class _RangeTrackState extends State<_RangeTrack>
+class _RangeGaugeState extends State<_RangeGauge>
     with SingleTickerProviderStateMixin {
   late final _controller = AnimationController(
     vsync: this,
@@ -534,7 +540,7 @@ class _RangeTrackState extends State<_RangeTrack>
   }
 
   @override
-  void didUpdateWidget(_RangeTrack oldWidget) {
+  void didUpdateWidget(_RangeGauge oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!widget.animate && oldWidget.animate) _controller.value = 1;
   }
@@ -548,121 +554,176 @@ class _RangeTrackState extends State<_RangeTrack>
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: _RangePainter.endpointInset,
-          ),
-          child: Row(
-            textDirection: TextDirection.ltr,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Text(
-                  'Strong sell',
-                  textAlign: TextAlign.left,
-                  style: AppTypo.meta(t, color: t.negativeText),
+    final percent = (widget.position * 100).round();
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 232),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Semantics(
+              image: true,
+              label: 'Entry is $percent percent of the way from stop to exit',
+              child: AspectRatio(
+                aspectRatio: 1.9,
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: _RangeGaugePainter(
+                      position: widget.position,
+                      animation: _controller,
+                      loss: t.negative,
+                      gain: t.positive,
+                      entry: t.highlight,
+                      face: t.surfaceRaised,
+                      track: t.hairline,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(width: AppSpace.s8),
-              Expanded(
-                child: Text(
-                  'Strong buy',
-                  textAlign: TextAlign.right,
-                  style: AppTypo.meta(t, color: t.positiveText),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpace.xxs),
-        ExcludeSemantics(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) => CustomPaint(
-              painter: _RangePainter(
-                position: widget.position,
-                progress: AppMotion.ease.transform(_controller.value),
-                loss: t.negative,
-                gain: t.positive,
-                entry: t.highlight,
-              ),
-              child: child,
             ),
-            child: const SizedBox(height: 20),
-          ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: _RangeGaugePainter.inset,
+              ),
+              child: Row(
+                textDirection: TextDirection.ltr,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Strong sell',
+                      textAlign: TextAlign.left,
+                      style: AppTypo.meta(t, color: t.negativeText),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpace.s8),
+                  Expanded(
+                    child: Text(
+                      'Strong buy',
+                      textAlign: TextAlign.right,
+                      style: AppTypo.meta(t, color: t.positiveText),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
 
-class _RangePainter extends CustomPainter {
-  const _RangePainter({
+class _RangeGaugePainter extends CustomPainter {
+  _RangeGaugePainter({
     required this.position,
-    required this.progress,
+    required this.animation,
     required this.loss,
     required this.gain,
     required this.entry,
-  });
+    required this.face,
+    required this.track,
+  }) : super(repaint: animation);
 
-  static const double endpointInset = 10;
+  static const double inset = 8;
+  static const double _start = math.pi;
 
   final double position;
-  final double progress;
+  final Animation<double> animation;
   final Color loss;
   final Color gain;
   final Color entry;
+  final Color face;
+  final Color track;
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (size.width <= 2 * endpointInset || progress <= 0) return;
-    const start = endpointInset;
-    final end = size.width - start;
-    final x = start + (end - start) * position;
-    final center = size.height / 2;
-    final revealed = size.width * progress;
+    final radius = math.min(size.width / 2 - inset, size.height - 2 * inset);
+    if (radius <= 0) return;
 
-    canvas.save();
-    canvas.clipRect(Rect.fromLTRB(0, 0, revealed, size.height));
-    canvas.drawRect(
-      Rect.fromLTRB(start, center - 3, x, center + 3),
-      Paint()..color = loss.withValues(alpha: 0.35),
-    );
-    canvas.drawRect(
-      Rect.fromLTRB(x, center - 3, end, center + 3),
-      Paint()..color = gain.withValues(alpha: 0.4),
-    );
-    for (final (offset, color) in [(start, loss), (end, gain)]) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(center: Offset(offset, center), width: 4, height: 18),
-          const Radius.circular(2),
-        ),
-        Paint()..color = color,
-      );
-    }
+    final center = Offset(size.width / 2, size.height - inset);
+    final bounds = Rect.fromCircle(center: center, radius: radius);
+    final strokeWidth = math.min(9.0, radius * 0.12);
+    final progress = AppMotion.ease.transform(animation.value);
+    final entrySweep = math.pi * position;
+    final revealSweep = math.pi * progress;
+    final arcPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
     canvas.drawPath(
       Path()
-        ..moveTo(x - 4, 0)
-        ..lineTo(x + 9, 0)
-        ..lineTo(x + 4, size.height)
-        ..lineTo(x - 9, size.height)
+        ..arcTo(bounds, _start, math.pi, true)
         ..close(),
-      Paint()..color = entry,
+      Paint()..color = face,
     );
-    canvas.restore();
+    canvas.drawLine(
+      center - Offset(radius, 0),
+      center + Offset(radius, 0),
+      Paint()
+        ..color = track
+        ..strokeWidth = 1.5,
+    );
+    canvas.drawArc(bounds, _start, math.pi, false, arcPaint..color = track);
+    if (progress > 0) {
+      canvas.drawArc(
+        bounds,
+        _start,
+        math.min(entrySweep, revealSweep),
+        false,
+        arcPaint..color = loss.withValues(alpha: 0.65),
+      );
+      if (revealSweep > entrySweep) {
+        canvas.drawArc(
+          bounds,
+          _start + entrySweep,
+          revealSweep - entrySweep,
+          false,
+          arcPaint..color = gain.withValues(alpha: 0.65),
+        );
+      }
+    }
+
+    final tickPaint = Paint()
+      ..color = track
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+    for (final fraction in const [0.25, 0.5, 0.75]) {
+      final angle = _start + math.pi * fraction;
+      final tick = Offset(math.cos(angle), math.sin(angle));
+      canvas.drawLine(
+        center + tick * (radius - strokeWidth),
+        center + tick * (radius - strokeWidth * 1.7),
+        tickPaint,
+      );
+    }
+
+    final angle = _start + entrySweep * progress;
+    final direction = Offset(math.cos(angle), math.sin(angle));
+    final wing = Offset(-direction.dy, direction.dx) * (strokeWidth / 3);
+    final tip = center + direction * (radius - strokeWidth * 1.9);
+    final needlePaint = Paint()..color = entry.withValues(alpha: progress);
+    canvas.drawPath(
+      Path()
+        ..moveTo(center.dx + wing.dx, center.dy + wing.dy)
+        ..lineTo(tip.dx, tip.dy)
+        ..lineTo(center.dx - wing.dx, center.dy - wing.dy)
+        ..close(),
+      needlePaint,
+    );
+    canvas.drawCircle(center, strokeWidth * 0.55, needlePaint);
   }
 
   @override
-  bool shouldRepaint(_RangePainter old) =>
+  bool shouldRepaint(_RangeGaugePainter old) =>
       position != old.position ||
-      progress != old.progress ||
+      animation != old.animation ||
       loss != old.loss ||
       gain != old.gain ||
-      entry != old.entry;
+      entry != old.entry ||
+      face != old.face ||
+      track != old.track;
 }
 
 class _Levels extends StatelessWidget {

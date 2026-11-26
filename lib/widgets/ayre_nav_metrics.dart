@@ -1,10 +1,24 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
+import 'ayre_icons.dart';
 import 'responsive.dart';
+
+class NavDestination {
+  const NavDestination({required this.label, required this.glyph});
+
+  final String label;
+  final AyreGlyph glyph;
+}
+
+const kNavDestinations = [
+  NavDestination(label: 'Home', glyph: AyreGlyph.home),
+  NavDestination(label: 'Reports', glyph: AyreGlyph.report),
+  NavDestination(label: 'Learn', glyph: AyreGlyph.learn),
+  NavDestination(label: 'Profile', glyph: AyreGlyph.profile),
+];
 
 /// Single source of truth for the bottom dock and the navigation rail
 /// geometry.
@@ -46,25 +60,47 @@ abstract final class AyreNavMetrics {
   /// Widest the dock gets before it centres ([AppBreakpoints.dockMaxWidth]).
   static const double maxWidth = AppBreakpoints.dockMaxWidth;
 
-  /// Label text scale is capped here (single-word labels in a fixed-width
-  /// slot); beyond it a `FittedBox(scaleDown)` is the last resort.
-  static const double labelScaleCap = 1.3;
+  static const double labelPadding = 2;
 
   /// Navigation rail width and minimum item height.
   static const double railWidth = 80;
   static const double railItemMinHeight = 64;
 
-  /// Dock label size: 11/700 on every platform.
-  static double labelSizeFor(TargetPlatform platform) => AppTextScale.navLabel;
-
-  static double get labelSize => labelSizeFor(defaultTargetPlatform);
+  static TextStyle labelStyleOf(BuildContext context, {Color? color}) =>
+      AppTypo.navLabel(context.tokens, color: color).copyWith(height: 1.15);
 
   /// True when the rail replaces the dock (at/above the two-column pivot).
   static bool usesRail(double viewportWidth) =>
       viewportWidth >= AppBreakpoints.twoColumn;
 
-  static double labelLineFor(double textScale, double labelSize) =>
-      labelSize * math.min(textScale, labelScaleCap) * 1.15;
+  static double dockWidthFor(double viewportWidth) =>
+      viewportWidth >= AppBreakpoints.mediumStart
+      ? math.min(maxWidth, viewportWidth)
+      : viewportWidth;
+
+  static double labelHeightFor(BuildContext context, double slotWidth) {
+    final width = math.max(0.0, slotWidth - 2 * labelPadding);
+    final style = labelStyleOf(context);
+    return kNavDestinations
+        .map(
+          (entry) => measureText(
+            context,
+            entry.label,
+            style,
+            maxWidth: width,
+          ).height.ceilToDouble(),
+        )
+        .reduce(math.max);
+  }
+
+  static double dockLabelHeightOf(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final width =
+        dockWidthFor(media.size.width) -
+        media.viewPadding.horizontal -
+        2 * horizontalPadding;
+    return labelHeightFor(context, width / kNavDestinations.length);
+  }
 
   /// Space under the label: the reference breathing room, or the system inset
   /// plus a little air, whichever is larger. The inset is counted once.
@@ -73,32 +109,16 @@ abstract final class AyreNavMetrics {
 
   /// Height of the dock including the bottom safe-area inset.
   static double barHeightFor({
-    required double textScale,
-    required double labelSize,
+    required double labelHeight,
     double bottomInset = 0,
   }) {
     final content =
         topPadding +
         slotHeight +
         labelGap +
-        labelLineFor(textScale, labelSize) +
+        labelHeight +
         bottomPaddingFor(bottomInset);
     return math.max(minHeight, content);
-  }
-
-  /// Pure clearance: the full dock height (inset included), or 0 with a rail.
-  static double clearanceFor({
-    required double viewportWidth,
-    required double bottomInset,
-    required double textScale,
-    required double labelSize,
-  }) {
-    if (usesRail(viewportWidth)) return 0;
-    return barHeightFor(
-      textScale: textScale,
-      labelSize: labelSize,
-      bottomInset: bottomInset,
-    );
   }
 
   /// Space a scrolling body must leave at its end so the last row clears the
@@ -109,11 +129,10 @@ abstract final class AyreNavMetrics {
   /// rewrites to include the bar.
   static double clearanceOf(BuildContext context, {double? bottomInset}) {
     final media = MediaQuery.of(context);
-    return clearanceFor(
-      viewportWidth: media.size.width,
+    if (usesRail(media.size.width)) return 0;
+    return barHeightFor(
       bottomInset: bottomInset ?? media.viewPadding.bottom,
-      textScale: media.textScaler.scale(labelSize) / labelSize,
-      labelSize: labelSize,
+      labelHeight: dockLabelHeightOf(context),
     );
   }
 }

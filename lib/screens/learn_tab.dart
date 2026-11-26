@@ -359,24 +359,24 @@ class _SubjectFilter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          AyreFilterChip(
-            label: 'All',
-            selected: selected == null,
-            onTap: () => onSelected(null),
-          ),
-          for (final subject in subjects) ...[
-            const SizedBox(width: AppSpace.xs),
-            AyreFilterChip(
-              label: subject,
-              selected: subject == selected,
-              onTap: () => onSelected(subject),
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final subject in <String?>[null, ...subjects]) ...[
+              if (subject != null) const SizedBox(width: AppSpace.xs),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: constraints.maxWidth),
+                child: AyreFilterChip(
+                  label: subject ?? 'All',
+                  selected: subject == selected,
+                  onTap: () => onSelected(subject),
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -420,6 +420,24 @@ class _ContinueCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final progress = course.progress ?? 0;
+    final ring = ProgressRing(value: progress);
+    final labelStyle = AppTypo.label(t, color: t.accentInk);
+    final description = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text('CONTINUE', style: labelStyle),
+        const SizedBox(height: AppSpace.xxs),
+        Text(course.title, style: AppTypo.sectionTitle(t)),
+        const SizedBox(height: AppSpace.xxs),
+        Figure.static(
+          '${course.lessonsDone} of ${course.lessonsTotal} lessons',
+          fontSize: AppTextScale.hint,
+          color: t.foregroundMuted,
+        ),
+      ],
+    );
+    final chevron = AyreIcon(AyreGlyph.forward, size: 16, color: t.accentInk);
 
     return Semantics(
       button: true,
@@ -432,31 +450,40 @@ class _ContinueCard extends StatelessWidget {
         onTap: onTap,
         notch: true,
         padding: const EdgeInsets.all(AppSpace.lg),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            ProgressRing(value: progress),
-            const SizedBox(width: AppSpace.md),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final minimumWidth =
+                ring.diameterOf(context) +
+                AppSpace.md +
+                singleLineTextWidth(context, 'CONTINUE', labelStyle) +
+                AppSpace.xs +
+                16;
+            if (minimumWidth <= constraints.maxWidth) {
+              return Row(
                 children: [
-                  Text('CONTINUE', style: AppTypo.label(t, color: t.accentInk)),
-                  const SizedBox(height: AppSpace.xxs),
-                  Text(course.title, style: AppTypo.sectionTitle(t)),
-                  const SizedBox(height: AppSpace.xxs),
-                  Figure.static(
-                    '${course.lessonsDone} of ${course.lessonsTotal} lessons',
-                    fontSize: AppTextScale.hint,
-                    color: t.foregroundMuted,
-                  ),
+                  ring,
+                  const SizedBox(width: AppSpace.md),
+                  Expanded(child: description),
+                  const SizedBox(width: AppSpace.xs),
+                  chevron,
                 ],
-              ),
-            ),
-            const SizedBox(width: AppSpace.xs),
-            AyreIcon(AyreGlyph.forward, size: 16, color: t.accentInk),
-          ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Flexible(child: ring),
+                    const Spacer(),
+                    chevron,
+                  ],
+                ),
+                const SizedBox(height: AppSpace.s8),
+                description,
+              ],
+            );
+          },
         ),
       ),
     );
@@ -535,12 +562,7 @@ class _CourseRow extends StatelessWidget {
               ],
             ] else if (course.body.isNotEmpty) ...[
               const SizedBox(height: AppSpace.s8),
-              Text(
-                course.body,
-                style: AppTypo.body(t),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
+              Text(textPreview(course.body, words: 18), style: AppTypo.body(t)),
             ],
           ],
         ),

@@ -1,15 +1,43 @@
 import 'package:flutter/material.dart';
 
-double singleLineTextWidth(BuildContext context, String text, TextStyle style) {
+Size measureText(
+  BuildContext context,
+  String text,
+  TextStyle style, {
+  double maxWidth = double.infinity,
+  int? maxLines,
+}) {
+  final defaults = DefaultTextStyle.of(context);
+  final effectiveStyle = style.inherit ? defaults.style.merge(style) : style;
   final painter = TextPainter(
-    text: TextSpan(text: text, style: style),
+    text: TextSpan(
+      text: text,
+      style: MediaQuery.boldTextOf(context)
+          ? effectiveStyle.copyWith(fontWeight: FontWeight.bold)
+          : effectiveStyle,
+    ),
     textDirection: Directionality.of(context),
     textScaler: MediaQuery.textScalerOf(context),
-    maxLines: 1,
-  )..layout();
-  final width = painter.width.ceilToDouble();
+    locale: Localizations.maybeLocaleOf(context),
+    textHeightBehavior: defaults.textHeightBehavior,
+    maxLines: maxLines,
+  )..layout(maxWidth: maxWidth);
+  final size = painter.size;
   painter.dispose();
-  return width;
+  return size;
+}
+
+double singleLineTextWidth(
+  BuildContext context,
+  String text,
+  TextStyle style,
+) => measureText(context, text, style, maxLines: 1).width.ceilToDouble();
+
+/// Keep previews the same length as text grows and wraps onto more lines.
+String textPreview(String text, {required int words}) {
+  final matches = RegExp(r'\S+').allMatches(text).take(words + 1).toList();
+  if (matches.length <= words) return text;
+  return '${text.substring(0, matches.last.start).trimRight()}…';
 }
 
 /// Material window size classes (Spec §13.2). Additive: the 720/1120 pivots

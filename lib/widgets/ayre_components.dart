@@ -642,7 +642,7 @@ class AyreSegmented<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
-    final scale = MediaQuery.textScalerOf(context).scale(13) / 13;
+    final labelStyle = _Segment.labelStyle();
     final options = [
       for (final segment in segments)
         _Segment(
@@ -660,7 +660,14 @@ class AyreSegmented<T> extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          if (constraints.maxWidth < options.length * (24 + 52 * scale)) {
+          final slotWidth = constraints.maxWidth / options.length;
+          final fitsInRow = segments.every(
+            (segment) =>
+                singleLineTextWidth(context, segment.label, labelStyle) +
+                    2 * AppSpace.sm <=
+                slotWidth,
+          );
+          if (!fitsInRow) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: options,
@@ -687,6 +694,13 @@ class _Segment<T> extends StatelessWidget {
   final bool selected;
   final bool compact;
   final VoidCallback onTap;
+
+  static TextStyle labelStyle({Color? color}) => AppTypo.ui(
+    fontSize: AppTextScale.hint,
+    fontWeight: FontWeight.w700,
+    color: color,
+    height: 1.2,
+  );
 
   // Each segment fades its own fill using the same timing.
   @override
@@ -730,12 +744,7 @@ class _Segment<T> extends StatelessWidget {
               ],
               Text(
                 segment.label,
-                style: AppTypo.ui(
-                  fontSize: AppTextScale.hint,
-                  fontWeight: FontWeight.w700,
-                  color: fg,
-                  height: 1.2,
-                ),
+                style: labelStyle(color: fg),
                 textAlign: TextAlign.center,
               ),
             ],
@@ -780,6 +789,21 @@ class AyreChip extends StatelessWidget {
   final AyreGlyph? glyph;
   final bool dot;
 
+  static const double _horizontalPadding = 10;
+  static const double _dotSize = 6;
+  static const double _glyphSize = 12;
+
+  double singleLineWidth(BuildContext context) =>
+      2 * _horizontalPadding +
+      (dot
+          ? _dotSize + AppSpace.xs
+          : (glyph != null ? _glyphSize + AppSpace.xs : 0)) +
+      singleLineTextWidth(
+        context,
+        label.toUpperCase(),
+        AppTypo.chip(context.tokens),
+      );
+
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
@@ -793,7 +817,10 @@ class AyreChip extends StatelessWidget {
     };
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(
+        horizontal: _horizontalPadding,
+        vertical: 5,
+      ),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(AppRadius.chip),
@@ -804,11 +831,11 @@ class AyreChip extends StatelessWidget {
           if (dot) ...[
             DecoratedBox(
               decoration: BoxDecoration(color: fg, shape: BoxShape.circle),
-              child: const SizedBox.square(dimension: 6),
+              child: const SizedBox.square(dimension: _dotSize),
             ),
             const SizedBox(width: AppSpace.xs),
           ] else if (glyph != null) ...[
-            AyreIcon(glyph!, size: 12, color: fg),
+            AyreIcon(glyph!, size: _glyphSize, color: fg),
             const SizedBox(width: AppSpace.xs),
           ],
           // Status words wrap, never truncate (D-1 floor: chips are 11 sp).
@@ -852,6 +879,21 @@ class SettingRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final tone = danger ? t.negativeText : t.textPrimary;
+    final titleStyle = AppTypo.rowLabel(
+      t,
+      color: danger ? t.negativeText : null,
+    );
+    final accessory = trailing;
+    final accessoryWidth = switch (accessory) {
+      AyreChip chip => chip.singleLineWidth(context),
+      Text(data: final text?, :final style) => singleLineTextWidth(
+        context,
+        text,
+        style ?? const TextStyle(),
+      ),
+      _ => null,
+    };
+    final showChevron = onTap != null && (accessory == null || status != null);
 
     final row = Opacity(
       opacity: enabled ? 1 : 0.5,
@@ -862,51 +904,73 @@ class SettingRow extends StatelessWidget {
             horizontal: AppSpace.s21,
             vertical: AppSpace.hairlineRowPadding,
           ),
-          child: Row(
-            children: [
-              Container(
-                width: AppShape.iconTileSize,
-                height: AppShape.iconTileSize,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: danger ? t.negativeSoft : t.surfaceRaised,
-                  borderRadius: AppShape.field,
-                ),
-                child: AyreIcon(glyph, size: 22, color: tone),
-              ),
-              const SizedBox(width: AppSpace.s13),
-              Expanded(
-                flex: 2,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      title,
-                      style: AppTypo.rowLabel(
-                        t,
-                        color: danger ? t.negativeText : null,
-                      ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final available =
+                  constraints.maxWidth -
+                  AppShape.iconTileSize -
+                  AppSpace.s13 -
+                  (showChevron ? AppSpace.s8 + 18 : 0);
+              final stackAccessory =
+                  accessoryWidth != null &&
+                  singleLineTextWidth(context, title, titleStyle) +
+                          AppSpace.s8 +
+                          accessoryWidth >
+                      available;
+              return Row(
+                children: [
+                  Container(
+                    width: AppShape.iconTileSize,
+                    height: AppShape.iconTileSize,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: danger ? t.negativeSoft : t.surfaceRaised,
+                      borderRadius: AppShape.field,
                     ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle!,
-                        style: AppTypo.body(t, color: t.foregroundMuted),
-                      ),
-                    ],
+                    child: AyreIcon(glyph, size: 22, color: tone),
+                  ),
+                  const SizedBox(width: AppSpace.s13),
+                  Expanded(
+                    flex: 2,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(title, style: titleStyle),
+                        if (subtitle != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle!,
+                            style: AppTypo.body(t, color: t.foregroundMuted),
+                          ),
+                        ],
+                        if (stackAccessory && accessory != null) ...[
+                          const SizedBox(height: AppSpace.xxs),
+                          accessory,
+                        ],
+                      ],
+                    ),
+                  ),
+                  if (accessory != null && !stackAccessory) ...[
+                    const SizedBox(width: AppSpace.s8),
+                    if (toggled != null)
+                      accessory
+                    else if (accessoryWidth != null)
+                      SizedBox(width: accessoryWidth, child: accessory)
+                    else
+                      Flexible(child: accessory),
                   ],
-                ),
-              ),
-              if (trailing case final accessory?) ...[
-                const SizedBox(width: AppSpace.s8),
-                if (toggled != null) accessory else Flexible(child: accessory),
-              ],
-              if (onTap != null && (trailing == null || status != null)) ...[
-                const SizedBox(width: AppSpace.s8),
-                AyreIcon(AyreGlyph.forward, size: 18, color: t.foregroundMuted),
-              ],
-            ],
+                  if (showChevron) ...[
+                    const SizedBox(width: AppSpace.s8),
+                    AyreIcon(
+                      AyreGlyph.forward,
+                      size: 18,
+                      color: t.foregroundMuted,
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -1336,7 +1400,10 @@ class AyreFilterChip extends StatelessWidget {
           curve: AppMotion.easeInOut,
           // 48 pt minimum hit height (Phase 3); grows with text scale.
           constraints: const BoxConstraints(minHeight: AppSpace.minTarget),
-          padding: const EdgeInsets.symmetric(horizontal: AppSpace.md),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpace.md,
+            vertical: AppSpace.xxs,
+          ),
           decoration: BoxDecoration(
             color: selected ? t.accent : t.surface,
             borderRadius: AppShape.field,

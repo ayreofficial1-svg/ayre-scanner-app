@@ -248,39 +248,53 @@ class WeeklyReportMast extends StatelessWidget {
                       constraints: BoxConstraints(
                         minHeight: onPick == null ? 0 : AppSpace.minTarget,
                       ),
-                      child: Wrap(
-                        spacing: AppSpace.s8,
-                        runSpacing: AppSpace.s8,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Text(
-                            formatWeekRange(week.weekStart, week.weekEnd),
-                            style: AppTypo.subtitle(t, color: p.muted),
-                          ),
-                          DecoratedBox(
-                            decoration: BoxDecoration(
-                              color: p.glass,
-                              borderRadius: AppShape.field,
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        widthFactor: 1,
+                        heightFactor: 1,
+                        child: Wrap(
+                          spacing: AppSpace.s8,
+                          runSpacing: AppSpace.s8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Text(
+                              formatWeekRange(week.weekStart, week.weekEnd),
+                              style: AppTypo.subtitle(t, color: p.muted),
                             ),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 5,
-                              ),
-                              child: Text(
-                                status,
-                                style: AppTypo.meta(t, color: p.ink),
-                              ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: p.glass,
+                                      borderRadius: AppShape.field,
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 5,
+                                      ),
+                                      child: Text(
+                                        status,
+                                        style: AppTypo.meta(t, color: p.ink),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                if (onPick != null) ...[
+                                  const SizedBox(width: AppSpace.s8),
+                                  FinanceIcon(
+                                    FinanceGlyph.chevron,
+                                    quarterTurns: 1,
+                                    size: 16,
+                                    color: p.ink,
+                                  ),
+                                ],
+                              ],
                             ),
-                          ),
-                          if (onPick != null)
-                            FinanceIcon(
-                              FinanceGlyph.chevron,
-                              quarterTurns: 1,
-                              size: 16,
-                              color: p.ink,
-                            ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -355,7 +369,6 @@ class _ReportSummary extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 6),
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CountUpFigure(
                           value: value.toDouble(),
@@ -589,7 +602,7 @@ class _StockCard extends StatelessWidget {
         header: LayoutBuilder(
           builder: (context, constraints) {
             final identityWidth =
-                44 +
+                AyreInstrumentTile.defaultSize +
                 AppSpace.s13 +
                 singleLineTextWidth(context, stock.symbol, symbolStyle);
             final returnWidth = math.max(
@@ -604,7 +617,7 @@ class _StockCard extends StatelessWidget {
                 children: [
                   Expanded(child: identity),
                   const SizedBox(width: AppSpace.s8),
-                  returns,
+                  SizedBox(width: returnWidth, child: returns),
                 ],
               );
             }
@@ -705,20 +718,14 @@ class _StockDetails extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         const gap = AppSpace.s8;
-        const priceFlex = 5;
-        const outcomeFlex = 6;
-        final widthPerFlex =
-            (constraints.maxWidth - gap * (fields.length - 1)) /
-            (priceFlex * 2 + outcomeFlex);
-        int flexFor(int index) => index == 1 ? outcomeFlex : priceFlex;
+        final available = constraints.maxWidth - gap * (fields.length - 1);
+        final minimums = [
+          for (final field in fields)
+            singleLineTextWidth(context, field.value, valueStyle),
+        ];
+        final required = minimums.reduce((a, b) => a + b);
 
-        final inline = fields.indexed.every(
-          (item) =>
-              singleLineTextWidth(context, item.$2.value, valueStyle) <=
-              widthPerFlex * flexFor(item.$1),
-        );
-
-        if (!inline) {
+        if (required > available) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -742,13 +749,25 @@ class _StockDetails extends StatelessWidget {
           );
         }
 
+        // Equal side columns keep the outcome centered whenever they fit.
+        // Unequal amounts can borrow space before the layout has to stack.
+        final sideMin = math.max(minimums.first, minimums.last);
+        final sideMax = (available - minimums[1]) / 2;
+        final side = math.max(sideMin, math.min(available * 5 / 16, sideMax));
+        final widths = sideMin <= sideMax
+            ? [side, available - side * 2, side]
+            : [
+                for (final minimum in minimums)
+                  minimum + (available - required) / minimums.length,
+              ];
+
         Widget row({required bool labels}) => Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (final (i, field) in fields.indexed) ...[
               if (i > 0) const SizedBox(width: gap),
-              Expanded(
-                flex: flexFor(i),
+              SizedBox(
+                width: widths[i],
                 child: Text(
                   labels ? field.label : field.value,
                   style: labels

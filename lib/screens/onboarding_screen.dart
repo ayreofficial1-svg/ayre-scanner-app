@@ -141,31 +141,32 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           AppSpace.gutterOf(context),
                           AppSpace.s34,
                         ),
-                        child: Row(
-                          children: [
-                            OnboardingPageIndicator(
-                              page: _page,
-                              total: kOnboardingSteps.length,
-                            ),
-                            const SizedBox(width: AppSpace.s13),
-                            Expanded(
-                              child: Align(
-                                alignment: AlignmentDirectional.centerEnd,
-                                child: ConstrainedBox(
-                                  constraints: BoxConstraints(
-                                    minWidth: _page == _last ? 178 : 144,
-                                  ),
-                                  child: AyreButton(
-                                    expand: false,
-                                    label: _page == _last
-                                        ? OnboardingLabels.getStarted
-                                        : OnboardingLabels.next,
-                                    onPressed: _finishing ? null : _primary,
-                                  ),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: Wrap(
+                            alignment: WrapAlignment.spaceBetween,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: AppSpace.s13,
+                            runSpacing: AppSpace.s8,
+                            children: [
+                              OnboardingPageIndicator(
+                                page: _page,
+                                total: kOnboardingSteps.length,
+                              ),
+                              ConstrainedBox(
+                                constraints: BoxConstraints(
+                                  minWidth: _page == _last ? 178 : 144,
+                                ),
+                                child: AyreButton(
+                                  expand: false,
+                                  label: _page == _last
+                                      ? OnboardingLabels.getStarted
+                                      : OnboardingLabels.next,
+                                  onPressed: _finishing ? null : _primary,
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],

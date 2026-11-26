@@ -178,7 +178,6 @@ class _HomeTabState extends State<HomeTab> {
       header: AyreMasthead.tab(
         tone: AyreMastTone.home,
         height: AppShape.mastHome,
-        contentBottomClearance: AppSpace.s26,
         child: _Header(name: displayName, onOpenProfile: widget.onOpenProfile),
       ),
       // One network pass per surface; the signals reload is silent.
@@ -382,16 +381,12 @@ class _Header extends StatelessWidget {
           Text(resolved, style: AppTypo.homeName(t, color: mast.ink)),
         ],
         SizedBox(height: resolved.isNotEmpty ? AppSpace.s8 : AppSpace.xxs),
-        FractionallySizedBox(
-          alignment: AlignmentDirectional.centerStart,
-          widthFactor: 0.72,
-          child: Text(
-            date,
-            style: AppTypo.ui(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: mast.muted,
-            ),
+        Text(
+          date,
+          style: AppTypo.ui(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: mast.muted,
           ),
         ),
       ],

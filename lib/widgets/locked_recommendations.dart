@@ -208,8 +208,6 @@ class _MaskedLevel extends StatelessWidget {
         const SizedBox(height: AppSpace.xxs),
         Text(
           '₹ ••••',
-          maxLines: 1,
-          overflow: TextOverflow.clip,
           style: AppTypo.levelPrice(
             context.tokens,
             color: context.tokens.foregroundMuted,

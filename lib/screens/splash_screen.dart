@@ -2,6 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import '../widgets/ayre_logo.dart';
+import '../widgets/responsive.dart';
+
+const _tagline = 'Market research and signals.';
+
+TextStyle _taglineStyle(AppThemeTokens t) => AppTypo.ui(
+  fontSize: 13,
+  fontWeight: FontWeight.w600,
+  color: t.foregroundMuted,
+);
 
 /// The splash screen: the approved lockup centred on the page canvas with the
 /// tagline beneath it and a short decorative track near the bottom.
@@ -52,45 +61,78 @@ class _AyreSplashScreenState extends State<AyreSplashScreen>
       // so screen readers should not announce it as content or a loading
       // state that outlives its ~1s visible duration.
       body: ExcludeSemantics(
-        child: Stack(
-          children: [
-            Center(
-              child: AnimatedBuilder(
-                animation: _controller,
-                builder: (context, child) {
-                  if (reduceMotion) return child!;
-                  // A short rise and fade in, then a fade out as the app
-                  // takes over.
-                  final enter = AppMotion.ease.transform(
-                    (_controller.value / 0.45).clamp(0.0, 1.0),
-                  );
-                  final exit =
-                      1 -
-                      AppMotion.easeInOut.transform(
-                        ((_controller.value - 0.81) / 0.19).clamp(0.0, 1.0),
-                      );
-                  return Opacity(
-                    opacity: enter * exit,
-                    child: Transform.translate(
-                      offset: Offset(0, 6 * (1 - enter)),
-                      child: child,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final gutter = AppSpace.gutterOf(context);
+            final bottomInset = MediaQuery.paddingOf(context).bottom;
+            final taglineHeight = measureText(
+              context,
+              _tagline,
+              _taglineStyle(t),
+              maxWidth: (constraints.maxWidth - 2 * gutter).clamp(
+                0.0,
+                constraints.maxWidth,
+              ),
+            ).height;
+            final markHeight =
+                const LogoMark(placement: LogoPlacement.splash).size.height +
+                AppSpace.s21 +
+                taglineHeight;
+            final spaceBelow = (constraints.maxHeight - markHeight) / 2;
+            final trackBottom =
+                bottomInset +
+                (spaceBelow >= bottomInset + AppSpace.s89 + AppSpace.s13
+                    ? AppSpace.s89
+                    : AppSpace.s13);
+            return Stack(
+              children: [
+                Center(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(horizontal: gutter),
+                    clipBehavior: Clip.none,
+                    child: AnimatedBuilder(
+                      animation: _controller,
+                      builder: (context, child) {
+                        if (reduceMotion) return child!;
+                        // A short rise and fade in, then a fade out as the app
+                        // takes over.
+                        final enter = AppMotion.ease.transform(
+                          (_controller.value / 0.45).clamp(0.0, 1.0),
+                        );
+                        final exit =
+                            1 -
+                            AppMotion.easeInOut.transform(
+                              ((_controller.value - 0.81) / 0.19).clamp(
+                                0.0,
+                                1.0,
+                              ),
+                            );
+                        return Opacity(
+                          opacity: enter * exit,
+                          child: Transform.translate(
+                            offset: Offset(0, 6 * (1 - enter)),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: const _SplashMark(),
                     ),
-                  );
-                },
-                child: const _SplashMark(),
-              ),
-            ),
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: AppSpace.s89 + MediaQuery.paddingOf(context).bottom,
-              child: Center(
-                child: _SplashTrack(
-                  animation: reduceMotion ? null : _controller,
+                  ),
                 ),
-              ),
-            ),
-          ],
+                if (spaceBelow >= trackBottom + AppSpace.s13)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: trackBottom,
+                    child: Center(
+                      child: _SplashTrack(
+                        animation: reduceMotion ? null : _controller,
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -108,15 +150,7 @@ class _SplashMark extends StatelessWidget {
       children: [
         const LogoMark(placement: LogoPlacement.splash),
         const SizedBox(height: AppSpace.s21),
-        Text(
-          'Market research and signals.',
-          textAlign: TextAlign.center,
-          style: AppTypo.ui(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: t.foregroundMuted,
-          ),
-        ),
+        Text(_tagline, textAlign: TextAlign.center, style: _taglineStyle(t)),
       ],
     );
   }

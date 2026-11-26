@@ -23,22 +23,31 @@ class VerificationBannerHost extends StatelessWidget {
       listenable: service,
       builder: (context, _) {
         final visible = service.bannerVisible;
-        return Column(
-          children: [
-            if (visible)
-              SafeArea(bottom: false, child: const _VerificationBanner())
-            else
-              const SizedBox.shrink(),
-            Expanded(
-              // The banner already cleared the status bar, so the tabs below
-              // must not pad for it a second time.
-              child: MediaQuery.removePadding(
-                context: context,
-                removeTop: visible,
-                child: child,
+        return LayoutBuilder(
+          builder: (context, constraints) => Column(
+            children: [
+              if (visible)
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: constraints.maxHeight / 2,
+                  ),
+                  child: const SafeArea(
+                    bottom: false,
+                    child: SingleChildScrollView(
+                      primary: false,
+                      child: _VerificationBanner(),
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: MediaQuery.removePadding(
+                  context: context,
+                  removeTop: visible,
+                  child: child,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       },
     );

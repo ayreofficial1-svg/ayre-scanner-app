@@ -7,21 +7,7 @@ import '../theme/app_theme.dart';
 import 'ayre_icons.dart';
 import 'ayre_nav_metrics.dart';
 
-/// A navigation destination. The label is rendered on screen (icon + label on
-/// every item) and is also the accessibility name.
-class NavDestination {
-  const NavDestination({required this.label, required this.glyph});
-
-  final String label;
-  final AyreGlyph glyph;
-}
-
-const List<NavDestination> kNavDestinations = [
-  NavDestination(label: 'Home', glyph: AyreGlyph.home),
-  NavDestination(label: 'Reports', glyph: AyreGlyph.report),
-  NavDestination(label: 'Learn', glyph: AyreGlyph.learn),
-  NavDestination(label: 'Profile', glyph: AyreGlyph.profile),
-];
+export 'ayre_nav_metrics.dart' show NavDestination, kNavDestinations;
 
 /// A stable handle on a destination, used by tests, the spotlight tour and the
 /// tooltip/semantics wiring.
@@ -56,12 +42,10 @@ class AyreBottomNav extends StatelessWidget {
     final media = MediaQuery.of(context);
     final highContrast = MediaQuery.highContrastOf(context);
 
-    final labelSize = AyreNavMetrics.labelSize;
-    final scale = media.textScaler.scale(labelSize) / labelSize;
+    final labelHeight = AyreNavMetrics.dockLabelHeightOf(context);
     final inset = media.viewPadding.bottom;
     final barHeight = AyreNavMetrics.barHeightFor(
-      textScale: scale,
-      labelSize: labelSize,
+      labelHeight: labelHeight,
       bottomInset: inset,
     );
 
@@ -86,8 +70,7 @@ class AyreBottomNav extends StatelessWidget {
             selectedIndex: selectedIndex,
             onSelected: onSelected,
             onReselected: onReselected,
-            labelSize: labelSize,
-            textScale: scale,
+            labelHeight: labelHeight,
           ),
         ),
       ),
@@ -98,9 +81,7 @@ class AyreBottomNav extends StatelessWidget {
       heightFactor: 1,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: media.size.width >= 600
-              ? AyreNavMetrics.maxWidth
-              : double.infinity,
+          maxWidth: AyreNavMetrics.dockWidthFor(media.size.width),
         ),
         child: ClipRRect(borderRadius: AppShape.sheetTop, child: surface),
       ),
@@ -113,15 +94,13 @@ class _DockItems extends StatelessWidget {
     required this.selectedIndex,
     required this.onSelected,
     required this.onReselected,
-    required this.labelSize,
-    required this.textScale,
+    required this.labelHeight,
   });
 
   final int selectedIndex;
   final ValueChanged<int> onSelected;
   final ValueChanged<int>? onReselected;
-  final double labelSize;
-  final double textScale;
+  final double labelHeight;
 
   @override
   Widget build(BuildContext context) {
@@ -158,8 +137,7 @@ class _DockItems extends StatelessWidget {
                           onSelected,
                           onReselected,
                         ),
-                        labelSize: labelSize,
-                        textScale: textScale,
+                        labelHeight: labelHeight,
                         vertical: false,
                       ),
                     ),
@@ -236,8 +214,7 @@ class AyreNavRail extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final media = MediaQuery.of(context);
-    final labelSize = AyreNavMetrics.labelSize;
-    final scale = media.textScaler.scale(labelSize) / labelSize;
+    final labelHeight = AyreNavMetrics.labelHeightFor(context, width);
 
     final duration = media.disableAnimations
         ? Duration.zero
@@ -246,10 +223,7 @@ class AyreNavRail extends StatelessWidget {
     const railTop = AppSpace.s13;
     final itemHeight = math.max(
       AyreNavMetrics.railItemMinHeight,
-      16 +
-          AyreNavMetrics.slotHeight +
-          AyreNavMetrics.labelGap +
-          AyreNavMetrics.labelLineFor(scale, labelSize),
+      16 + AyreNavMetrics.slotHeight + AyreNavMetrics.labelGap + labelHeight,
     );
     final leftToRight = Directionality.of(context) == TextDirection.ltr;
     final leadingInset = leftToRight ? media.padding.left : media.padding.right;
@@ -288,8 +262,7 @@ class AyreNavRail extends StatelessWidget {
                                 onSelected,
                                 onReselected,
                               ),
-                              labelSize: labelSize,
-                              textScale: scale,
+                              labelHeight: labelHeight,
                               vertical: true,
                             ),
                           ),
@@ -335,8 +308,7 @@ class _NavItem extends StatefulWidget {
     required this.destination,
     required this.selected,
     required this.onTap,
-    required this.labelSize,
-    required this.textScale,
+    required this.labelHeight,
     required this.vertical,
   });
 
@@ -344,8 +316,7 @@ class _NavItem extends StatefulWidget {
   final NavDestination destination;
   final bool selected;
   final VoidCallback onTap;
-  final double labelSize;
-  final double textScale;
+  final double labelHeight;
 
   /// True in the rail, where each destination is centred in its row.
   final bool vertical;
@@ -379,14 +350,7 @@ class _NavItemState extends State<_NavItem> {
       background = t.surfaceRaised.withValues(alpha: 0.6);
     }
 
-    final labelStyle = AppTypo.navLabel(
-      t,
-      color: color,
-    ).copyWith(fontSize: widget.labelSize, height: 1.15);
-    final labelLine = AyreNavMetrics.labelLineFor(
-      widget.textScale,
-      widget.labelSize,
-    );
+    final labelStyle = AyreNavMetrics.labelStyleOf(context, color: color);
 
     final slot = SizedBox(
       width: AyreNavMetrics.slotWidth,
@@ -422,23 +386,19 @@ class _NavItemState extends State<_NavItem> {
       children: [
         slot,
         const SizedBox(height: AyreNavMetrics.labelGap),
-        // Never ellipsised: the label's scale is capped, then scaled down as
-        // a last resort.
         SizedBox(
-          height: labelLine,
+          height: widget.labelHeight,
           width: double.infinity,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AyreNavMetrics.labelPadding,
+            ),
+            child: Align(
+              alignment: Alignment.topCenter,
               child: Text(
                 label,
-                maxLines: 1,
-                softWrap: false,
-                textScaler: TextScaler.linear(
-                  math.min(widget.textScale, AyreNavMetrics.labelScaleCap),
-                ),
                 style: labelStyle,
+                textAlign: TextAlign.center,
               ),
             ),
           ),

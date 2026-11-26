@@ -5,6 +5,7 @@ import '../services/market_models.dart' show InsightNote;
 import '../theme/app_theme.dart';
 import 'ayre_components.dart';
 import 'finance_icons.dart';
+import 'responsive.dart';
 
 class AyreInsightCarousel extends StatefulWidget {
   const AyreInsightCarousel({
@@ -182,12 +183,7 @@ class _Page extends StatelessWidget {
         Text(note.title, style: AppTypo.sectionTitle(t)),
         if (body.isNotEmpty) ...[
           const SizedBox(height: AppSpace.s8),
-          Text(
-            body,
-            style: AppTypo.body(t),
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-          ),
+          Text(textPreview(body, words: 26), style: AppTypo.body(t)),
           const SizedBox(height: AppSpace.s13),
           AyreButton(
             label: 'Read more',

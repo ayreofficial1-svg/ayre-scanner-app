@@ -95,8 +95,7 @@ class _AuthFieldState extends State<AuthField> {
             decoration: InputDecoration(
               hintText: widget.hint,
               hintStyle: AppTypo.fieldValue(t, color: t.foregroundMuted),
-              errorText: widget.errorText,
-              errorMaxLines: 8,
+              error: widget.errorText == null ? null : Text(widget.errorText!),
               filled: true,
               fillColor: t.surface,
               contentPadding: const EdgeInsets.symmetric(

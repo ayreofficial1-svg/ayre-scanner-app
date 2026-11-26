@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import 'figure.dart';
+import 'responsive.dart';
 
 // ─── Shared arc geometry ───────────────────────────────────────────────────
 
@@ -140,49 +141,73 @@ class ProgressRing extends StatelessWidget {
 
   bool get _complete => value >= 0.999;
 
+  double diameterOf(BuildContext context) {
+    if (!showPercent || label != null) return size;
+
+    final metrics = measureText(
+      context,
+      '100%',
+      AppTypo.num(
+        fontSize: size * 0.24,
+        fontWeight: FontWeight.w600,
+        height: 1,
+      ),
+    );
+    final diagonal = math.sqrt(
+      metrics.width * metrics.width + metrics.height * metrics.height,
+    );
+    return math.max(size, diagonal + 2 * (thickness + 2));
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
     final clamped = value.clamp(0.0, 1.0);
     final fill = _complete ? t.positive : t.accent;
 
-    return SizedBox(
-      width: size,
-      height: size,
-      child: _DrawOn(
-        builder: (context, progress) => CustomPaint(
-          painter: _RingPainter(
-            value: clamped * progress,
-            fill: fill,
-            track: t.surfaceRaised,
-            thickness: thickness,
-          ),
-          // Same fixed-diameter problem as the donut: the ring is 64px whatever
-          // the text scale, so the label shrinks to fit rather than overflowing
-          // it.
-          child: Padding(
-            padding: EdgeInsets.all(thickness + 2),
-            child: Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child:
-                    label ??
-                    (showPercent
-                        ? CountUpFigure(
-                            value: clamped * 100,
-                            format: (v) => '${v.round()}%',
-                            fontSize: size * 0.24,
-                            fontWeight: FontWeight.w600,
-                            color: _complete ? t.positiveText : t.textPrimary,
-                            semanticsLabel:
-                                '${(clamped * 100).round()} percent complete',
-                          )
-                        : const SizedBox.shrink()),
+    final caption =
+        label ??
+        (showPercent
+            ? CountUpFigure(
+                value: clamped * 100,
+                format: (v) => '${v.round()}%',
+                fontSize: size * 0.24,
+                fontWeight: FontWeight.w600,
+                color: _complete ? t.positiveText : t.textPrimary,
+                textAlign: TextAlign.center,
+                semanticsLabel: '${(clamped * 100).round()} percent complete',
+              )
+            : null);
+    final preferredDiameter = diameterOf(context);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final diameter = math.min(preferredDiameter, constraints.maxWidth);
+        final fitsInside = diameter >= preferredDiameter;
+        final ring = SizedBox.square(
+          dimension: diameter,
+          child: _DrawOn(
+            builder: (context, progress) => CustomPaint(
+              painter: _RingPainter(
+                value: clamped * progress,
+                fill: fill,
+                track: t.surfaceRaised,
+                thickness: thickness,
               ),
+              child: fitsInside ? Center(child: caption) : null,
             ),
           ),
-        ),
-      ),
+        );
+        if (fitsInside || caption == null) return ring;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ring,
+            const SizedBox(height: AppSpace.xxs),
+            caption,
+          ],
+        );
+      },
     );
   }
 }

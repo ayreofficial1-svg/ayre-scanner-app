@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import 'ayre_components.dart';
 import 'ayre_icons.dart';
 import 'pressable_scale.dart';
+import 'responsive.dart';
 
 /// The app's existing general-research line (same wording as the first-run
 /// page in `onboarding_content.dart`).
@@ -22,8 +23,7 @@ String? restoreOutcomeMessage(SubscriptionOutcome outcome) {
     SubscriptionOutcomeKind.success => 'Subscription restored.',
     SubscriptionOutcomeKind.nothingFound =>
       'No active subscription was found for this store account.',
-    SubscriptionOutcomeKind.pending =>
-      'Your purchase is waiting for approval.',
+    SubscriptionOutcomeKind.pending => 'Your purchase is waiting for approval.',
     SubscriptionOutcomeKind.failed =>
       outcome.failure?.silent == true
           ? null
@@ -53,6 +53,17 @@ class PaywallPlanTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final detail = [?plan.period, ?plan.trial].join(' · ');
+    final priceStyle = AppTypo.rowLabel(t);
+    final description = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(plan.title, style: priceStyle),
+        if (detail.isNotEmpty) ...[
+          const SizedBox(height: 2),
+          Text(detail, style: AppTypo.hint(t)),
+        ],
+      ],
+    );
     return Semantics(
       inMutuallyExclusiveGroup: true,
       selected: selected,
@@ -60,11 +71,7 @@ class PaywallPlanTile extends StatelessWidget {
       button: true,
       enabled: enabled,
       onTap: enabled ? onTap : null,
-      label: [
-        plan.title,
-        plan.price,
-        if (detail.isNotEmpty) detail,
-      ].join(', '),
+      label: [plan.title, plan.price, if (detail.isNotEmpty) detail].join(', '),
       excludeSemantics: true,
       child: Opacity(
         opacity: enabled ? 1 : 0.6,
@@ -91,23 +98,44 @@ class PaywallPlanTile extends StatelessWidget {
               ),
               const SizedBox(width: AppSpace.s13),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(plan.title, style: AppTypo.rowLabel(t)),
-                    if (detail.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(detail, style: AppTypo.hint(t)),
-                    ],
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpace.s8),
-              Flexible(
-                child: Text(
-                  plan.price,
-                  textAlign: TextAlign.end,
-                  style: AppTypo.rowLabel(t),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final priceWidth = singleLineTextWidth(
+                      context,
+                      plan.price,
+                      priceStyle,
+                    );
+                    final titleWidth = singleLineTextWidth(
+                      context,
+                      plan.title,
+                      priceStyle,
+                    );
+                    if (priceWidth + titleWidth + AppSpace.s8 >
+                        constraints.maxWidth) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          description,
+                          const SizedBox(height: AppSpace.xxs),
+                          Text(plan.price, style: priceStyle),
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: description),
+                        const SizedBox(width: AppSpace.s8),
+                        SizedBox(
+                          width: priceWidth,
+                          child: Text(
+                            plan.price,
+                            textAlign: TextAlign.end,
+                            style: priceStyle,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -336,10 +364,7 @@ class _FooterLink extends StatelessWidget {
           child: Align(
             widthFactor: 1,
             alignment: Alignment.centerLeft,
-            child: Text(
-              label,
-              style: AppTypo.rowLabel(t, color: t.accentInk),
-            ),
+            child: Text(label, style: AppTypo.rowLabel(t, color: t.accentInk)),
           ),
         ),
       ),
