@@ -260,7 +260,6 @@ class _SignalList extends StatelessWidget {
       child: _SignalCard(
         signal: signal,
         current: current,
-        notch: index == 0,
         claimDraw: () => claimDraw(signal),
       ),
     );
@@ -312,13 +311,11 @@ class _SignalCard extends StatelessWidget {
   const _SignalCard({
     required this.signal,
     required this.current,
-    required this.notch,
     required this.claimDraw,
   });
 
   final Signal signal;
   final bool current;
-  final bool notch;
   final bool Function() claimDraw;
 
   @override
@@ -327,6 +324,7 @@ class _SignalCard extends StatelessWidget {
     final name = signal.name?.trim();
     final symbolStyle = AppTypo.cardTitle(t);
     final range = _RecommendationRange.fromSignal(signal);
+    const logoSize = AppSpace.s34;
     final prices = <_Level>[
       if (signal.stop case final stop? when stop.isFinite)
         _Level('Stop', stop, change: range?.stopPct, tone: t.negativeText),
@@ -338,8 +336,12 @@ class _SignalCard extends StatelessWidget {
 
     final identity = Row(
       children: [
-        AyreInstrumentTile(symbol: signal.symbol, name: signal.name),
-        const SizedBox(width: AppSpace.s13),
+        AyreInstrumentTile(
+          symbol: signal.symbol,
+          name: signal.name,
+          size: logoSize,
+        ),
+        const SizedBox(width: AppSpace.s8),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -358,18 +360,16 @@ class _SignalCard extends StatelessWidget {
 
     return MergeSemantics(
       child: AyreCard(
-        notch: notch,
-        featured: true,
-        clip: true,
+        padding: const EdgeInsets.all(AppSpace.cardPadding),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             LayoutBuilder(
               builder: (context, constraints) {
                 if (!current) return identity;
                 final tickerWidth =
-                    AyreInstrumentTile.defaultSize +
-                    AppSpace.s13 +
+                    logoSize +
+                    AppSpace.s8 +
                     singleLineTextWidth(context, signal.symbol, symbolStyle);
                 final badgeWidth = active.singleLineWidth(context);
                 if (constraints.maxWidth <
@@ -392,26 +392,8 @@ class _SignalCard extends StatelessWidget {
                 );
               },
             ),
-            if (range != null) ...[
-              const SizedBox(height: AppSpace.s13),
-              _PriceSummary(
-                ring: _RangeRing(
-                  key: ValueKey((
-                    signal.symbol,
-                    signal.stop,
-                    signal.entry,
-                    signal.exitPrice,
-                    signal.addedOn,
-                  )),
-                  position: range.entryPosition,
-                  claimDraw: claimDraw,
-                  animate: current,
-                ),
-                levels: prices.reversed.toList(),
-                ratio: '1 : ${range.rewardLabel}',
-              ),
-            ] else if (prices.isNotEmpty) ...[
-              const SizedBox(height: AppSpace.s13),
+            if (prices.isNotEmpty) ...[
+              const SizedBox(height: AppSpace.md),
               _Levels(prices: prices),
             ],
             if (signal.rationale.trim().isNotEmpty) ...[
@@ -420,87 +402,49 @@ class _SignalCard extends StatelessWidget {
               const SizedBox(height: AppSpace.s13),
               Text(signal.rationale, style: AppTypo.body(t)),
             ],
+            if (range != null) ...[
+              const SizedBox(height: AppSpace.md),
+              InkPanel(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpace.s13,
+                  vertical: AppSpace.s13,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: AppSpace.s8,
+                      runSpacing: AppSpace.xxs,
+                      children: [
+                        Text('Risk / reward', style: AppTypo.hint(t)),
+                        Text(
+                          '1 : ${range.rewardLabel}',
+                          style: AppTypo.value(t, fontSize: 16),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpace.s13),
+                    _RangeGauge(
+                      key: ValueKey((
+                        signal.symbol,
+                        signal.stop,
+                        signal.entry,
+                        signal.exitPrice,
+                        signal.addedOn,
+                      )),
+                      position: range.entryPosition,
+                      claimDraw: claimDraw,
+                      animate: current,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
-    );
-  }
-}
-
-class _PriceSummary extends StatelessWidget {
-  const _PriceSummary({
-    required this.ring,
-    required this.levels,
-    required this.ratio,
-  });
-
-  final _RangeRing ring;
-  final List<_Level> levels;
-  final String ratio;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    final ladder = _LevelStack(levels: levels);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final minimumGauge = ring.minimumWidthOf(context);
-            final roomForGauge =
-                constraints.maxWidth -
-                AppSpace.s13 -
-                ladder.singleLineWidth(context);
-
-            if (minimumGauge <= roomForGauge) {
-              final gaugeWidth = (constraints.maxWidth * 0.44).clamp(
-                minimumGauge,
-                math.min(roomForGauge, math.max(minimumGauge, 172.0)),
-              );
-              return Row(
-                children: [
-                  SizedBox(width: gaugeWidth.toDouble(), child: ring),
-                  const SizedBox(width: AppSpace.s13),
-                  Expanded(child: ladder),
-                ],
-              );
-            }
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: math.max(184.0, minimumGauge),
-                    ),
-                    child: ring,
-                  ),
-                ),
-                const SizedBox(height: AppSpace.s8),
-                ladder,
-              ],
-            );
-          },
-        ),
-        const SizedBox(height: AppSpace.s8),
-        const HairlineDivider(),
-        const SizedBox(height: AppSpace.s8),
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: AppSpace.s8,
-          runSpacing: AppSpace.xxs,
-          children: [
-            Text('Risk / reward', style: AppTypo.meta(t)),
-            Text(
-              ratio,
-              style: AppTypo.value(t, color: t.accentInk, fontSize: 17),
-            ),
-          ],
-        ),
-      ],
     );
   }
 }
@@ -558,9 +502,9 @@ class _RecommendationRange {
   }
 }
 
-/// A D-shaped gauge showing entry's position between the stop and exit.
-class _RangeRing extends StatefulWidget {
-  const _RangeRing({
+/// A semicircle showing entry's position between stop and exit.
+class _RangeGauge extends StatefulWidget {
+  const _RangeGauge({
     super.key,
     required this.position,
     required this.claimDraw,
@@ -571,31 +515,22 @@ class _RangeRing extends StatefulWidget {
   final bool Function() claimDraw;
   final bool animate;
 
-  static const _minWidth = 110.0;
-  static const _inset = 3.0;
-  static const _buy = 'Strong buy';
-  static const _sell = 'Strong sell';
-
-  static double strokeFor(double diameter) => math.min(10.0, diameter * 0.12);
-
-  static TextStyle _labelStyle(AppThemeTokens t) =>
-      AppTypo.meta(t).copyWith(fontWeight: FontWeight.w700);
-
-  double minimumWidthOf(BuildContext context) {
-    final style = _labelStyle(context.tokens);
-    final labelWidth = singleLineTextWidth(context, 'Strong', style);
-    return math.max(_minWidth, 2 * labelWidth + AppSpace.xxs);
-  }
-
   @override
-  State<_RangeRing> createState() => _RangeRingState();
+  State<_RangeGauge> createState() => _RangeGaugeState();
 }
 
-class _RangeRingState extends State<_RangeRing>
+class _RangeGaugeState extends State<_RangeGauge>
     with SingleTickerProviderStateMixin {
+  static const _maxRadius = 102.0;
+  static const _buyLabel = 'Strong buy';
+  static const _sellLabel = 'Strong sell';
+
   late final _controller = AnimationController(
     vsync: this,
-    duration: AppMotion.rangeDraw,
+    duration: AppMotion.rangeDraw + AppMotion.controlChange,
+  );
+  late final _labelOpacity = _controller.drive(
+    CurveTween(curve: const Interval(0.42, 1, curve: AppMotion.ease)),
   );
   bool _started = false;
 
@@ -617,7 +552,7 @@ class _RangeRingState extends State<_RangeRing>
   }
 
   @override
-  void didUpdateWidget(_RangeRing oldWidget) {
+  void didUpdateWidget(_RangeGauge oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!widget.animate && oldWidget.animate) _controller.value = 1;
   }
@@ -632,60 +567,73 @@ class _RangeRingState extends State<_RangeRing>
   Widget build(BuildContext context) {
     final t = context.tokens;
     final percent = (widget.position * 100).round();
+    final labelStyle = AppTypo.meta(t).copyWith(fontWeight: FontWeight.w700);
+    final preferredLabelWidth = math.max(
+      singleLineTextWidth(context, _buyLabel, labelStyle),
+      singleLineTextWidth(context, _sellLabel, labelStyle),
+    );
 
     return Semantics(
-      image: true,
-      excludeSemantics: true,
       label:
-          'Strong buy at the red end. Strong sell at the green end. '
+          '$_buyLabel on the left. $_sellLabel on the right. '
           'Entry is $percent percent of the way from stop to exit',
+      excludeSemantics: true,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final width = constraints.maxWidth;
-          final chartHeight =
-              width / 2 + _RangeRing.strokeFor(width) / 2 + _RangeRing._inset;
-          final labelWidth = (width - AppSpace.xxs) / 2;
-          final style = _RangeRing._labelStyle(t);
-          final wrapLabels = [_RangeRing._buy, _RangeRing._sell].any(
-            (text) => singleLineTextWidth(context, text, style) > labelWidth,
+          final labelWidth = math.min(
+            preferredLabelWidth,
+            constraints.maxWidth * 0.42,
+          );
+          final radius = math.min(
+            _maxRadius,
+            (constraints.maxWidth - labelWidth) / 2,
+          );
+          final wrapLabels = labelWidth < preferredLabelWidth;
+
+          Widget endpointLabel(String label, Color color) => SizedBox(
+            width: labelWidth,
+            child: Text(
+              wrapLabels ? label.replaceFirst(' ', '\n') : label,
+              style: labelStyle.copyWith(color: color),
+              textAlign: TextAlign.center,
+            ),
           );
 
-          Widget label(String text, Color ink) => Text(
-            wrapLabels ? text.replaceFirst(' ', '\n') : text,
-            style: style.copyWith(color: ink),
-            textAlign: TextAlign.center,
-          );
-
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              SizedBox(
-                height: chartHeight,
-                child: RepaintBoundary(
-                  child: CustomPaint(
-                    painter: _RangeRingPainter(
-                      position: widget.position,
-                      animation: _controller,
-                      loss: t.negative,
-                      gain: t.positive,
-                      track: t.hairline,
-                      needle: t.highlight,
-                      ink: t.textPrimary,
+          // The arc spans the distance between the two label centers.
+          return Center(
+            child: SizedBox(
+              width: 2 * radius + labelWidth,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    height: radius + _RangeGaugePainter.stroke,
+                    child: RepaintBoundary(
+                      child: CustomPaint(
+                        painter: _RangeGaugePainter(
+                          position: widget.position,
+                          animation: _controller,
+                          tokens: t,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              Row(
-                textDirection: TextDirection.ltr,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: label(_RangeRing._buy, t.negativeText)),
-                  const SizedBox(width: AppSpace.xxs),
-                  Expanded(child: label(_RangeRing._sell, t.positiveText)),
+                  const SizedBox(height: AppSpace.s8),
+                  FadeTransition(
+                    opacity: _labelOpacity,
+                    child: Row(
+                      textDirection: TextDirection.ltr,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        endpointLabel(_buyLabel, t.negativeText),
+                        endpointLabel(_sellLabel, t.positiveText),
+                      ],
+                    ),
+                  ),
                 ],
               ),
-            ],
+            ),
           );
         },
       ),
@@ -693,205 +641,94 @@ class _RangeRingState extends State<_RangeRing>
   }
 }
 
-class _RangeRingPainter extends CustomPainter {
-  _RangeRingPainter({
+class _RangeGaugePainter extends CustomPainter {
+  _RangeGaugePainter({
     required this.position,
     required this.animation,
-    required this.loss,
-    required this.gain,
-    required this.track,
-    required this.needle,
-    required this.ink,
+    required this.tokens,
   }) : super(repaint: animation);
 
-  static const double _start = math.pi;
-  static const double _sweep = math.pi;
+  static const stroke = 10.0;
+  static const _arcCurve = Interval(0, 0.78, curve: AppMotion.ease);
+  static const _needleCurve = Interval(0.18, 1, curve: AppMotion.easeInOut);
+  static const _needleFade = Interval(0.18, 0.48, curve: AppMotion.ease);
 
   final double position;
   final Animation<double> animation;
-  final Color loss;
-  final Color gain;
-  final Color track;
-  final Color needle;
-  final Color ink;
+  final AppThemeTokens tokens;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final stroke = _RangeRing.strokeFor(size.width);
-    final center = Offset(size.width / 2, size.width / 2);
-    final radius = center.dx - stroke / 2 - _RangeRing._inset;
+    const sweep = math.pi;
+    final center = Offset(size.width / 2, size.height - stroke / 2);
+    final radius = size.height - stroke;
     if (radius <= 0) return;
 
-    final rect = Rect.fromCircle(center: center, radius: radius);
+    final arc = Rect.fromCircle(center: center, radius: radius);
+    final reveal = _arcCurve.transform(animation.value);
+    final split = sweep * position;
+    final gap = math.min(1.5 / radius, math.min(split, sweep - split) / 2);
     final cap = stroke / 2 / radius;
-    final progress = AppMotion.ease.transform(animation.value);
-    final reveal = _sweep * progress;
-    final split = _sweep * position.clamp(0.0, 1.0);
-    final gap = math.min(3 / radius, math.min(split, _sweep - split) / 2);
-
     final paint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
       ..strokeCap = StrokeCap.round;
 
-    canvas.drawArc(rect, _start, _sweep, false, paint..color = track);
+    canvas.drawArc(arc, math.pi, sweep, false, paint..color = tokens.hairline);
 
-    void segment(double from, double to, Color color) {
-      final lo = from + (from > 0 ? gap / 2 : 0);
-      final hi = math.min(to - (to < _sweep ? gap / 2 : 0), reveal);
-      final sweep = hi - lo;
-      if (sweep <= 0) return;
-      final round = sweep > 2 * cap;
-      final trim = round ? cap : 0.0;
+    void drawSegment(double from, double to, Color color) {
+      final end = math.min(to, sweep * reveal);
+      final span = end - from;
+      if (span <= 0) return;
+      final tint = RadialGradient(
+        colors: [color.withValues(alpha: 0), color.withValues(alpha: 0.25)],
+        stops: const [0.58, 1],
+        radius: 0.5,
+      ).createShader(arc);
+      canvas.drawArc(arc, math.pi + from, span, true, Paint()..shader = tint);
+
+      final round = span > 2 * cap;
+      final startInset = round && from > 0 ? cap : 0.0;
+      final endInset = round && end < sweep ? cap : 0.0;
       canvas.drawArc(
-        rect,
-        _start + lo + trim,
-        sweep - 2 * trim,
+        arc,
+        math.pi + from + startInset,
+        span - startInset - endInset,
         false,
         paint
-          ..color = color
+          ..color = color.withValues(alpha: 0.82)
           ..strokeCap = round ? StrokeCap.round : StrokeCap.butt,
       );
     }
 
-    segment(0, split, loss);
-    segment(split, _sweep, gain);
+    drawSegment(0, split - gap, tokens.negative);
+    drawSegment(split + gap, sweep, tokens.positive);
 
-    final angle = _start + split * progress;
-    final direction = Offset(math.cos(angle), math.sin(angle));
-    final wing = Offset(-direction.dy, direction.dx) * (stroke * 0.21);
-    final tip = center + direction * (radius * 0.63);
-    final pointer = Path()
-      ..moveTo((center + wing).dx, (center + wing).dy)
-      ..lineTo(tip.dx, tip.dy)
-      ..lineTo((center - wing).dx, (center - wing).dy)
-      ..close();
-    final fill = Paint()..color = needle.withValues(alpha: progress);
-    canvas.drawPath(pointer, fill);
-    canvas.drawCircle(
-      center,
-      stroke * 0.36,
-      Paint()..color = ink.withValues(alpha: progress),
+    final needleProgress = _needleCurve.transform(animation.value);
+    final needleColor = tokens.textPrimary.withValues(
+      alpha: _needleFade.transform(animation.value),
     );
+    final angle = math.pi + split * needleProgress;
+    final direction = Offset(math.cos(angle), math.sin(angle));
+    final length = math.min(20.0, radius * 0.25);
+    final tip = center + direction * (length * 1.4);
+    final base = tip - direction * length;
+    final wing = Offset(-direction.dy, direction.dx) * (length * 0.25);
+    final notch = base + direction * (length * 0.26);
+    final pointer = Path()
+      ..moveTo(tip.dx, tip.dy)
+      ..lineTo(base.dx + wing.dx, base.dy + wing.dy)
+      ..lineTo(notch.dx, notch.dy)
+      ..lineTo(base.dx - wing.dx, base.dy - wing.dy)
+      ..close();
+    canvas.drawPath(pointer, Paint()..color = needleColor);
   }
 
   @override
-  bool shouldRepaint(_RangeRingPainter old) =>
+  bool shouldRepaint(_RangeGaugePainter old) =>
       position != old.position ||
       animation != old.animation ||
-      loss != old.loss ||
-      gain != old.gain ||
-      track != old.track ||
-      needle != old.needle ||
-      ink != old.ink;
-}
-
-/// Price labels share a baseline with their amounts.
-class _LevelStack extends StatelessWidget {
-  const _LevelStack({required this.levels});
-
-  final List<_Level> levels;
-
-  static TextStyle _priceStyle(AppThemeTokens t, _Level level) =>
-      AppTypo.levelPrice(
-        t,
-        color: (level.change ?? 0) > 0 ? t.positiveText : null,
-      );
-
-  static TextStyle _changeStyle(AppThemeTokens t, _Level level) =>
-      AppTypo.value(t, color: level.tone, fontSize: 12);
-
-  double singleLineWidth(BuildContext context) {
-    final t = context.tokens;
-    var width = 0.0;
-    for (final level in levels) {
-      final labelWidth = singleLineTextWidth(
-        context,
-        level.label,
-        AppTypo.hint(t),
-      );
-      final priceWidth = singleLineTextWidth(
-        context,
-        level.price,
-        _priceStyle(t, level),
-      );
-      final change = level.change;
-      final changeWidth = change == null
-          ? 0.0
-          : singleLineTextWidth(
-              context,
-              formatDelta(change),
-              _changeStyle(t, level),
-            );
-      width = math.max(
-        width,
-        labelWidth + AppSpace.s8 + math.max(priceWidth, changeWidth),
-      );
-    }
-    return width;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Semantics(
-      label: 'Analyst price levels and distances from entry',
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final inline = singleLineWidth(context) <= constraints.maxWidth;
-
-          Widget rowFor(_Level level) {
-            final label = Text(level.label, style: AppTypo.hint(t));
-            final value = Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  level.price,
-                  style: _priceStyle(t, level),
-                  textAlign: TextAlign.end,
-                ),
-                if (level.change case final change?) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    formatDelta(change),
-                    style: _changeStyle(t, level),
-                    textAlign: TextAlign.end,
-                  ),
-                ],
-              ],
-            );
-            if (!inline) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [label, const SizedBox(height: 2), value],
-              );
-            }
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Expanded(child: label),
-                const SizedBox(width: AppSpace.s8),
-                value,
-              ],
-            );
-          }
-
-          return Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var i = 0; i < levels.length; i++) ...[
-                if (i > 0) const SizedBox(height: AppSpace.s8),
-                rowFor(levels[i]),
-              ],
-            ],
-          );
-        },
-      ),
-    );
-  }
+      tokens != old.tokens;
 }
 
 class _Levels extends StatelessWidget {
@@ -901,45 +738,93 @@ class _Levels extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final t = context.tokens;
+    final labelStyle = AppTypo.hint(t);
+    final priceStyle = AppTypo.levelPrice(t).copyWith(fontSize: 17);
+    final changeStyle = AppTypo.value(t, fontSize: 12);
+
+    Widget values(_Level level, CrossAxisAlignment alignment) => Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: alignment,
+      children: [
+        Text(level.price, style: priceStyle),
+        if (level.delta case final delta?) ...[
+          const SizedBox(height: 2),
+          Text(delta, style: changeStyle.copyWith(color: level.tone)),
+        ],
+      ],
+    );
+
+    Widget column(_Level level, CrossAxisAlignment alignment) => Column(
+      crossAxisAlignment: alignment,
+      children: [
+        Text(level.label, style: labelStyle),
+        const SizedBox(height: AppSpace.xxs),
+        values(level, alignment),
+      ],
+    );
+
     return LayoutBuilder(
       builder: (context, constraints) {
         const gap = AppSpace.s8;
-        final widths = [
-          for (final level in prices) level.minimumWidth(context),
-        ];
-        final requiredWidth =
-            widths.reduce((a, b) => a + b) + gap * (widths.length - 1);
-        if (requiredWidth > constraints.maxWidth) {
+        final columnWidth =
+            (constraints.maxWidth - gap * (prices.length - 1)) / prices.length;
+        var widestLabel = 0.0;
+        var widestValue = 0.0;
+        for (final level in prices) {
+          widestLabel = math.max(
+            widestLabel,
+            singleLineTextWidth(context, level.label, labelStyle),
+          );
+          widestValue = math.max(
+            widestValue,
+            singleLineTextWidth(context, level.price, priceStyle),
+          );
+          final delta = level.delta;
+          if (delta != null) {
+            widestValue = math.max(
+              widestValue,
+              singleLineTextWidth(context, delta, changeStyle),
+            );
+          }
+        }
+
+        if (math.max(widestLabel, widestValue) > columnWidth) {
+          final fitsInRows =
+              widestLabel + gap + widestValue <= constraints.maxWidth;
           return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (var i = 0; i < prices.length; i++) ...[
                 if (i > 0) const SizedBox(height: AppSpace.s8),
-                prices[i],
+                if (fitsInRows)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Expanded(child: Text(prices[i].label, style: labelStyle)),
+                      const SizedBox(width: gap),
+                      values(prices[i], CrossAxisAlignment.end),
+                    ],
+                  )
+                else
+                  column(prices[i], CrossAxisAlignment.start),
               ],
             ],
           );
         }
 
-        final extra = (constraints.maxWidth - requiredWidth) / widths.length;
         return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (var i = 0; i < prices.length; i++) ...[
               if (i > 0) const SizedBox(width: gap),
-              SizedBox(
-                width: widths[i] + extra,
-                child: _Level(
-                  prices[i].label,
-                  prices[i].value,
-                  change: prices[i].change,
-                  tone: prices[i].tone,
-                  alignment: switch (i) {
-                    0 => CrossAxisAlignment.start,
-                    _ when i == prices.length - 1 => CrossAxisAlignment.end,
-                    _ => CrossAxisAlignment.center,
-                  },
-                ),
+              Expanded(
+                child: column(prices[i], switch (i) {
+                  0 => CrossAxisAlignment.start,
+                  _ when i == prices.length - 1 => CrossAxisAlignment.end,
+                  _ => CrossAxisAlignment.center,
+                }),
               ),
             ],
           ],
@@ -949,61 +834,16 @@ class _Levels extends StatelessWidget {
   }
 }
 
-class _Level extends StatelessWidget {
-  const _Level(
-    this.label,
-    this.value, {
-    this.change,
-    this.tone,
-    this.alignment = CrossAxisAlignment.start,
-  });
+class _Level {
+  const _Level(this.label, this.value, {this.change, this.tone});
 
   final String label;
   final num value;
   final double? change;
   final Color? tone;
-  final CrossAxisAlignment alignment;
 
   String get price => '₹${formatPrice(value)}';
-
-  double minimumWidth(BuildContext context) {
-    final t = context.tokens;
-    final labelWidth = singleLineTextWidth(context, label, AppTypo.hint(t));
-    final priceWidth = singleLineTextWidth(
-      context,
-      price,
-      AppTypo.levelPrice(t),
-    );
-    if (change case final change?) {
-      final changeWidth = singleLineTextWidth(
-        context,
-        formatDelta(change),
-        AppTypo.value(t, color: tone, fontSize: 12),
-      );
-      return math.max(math.max(labelWidth, priceWidth), changeWidth);
-    }
-    return math.max(labelWidth, priceWidth);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final t = context.tokens;
-    return Column(
-      crossAxisAlignment: alignment,
-      children: [
-        Text(label, style: AppTypo.hint(t)),
-        const SizedBox(height: 3),
-        Text(price, style: AppTypo.levelPrice(t)),
-        if (change case final change?) ...[
-          const SizedBox(height: 3),
-          Text(
-            formatDelta(change, percent: true),
-            style: AppTypo.value(t, color: tone, fontSize: 12),
-          ),
-        ],
-      ],
-    );
-  }
+  String? get delta => change == null ? null : formatDelta(change!);
 }
 
 class _CaughtUp extends StatelessWidget {
