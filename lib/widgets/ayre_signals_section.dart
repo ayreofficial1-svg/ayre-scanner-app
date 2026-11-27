@@ -394,47 +394,28 @@ class _SignalCard extends StatelessWidget {
             ),
             if (range != null) ...[
               const SizedBox(height: AppSpace.s13),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: AppShape.field,
-                  border: Border.all(
-                    color: Color.lerp(t.hairline, t.positive, 0.18)!,
-                  ),
-                  gradient: LinearGradient(
-                    begin: AlignmentDirectional.topStart,
-                    end: AlignmentDirectional.bottomEnd,
-                    colors: [
-                      t.positiveSoft,
-                      Color.lerp(t.surface, t.positiveSoft, 0.25)!,
-                    ],
-                  ),
+              _PriceSummary(
+                ring: _RangeRing(
+                  key: ValueKey((
+                    signal.symbol,
+                    signal.stop,
+                    signal.entry,
+                    signal.exitPrice,
+                    signal.addedOn,
+                  )),
+                  position: range.entryPosition,
+                  claimDraw: claimDraw,
+                  animate: current,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpace.s13),
-                  child: _PriceSummary(
-                    ring: _RangeRing(
-                      key: ValueKey((
-                        signal.symbol,
-                        signal.stop,
-                        signal.entry,
-                        signal.exitPrice,
-                        signal.addedOn,
-                      )),
-                      position: range.entryPosition,
-                      claimDraw: claimDraw,
-                      animate: current,
-                    ),
-                    levels: prices.reversed.toList(),
-                    ratio: '1 : ${range.rewardLabel}',
-                  ),
-                ),
+                levels: prices.reversed.toList(),
+                ratio: '1 : ${range.rewardLabel}',
               ),
             ] else if (prices.isNotEmpty) ...[
               const SizedBox(height: AppSpace.s13),
               _Levels(prices: prices),
             ],
             if (signal.rationale.trim().isNotEmpty) ...[
-              const SizedBox(height: AppSpace.s21),
+              const SizedBox(height: AppSpace.s13),
               const HairlineDivider(),
               const SizedBox(height: AppSpace.s13),
               Text(signal.rationale, style: AppTypo.body(t)),
@@ -459,38 +440,67 @@ class _PriceSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final diameter = ring.diameterOf(context);
-        final ladder = _LevelStack(levels: levels, ratio: ratio);
-        final roomForRing =
-            constraints.maxWidth -
-            AppSpace.s13 -
-            ladder.singleLineWidth(context);
-        if (diameter <= roomForRing) {
-          final ringWidth = math.max(
-            diameter,
-            math.min(roomForRing, math.min(196.0, constraints.maxWidth * 0.56)),
-          );
-          return Row(
-            children: [
-              SizedBox(width: ringWidth, child: ring),
-              const SizedBox(width: AppSpace.s13),
-              Expanded(child: ladder),
-            ],
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    final t = context.tokens;
+    final ladder = _LevelStack(levels: levels);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final minimumGauge = ring.minimumWidthOf(context);
+            final roomForGauge =
+                constraints.maxWidth -
+                AppSpace.s13 -
+                ladder.singleLineWidth(context);
+
+            if (minimumGauge <= roomForGauge) {
+              final gaugeWidth = (constraints.maxWidth * 0.44).clamp(
+                minimumGauge,
+                math.min(roomForGauge, math.max(minimumGauge, 172.0)),
+              );
+              return Row(
+                children: [
+                  SizedBox(width: gaugeWidth.toDouble(), child: ring),
+                  const SizedBox(width: AppSpace.s13),
+                  Expanded(child: ladder),
+                ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: math.max(184.0, minimumGauge),
+                    ),
+                    child: ring,
+                  ),
+                ),
+                const SizedBox(height: AppSpace.s8),
+                ladder,
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: AppSpace.s8),
+        const HairlineDivider(),
+        const SizedBox(height: AppSpace.s8),
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: AppSpace.s8,
+          runSpacing: AppSpace.xxs,
           children: [
-            Center(child: ring),
-            const SizedBox(height: AppSpace.s13),
-            const HairlineDivider(),
-            const SizedBox(height: AppSpace.s13),
-            _LevelStack(levels: levels, ratio: ratio, inlineLabels: true),
+            Text('Risk / reward', style: AppTypo.meta(t)),
+            Text(
+              ratio,
+              style: AppTypo.value(t, color: t.accentInk, fontSize: 17),
+            ),
           ],
-        );
-      },
+        ),
+      ],
     );
   }
 }
@@ -561,27 +571,20 @@ class _RangeRing extends StatefulWidget {
   final bool Function() claimDraw;
   final bool animate;
 
-  static const _minDiameter = 142.0;
+  static const _minWidth = 110.0;
   static const _inset = 3.0;
-  static const _labelPadding = EdgeInsets.symmetric(horizontal: 8, vertical: 3);
   static const _buy = 'Strong buy';
   static const _sell = 'Strong sell';
 
-  static double strokeFor(double diameter) => math.min(15.0, diameter * 0.16);
+  static double strokeFor(double diameter) => math.min(10.0, diameter * 0.12);
 
-  static TextStyle _labelStyle(AppThemeTokens t, {Color? color}) =>
-      AppTypo.meta(t, color: color).copyWith(fontWeight: FontWeight.w800);
+  static TextStyle _labelStyle(AppThemeTokens t) =>
+      AppTypo.meta(t).copyWith(fontWeight: FontWeight.w700);
 
-  double diameterOf(BuildContext context) {
+  double minimumWidthOf(BuildContext context) {
     final style = _labelStyle(context.tokens);
-    final labelWidth = math.max(
-      singleLineTextWidth(context, _buy, style),
-      singleLineTextWidth(context, _sell, style),
-    );
-    return math.max(
-      _minDiameter,
-      labelWidth + _labelPadding.horizontal + AppSpace.s34,
-    );
+    final labelWidth = singleLineTextWidth(context, 'Strong', style);
+    return math.max(_minWidth, 2 * labelWidth + AppSpace.xxs);
   }
 
   @override
@@ -629,7 +632,6 @@ class _RangeRingState extends State<_RangeRing>
   Widget build(BuildContext context) {
     final t = context.tokens;
     final percent = (widget.position * 100).round();
-    final preferredDiameter = widget.diameterOf(context);
 
     return Semantics(
       image: true,
@@ -639,106 +641,51 @@ class _RangeRingState extends State<_RangeRing>
           'Entry is $percent percent of the way from stop to exit',
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final diameter = preferredDiameter.clamp(
-            constraints.minWidth,
-            constraints.maxWidth,
+          final width = constraints.maxWidth;
+          final chartHeight =
+              width / 2 + _RangeRing.strokeFor(width) / 2 + _RangeRing._inset;
+          final labelWidth = (width - AppSpace.xxs) / 2;
+          final style = _RangeRing._labelStyle(t);
+          final wrapLabels = [_RangeRing._buy, _RangeRing._sell].any(
+            (text) => singleLineTextWidth(context, text, style) > labelWidth,
           );
-          const padding = _RangeRing._labelPadding;
-          final endpointInset =
-              _RangeRing._inset + _RangeRing.strokeFor(diameter) / 2;
 
-          Size labelSize(String text) {
-            final size = measureText(
-              context,
-              text,
-              _RangeRing._labelStyle(t),
-              maxWidth: math.max(0.0, diameter - padding.horizontal),
-            );
-            return Size(
-              math.min(
-                diameter,
-                size.width.ceilToDouble() + padding.horizontal,
-              ),
-              size.height.ceilToDouble() + padding.vertical,
-            );
-          }
+          Widget label(String text, Color ink) => Text(
+            wrapLabels ? text.replaceFirst(' ', '\n') : text,
+            style: style.copyWith(color: ink),
+            textAlign: TextAlign.center,
+          );
 
-          final buySize = labelSize(_RangeRing._buy);
-          final sellSize = labelSize(_RangeRing._sell);
-          final top = math.max(0.0, buySize.height / 2 - endpointInset);
-          final bottom = math.max(0.0, sellSize.height / 2 - endpointInset);
-
-          Widget label(
-            String text,
-            Size size,
-            Color ink,
-            Color tint,
-            double y,
-          ) {
-            return Positioned(
-              left: (diameter / 2 - size.width + AppSpace.xs).clamp(
-                0.0,
-                diameter - size.width,
-              ),
-              top: y,
-              width: size.width,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Color.lerp(t.surface, tint, 0.58),
-                  border: Border.all(color: ink.withValues(alpha: 0.20)),
-                  borderRadius: BorderRadius.circular(AppRadius.pill),
-                ),
-                child: Padding(
-                  padding: padding,
-                  child: Text(
-                    text,
-                    style: _RangeRing._labelStyle(t, color: ink),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-            );
-          }
-
-          return SizedBox(
-            width: diameter,
-            height: top + diameter + bottom,
-            child: Stack(
-              children: [
-                Positioned(
-                  top: top,
-                  width: diameter,
-                  height: diameter,
-                  child: RepaintBoundary(
-                    child: CustomPaint(
-                      painter: _RangeRingPainter(
-                        position: widget.position,
-                        animation: _controller,
-                        loss: t.negative,
-                        gain: t.positive,
-                        track: t.surface,
-                        needle: t.highlight,
-                        ink: t.textPrimary,
-                      ),
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                height: chartHeight,
+                child: RepaintBoundary(
+                  child: CustomPaint(
+                    painter: _RangeRingPainter(
+                      position: widget.position,
+                      animation: _controller,
+                      loss: t.negative,
+                      gain: t.positive,
+                      track: t.hairline,
+                      needle: t.highlight,
+                      ink: t.textPrimary,
                     ),
                   ),
                 ),
-                label(
-                  _RangeRing._buy,
-                  buySize,
-                  t.negativeText,
-                  t.negativeSoft,
-                  top + endpointInset - buySize.height / 2,
-                ),
-                label(
-                  _RangeRing._sell,
-                  sellSize,
-                  t.positiveText,
-                  t.positiveSoft,
-                  top + diameter - endpointInset - sellSize.height / 2,
-                ),
-              ],
-            ),
+              ),
+              Row(
+                textDirection: TextDirection.ltr,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: label(_RangeRing._buy, t.negativeText)),
+                  const SizedBox(width: AppSpace.xxs),
+                  Expanded(child: label(_RangeRing._sell, t.positiveText)),
+                ],
+              ),
+            ],
           );
         },
       ),
@@ -757,7 +704,7 @@ class _RangeRingPainter extends CustomPainter {
     required this.ink,
   }) : super(repaint: animation);
 
-  static const double _start = -math.pi / 2;
+  static const double _start = math.pi;
   static const double _sweep = math.pi;
 
   final double position;
@@ -770,9 +717,9 @@ class _RangeRingPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final stroke = _RangeRing.strokeFor(size.shortestSide);
-    final center = size.center(Offset.zero);
-    final radius = size.shortestSide / 2 - stroke / 2 - _RangeRing._inset;
+    final stroke = _RangeRing.strokeFor(size.width);
+    final center = Offset(size.width / 2, size.width / 2);
+    final radius = center.dx - stroke / 2 - _RangeRing._inset;
     if (radius <= 0) return;
 
     final rect = Rect.fromCircle(center: center, radius: radius);
@@ -787,16 +734,6 @@ class _RangeRingPainter extends CustomPainter {
       ..strokeWidth = stroke
       ..strokeCap = StrokeCap.round;
 
-    final face = Path()
-      ..arcTo(rect, _start, _sweep, true)
-      ..close();
-    canvas.drawPath(
-      face,
-      Paint()
-        ..shader = LinearGradient(
-          colors: [track.withValues(alpha: 0.28), track.withValues(alpha: 0.8)],
-        ).createShader(Rect.fromLTWH(center.dx, rect.top, radius, rect.height)),
-    );
     canvas.drawArc(rect, _start, _sweep, false, paint..color = track);
 
     void segment(double from, double to, Color color) {
@@ -820,20 +757,6 @@ class _RangeRingPainter extends CustomPainter {
     segment(0, split, loss);
     segment(split, _sweep, gain);
 
-    final tickPaint = Paint()
-      ..color = ink.withValues(alpha: 0.20)
-      ..strokeWidth = 1.25
-      ..strokeCap = StrokeCap.round;
-    for (final fraction in const [0.25, 0.5, 0.75]) {
-      final angle = _start + _sweep * fraction;
-      final direction = Offset(math.cos(angle), math.sin(angle));
-      canvas.drawLine(
-        center + direction * (radius - stroke * 0.7),
-        center + direction * (radius - stroke * 1.05),
-        tickPaint,
-      );
-    }
-
     final angle = _start + split * progress;
     final direction = Offset(math.cos(angle), math.sin(angle));
     final wing = Offset(-direction.dy, direction.dx) * (stroke * 0.21);
@@ -844,17 +767,12 @@ class _RangeRingPainter extends CustomPainter {
       ..lineTo((center - wing).dx, (center - wing).dy)
       ..close();
     final fill = Paint()..color = needle.withValues(alpha: progress);
-    canvas.drawPath(
-      pointer.shift(const Offset(0, 1)),
-      Paint()..color = ink.withValues(alpha: 0.18 * progress),
-    );
     canvas.drawPath(pointer, fill);
     canvas.drawCircle(
       center,
       stroke * 0.36,
       Paint()..color = ink.withValues(alpha: progress),
     );
-    canvas.drawCircle(center, stroke * 0.18, fill);
   }
 
   @override
@@ -868,21 +786,11 @@ class _RangeRingPainter extends CustomPainter {
       ink != old.ink;
 }
 
-/// Right-aligned price ladder. Below the ring it has room for labels beside
-/// their amounts.
+/// Price labels share a baseline with their amounts.
 class _LevelStack extends StatelessWidget {
-  const _LevelStack({
-    required this.levels,
-    required this.ratio,
-    this.inlineLabels = false,
-  });
+  const _LevelStack({required this.levels});
 
   final List<_Level> levels;
-  final String ratio;
-  final bool inlineLabels;
-
-  static const _ratioLabel = 'Risk / reward';
-  static const _ratioPadding = EdgeInsets.symmetric(horizontal: 8, vertical: 6);
 
   static TextStyle _priceStyle(AppThemeTokens t, _Level level) =>
       AppTypo.levelPrice(
@@ -893,26 +801,14 @@ class _LevelStack extends StatelessWidget {
   static TextStyle _changeStyle(AppThemeTokens t, _Level level) =>
       AppTypo.value(t, color: level.tone, fontSize: 12);
 
-  static TextStyle _ratioStyle(AppThemeTokens t) =>
-      AppTypo.value(t, color: t.accentInk, fontSize: 17);
-
-  double _rowWidth(double labelWidth, double valueWidth) => inlineLabels
-      ? labelWidth + AppSpace.s13 + valueWidth
-      : math.max(labelWidth, valueWidth);
-
   double singleLineWidth(BuildContext context) {
     final t = context.tokens;
-    var width =
-        _ratioPadding.horizontal +
-        _rowWidth(
-          singleLineTextWidth(context, _ratioLabel, AppTypo.meta(t)),
-          singleLineTextWidth(context, ratio, _ratioStyle(t)),
-        );
+    var width = 0.0;
     for (final level in levels) {
       final labelWidth = singleLineTextWidth(
         context,
         level.label,
-        AppTypo.meta(t),
+        AppTypo.hint(t),
       );
       final priceWidth = singleLineTextWidth(
         context,
@@ -927,8 +823,10 @@ class _LevelStack extends StatelessWidget {
               formatDelta(change),
               _changeStyle(t, level),
             );
-      final valueWidth = math.max(priceWidth, changeWidth);
-      width = math.max(width, _rowWidth(labelWidth, valueWidth));
+      width = math.max(
+        width,
+        labelWidth + AppSpace.s8 + math.max(priceWidth, changeWidth),
+      );
     }
     return width;
   }
@@ -940,15 +838,10 @@ class _LevelStack extends StatelessWidget {
       label: 'Analyst price levels and distances from entry',
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final inline =
-              inlineLabels && singleLineWidth(context) <= constraints.maxWidth;
+          final inline = singleLineWidth(context) <= constraints.maxWidth;
 
           Widget rowFor(_Level level) {
-            final label = Text(
-              level.label,
-              style: AppTypo.meta(t),
-              textAlign: inline ? TextAlign.start : TextAlign.end,
-            );
+            final label = Text(level.label, style: AppTypo.hint(t));
             final value = Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -970,7 +863,7 @@ class _LevelStack extends StatelessWidget {
             );
             if (!inline) {
               return Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [label, const SizedBox(height: 2), value],
               );
             }
@@ -979,22 +872,11 @@ class _LevelStack extends StatelessWidget {
               textBaseline: TextBaseline.alphabetic,
               children: [
                 Expanded(child: label),
-                const SizedBox(width: AppSpace.s13),
+                const SizedBox(width: AppSpace.s8),
                 value,
               ],
             );
           }
-
-          final ratioLabel = Text(
-            _ratioLabel,
-            style: AppTypo.meta(t),
-            textAlign: inline ? TextAlign.start : TextAlign.end,
-          );
-          final ratioValue = Text(
-            ratio,
-            style: _ratioStyle(t),
-            textAlign: TextAlign.end,
-          );
 
           return Column(
             mainAxisSize: MainAxisSize.min,
@@ -1004,31 +886,6 @@ class _LevelStack extends StatelessWidget {
                 if (i > 0) const SizedBox(height: AppSpace.s8),
                 rowFor(levels[i]),
               ],
-              const SizedBox(height: AppSpace.s13),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Color.lerp(t.surface, t.positiveSoft, 0.25),
-                  border: Border.all(
-                    color: Color.lerp(t.hairline, t.positive, 0.14)!,
-                  ),
-                  borderRadius: AppShape.field,
-                ),
-                child: Padding(
-                  padding: _ratioPadding,
-                  child: inline
-                      ? Row(
-                          children: [
-                            Expanded(child: ratioLabel),
-                            const SizedBox(width: AppSpace.s13),
-                            ratioValue,
-                          ],
-                        )
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [ratioLabel, ratioValue],
-                        ),
-                ),
-              ),
             ],
           );
         },
