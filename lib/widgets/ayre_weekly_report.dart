@@ -103,10 +103,22 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
     final stocks = report.stocks;
     final canExpand = stocks.length > widget.collapsedCount;
     final visible = _showAll ? stocks : stocks.take(widget.collapsedCount);
-    final duration = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : AppMotion.expand;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final animate = !_changedWeek && report.id == _firstWeek && !widget.stale;
+    final stockList = Column(
+      key: ValueKey(report.id),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final (i, stock) in visible.indexed) ...[
+          if (i > 0) const SizedBox(height: AppSpace.cardGap),
+          Entrance(
+            index: i,
+            animate: animate && i < widget.collapsedCount,
+            child: _StockCard(stock: stock, report: report),
+          ),
+        ],
+      ],
+    );
 
     return AyreTabScroll(
       eager: true,
@@ -133,40 +145,32 @@ class _WeeklyReportCardState extends State<WeeklyReportCard> {
           ),
           const SizedBox(height: AppSpace.s13),
         ],
-        AnimatedSize(
-          duration: duration,
-          curve: AppMotion.easeInOut,
-          alignment: Alignment.topCenter,
-          child: AnimatedSwitcher(
-            duration: duration,
-            switchInCurve: AppMotion.easeInOut,
-            switchOutCurve: AppMotion.easeInOut,
-            layoutBuilder: (current, previous) => Stack(
-              alignment: Alignment.topCenter,
-              children: [
-                for (final child in previous)
-                  ExcludeFocus(
-                    child: ExcludeSemantics(child: IgnorePointer(child: child)),
-                  ),
-                ?current,
-              ],
-            ),
-            child: Column(
-              key: ValueKey(report.id),
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final (i, stock) in visible.indexed) ...[
-                  if (i > 0) const SizedBox(height: AppSpace.cardGap),
-                  Entrance(
-                    index: i,
-                    animate: animate && i < widget.collapsedCount,
-                    child: _StockCard(stock: stock, report: report),
-                  ),
+        if (reduceMotion)
+          stockList
+        else
+          AnimatedSize(
+            duration: AppMotion.expand,
+            curve: AppMotion.easeInOut,
+            alignment: Alignment.topCenter,
+            child: AnimatedSwitcher(
+              duration: AppMotion.expand,
+              switchInCurve: AppMotion.easeInOut,
+              switchOutCurve: AppMotion.easeInOut,
+              layoutBuilder: (current, previous) => Stack(
+                alignment: Alignment.topCenter,
+                children: [
+                  for (final child in previous)
+                    ExcludeFocus(
+                      child: ExcludeSemantics(
+                        child: IgnorePointer(child: child),
+                      ),
+                    ),
+                  ?current,
                 ],
-              ],
+              ),
+              child: stockList,
             ),
           ),
-        ),
         if (canExpand) ...[
           const SizedBox(height: AppSpace.s8),
           _ExpandToggle(
@@ -352,46 +356,103 @@ class _ReportSummary extends StatelessWidget {
         'Stop-loss hit',
       ),
     ];
+    const valueSize = 21.0;
+    const valueWeight = FontWeight.w800;
+    const sidePadding = 6.0;
+    final valueStyle = AppTypo.num(
+      fontSize: valueSize,
+      fontWeight: valueWeight,
+    );
+    final labelStyle = AppTypo.meta(t);
+
+    Widget metric(int value, String label, {required bool stacked}) {
+      final figure = CountUpFigure(
+        value: value.toDouble(),
+        from: animate ? 0 : value.toDouble(),
+        format: (number) => number.round().toString(),
+        fontSize: valueSize,
+        fontWeight: valueWeight,
+        textAlign: stacked ? TextAlign.end : TextAlign.center,
+      );
+      final caption = Text(
+        label,
+        textAlign: stacked ? TextAlign.start : TextAlign.center,
+        style: labelStyle,
+      );
+      return Semantics(
+        label: '$value $label',
+        excludeSemantics: true,
+        child: stacked
+            ? Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpace.md,
+                  vertical: AppSpace.s8,
+                ),
+                child: Wrap(
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: AppSpace.s8,
+                  runSpacing: AppSpace.xxs,
+                  children: [caption, figure],
+                ),
+              )
+            : Padding(
+                padding: const EdgeInsets.symmetric(horizontal: sidePadding),
+                child: Column(
+                  children: [figure, const SizedBox(height: 3), caption],
+                ),
+              ),
+      );
+    }
+
     return AyreCard(
       strongShadow: true,
       padding: const EdgeInsets.symmetric(vertical: AppSpace.s8),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (final (i, (value, label)) in cells.indexed) ...[
-              if (i > 0)
-                VerticalDivider(width: 1, thickness: 1, color: t.hairline),
-              Expanded(
-                child: Semantics(
-                  label: '$value $label',
-                  excludeSemantics: true,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Column(
-                      children: [
-                        CountUpFigure(
-                          value: value.toDouble(),
-                          from: animate ? 0 : value.toDouble(),
-                          format: (number) => number.round().toString(),
-                          fontSize: 21,
-                          fontWeight: FontWeight.w800,
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          label,
-                          textAlign: TextAlign.center,
-                          style: AppTypo.meta(t),
-                        ),
-                      ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final cellWidth =
+              (constraints.maxWidth - (cells.length - 1)) / cells.length -
+              2 * sidePadding;
+          final fitsInColumns = cells.every(
+            (cell) =>
+                singleLineTextWidth(context, cell.$1.toString(), valueStyle) <=
+                    cellWidth &&
+                cell.$2
+                    .split(' ')
+                    .every(
+                      (word) =>
+                          singleLineTextWidth(context, word, labelStyle) <=
+                          cellWidth,
                     ),
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
+          );
+          if (!fitsInColumns) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (i, (value, label)) in cells.indexed) ...[
+                  if (i > 0)
+                    const HairlineDivider(
+                      indent: AppSpace.md,
+                      endIndent: AppSpace.md,
+                    ),
+                  metric(value, label, stacked: true),
+                ],
+              ],
+            );
+          }
+          return IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (i, (value, label)) in cells.indexed) ...[
+                  if (i > 0)
+                    VerticalDivider(width: 1, thickness: 1, color: t.hairline),
+                  Expanded(child: metric(value, label, stacked: false)),
+                ],
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -721,29 +782,60 @@ class _StockDetails extends StatelessWidget {
         final available = constraints.maxWidth - gap * (fields.length - 1);
         final minimums = [
           for (final field in fields)
-            singleLineTextWidth(context, field.value, valueStyle),
+            field.label
+                .split(' ')
+                .fold<double>(
+                  singleLineTextWidth(context, field.value, valueStyle),
+                  (width, word) => math.max(
+                    width,
+                    singleLineTextWidth(context, word, labelStyle),
+                  ),
+                ),
         ];
         final required = minimums.reduce((a, b) => a + b);
 
         if (required > available) {
+          final fitsInRows = fields.every(
+            (field) =>
+                singleLineTextWidth(context, field.label, labelStyle) +
+                    gap +
+                    singleLineTextWidth(context, field.value, valueStyle) <=
+                constraints.maxWidth,
+          );
+
+          Widget detail(({String label, String value, Color color}) field) {
+            final label = Text(field.label, style: labelStyle);
+            final value = Text(
+              field.value,
+              style: valueStyle.copyWith(color: field.color),
+            );
+            if (fitsInRows) {
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.baseline,
+                textBaseline: TextBaseline.alphabetic,
+                children: [
+                  Expanded(child: label),
+                  const SizedBox(width: gap),
+                  value,
+                ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                label,
+                const SizedBox(height: AppSpace.xxs),
+                value,
+              ],
+            );
+          }
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (final (i, field) in fields.indexed) ...[
                 if (i > 0) const SizedBox(height: AppSpace.s8),
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  spacing: gap,
-                  runSpacing: AppSpace.xxs,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(field.label, style: labelStyle),
-                    Text(
-                      field.value,
-                      style: valueStyle.copyWith(color: field.color),
-                    ),
-                  ],
-                ),
+                detail(field),
               ],
             ],
           );

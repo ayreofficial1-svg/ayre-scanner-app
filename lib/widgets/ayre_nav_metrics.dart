@@ -51,6 +51,7 @@ abstract final class AyreNavMetrics {
 
   /// Gap between slot and label.
   static const double labelGap = 5;
+  static const double dockRowGap = AppSpace.xxs;
 
   /// Saffron marker: 34×4 on the dock's top edge, skewed −24°.
   static const double markerWidth = 34;
@@ -78,6 +79,34 @@ abstract final class AyreNavMetrics {
       ? math.min(maxWidth, viewportWidth)
       : viewportWidth;
 
+  static double _widestLabel(BuildContext context) {
+    final style = labelStyleOf(context);
+    return kNavDestinations
+            .map((entry) => singleLineTextWidth(context, entry.label, style))
+            .reduce(math.max) +
+        2 * labelPadding;
+  }
+
+  static double _dockContentWidthOf(BuildContext context) {
+    final media = MediaQuery.of(context);
+    return dockWidthFor(media.size.width) -
+        media.viewPadding.horizontal -
+        2 * horizontalPadding;
+  }
+
+  static int dockColumnsOf(BuildContext context) {
+    final count = kNavDestinations.length;
+    // At larger text sizes give every destination more room to fit its name.
+    return _widestLabel(context) * count <= _dockContentWidthOf(context)
+        ? count
+        : 2;
+  }
+
+  static double railWidthOf(BuildContext context) => math.max(
+    railWidth,
+    math.min(MediaQuery.sizeOf(context).width / 4, _widestLabel(context)),
+  );
+
   static double labelHeightFor(BuildContext context, double slotWidth) {
     final width = math.max(0.0, slotWidth - 2 * labelPadding);
     final style = labelStyleOf(context);
@@ -93,14 +122,14 @@ abstract final class AyreNavMetrics {
         .reduce(math.max);
   }
 
-  static double dockLabelHeightOf(BuildContext context) {
-    final media = MediaQuery.of(context);
-    final width =
-        dockWidthFor(media.size.width) -
-        media.viewPadding.horizontal -
-        2 * horizontalPadding;
-    return labelHeightFor(context, width / kNavDestinations.length);
-  }
+  static double dockLabelHeightOf(BuildContext context, [int? columns]) =>
+      labelHeightFor(
+        context,
+        _dockContentWidthOf(context) / (columns ?? dockColumnsOf(context)),
+      );
+
+  static double dockItemHeightFor(double labelHeight) =>
+      topPadding + slotHeight + labelGap + labelHeight;
 
   /// Space under the label: the reference breathing room, or the system inset
   /// plus a little air, whichever is larger. The inset is counted once.
@@ -111,12 +140,13 @@ abstract final class AyreNavMetrics {
   static double barHeightFor({
     required double labelHeight,
     double bottomInset = 0,
+    int? columns,
   }) {
+    final count = kNavDestinations.length;
+    final rows = (count / (columns ?? count)).ceil();
     final content =
-        topPadding +
-        slotHeight +
-        labelGap +
-        labelHeight +
+        rows * dockItemHeightFor(labelHeight) +
+        (rows - 1) * dockRowGap +
         bottomPaddingFor(bottomInset);
     return math.max(minHeight, content);
   }
@@ -130,9 +160,11 @@ abstract final class AyreNavMetrics {
   static double clearanceOf(BuildContext context, {double? bottomInset}) {
     final media = MediaQuery.of(context);
     if (usesRail(media.size.width)) return 0;
+    final columns = dockColumnsOf(context);
     return barHeightFor(
+      columns: columns,
       bottomInset: bottomInset ?? media.viewPadding.bottom,
-      labelHeight: dockLabelHeightOf(context),
+      labelHeight: dockLabelHeightOf(context, columns),
     );
   }
 }

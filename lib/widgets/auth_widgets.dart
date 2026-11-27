@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../services/auth_validators.dart';
@@ -6,6 +8,7 @@ import 'ayre_icons.dart';
 import 'ayre_logo.dart';
 import 'ayre_masthead.dart';
 import 'finance_icons.dart';
+import 'responsive.dart';
 
 /// A labelled text field for the sign-in flow: 12/700 label, a 6 gap, then a
 /// card-filled 55-high field with a 1px line, radius 13, a 20 leading glyph and
@@ -94,6 +97,7 @@ class _AuthFieldState extends State<AuthField> {
             onSubmitted: widget.onSubmitted,
             decoration: InputDecoration(
               hintText: widget.hint,
+              hintMaxLines: 4,
               hintStyle: AppTypo.fieldValue(t, color: t.foregroundMuted),
               error: widget.errorText == null ? null : Text(widget.errorText!),
               filled: true,
@@ -219,25 +223,36 @@ class _Row extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = context.tokens;
+    final style = AppTypo.caption(
+      t,
+      color: ok ? t.textPrimary : t.foregroundMuted,
+    );
+    final firstLineHeight = measureText(
+      context,
+      text,
+      style,
+      maxLines: 1,
+    ).height;
     return Padding(
       padding: const EdgeInsets.only(top: AppSpace.xxs + 1),
       child: Semantics(
         label: '$text, ${ok ? 'met' : 'not met'}',
         excludeSemantics: true,
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
               width: 16,
-              height: 16,
-              child: ok
-                  ? FinanceIcon(
-                      FinanceGlyph.check,
-                      size: 14,
-                      color: t.positiveText,
-                      strokeWidth: 2,
-                    )
-                  : Center(
-                      child: Container(
+              height: math.max(16, firstLineHeight),
+              child: Center(
+                child: ok
+                    ? FinanceIcon(
+                        FinanceGlyph.check,
+                        size: 14,
+                        color: t.positiveText,
+                        strokeWidth: 2,
+                      )
+                    : Container(
                         width: 6,
                         height: 6,
                         decoration: BoxDecoration(
@@ -245,18 +260,10 @@ class _Row extends StatelessWidget {
                           color: t.foregroundSubtle,
                         ),
                       ),
-                    ),
-            ),
-            const SizedBox(width: AppSpace.sm),
-            Expanded(
-              child: Text(
-                text,
-                style: AppTypo.caption(
-                  t,
-                  color: ok ? t.textPrimary : t.foregroundMuted,
-                ),
               ),
             ),
+            const SizedBox(width: AppSpace.sm),
+            Expanded(child: Text(text, style: style)),
           ],
         ),
       ),

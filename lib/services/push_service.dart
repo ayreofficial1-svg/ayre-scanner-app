@@ -272,9 +272,14 @@ class PushService extends ChangeNotifier {
       case _typeSignal:
       case _typeRevised:
         if (symbol.isEmpty) return null;
-        final fallback = type == _typeSignal
-            ? NotificationCopy.newSignal(symbol)
-            : NotificationCopy.revisedSignal(symbol);
+        final name = data['stock_name']?.toString().trim() ?? '';
+        final fallback = NotificationCopy.signal(
+          stock: name.isEmpty ? symbol : name,
+          revised: type == _typeRevised,
+          potentialReturnPct: NotificationCopy.parseAmount(
+            data['potential_return_pct'],
+          ),
+        );
         return Notice(
           kind: type == _typeSignal ? NoticeKind.signal : NoticeKind.revised,
           title: title.isNotEmpty ? title : fallback.title,
@@ -297,12 +302,10 @@ class PushService extends ChangeNotifier {
           );
         }
         final profit = NotificationCopy.parseAmount(data['profit']);
-        final exitPrice = NotificationCopy.parseAmount(data['exit_price']);
-        if (symbol.isEmpty || profit == null || exitPrice == null) return null;
+        if (symbol.isEmpty || profit == null || !profit.isFinite) return null;
         final copy = NotificationCopy.exitSignal(
           stock: symbol,
           profit: profit,
-          exitPrice: exitPrice,
         );
         return Notice(
           kind: NoticeKind.exit,
@@ -403,6 +406,8 @@ class PushService extends ChangeNotifier {
     if (messenger == null) return;
     final context = navigatorKey.currentContext;
     final tokens = context?.tokens;
+    final isPick =
+        notice.kind == NoticeKind.signal || notice.kind == NoticeKind.revised;
 
     final VoidCallback? onView = switch (notice.kind) {
       NoticeKind.signal || NoticeKind.revised => _requestOpenSignals,
@@ -419,12 +424,16 @@ class PushService extends ChangeNotifier {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(notice.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(
+                notice.title,
+                maxLines: isPick ? null : 1,
+                overflow: isPick ? null : TextOverflow.ellipsis,
+              ),
               if (notice.body.isNotEmpty)
                 Text(
                   notice.body,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  maxLines: isPick ? null : 2,
+                  overflow: isPick ? null : TextOverflow.ellipsis,
                   style: tokens == null ? null : AppTypo.body(tokens),
                 ),
             ],

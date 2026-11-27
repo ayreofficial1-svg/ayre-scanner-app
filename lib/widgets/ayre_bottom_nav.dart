@@ -17,9 +17,10 @@ Key navDestinationKey(String label) => ValueKey('nav-destination-$label');
 /// top border and 26px top corners, flush with the window bottom.
 ///
 /// Four equally spaced destinations, each an outline glyph in a transparent
-/// 55×34 slot with an 11/700 label. Selection is the brand colour plus one
-/// saffron marker (34×4, skewed −24°) that glides between item centres in
-/// 233ms — no filled capsule and no per-icon bounce.
+/// 55×34 slot with an 11/700 label. The dock uses two rows when needed to fit
+/// the destination labels at the chosen text size. Selection is the brand
+/// colour plus one saffron marker (34×4, skewed −24°) that glides between
+/// item centres.
 ///
 /// [onSelected] fires only for a *new* index (with the selection haptic).
 /// [onReselected] fires when the already-selected item is tapped; it never
@@ -42,9 +43,11 @@ class AyreBottomNav extends StatelessWidget {
     final media = MediaQuery.of(context);
     final highContrast = MediaQuery.highContrastOf(context);
 
-    final labelHeight = AyreNavMetrics.dockLabelHeightOf(context);
+    final columns = AyreNavMetrics.dockColumnsOf(context);
+    final labelHeight = AyreNavMetrics.dockLabelHeightOf(context, columns);
     final inset = media.viewPadding.bottom;
     final barHeight = AyreNavMetrics.barHeightFor(
+      columns: columns,
       labelHeight: labelHeight,
       bottomInset: inset,
     );
@@ -67,6 +70,7 @@ class AyreBottomNav extends StatelessWidget {
             right: AyreNavMetrics.horizontalPadding + media.viewPadding.right,
           ),
           child: _DockItems(
+            columns: columns,
             selectedIndex: selectedIndex,
             onSelected: onSelected,
             onReselected: onReselected,
@@ -91,12 +95,14 @@ class AyreBottomNav extends StatelessWidget {
 
 class _DockItems extends StatelessWidget {
   const _DockItems({
+    required this.columns,
     required this.selectedIndex,
     required this.onSelected,
     required this.onReselected,
     required this.labelHeight,
   });
 
+  final int columns;
   final int selectedIndex;
   final ValueChanged<int> onSelected;
   final ValueChanged<int>? onReselected;
@@ -107,47 +113,60 @@ class _DockItems extends StatelessWidget {
     final t = context.tokens;
     final count = kNavDestinations.length;
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final rows = (count / columns).ceil();
+    final itemHeight = AyreNavMetrics.dockItemHeightFor(labelHeight);
+
+    Widget row(int rowIndex) => Row(
+      children: [
+        for (var i = rowIndex * columns; i < (rowIndex + 1) * columns; i++)
+          Expanded(
+            child: i < count
+                ? _NavItem(
+                    key: navDestinationKey(kNavDestinations[i].label),
+                    index: i,
+                    destination: kNavDestinations[i],
+                    selected: i == selectedIndex,
+                    onTap: () =>
+                        _handleTap(i, selectedIndex, onSelected, onReselected),
+                    labelHeight: labelHeight,
+                    vertical: false,
+                  )
+                : const SizedBox.shrink(),
+          ),
+      ],
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final slotWidth = constraints.maxWidth / count;
+        final slotWidth = constraints.maxWidth / columns;
         // The marker's left edge, centred on the selected item. The dock is
         // inset by its own padding, so the marker is positioned in the same
         // coordinate space as the items.
         final markerLeft =
-            slotWidth * selectedIndex +
+            slotWidth * (selectedIndex % columns) +
             (slotWidth - AyreNavMetrics.markerWidth) / 2;
+        final markerTop =
+            (selectedIndex ~/ columns) *
+            (itemHeight + AyreNavMetrics.dockRowGap);
         return FocusTraversalGroup(
           policy: ReadingOrderTraversalPolicy(),
           child: Stack(
             clipBehavior: Clip.none,
             children: [
-              Row(
+              Column(
                 children: [
-                  for (var i = 0; i < count; i++)
-                    Expanded(
-                      child: _NavItem(
-                        key: navDestinationKey(kNavDestinations[i].label),
-                        index: i,
-                        destination: kNavDestinations[i],
-                        selected: i == selectedIndex,
-                        onTap: () => _handleTap(
-                          i,
-                          selectedIndex,
-                          onSelected,
-                          onReselected,
-                        ),
-                        labelHeight: labelHeight,
-                        vertical: false,
-                      ),
-                    ),
+                  for (var i = 0; i < rows - 1; i++) ...[
+                    SizedBox(height: itemHeight, child: row(i)),
+                    const SizedBox(height: AyreNavMetrics.dockRowGap),
+                  ],
+                  Expanded(child: row(rows - 1)),
                 ],
               ),
               AnimatedPositionedDirectional(
                 duration: reduceMotion ? Duration.zero : AppMotion.navMarker,
                 curve: AppMotion.easeInOut,
                 start: markerLeft,
-                top: 0,
+                top: markerTop,
                 width: AyreNavMetrics.markerWidth,
                 height: AyreNavMetrics.markerHeight,
                 child: ExcludeSemantics(
@@ -214,6 +233,7 @@ class AyreNavRail extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = context.tokens;
     final media = MediaQuery.of(context);
+    final width = AyreNavMetrics.railWidthOf(context);
     final labelHeight = AyreNavMetrics.labelHeightFor(context, width);
 
     final duration = media.disableAnimations

@@ -137,14 +137,20 @@ class _SignalsSectionState extends State<SignalsSection> {
     });
     // A5: no completion haptic after a refresh.
 
-    if (!result.isReady || result.value == null) return;
-    final fresh = await SeenSignalsStore.diffAndRecord(
-      result.value!.map((s) => s.symbol),
-    );
+    final signals = result.value;
+    if (signals == null) return;
+    final fresh = await SeenSignalsStore.diffAndRecord(signals.map((s) => s.symbol));
     if (fresh.isEmpty) return;
-    final single = fresh.length == 1
-        ? NotificationCopy.newSignal(fresh.first)
+    final newPick = fresh.length == 1
+        ? signals.firstWhere((signal) => signal.symbol == fresh.first)
         : null;
+    final name = newPick?.name?.trim();
+    final single = newPick == null
+        ? null
+        : NotificationCopy.signal(
+            stock: name == null || name.isEmpty ? newPick.symbol : name,
+            potentialReturnPct: newPick.potentialReturnPct,
+          );
     await NotificationLog.instance.add(
       Notice(
         kind: NoticeKind.signal,
@@ -490,9 +496,9 @@ class _RecommendationRange {
     final risk = (entry - stop).toDouble();
     final reward = (exit - entry).toDouble();
     final stopPct = -risk / entry * 100;
-    final exitPct = reward / entry * 100;
+    final exitPct = signal.potentialReturnPct;
     final ratio = reward / risk;
-    if (!exitPct.isFinite || !ratio.isFinite) return null;
+    if (exitPct == null || !ratio.isFinite) return null;
     return _RecommendationRange(
       entryPosition: risk / (exit - stop),
       stopPct: stopPct,
@@ -572,23 +578,30 @@ class _RangeGaugeState extends State<_RangeGauge>
       singleLineTextWidth(context, _buyLabel, labelStyle),
       singleLineTextWidth(context, _sellLabel, labelStyle),
     );
+    final wrappedLabelWidth = singleLineTextWidth(
+      context,
+      'Strong',
+      labelStyle,
+    );
 
     return Semantics(
       label:
-          '$_buyLabel on the left. $_sellLabel on the right. '
+          '$_sellLabel on the left. $_buyLabel on the right. '
           'Entry is $percent percent of the way from stop to exit',
       excludeSemantics: true,
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final labelWidth = math.min(
-            preferredLabelWidth,
-            constraints.maxWidth * 0.42,
-          );
+          final wrapLabels = preferredLabelWidth > constraints.maxWidth * 0.42;
+          final labelWidth = wrapLabels
+              ? math.min(
+                  wrappedLabelWidth,
+                  math.max(0.0, (constraints.maxWidth - AppSpace.s8) / 2),
+                )
+              : preferredLabelWidth;
           final radius = math.min(
             _maxRadius,
             (constraints.maxWidth - labelWidth) / 2,
           );
-          final wrapLabels = labelWidth < preferredLabelWidth;
 
           Widget endpointLabel(String label, Color color) => SizedBox(
             width: labelWidth,
@@ -626,8 +639,8 @@ class _RangeGaugeState extends State<_RangeGauge>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        endpointLabel(_buyLabel, t.negativeText),
-                        endpointLabel(_sellLabel, t.positiveText),
+                        endpointLabel(_sellLabel, t.negativeText),
+                        endpointLabel(_buyLabel, t.positiveText),
                       ],
                     ),
                   ),

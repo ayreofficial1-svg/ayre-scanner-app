@@ -2,11 +2,8 @@ import 'dart:math';
 
 /// The wording for every notification the app writes itself.
 ///
-/// Each kind has a pool of short variations and a pick is shuffled so the same
-/// line doesn't show up twice in a row. The backend (`alerts/push.py`) keeps a
-/// matching pool for the notification the phone shows while the app is closed;
-/// this copy is used for anything the app records on its own (the Signals
-/// board spotting a new pick, a message that arrives with the app open).
+/// Matches the backend copy for notices the app records itself or receives
+/// without the notification text.
 ///
 /// Language rule: plain words only. A heading is two or three words, followed
 /// by the stock, then one short line.
@@ -17,24 +14,6 @@ class NotificationCopy {
   static final Map<String, int> _last = {};
 
   // ── Pools ────────────────────────────────────────────────────────────────
-
-  static const _newPick = <(String, String)>[
-    ('New Pick', 'A fresh pick is ready.'),
-    ('New Signal', 'Check Signals on Home.'),
-    ('Fresh Setup', 'A new setup is available.'),
-    ('New Opportunity', 'See Signals on Home.'),
-    ('Buy Setup', 'A new setup is ready.'),
-    ('Fresh Pick', 'Take a look in Signals.'),
-    ('Buy Signal', 'Open Signals on Home.'),
-  ];
-
-  static const _revised = <(String, String)>[
-    ('Signal Updated', 'The signal has been updated.'),
-    ('Pick Revised', 'The existing pick has changed.'),
-    ('Updated Signal', 'Check the latest details.'),
-    ('Setup Updated', 'The setup has been updated.'),
-    ('Pick Updated', 'Open Signals for the change.'),
-  ];
 
   static const _exitProfit = <String>[
     'Book Profit',
@@ -49,19 +28,22 @@ class NotificationCopy {
 
   // ── Public ───────────────────────────────────────────────────────────────
 
-  /// A new pick, e.g. `New Pick: RELIANCE` / `A fresh pick is ready.`
-  static ({String title, String body}) newSignal(String stock) =>
-      _fromPairs('new', _newPick, stock);
+  static ({String title, String body}) signal({
+    required String stock,
+    bool revised = false,
+    num? potentialReturnPct,
+  }) {
+    final heading = revised ? 'Pick Updated' : 'Fresh Pick';
+    final body = potentialReturnPct != null && potentialReturnPct.isFinite
+        ? 'Potential return: ${potentialReturnPct.toStringAsFixed(2)}%.'
+        : 'Open Signals for details.';
+    return (title: '$heading: $stock', body: body);
+  }
 
-  /// An already-announced pick that has changed.
-  static ({String title, String body}) revisedSignal(String stock) =>
-      _fromPairs('revised', _revised, stock);
-
-  /// An exit call: `Book Profit: RELIANCE` / `Profit ₹120 | Exit ₹2,850`.
+  /// An exit call, with the profit or loss in the body.
   static ({String title, String body}) exitSignal({
     required String stock,
     required num profit,
-    required num exitPrice,
   }) {
     final loss = profit < 0;
     final pool = loss ? _exitLoss : _exitProfit;
@@ -69,8 +51,7 @@ class NotificationCopy {
     final label = loss ? 'Loss' : 'Profit';
     return (
       title: '$heading: $stock',
-      body: '$label ${formatRupees(profit.abs())} | '
-          'Exit ${formatRupees(exitPrice)}',
+      body: '$label ${formatRupees(profit.abs())}. Open Alerts for details.',
     );
   }
 
@@ -108,15 +89,6 @@ class NotificationCopy {
   }
 
   // ── Internals ────────────────────────────────────────────────────────────
-
-  static ({String title, String body}) _fromPairs(
-    String key,
-    List<(String, String)> pool,
-    String stock,
-  ) {
-    final (heading, line) = pool[_pick(key, pool.length)];
-    return (title: '$heading: $stock', body: line);
-  }
 
   /// Random index that never repeats the previous one for the same [key].
   static int _pick(String key, int length) {

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -167,9 +169,23 @@ class _LearnTabState extends State<LearnTab> {
     final visible = _category == null
         ? courses
         : courses.where((course) => course.category == _category).toList();
-    final duration = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : AppMotion.expand;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final library = KeyedSubtree(
+      key: ValueKey(_category),
+      child: _list(columns, visible),
+    );
+    final stats = [
+      AyreStatTile(
+        value: countsKnown ? '${subjects.length}' : '—',
+        label: 'Subjects',
+        animate: _result?.stale != true,
+      ),
+      AyreStatTile(
+        value: countsKnown ? '${courses.length}' : '—',
+        label: 'Courses',
+        animate: _result?.stale != true,
+      ),
+    ];
 
     return AyreTabScroll(
       eager: true,
@@ -198,27 +214,33 @@ class _LearnTabState extends State<LearnTab> {
             ],
           ),
         ),
-        overlapChild: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: AyreStatTile(
-                  value: countsKnown ? '${subjects.length}' : '—',
-                  label: 'Subjects',
-                  animate: _result?.stale != true,
-                ),
+        overlapChild: LayoutBuilder(
+          builder: (context, constraints) {
+            const gap = AppSpace.cardGap;
+            final tileWidth = (constraints.maxWidth - gap) / 2;
+            if (stats.any(
+              (tile) => tile.singleLineWidth(context) > tileWidth,
+            )) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  stats.first,
+                  const SizedBox(height: gap),
+                  stats.last,
+                ],
+              );
+            }
+            return IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(child: stats.first),
+                  const SizedBox(width: gap),
+                  Expanded(child: stats.last),
+                ],
               ),
-              const SizedBox(width: AppSpace.cardGap),
-              Expanded(
-                child: AyreStatTile(
-                  value: countsKnown ? '${courses.length}' : '—',
-                  label: 'Courses',
-                  animate: _result?.stale != true,
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
       children: [
@@ -243,30 +265,32 @@ class _LearnTabState extends State<LearnTab> {
           ),
           const SizedBox(height: AppSpace.s8),
         ],
-        AnimatedSize(
-          alignment: Alignment.topCenter,
-          duration: duration,
-          curve: AppMotion.easeInOut,
-          child: AnimatedSwitcher(
-            duration: duration,
-            switchInCurve: AppMotion.easeInOut,
-            switchOutCurve: AppMotion.easeInOut,
-            layoutBuilder: (current, previous) => Stack(
-              alignment: Alignment.topCenter,
-              children: [
-                for (final child in previous)
-                  ExcludeFocus(
-                    child: ExcludeSemantics(child: IgnorePointer(child: child)),
-                  ),
-                ?current,
-              ],
-            ),
-            child: KeyedSubtree(
-              key: ValueKey(_category),
-              child: _list(columns, visible),
+        if (reduceMotion)
+          library
+        else
+          AnimatedSize(
+            alignment: Alignment.topCenter,
+            duration: AppMotion.expand,
+            curve: AppMotion.easeInOut,
+            child: AnimatedSwitcher(
+              duration: AppMotion.expand,
+              switchInCurve: AppMotion.easeInOut,
+              switchOutCurve: AppMotion.easeInOut,
+              layoutBuilder: (current, previous) => Stack(
+                alignment: Alignment.topCenter,
+                children: [
+                  for (final child in previous)
+                    ExcludeFocus(
+                      child: ExcludeSemantics(
+                        child: IgnorePointer(child: child),
+                      ),
+                    ),
+                  ?current,
+                ],
+              ),
+              child: library,
             ),
           ),
-        ),
         const SizedBox(height: AppSpace.sectionGap),
         const _LearnFooter(),
       ],
@@ -422,13 +446,14 @@ class _ContinueCard extends StatelessWidget {
     final progress = course.progress ?? 0;
     final ring = ProgressRing(value: progress);
     final labelStyle = AppTypo.label(t, color: t.accentInk);
+    final titleStyle = AppTypo.sectionTitle(t);
     final description = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         Text('CONTINUE', style: labelStyle),
         const SizedBox(height: AppSpace.xxs),
-        Text(course.title, style: AppTypo.sectionTitle(t)),
+        Text(course.title, style: titleStyle),
         const SizedBox(height: AppSpace.xxs),
         Figure.static(
           '${course.lessonsDone} of ${course.lessonsTotal} lessons',
@@ -452,10 +477,19 @@ class _ContinueCard extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpace.lg),
         child: LayoutBuilder(
           builder: (context, constraints) {
+            final descriptionWidth = course.title
+                .split(RegExp(r'\s+'))
+                .fold<double>(
+                  singleLineTextWidth(context, 'CONTINUE', labelStyle),
+                  (width, word) => math.max(
+                    width,
+                    singleLineTextWidth(context, word, titleStyle),
+                  ),
+                );
             final minimumWidth =
                 ring.diameterOf(context) +
                 AppSpace.md +
-                singleLineTextWidth(context, 'CONTINUE', labelStyle) +
+                descriptionWidth +
                 AppSpace.xs +
                 16;
             if (minimumWidth <= constraints.maxWidth) {
@@ -474,8 +508,13 @@ class _ContinueCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Flexible(child: ring),
-                    const Spacer(),
+                    Expanded(
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: ring,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpace.xs),
                     chevron,
                   ],
                 ),

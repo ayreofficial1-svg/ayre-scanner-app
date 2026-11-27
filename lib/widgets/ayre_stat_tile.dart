@@ -1,9 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 import 'ayre_components.dart';
 import 'ayre_icons.dart';
 import 'figure.dart';
+import 'responsive.dart';
 
 /// A compact stat tile: a bold figure over a muted label (redesign plan §2.3 /
 /// §2.4).
@@ -32,6 +35,23 @@ class AyreStatTile extends StatelessWidget {
   /// Omit for the icon-less Learn variant.
   final AyreGlyph? glyph;
   final bool animate;
+
+  static const _figureSize = 34.0;
+  static const _figureWeight = FontWeight.w800;
+
+  double singleLineWidth(BuildContext context) {
+    final valueStyle = AppTypo.num(
+      fontSize: _figureSize,
+      fontWeight: _figureWeight,
+    );
+    final labelStyle = AppTypo.body(context.tokens);
+    return 2 * AppSpace.cardPadding +
+        (glyph == null ? 0 : AppShape.iconTileSize + AppSpace.s13) +
+        math.max(
+          singleLineTextWidth(context, value, valueStyle),
+          singleLineTextWidth(context, label, labelStyle),
+        );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,15 +85,15 @@ class AyreStatTile extends StatelessWidget {
                       value: count.toDouble(),
                       from: animate ? 0 : count.toDouble(),
                       format: (number) => number.round().toString(),
-                      fontSize: 34,
-                      fontWeight: FontWeight.w800,
+                      fontSize: _figureSize,
+                      fontWeight: _figureWeight,
                     )
                   else
                     Text(
                       value,
                       style: AppTypo.num(
-                        fontSize: 34,
-                        fontWeight: FontWeight.w800,
+                        fontSize: _figureSize,
+                        fontWeight: _figureWeight,
                         color: t.textPrimary,
                       ),
                     ),

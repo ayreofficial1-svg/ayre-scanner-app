@@ -66,6 +66,14 @@ class Signal {
   final num? stop;
   final String? addedOn;
 
+  double? get potentialReturnPct {
+    final entry = this.entry;
+    final exit = exitPrice;
+    if (entry == null || exit == null || entry <= 0 || exit <= 0) return null;
+    final change = (exit - entry) / entry * 100;
+    return change.isFinite ? change : null;
+  }
+
   static Signal? tryParse(Map<String, dynamic> json) {
     final symbol = _str(json, const ['symbol', 'ticker', 'scrip']);
     if (symbol == null || symbol.isEmpty) return null;

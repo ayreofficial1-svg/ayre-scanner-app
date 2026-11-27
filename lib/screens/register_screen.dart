@@ -172,9 +172,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         strokeWidth: 2,
                       ),
                       const SizedBox(width: AppSpace.xs),
-                      Text(
-                        'Passwords match',
-                        style: AppTypo.caption(t, color: t.positiveText),
+                      Flexible(
+                        child: Text(
+                          'Passwords match',
+                          style: AppTypo.caption(t, color: t.positiveText),
+                        ),
                       ),
                     ],
                   ),

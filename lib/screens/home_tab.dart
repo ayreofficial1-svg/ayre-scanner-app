@@ -18,6 +18,7 @@ import '../widgets/ayre_signals_section.dart';
 import '../widgets/ayre_tab_scroll.dart';
 import '../widgets/pressable_scale.dart';
 import '../widgets/recommendations_gate.dart';
+import '../widgets/responsive.dart';
 import '../widgets/state_views.dart';
 import 'home_shell.dart' show initialsFor;
 import 'insight_note_screen.dart';
@@ -287,6 +288,29 @@ class _Header extends StatelessWidget {
     final resolved = name.trim();
     final now = DateTime.now();
     final date = _dateFor(now);
+    const brand = 'investee';
+    const brandMarkWidth = 23.0;
+    final brandStyle = AppTypo.display(
+      fontSize: 22,
+      height: 1,
+      color: mast.ink,
+    );
+    final wordmark = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Image.asset(
+          'assets/brand/investee_mark_on_dark.png',
+          width: brandMarkWidth,
+          height: 17,
+          fit: BoxFit.contain,
+          excludeFromSemantics: true,
+        ),
+        const SizedBox(width: AppSpace.s8),
+        Flexible(
+          child: Text(brand, semanticsLabel: 'Investee', style: brandStyle),
+        ),
+      ],
+    );
     final controls = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -337,42 +361,35 @@ class _Header extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Image.asset(
-                        'assets/brand/investee_mark_on_dark.png',
-                        width: 23,
-                        height: 17,
-                        fit: BoxFit.contain,
-                        excludeFromSemantics: true,
-                      ),
-                      const SizedBox(width: AppSpace.s8),
-                      Text(
-                        'investee',
-                        semanticsLabel: 'Investee',
-                        textScaler: TextScaler.noScaling,
-                        style: AppTypo.display(
-                          fontSize: 22,
-                          height: 1,
-                          color: mast.ink,
-                        ),
-                      ),
-                    ],
-                  ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final brandWidth =
+                brandMarkWidth +
+                AppSpace.s8 +
+                singleLineTextWidth(context, brand, brandStyle);
+            const controlsWidth = 2 * AppSpace.minTarget + AppSpace.xxs;
+            if (brandWidth + AppSpace.s8 + controlsWidth <=
+                constraints.maxWidth) {
+              return Row(
+                children: [
+                  Expanded(child: wordmark),
+                  const SizedBox(width: AppSpace.s8),
+                  controls,
+                ],
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                wordmark,
+                const SizedBox(height: AppSpace.xxs),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: controls,
                 ),
-              ),
-            ),
-            const SizedBox(width: AppSpace.s8),
-            controls,
-          ],
+              ],
+            );
+          },
         ),
         const SizedBox(height: AppSpace.s13),
         Text(_greetingFor(now), style: AppTypo.subtitle(t, color: mast.muted)),
